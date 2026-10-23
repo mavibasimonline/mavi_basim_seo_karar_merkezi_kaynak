@@ -1,8 +1,10 @@
+let previousQuestionId;
+let questionMonth;
 const $ = (id) => document.getElementById(id);
 const number = (value) => value == null ? 'Veri yok' : new Intl.NumberFormat('tr-TR', {maximumFractionDigits:2}).format(value);
 const node = (tag, text, className) => { const e=document.createElement(tag); if(text!=null)e.textContent=text;if(className)e.className=className;return e; };
 async function api(path, options={}) { const response=await fetch(path,{...options,headers:{'Content-Type':'application/json',...options.headers}});const data=response.status===204?null:await response.json();if(!response.ok){if(response.status===401)showLogin();throw new Error(data?.error||'İstek tamamlanamadı.');}return data; }
-function showLogin(){ $('login').hidden=false;$('dashboard').hidden=true;$('logout').hidden=true; }
+function showLogin(){ previousQuestionId=undefined;questionMonth=undefined; $('login').hidden=false;$('dashboard').hidden=true;$('logout').hidden=true; }
 function detail(title,...contents){const e=node('details');e.append(node('summary',title),...contents);return e;}
 const list=(values)=>{const ul=node('ul');values.forEach(value=>ul.append(node('li',value)));return ul;};
 const deviceName=(value)=>({MOBILE:'Mobil',DESKTOP:'Masaüstü',TABLET:'Tablet'}[value]||value);
@@ -26,7 +28,10 @@ function performanceView(p){
 function answerView(answer){
   const parts=[node('p',`Kaynak: ${answer.source}. Ölçüm: ${answer.measured_at}. Dönem: ${answer.period.start} – ${answer.period.end}.`),node('p',`Sayfa: ${answer.url||'Bu soru için doğrulanmış sayfa ölçümü yok'}. Cihaz: ${deviceName(answer.device)||'Soru kapsamı'}.`),
     node('p',`Tıklama: ${number(answer.current?.clicks)}; önceki dönem: ${number(answer.previous?.clicks)}.`),list(answer.missing||[]),list(answer.limitations||[])];
-  if(answer.products)parts.push(list(answer.products.map(p=>`${p.name}: ${p.queries.map(q=>q.query).join(', ')||'Mevcut çalışma korunmalı'}. ${p.risk}`)));
+  if(answer.products)parts.push(list(answer.products.map(p=>`${p.name} · ${p.url||'URL doğrulanmadı'}: ${number(p.current?.clicks)} tıklama; önceki ${number(p.previous?.clicks)}. ${(p.queries||[]).filter(q=>q.protect).map(q=>q.query).join(', ')||''} ${p.risk||''} ${(p.missing||[]).join(' ')}`)));
+  if(answer.items)parts.push(list(answer.items.map(r=>`${r.name} · ${r.url} · ${r.query}: ${number(r.current?.clicks)} tıklama, ${number(r.current?.impressions)} gösterim, CTR ${number(r.current?.ctr)}, ortalama konum ${number(r.current?.position)}. ${r.risk}`)));
+  if(answer.history)parts.push(list(answer.history.map(r=>`${r.url}: tespit ${r.observed_from} – ${r.observed_to}; yayın tarihi ${r.published_at||'bilinmiyor'}.`)));
+  if(answer.outcomes)parts.push(list(answer.outcomes.map(r=>`${r.name} · ${r.url} · ${r.days} gün: ${r.status==='measured'?'ölçüldü; nedensellik doğrulanamadı':'veri bekleniyor'}.`)));
   if(answer.rows)parts.push(list(answer.rows.map(r=>`${r.city} / ${r.device}: ${number(r.sessions)} organik oturum.`)));
   return detail('Kaynak, tarih ve ölçüm',...parts);
 }
@@ -52,6 +57,6 @@ const last=new Date();last.setUTCDate(1);last.setUTCMonth(last.getUTCMonth()-1);
 $('login').addEventListener('submit',async e=>{e.preventDefault();try{await api('/api/session',{method:'POST',body:JSON.stringify({token:$('token').value})});$('token').value='';await load();}catch(e){$('message').textContent=e.message;}});
 $('refresh').addEventListener('click',load);
 $('logout').addEventListener('click',async()=>{try{await api('/api/session',{method:'DELETE'});showLogin();}catch(e){$('message').textContent=e.message;}});
-$('question').addEventListener('submit',async e=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const answer=await api('/api/questions',{method:'POST',body:JSON.stringify({question:$('questionText').value,month:$('month').value})});$('answer').replaceChildren(node('h2','Kanıta dayalı yanıt'),node('p',answer.text),answerView(answer));$('answer').hidden=false;}catch(e){$('message').textContent=e.message;}finally{button.disabled=false;}});
+$('question').addEventListener('submit',async e=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const answer=await api('/api/questions',{method:'POST',body:JSON.stringify({question:$('questionText').value,month:$('month').value,...(questionMonth===$('month').value&&previousQuestionId?{previous_question_id:previousQuestionId}:{})})});previousQuestionId=answer.question_id;questionMonth=$('month').value;const sections=answer.sections; $('answer').replaceChildren(node('h2','Kanıta dayalı yanıt'),node('h3','Ne oldu?'),node('p',answer.text),...(sections?[node('h3','Olası açıklamalar'),list(sections.explanations),node('h3','Ne yapmalıyım?'),node('p',sections.action),node('p',`Güven düzeyi: ${sections.confidence}`)]:[]),answerView(answer));$('answer').hidden=false;}catch(e){$('message').textContent=e.message;}finally{button.disabled=false;}});
 $('google').addEventListener('click',async()=>{try{const data=await api('/api/oauth/google/start',{method:'POST'});const url=new URL(data.authorization_url);if(url.origin==='https://accounts.google.com')location.assign(url.href);}catch(e){$('message').textContent=e.message;}});
 load();
