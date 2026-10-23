@@ -1,0 +1,3 @@
+# Güvenlik düzeltme kaydı
+
+2026-10-23: PR #4 CI, yerel önceki başarılı audit sonrasında GHSA-4qv8-2p9j-2685 ve GHSA-f72v-6w45-q472 nedeniyle durdu (4 moderate bağımlılık zinciri bildirimi). GitHub advisory verisi 7.x için ilk düzeltilen sürümün undici 7.30.1 olduğunu doğruladı. Miniflare alt bağımlılığı bu sürüme sabitlendi; plugin düşürme/force veya denetimi kapatma uygulanmadı. Frozen npm ci ve npm audit --audit-level=moderate yeniden geçti: 0 açık. Bu değişiklik en alt geliştirme dalından sonraki dallara normal merge ile taşınır; main ve Git geçmişi yeniden yazılmaz. Yeni CI sonuçları ayrıca kontrol edilir. Önceki raporlardaki sıfır açık, o denetim anındaki sonuçtur.
