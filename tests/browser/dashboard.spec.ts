@@ -16,6 +16,7 @@ test('real local database, secure login, all products and truthful disconnected 
   const first=page.locator('.product').first();await first.getByText('Kanıt, hesaplama ve eksikler',{exact:true}).click();
   await expect(first.locator('details').first()).toContainText('Kanıt güveni');
   const source=page.locator('.product').filter({has:page.getByRole('heading',{name:'Broşür',exact:true})});
+  await source.getByText('SEO değişiklik geçmişi',{exact:true}).click();await expect(source).toContainText('Doğrulanmış tarama değişikliği yok.');
   await source.getByText(/Keyword Planner kaynakları/).click();await expect(source).toContainText('Yaklaşık aylık arama');
   await page.getByPlaceholder('Broşür mobilde neden düştü?').fill('Broşür mobilde neden düştü?');await page.getByRole('button',{name:'Sor',exact:true}).click();
   await expect(page.locator('#answer')).toContainText('kanıtlayamam');await expect(page.locator('#answer')).toContainText('kanıt');
