@@ -1,5 +1,7 @@
 # Mavi Basım SEO Karar Merkezi
 
+Üretime geçiş: [hesap/dağıtım/OAuth yönergesi](docs/PRODUCTION.md), [ilk gerçek veri kabulü](docs/PRODUCTION_ACCEPTANCE.md), [main ve güvenlik denetimi](docs/RELEASE_REVIEW.md). Çalışan uygulama korunur; üretim kaynakları bu oturumda oluşturulmadı.
+
 Türkçe tek ekran paneli, Cloudflare Worker API'si, D1/SQLite veri modeli, günlük Google senkron kuyruğu, salt okunur site tarayıcısı ve kanıtla sınırlanan karar motoru. Ücretli LLM veya ücretli API zorunluluğu yoktur. Uygulama canlı siteye yazmaz.
 
 **Gerçek durum:** Uygulama yerel Workers/D1 ortamında çalıştırıldı ve otomatik testlerden geçti. Kaynak CSV'ler gerçektir. Google hesabı bağlanmadı, canlı tarama bu ortamın ağ politikası nedeniyle doğrulanamadı ve Cloudflare üretim dağıtımı yapılmadı. Panel eksik bağlantıyı **Veri bekle** olarak gösterir. Testlerdeki sentetik Google yanıtları yalnızca test fixtures içindedir; gerçek kullanıcı veritabanına yüklenmez.
@@ -87,7 +89,7 @@ Keyword Planner otomasyonu yalnızca `ENABLE_GOOGLE_ADS=true`, geçerli ve o tar
 
 Üretim dağıtımı veya ücretli hizmet etkinleştirmesi bu oturumda yapılmadı. D1 kimliği güvenli yerel geliştirme için sıfır yer tutucudur; gerçek hesapta D1 oluşturulup kimlik ve ayrı uygulama alan adı tanımlanmadan dağıtmayın. `workers_dev=false`; canlı `mavibasim.com` için route tanımlanmaz. İlgili hesap erişimiyle geliştirici sırasıyla migration'ları ve kaynak SQL'ini gerçek D1'e uygulamalı, gizli değerleri `wrangler secret put` ile girmeli, ayrı SEO uygulamasını dağıtmalı ve gerçek GSC/GA4/cron/geri dönüş kabulünü yapmalıdır.
 
-Ücretsiz plan seçimi, mevcut D1 depolaması/satır okuma-yazma, Workers CPU/istek ve GitHub Actions dakika/artifact kullanımı hesap panelinden doğrulanmalıdır. Bu ortamdan resmi Cloudflare fiyat/limit sayfaları 403 döndüğü için güncel kotalar doğrulanmış sayılmaz. Kod ücretli planı açmaz veya kota artışı satın almaz. CI tek Linux işi, iptal edilebilir eşzamanlılık, 12 dakika üst sınır ve matris kullanmadan çalışır. Yedek işi 8 dakika sınırı ve 7 gün saklama kullanır; bunlar sınırsız ücretsiz kullanım garantisi değildir. Bütçe/harcama limitleri hesapta kontrol edilmeden ücretli plan kullanılmamalıdır.
+Ücretsiz plan seçimi, mevcut D1 depolaması/satır okuma-yazma, Workers CPU/istek ve GitHub Actions dakika/artifact kullanımı hesap panelinden doğrulanmalıdır. Cloudflare doküman sitesine 403 alınsa da resmi doküman GitHub deposundan Free sınırları doğrulandı; kesin kaynak commit'i ve limitler üretim yönergesindedir. Hesabın kalan kotası ve 10 ms CPU uyumu henüz ölçülmedi. Kod ücretli planı açmaz veya kota artışı satın almaz. CI tek Linux işi, iptal edilebilir eşzamanlılık, 12 dakika üst sınır ve matris kullanmadan çalışır. Yedek işi 8 dakika sınırı ve 7 gün saklama kullanır; bunlar sınırsız ücretsiz kullanım garantisi değildir.
 
 Gerekli ağ hedefleri: `mavibasim.com`, `accounts.google.com`, `oauth2.googleapis.com`, `www.googleapis.com`, isteğe bağlı `analyticsdata.googleapis.com`, `googleads.googleapis.com`; dağıtım/yedek için Cloudflare API. Mevcut ortamda canlı site isteği 403 ile engellendi. Güvenlik kontrolleri veya TLS doğrulaması kapatılmadı.
 

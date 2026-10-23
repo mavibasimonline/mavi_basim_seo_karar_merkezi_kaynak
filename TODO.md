@@ -1,5 +1,17 @@
 # Durum, teslim denetimi ve devam kaydı
 
+## Üretime geçiş hazırlığı — güncel
+
+Yeni özellik eklenmedi; mevcut `src/`, `public/`, migration'lar ve 521 CSV korundu. Main farkı/çatışma kontrolü, bağımlılık güvenlik düzeltmeleri, SHA sabitli CI, ayrı üretim yapılandırması, OAuth/Free plan/rollback yönergesi ve gerçek veri kabul araçları hazır. Güncel sonuç: **42 Workers + 16 Python + 2 tarayıcı = 60 test geçti**, tüm bağımlılıklarda npm audit 0. Önceki 52 testlik kayıt aşağıda geliştirme aşamasının tarihçesidir.
+
+Üretim dosyaları `docs/PRODUCTION.md`, `docs/PRODUCTION_ACCEPTANCE.md`, `docs/RELEASE_REVIEW.md` ve `deploy/` altında. Gerçek kimlikler yokken --ready kapısı geçmez. Yerel ayrı üretim D1 provasında 3 migration ve 521/9.075 kaynak doğrulandı.
+
+PR açıklaması `docs/PULL_REQUEST.md` içinde somut hazır. GitHub API ağı proxy 403 ile engellendiği için PR oluşturma ve uzak CI sonucu henüz tamamlanamadı; Git erişimi çalışıyor. Kullanıcıya yalnızca gerekli API ağ erişimi soruldu. Erişim açılınca mevcut kimlikle PR/Actions tekrar denenmeli; yeni token gerekip gerekmediği henüz belirlenmedi.
+
+Yalnızca dış yetki bekleyenler: GitHub API HTTPS erişimi; Cloudflare Workers Free hesap/D1/Worker secret erişimi; Google OAuth projesi ve mevcut GSC mülküne okuma+consent; dar kapsamlı yedek erişimi ve bağımsız anahtar. Uzak kaynak/Google bağlantısı/üretim yayını yapılmadı, ücretli hizmet açılmadı. Son hazırlık commit'i için `git log -1 --oneline` kullanın.
+
+## Önceki uygulama geliştirme kaydı
+
 Uygulama yerel Workers/D1 ortamında çalışıyor. Gerçek kaynaklar içe aktarıldı. Google hesabı bağlı değil; canlı tarama, üretim dağıtımı ve uzak yedekleme doğrulanmadı. Canlı siteye yazılmadı, ücretli hizmet açılmadı.
 
 Dal: `feat/seo-karar-merkezi`. Son doğrulanmış uygulama commit'i: `f112b46`; motor: `1.1.1`. Bu durum belgesini içeren commit için `git log -1 --oneline` kullanın. Kod aynı dalda GitHub'a gönderildi; main'e birleştirme yapılmadı.
