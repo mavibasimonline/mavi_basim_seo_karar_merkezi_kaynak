@@ -1,0 +1,118 @@
+# Mavi Basım SEO Karar Merkezi
+
+Üretime geçiş: [hesap/dağıtım/OAuth yönergesi](docs/PRODUCTION.md), [ilk gerçek veri kabulü](docs/PRODUCTION_ACCEPTANCE.md), [main ve güvenlik denetimi](docs/RELEASE_REVIEW.md). Çalışan uygulama korunur; üretim kaynakları bu oturumda oluşturulmadı.
+
+Türkçe tek ekran paneli, Cloudflare Worker API'si, D1/SQLite veri modeli, günlük Google senkron kuyruğu, salt okunur site tarayıcısı ve kanıtla sınırlanan karar motoru. Ücretli LLM veya ücretli API zorunluluğu yoktur. Uygulama canlı siteye yazmaz.
+
+**Gerçek durum:** Uygulama yerel Workers/D1 ortamında çalıştırıldı ve otomatik testlerden geçti. Kaynak CSV'ler gerçektir. Google hesabı bağlanmadı, canlı tarama bu ortamın ağ politikası nedeniyle doğrulanamadı ve Cloudflare üretim dağıtımı yapılmadı. Panel eksik bağlantıyı **Veri bekle** olarak gösterir. Testlerdeki sentetik Google yanıtları yalnızca test fixtures içindedir; gerçek kullanıcı veritabanına yüklenmez.
+
+## Kaynakların sonucu
+
+| Ölçüm | Doğrulanan değer |
+|---|---:|
+| Ana ürün grubu / ürün klasörü | 4 / 29 |
+| Orijinal UTF-16, sekme ayrımlı CSV | 521 |
+| Kaynak satırı | 9.075 |
+| Ürün + özgün kelime sayısı | 6.765 |
+| Birden fazla gözlemi bulunan ürün + kelime | 1.300 |
+| Tekrarlanan aynı kaynak gözlemi | 1.678 |
+| Farklı yazımları bulunan kelime aileleri | 54 |
+| Bozuk satır / aynı dosyada özdeş satır | 0 / 0 |
+| Ortalama araması boş gözlem | 4.169 |
+| Boş aylık arama hücresi | 212.148 |
+
+[Kaynak denetimi](docs/source-audit.json) her dosyanın özgün yolu, SHA-256, dışa aktarım tarihi/kapsamı ve tekrar eden kelimelerin listesini içerir. Boş hücreler sıfıra çevrilmez. Kaynakta bulunmayan lokasyon, dil, arama ağı ve dışa aktarım saat dilimi **bilinmiyor** olarak kalır. Reklamveren rekabeti organik SEO zorluğu değildir. Aynı kelimenin tekrarları ve `baskı`/`baski` varyantları toplanmaz.
+
+Yalnızca proje yönergelerinde belirtilen `/brosur` ve `/el-ilani` başlangıçta ürünlere eşlenir; canlı doğrulama yapılmış sayılmaz. Diğer URL'ler uydurulmaz. Tarayıcı bir ürünün birebir klasör kimliğine sahip URL'sini 200 ve kendisine işaret eden canonical ile gördüğünde eşlemeyi kanıtla kaydeder. Farklı ürünler arasında canonical/URL birleştirme otomatik yapılmaz. Henüz eşlenmemiş ürünlerin kaynakları arşivlenir, arama performansı için karar verilmez.
+
+## Yerelde çalıştırma
+
+Gereksinimler: Node.js 24, Python 3.12 ve npm. Mevcut checkout kullanılabilir; worktree gerekmez.
+
+```sh
+npm ci --no-fund
+python3 scripts/local_secrets.py
+npm run db:migrate
+npm run data:import
+npm run dev
+```
+
+Giriş anahtarı yalnızca yerel, Git tarafından yok sayılan `.dev.vars` dosyasındadır. Geliştirici dosyayı kendi güvenli editöründe açabilir; anahtarları sohbet veya loglara yapıştırmayın. Oluşturucu var olan dosyayı değiştirmez. Google ayarlarının adları `.env.example` içindedir; Workers geliştirmesinde gerçek değerler `.dev.vars` içinde tutulur. `npm run data:import` tekrarlanabilir; özgün kaynaklara yazmaz. Ayrıntılı yerel aktarım çıktısı `.local/import.log` dosyasına gider.
+
+```sh
+npm run check
+npm run test:e2e
+```
+
+`check`: Workers ve tarayıcı testlerinin tip kontrolü, Workers/D1 otomatik testleri, bütün kaynakların içe aktarımı ve şifreli yedek/geri dönüş Python testleri, gerçek Worker paketleme denetimi. `test:e2e`: gerçek yerel veritabanıyla Chromium'da masaüstü ve mobil giriş/panel/kaynak/soru/indirme/çıkış. Sistem Chromium'u varsayılan `/usr/bin/chromium`; farklı kurulumda `CHROMIUM_PATH` belirtin. CI Ubuntu Chrome yolunu kullanır. Tarayıcı testi için ilk veri aktarımı gereklidir.
+
+## Mimari ve veri güvenilirliği
+
+- `migrations/`: foreign key, benzersizlik, negatif/sınır değer ve değişmez snapshot kuralları. Şema kaynakları, sayfaları, Google ölçümlerini, görev/hata kayıtlarını, SEO hafızasını, analiz kanıtlarını ve öneri sonuçlarını ayırır.
+- `scripts/import_keywords.py`: standart Python ile salt okunur kaynak denetimi ve D1 SQL üretimi. Her gözlem dosya hash'i, özgün hücreler ve satır numarasıyla izlenebilir.
+- `src/google.ts`, `security.ts`: salt okunur OAuth kapsamları, tek kullanımlık state, HttpOnly/Secure oturum, kaynak denetimi, giriş deneme sınırı ve AES-256-GCM token şifreleme. GA4 kapsamı yalnızca GA4 yapılandırılmışsa istenir. Ads kapsamı ayrıca açıkça etkinleştirilmelidir. Token ve API hata gövdeleri loglanmaz.
+- `src/providers.ts`, `sync.ts`: GSC tarih/sayfa/sorgu/ülke/cihaz ve GA4 Organic Search şehir/cihaz/açılış sayfası adaptörleri. Sorgu ve sayfa toplamları ayrı tutulur; GA4 dönüşüm tanımları doğrulanmadığından key events **null** kalır. Sayfalama, veri tipi, tarih, metrik tutarlılığı ve kapsam denetlenir.
+- `src/crawler.ts`: robots önceliği, siteye özel istek aralığı, sitemap ve dahili bağlantı keşfi. Başlık, meta açıklama, H1–H6, canonical, robots, X-Robots-Tag, hreflang, JSON-LD, görsel alt metni, iç bağlantılar ve statik içerik hash'i saklanır. Ağ/yönlendirme güvenliği için yalnızca `https://mavibasim.com` hedeflenir; başka alan adına veya özel IP'ye gidilmez. Yönlendirme hedefi ayrı kuyruğa alınır.
+- `src/analysis.ts`, `validation.ts`: belirlenimci motor ve bağımsız SQL hesap kontrolü. Kanıtsız, yarım, eski veya sayfa/sorgu kapsamı eksik veride karar durur. Her rapor motor sürümü, kaynak veri kümesi, tarih, URL, cihaz, filtre ve formülle saklanır. Yeni veri veya başarısız sağlık kontrolü rapor önbelleğini geçersiz kılar.
+- `src/outcomes.ts`: uygulama beyanını eski/yeni değerlerle kaydeder; 7/28/60/90 gün sonra tam günlük kapsam varsa hedefi diğer sayfalarla karşılaştırır. Uygulama günü ve Google gecikmesi dışarıda tutulur. Kullanıcı beyanı doğrulanmış CMS yayın kaydı sayılmaz. Sonuç nedensellik iddiası içermez.
+- `src/questions.ts`, `public/`: veritabanı sonuçlarına dayalı Türkçe ürün, cihaz, şehir ve koruma soruları. Sayısal değer üreten LLM yoktur. Serbest biçimli bütün Türkçe soruları anlama iddiası yoktur.
+
+## Karar kuralları
+
+Önceki ay, önceki 3/6/12 ay ve geçen yılın aynı ayı veri kapsamı ayrı denetlenir. Eksik geçmiş dönemler **complete=false** ve **null** olarak raporlanır. Gün sayıları ve günlük ortalamalar görünürdür. GSC günleri Pasifik, GA4 günleri mülk saat dilimindedir; eşdeğer metrik gibi birleştirilmez.
+
+Tam dönem, en az üç günlük kesinleşme bekleme süresi, taze GSC doğrulaması (72 saat), sorgu kapsamı ve her iki dönemde gözlenen ürün sayfası gereklidir. Google bağlantı/sağlık sorunu varsa karar verilmez. GSC anonimleştirme ve üst satır sınırı nedeniyle görünür sorgular tüm sorgular değildir; kayıp sorgu **null** kalır.
+
+Başlangıç eşikleri denetlenebilir muhafazakâr kurallardır; istatistiksel anlamlılık veya neden kanıtı değildir: 30 ve en az %20 tıklama kaybı veya 300 ve en az %30 gösterim kaybı **İncele**; 100 gösterimin altı **Veri bekle**. 2→1 tıklama krize dönüşmez. CTR düşüşü artan gösterimle birlikte tek başına başarısızlık değildir. Mobil kayıp toplam masaüstü artışıyla gizlenmez. İyi performans veren veya geçmişte güçlü olup güncel sorgu kaydı eksik kelimeler korunur.
+
+**İyileştir** durumu şemada desteklenir; bu sürüm yeterli teknik/niyet kanıtı olmayan başlık, URL veya içerik değişikliği önermek yerine **İncele** üretir. Noindex veya farklı canonical tek başına otomatik düzeltme gerekçesi sayılmaz.
+
+## Otomatik çalışma ve günlük denetim
+
+`wrangler.jsonc` 15 dakikalık Cron içerir. **Cloudflare'a dağıtılınca** bilgisayar kapalıyken çalışır; yerel geliştirmede zamanlayıcı kendiliğinden tetiklenmez. Günlük tekilleştirilmiş planlama:
+
+1. Son kesinleşmiş günler yeniden uzlaştırılır. İlk geçmiş aktarımı her gün en fazla 90 günlük yeni görev ekleyerek 400 güne kadar ilerler; ücretsiz bütçe için istekler parçalara ayrılır.
+2. Her işte en fazla 200 Google satırı alınır. Veriler yeni veri kümesine yazılır; son sayfa ve satır sayısı doğrulanmadan aktif küme değiştirilmez. Hatalı veya eksik yeni aktarım eskisini bozmaz.
+3. İş kiralama ve token kontrolü eşzamanlı tekrarları sınırlar. 429/5xx/ağ hataları jitter, Retry-After ve üstel beklemeyle yeniden denenir. Altı başarısız denemeden sonra durur; günlük kontrol veya OAuth yeniden bağlama uygun işi tekrar açar. Hata kodu, deneme, zaman ve imleç saklanır.
+4. Her saatin `:45` dilimi taramaya ayrılır; her dört saatte bir sonuç ölçümü için ayrı dilim vardır. Uzun Google geçmiş aktarımı bu işleri süresiz bekletmez.
+5. Panel tamamlanmış günlük kapsamı, gecikmeleri, kuyruğu ve bağlantı hatalarını gösterir. İlk geçmiş aktarımı tamamlanana kadar raporların beklemesi beklenen davranıştır.
+
+Kaynak/istek sınırları: tek site, en az 5 saniye tarama aralığı (robots daha uzunsa o süre), 1.500.000 bayt sayfa, 2.000 URL/sitemap, 1.000 URL kuyruk, tur başına en fazla 20 yeni URL ve bağlantı derinliği 4. Sınırı aşan sitemap hata kaydına girer; kapsam tamamlandı denmez. JS render, gerçek cihaz hız ölçümü ve tüm sitemap boyutları bu sürümde desteklenmez. Veri saklama maliyeti için üretim büyüklüğünde ölçüm hâlâ gereklidir.
+
+## Google bağlantısı — henüz gerçek hesapla doğrulanmadı
+
+Sunucuda `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `TOKEN_ENCRYPTION_KEY`, `ADMIN_TOKEN` ayarlanır. Google Cloud'da Search Console API etkin ve OAuth yönlendirme URI'si tam eşleşmelidir; hesap GSC mülkünü okuyabilmelidir. Panelde bir kez Google bağlantısı verilir. GA4 için Data API ve sayısal `GA4_PROPERTY_ID` gerekir; sonradan eklendiyse kapsam için tekrar izin verilir. Kullanıcıdan günlük dosya veya komut istenmez.
+
+Keyword Planner otomasyonu yalnızca `ENABLE_GOOGLE_ADS=true`, geçerli ve o tarihte desteklenen `GOOGLE_ADS_API_VERSION`, Ads müşteri kimliği, onaylı developer token ve uygun OAuth/hesap erişimiyle açılır. Adaptör yalnızca geçmiş metrik okuma çağrısı yapar; kampanya oluşturmaz. TR/Türkçe/Google Search kapsamını CSV'nin bilinmeyen kapsamına eşdeğer saymaz. Google'ın `closeVariants` birleştirmesi özgün yanıtla saklanır, tekrar toplanmaz. Bu erişim mevcut olmadığından otomatik yeni Planner verisi çekildiği iddia edilmez.
+
+## Dağıtım, ücretsiz kullanım ve yetkiler
+
+Üretim dağıtımı veya ücretli hizmet etkinleştirmesi bu oturumda yapılmadı. D1 kimliği güvenli yerel geliştirme için sıfır yer tutucudur; gerçek hesapta D1 oluşturulup kimlik ve ayrı uygulama alan adı tanımlanmadan dağıtmayın. `workers_dev=false`; canlı `mavibasim.com` için route tanımlanmaz. İlgili hesap erişimiyle geliştirici sırasıyla migration'ları ve kaynak SQL'ini gerçek D1'e uygulamalı, gizli değerleri `wrangler secret put` ile girmeli, ayrı SEO uygulamasını dağıtmalı ve gerçek GSC/GA4/cron/geri dönüş kabulünü yapmalıdır.
+
+Ücretsiz plan seçimi, mevcut D1 depolaması/satır okuma-yazma, Workers CPU/istek ve GitHub Actions dakika/artifact kullanımı hesap panelinden doğrulanmalıdır. Cloudflare doküman sitesine 403 alınsa da resmi doküman GitHub deposundan Free sınırları doğrulandı; kesin kaynak commit'i ve limitler üretim yönergesindedir. Hesabın kalan kotası ve 10 ms CPU uyumu henüz ölçülmedi. Kod ücretli planı açmaz veya kota artışı satın almaz. CI tek Linux işi, iptal edilebilir eşzamanlılık, 12 dakika üst sınır ve matris kullanmadan çalışır. Yedek işi 8 dakika sınırı ve 7 gün saklama kullanır; bunlar sınırsız ücretsiz kullanım garantisi değildir.
+
+Gerekli ağ hedefleri: `mavibasim.com`, `accounts.google.com`, `oauth2.googleapis.com`, `www.googleapis.com`, isteğe bağlı `analyticsdata.googleapis.com`, `googleads.googleapis.com`; dağıtım/yedek için Cloudflare API. Mevcut ortamda canlı site isteği 403 ile engellendi. Güvenlik kontrolleri veya TLS doğrulaması kapatılmadı.
+
+## Yedek ve geri dönüş
+
+Yerel doğrulama bütün 29 ürün / 521 dosya / 9.075 satırı ayrı geçici SQLite'a geri yükler. Arşiv gzip + AES-256-GCM ile kimliği doğrulanarak şifrelenir; yanlış anahtar ve bozulma reddedilir. Yedek anahtarı OAuth şifreleme anahtarından ayrı, 32 bayt base64 olmalıdır; yedeklerle aynı yerde tutulmamalıdır.
+
+```sh
+node scripts/run.mjs wrangler d1 export seo --local --output .local/backup.sql
+# BACKUP_ENCRYPTION_KEY güvenli süreç ortamında sağlanmış olmalı; değerini komuta yazmayın.
+node scripts/backup.mjs encrypt .local/backup.sql .local/backup.mavi
+node scripts/backup.mjs decrypt .local/backup.mavi .local/restore.sql
+python3 scripts/verify_restore.py --sql .local/restore.sql
+```
+
+Şifreleme aracı mevcut çıktı dosyasının üzerine yazmaz. Gerçek felaket kurtarmada önce ayrı D1'e geri yükleyip ilişki, satır sayıları, OAuth anahtarı ve uygulama kabulünü doğrulayın; mevcut üretim veritabanını doğrudan ezmeyin. Anahtar kaybolursa şifreli token/yedek çözülemez; Google yeniden bağlama ve saklanan bağımsız anahtar gerekir.
+
+`.github/workflows/backup.yml` günlük uzak D1 export, şifreleme, ayrı SQLite'a geri yükleme denetimi ve yalnızca şifreli artifact saklama işini içerir. `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, ayrı `BACKUP_ENCRYPTION_KEY` ve gerçek D1 kimliği olmadan **yedek alınmadı** bildirip atlar. Otomatik üretim yedeklemesi henüz etkin değildir. Açık SQL, kullanıcı analizleri ve token'lar Git'e yüklenmez. Bağımsız ikinci yedek hedefi ve saklama politikası üretim öncesi belirlenmelidir.
+
+## API ve devam kaydı
+
+`/api/health` yalnızca servis durumunu açığa çıkarır. Diğer bütün veri endpoint'leri oturum veya Bearer yönetici anahtarı ister: `/api/report`, `/api/status`, `/api/questions`, `/api/keywords`, `/api/history`, `/api/inventory`, `/api/applied-changes`, `/api/outcomes`, `/api/export`. Değiştiren tarayıcı istekleri aynı origin kontrolüne tabidir. OAuth callback tek kullanımlık state ve ayrı HttpOnly cookie gerektirir. Kullanıcı soru ve performans verileri herkese açık endpoint'lerde bulunmaz.
+
+`/api/applied-changes` yalnızca geçmişte uygulanmış değişikliğin beyanını ve kanıtını kaydeder; site/CMS değiştirmez. Snapshot farkları için kesin yayın zamanı bilinmiyorsa `published_at=null`, `observed_from` ve `observed_to` kullanılır.
+
+Testler, gerçek entegrasyon engelleri ve sonraki somut işler [TODO.md](TODO.md) dosyasındadır. Kaynak kodu `feat/seo-karar-merkezi` dalında saklanır. Oturumun kendiliğinden yeniden başlatılacağına dair garanti yoktur.
