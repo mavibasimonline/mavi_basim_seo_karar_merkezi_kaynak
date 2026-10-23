@@ -51,7 +51,9 @@ export async function parseHTML(html: string, url: string, status = 200, headers
 }
 export function snapshotDiff(previous: Snapshot, next: Snapshot): Record<string,{old:unknown;new:unknown}> {
   const diff:Record<string,{old:unknown;new:unknown}>={};
-  for(const key of Object.keys(next) as (keyof Snapshot)[]) if(JSON.stringify(previous[key])!==JSON.stringify(next[key])) diff[key]={old:previous[key],new:next[key]};
+  // Error/redirect bodies do not prove that the site's title or content was removed.
+  const keys:(keyof Snapshot)[]=previous.status===200&&next.status===200?Object.keys(next) as (keyof Snapshot)[]:['status','redirect'];
+  for(const key of keys) if(JSON.stringify(previous[key])!==JSON.stringify(next[key])) diff[key]={old:previous[key],new:next[key]};
   return diff;
 }
 export function findings(snapshot: Snapshot, url: string): {code:string;severity:string;evidence:unknown}[] {
@@ -73,7 +75,7 @@ export function findings(snapshot: Snapshot, url: string): {code:string;severity
 }
 export async function saveSnapshot(env: Env, crawlId: string, url: string, snapshot: Snapshot, observed=nowISO()): Promise<string> {
   const id=crypto.randomUUID();
-  const previous=await env.DB.prepare('SELECT * FROM seo_snapshots WHERE url=? ORDER BY observed_at DESC,rowid DESC LIMIT 1').bind(url).first<{id:string;observed_at:string;snapshot_json:string}>();
+  const previous=await env.DB.prepare('SELECT * FROM seo_snapshots WHERE url=? AND (?<>200 OR json_extract(snapshot_json,\'$.status\')=200) ORDER BY observed_at DESC,rowid DESC LIMIT 1').bind(url,snapshot.status).first<{id:string;observed_at:string;snapshot_json:string}>();
   const statements=[env.DB.prepare('INSERT INTO seo_snapshots VALUES(?,?,?,?,?,?)').bind(id,crawlId,url,observed,await hash(JSON.stringify(snapshot)),JSON.stringify(snapshot))];
   if(previous){
     const diff=snapshotDiff(JSON.parse(previous.snapshot_json),snapshot);

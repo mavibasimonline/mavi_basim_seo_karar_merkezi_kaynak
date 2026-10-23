@@ -13,6 +13,9 @@ test('real local database, secure login, all products and truthful disconnected 
   await expect(page.locator('#summary')).toContainText('521');await expect(page.locator('#summary')).toContainText('9.075');
   await expect(page.locator('.badge').first()).toHaveText('Veri bekle');
   await page.getByText('SEO Fırsat Radarı',{exact:true}).click();
+  await page.getByText('SEO Değişiklik Takvimi',{exact:true}).click();
+  await page.locator('#showChanges').click();await expect(page.locator('#changeResults')).toContainText('Bu tarihte doğrulanmış değişiklik tespiti yok.');
+  await page.getByText('SEO Değişiklik Takvimi',{exact:true}).click();
   await expect(page.locator('#radarResults')).toContainText('Veri yetersizliği nedeniyle izlenenler');
   await expect(page.locator('#radarResults')).toContainText('Yeterli kanıtla belirlenen ürün yok.');
   await page.getByText('SEO Fırsat Radarı',{exact:true}).click();
