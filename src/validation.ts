@@ -21,6 +21,7 @@ export async function validateAnalysis(env:Env,report:AnalysisReport):Promise<st
       if(!actual&&expected)errors.push(`${product.id}:${period}:MISSING_MEASUREMENTS`);
       if(actual&&!expected)errors.push(`${product.id}:${period}:UNSUPPORTED_MEASUREMENTS`);
       if(actual&&expected)for(const key of ['clicks','impressions','ctr','position'] as const){
+        if(actual[key]!==null&&!Number.isFinite(actual[key]))errors.push(`${product.id}:${period}:${key}:NON_FINITE`);
         if((actual[key]===null)!==(expected[key]===null)||Math.abs((actual[key]||0)-(expected[key]||0))>0.000001)errors.push(`${product.id}:${period}:${key}:CALCULATION_MISMATCH`);
       }
     }
@@ -29,6 +30,7 @@ export async function validateAnalysis(env:Env,report:AnalysisReport):Promise<st
       if(query.protect&&!product.risk.includes('korunmalı'))errors.push(`${product.id}:PROTECTION_WARNING_MISSING`);
     }
     if(!['Koru','İncele','İyileştir','Veri bekle'].includes(product.decision))errors.push(`${product.id}:UNKNOWN_DECISION`);
+    if(product.decision==='İyileştir')errors.push(`${product.id}:UNSUPPORTED_IMPROVEMENT`);
   }
   return errors;
 }

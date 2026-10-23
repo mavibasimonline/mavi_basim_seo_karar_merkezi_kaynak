@@ -79,14 +79,20 @@ async function storePage(env: Env, job: Job, rows: GscRow[] | Ga4Row[], next: nu
     statements.push(env.DB.prepare(`INSERT INTO dataset_coverage(provider,day,scope,dataset_id,complete,query_partial,row_count,fetched_at,notes)
       SELECT provider,day,scope,generation,CASE WHEN (SELECT count(*) FROM ${table} WHERE dataset_id=sync_jobs.generation)=? THEN ? ELSE 0 END, ?, (SELECT count(*) FROM ${table} WHERE dataset_id=sync_jobs.generation),?,?
       FROM sync_jobs WHERE id=? AND lease_token=? AND status='running'
-      ON CONFLICT(provider,day,scope) DO UPDATE SET dataset_id=excluded.dataset_id,complete=excluded.complete,query_partial=excluded.query_partial,row_count=excluded.row_count,fetched_at=excluded.fetched_at,notes=excluded.notes`)
+      ON CONFLICT(provider,day,scope) DO UPDATE SET dataset_id=excluded.dataset_id,complete=excluded.complete,query_partial=excluded.query_partial,row_count=excluded.row_count,fetched_at=excluded.fetched_at,notes=excluded.notes
+      WHERE excluded.complete=1 OR dataset_coverage.complete=0`)
       .bind(job.cursor+rows.length,Number(complete && !job.quality_failed),Number(job.scope === 'query'),stamp,notes,job.id,job.lease_token));
   }
+  const usable=complete&&!job.quality_failed;
+  statements.push(env.DB.prepare(`INSERT INTO health_checks(provider,day,checked_at,status,code)
+    SELECT provider,?,?,CASE WHEN ?=1 AND (?=0 OR EXISTS(SELECT 1 FROM dataset_coverage WHERE dataset_id=sync_jobs.generation AND complete=1)) THEN 'ok' ELSE 'partial' END,
+      CASE WHEN ?=1 AND (?=0 OR EXISTS(SELECT 1 FROM dataset_coverage WHERE dataset_id=sync_jobs.generation AND complete=1)) THEN NULL ELSE 'DATA_QUALITY_INCOMPLETE' END
+    FROM sync_jobs WHERE id=? AND lease_token=? AND status='running'
+    ON CONFLICT(provider,day) DO UPDATE SET checked_at=excluded.checked_at,status=excluded.status,code=excluded.code`)
+    .bind(stamp.slice(0,10),stamp,Number(usable),Number(next===null),Number(usable),Number(next===null),job.id,job.lease_token));
   statements.push(env.DB.prepare("UPDATE sync_jobs SET status=?,cursor=?,quality_failed=max(quality_failed,?),attempts=0,lease_token=NULL,lease_until=NULL,error_code=NULL,updated_at=? WHERE id=? AND lease_token=?")
     .bind(next === null ? 'done' : 'pending',next || 0,Number(!complete),stamp,job.id,job.lease_token));
   statements.push(env.DB.prepare("UPDATE sync_runs SET status='done',finished_at=?,rows_received=? WHERE id=?").bind(stamp,rows.length,run));
-  statements.push(env.DB.prepare('INSERT INTO health_checks VALUES(?,?,?,?,?) ON CONFLICT(provider,day) DO UPDATE SET checked_at=excluded.checked_at,status=excluded.status,code=excluded.code')
-    .bind(job.provider,stamp.slice(0,10),stamp,complete ? 'ok' : 'partial',complete ? null : 'DATA_QUALITY_INCOMPLETE'));
   await env.DB.batch(statements);
 }
 export async function processJob(env: Env, job: Job, fetcher: Fetch = fetch): Promise<void> {

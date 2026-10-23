@@ -1,12 +1,15 @@
 # Durum, teslim denetimi ve devam kaydı
 
-## Bağımsız denetim — devam ediyor
+## Bağımsız denetim — tamamlandı
 
-- Main `b31d3b1` güncel; GitHub main verify=SUCCESS (run 40037571711).
-- Üretim güvenliği: Worker açıkça `AUTOMATION_ENABLED=true` olmadan hiçbir otomatik görev çalıştırmaz. Zamanlanmış yedek için ayrıca `PRODUCTION_BACKUPS_ENABLED=true` gerekir. GA4 sayısal kimlik ve ayrı consent testleri eklendi.
-- Hedefli 14 Workers/OAuth testi ve 6 release testi geçti. Tam regresyon ve en az 30 bağımsız SEO senaryosu sonraki adımdır; denetim henüz tamamlanmadı.
-- Gerçek Cloudflare oturumu ve Google bağları mevcut değil; bu bağlantılar/uzak kabul yapılmadı. Hesap yetkileri dışında kullanıcıdan işlem beklenmiyor.
-- Bu belgeyi içeren commit: `git log -1 --oneline`.
+- Dal `audit/seo-reliability`; sonuçlar [AUDIT_REPORT.md](AUDIT_REPORT.md).
+- 41 bağımsız senaryo: ilk 40 koşusunda 13 hata yeniden üretildi ve düzeltildi; son 41/41 başarılı.
+- Tam regresyon: 86 Workers/D1 + 20 Python + 2 Chromium = 108 başarılı; npm audit 0; tip kontrolü, kaynak koruma, üretim dry-run başarılı. Başarısız/atlanmış otomatik test yok.
+- 29 ürün / 521 dosya / 9.075 satır tekrar incelendi; kaynaklar ve talimatlar değişmedi.
+- Son uygulama motoru 1.2.0; bu belgeyi içeren commit `git log -1 --oneline`. İlk güvenlik aşaması f4a5d1b.
+- Main b31d3b1 uzak verify=SUCCESS. Denetim düzeltmeleri ayrı PR'a gönderilecek; main'e otomatik birleştirme yapılmaz.
+- Bir sonraki somut adım: Türkçe soru-cevap ve takip bağlamı (30 soru), ardından fırsat radarı (30 senaryo) ve değişiklik etki analizi (30 senaryo); ayrı PR'lar.
+- Gerçek Cloudflare ve Google bağlantısı yok; gerçek senkron/tarama/rapor/CPU/kota/uzak yedek kabulü yapılmadı. Gerekli hesap izinleri üretim yönergesinde.
 
 ## Önceki üretime geçiş hazırlığı kaydı
 

@@ -2,6 +2,8 @@
 
 Üretime geçiş: [hesap/dağıtım/OAuth yönergesi](docs/PRODUCTION.md), [ilk gerçek veri kabulü](docs/PRODUCTION_ACCEPTANCE.md), [main ve güvenlik denetimi](docs/RELEASE_REVIEW.md). Çalışan uygulama korunur; üretim kaynakları bu oturumda oluşturulmadı.
 
+Bağımsız denetim: [AUDIT_REPORT.md](AUDIT_REPORT.md). Motor 1.2.0; marka/cihaz ayrımı, sağlık ve URL kanıtı olmadan karar durur.
+
 Türkçe tek ekran paneli, Cloudflare Worker API'si, D1/SQLite veri modeli, günlük Google senkron kuyruğu, salt okunur site tarayıcısı ve kanıtla sınırlanan karar motoru. Ücretli LLM veya ücretli API zorunluluğu yoktur. Uygulama canlı siteye yazmaz.
 
 **Gerçek durum:** Uygulama yerel Workers/D1 ortamında çalıştırıldı ve otomatik testlerden geçti. Kaynak CSV'ler gerçektir. Google hesabı bağlanmadı, canlı tarama bu ortamın ağ politikası nedeniyle doğrulanamadı ve Cloudflare üretim dağıtımı yapılmadı. Panel eksik bağlantıyı **Veri bekle** olarak gösterir. Testlerdeki sentetik Google yanıtları yalnızca test fixtures içindedir; gerçek kullanıcı veritabanına yüklenmez.
