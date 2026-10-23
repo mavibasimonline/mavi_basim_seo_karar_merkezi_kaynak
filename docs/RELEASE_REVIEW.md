@@ -17,7 +17,7 @@ Bu çalışma yeni ürün özelliği içermez. Başlangıç HEAD'i `f87dd2f`; ç
 | Gerçek kaynaklı yerel uygulamada disconnected kabul CLI'si | 7 HTTP/veri koşulu geçti; bu gerçek üretim kabulü değildir |
 | Google'sız veritabanında sync/month SQL'i | Eksik veri boş veya eksik gün olarak raporlandı; gerçek veri analizi iddia edilmedi |
 | Orijinal CSV ve iki temel yönerge | Değişmedi |
-| GitHub Actions uzak sonucu / PR oluşturma | API ağı proxy 403; doğrulanmadı/oluşturulamadı |
+| PR / GitHub Actions erişimi | [PR #1](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/1) oluşturuldu; check sonuçları GraphQL üzerinden okunuyor. Son HEAD için verify=SUCCESS birleştirme kapısıdır. |
 
 Toplam **60 otomatik test** geçti; bu sonuçlar yerel çalıştırmalardır. Gerçek hesap/kota/CPU/OAuth/tarama/aylık rapor kabulü geçirilmiş sayılmaz.
 
@@ -45,9 +45,10 @@ Kabul dosyaları:
 
 ## Kullanıcı yetkisi bekleyenler
 
-1. Ortamdan `api.github.com` HTTPS erişimi: Git okuma/yazma çalışıyor; gh/API istekleri CONNECT aşamasında proxy 403 alıyor. Sandbox dışında read-only kontrol de aynı sonucu verdi. Yeni GitHub token'ı eksik olduğu sonucuna varılmadı. PR açıklaması `docs/PULL_REQUEST.md` içinde hazır; erişim açılınca mevcut bağlantıyla PR ve CI tekrar denenmeli.
-2. Cloudflare Workers Free hesabı, dar kapsamlı D1/Worker secret yetkisi ve ayrı workers.dev hesap alt adı. Bu oturumda uzak kaynak oluşturulmadı.
-3. Google Cloud OAuth istemcisi, mevcut GSC mülk okuma izni ve bir defalık consent. Secret değerleri sadece güvenli ayarlara girilmeli.
-4. Bağımsız yedek anahtarı ve yalnızca gerekli D1 okumasına izinli yedek erişimi.
+1. Cloudflare Workers Free hesabı, dar kapsamlı D1/Worker secret yetkisi ve ayrı workers.dev hesap alt adı. Bu oturumda uzak kaynak oluşturulmadı.
+2. Google Cloud OAuth istemcisi, mevcut GSC mülk okuma izni ve bir defalık consent. Secret değerleri sadece güvenli ayarlara girilmeli.
+3. Bağımsız yedek anahtarı ve yalnızca gerekli D1 okumasına izinli yedek erişimi.
+
+İlk REST API istekleri ve sandbox dışı read-only deneme proxy 403 aldı. Mevcut kimlikle GraphQL kullanılarak PR oluşturma ve uzak check sorgusu başarılı oldu. Bu GitHub engeli için kullanıcıdan ağ değişikliği veya yeni token gerekmiyor. PR açıldığında aynı branch/PR eşzamanlılık politikası önceki koşuyu iptal edebilir; CANCELLED koşu başarısız kabul testi değildir, güncel verify koşusunun tamamlanması beklenir.
 
 Main'e birleştirme, canlı site değişikliği, ücretli plan/hizmet açma, Google bağlantısı veya üretim yayını yapılmadı. Yerel sonuçlar bu işlemlerin yerine sunulmaz.

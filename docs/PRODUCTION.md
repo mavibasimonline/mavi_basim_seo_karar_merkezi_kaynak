@@ -4,7 +4,7 @@ Bu yönerge dağıtım hazırlığıdır. Bu oturumda gerçek Cloudflare kaynağ
 
 ## 1. Birleştirme kapısı
 
-- Hedef `main`, kaynak `feat/seo-karar-merkezi`; GitHub PR açıklaması `docs/PULL_REQUEST.md` içindedir. Merge veya auto-merge açılmadı.
+- Hedef `main`, kaynak `feat/seo-karar-merkezi`; [PR #1](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/1) oluşturuldu, açıklaması `docs/PULL_REQUEST.md` içindedir. Merge veya auto-merge açılmadı.
 - PR'nin son HEAD'i için CI, kaynak koruması, güvenlik ve mobil/masaüstü testleri yeşil olmalı. Yerel geçiş uzak CI sonucu yerine kullanılamaz.
 - `main` sonradan değişirse fetch ve merge denetimini tekrarlayın; kullanıcı değişikliklerini reset/rebase ile silmeyin.
 
@@ -111,9 +111,10 @@ D1 Time Travel veya şifreli yedek önce **ayrı kurtarma D1** üzerinde değerl
 
 ## Yalnızca hesap sahibinin sağlayacağı noktalar
 
-- GitHub API ağ erişimi (`api.github.com`) ve mevcut bağlantıyla PR açma/Actions okuma yetkisi; Git erişimi zaten çalışıyor.
 - Cloudflare Workers Free hesap/D1/Worker secret yetkisi ve ayrı workers.dev hesap alt adı; ücretli plana geçiş yok.
 - Google Cloud OAuth projesi/istemcisi, mevcut GSC mülk izni ve tek seferlik kullanıcı consent'i. Üretim OAuth uygunluğu Google politikasına göre tamamlanmalı.
 - Şifreli yedek anahtarının güvenli saklanması ve dar kapsamlı yedek erişimi.
 
 Diğer hazırlıklar dosyalarda ve otomatik kontrollerdedir. Gizli değerler sohbette istenmez; yetki olmadan hesap bağlandı, dağıtıldı veya üretim çalışıyor denmez.
+
+GitHub işlemleri mevcut kimlikle GraphQL üzerinden çalıştı; kullanıcıdan yeni GitHub token'ı veya ağ değişikliği gerekmiyor. Son PR HEAD'inin verify kontrolü burada hazırlanan CI komutlarını uzakta çalıştırır; main'e birleştirme otomatik yapılmaz.

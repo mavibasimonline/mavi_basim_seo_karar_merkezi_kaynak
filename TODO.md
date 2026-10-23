@@ -6,9 +6,9 @@ Yeni özellik eklenmedi; mevcut `src/`, `public/`, migration'lar ve 521 CSV koru
 
 Üretim dosyaları `docs/PRODUCTION.md`, `docs/PRODUCTION_ACCEPTANCE.md`, `docs/RELEASE_REVIEW.md` ve `deploy/` altında. Gerçek kimlikler yokken --ready kapısı geçmez. Yerel ayrı üretim D1 provasında 3 migration ve 521/9.075 kaynak doğrulandı.
 
-PR açıklaması `docs/PULL_REQUEST.md` içinde somut hazır. GitHub API ağı proxy 403 ile engellendiği için PR oluşturma ve uzak CI sonucu henüz tamamlanamadı; Git erişimi çalışıyor. Kullanıcıya yalnızca gerekli API ağ erişimi soruldu. Erişim açılınca mevcut kimlikle PR/Actions tekrar denenmeli; yeni token gerekip gerekmediği henüz belirlenmedi.
+PR açıklaması `docs/PULL_REQUEST.md` içinde. [PR #1](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/1) mevcut kimlikle GraphQL kullanılarak oluşturuldu; uzak check sonuçları aynı yolla sorgulanıyor. İlk REST proxy engeli için artık kullanıcıdan ağ ayarı veya yeni token istenmiyor. Birleştirme kapısı son HEAD için verify=SUCCESS; önceki concurrency iptali güncel koşuyla karıştırılmamalı.
 
-Yalnızca dış yetki bekleyenler: GitHub API HTTPS erişimi; Cloudflare Workers Free hesap/D1/Worker secret erişimi; Google OAuth projesi ve mevcut GSC mülküne okuma+consent; dar kapsamlı yedek erişimi ve bağımsız anahtar. Uzak kaynak/Google bağlantısı/üretim yayını yapılmadı, ücretli hizmet açılmadı. Son hazırlık commit'i için `git log -1 --oneline` kullanın.
+Yalnızca dış yetki bekleyenler: Cloudflare Workers Free hesap/D1/Worker secret erişimi; Google OAuth projesi ve mevcut GSC mülküne okuma+consent; dar kapsamlı yedek erişimi ve bağımsız anahtar. Uzak kaynak/Google bağlantısı/üretim yayını yapılmadı, ücretli hizmet açılmadı. Son hazırlık commit'i için `git log -1 --oneline` kullanın. Aşağıdaki geliştirme dönemi GitHub API engeli kaydı tarihçedir; GraphQL ile çözüldü.
 
 ## Önceki uygulama geliştirme kaydı
 
