@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="tr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Mavi Basım · SEO Karar Merkezi</title><link rel="stylesheet" href="/app.css"><script src="/app.js" defer></script></head>
+<body>
+<header><div><p class="eyebrow">MAVİ BASIM</p><h1>SEO Karar Merkezi</h1><p>Önce kanıt, sonra karar.</p></div><button id="logout" hidden>Çıkış</button></header>
+<main>
+<form id="login"><h2>Güvenli giriş</h2><label for="token">Erişim anahtarı</label><input id="token" name="token" type="password" autocomplete="current-password" required><button>Giriş yap</button><p>Arama verileriniz yalnızca yetkili kullanıcıya açıktır.</p></form>
+<p id="message" role="status" aria-live="polite"></p>
+<section id="dashboard" hidden>
+<div class="toolbar"><label for="month">Rapor dönemi <input id="month" type="month"></label><button id="refresh">Raporu göster</button><a id="export" href="/api/export">Raporu indir</a><button id="google">Google'ı bağla</button></div>
+<div id="status" class="notice"></div><div id="summary" class="summary"></div>
+<section><h2>Öncelik ve koruma</h2><div id="priorities"></div><p id="protect"></p></section>
+<form id="question"><label for="questionText">SEO verilerine sorun</label><div class="question-row"><input id="questionText" maxlength="1000" placeholder="Broşür mobilde neden düştü?" required><button>Sor</button></div></form>
+<article id="answer" aria-live="polite" hidden></article>
+<h2>Ürünlerin durumu</h2><p>Her ürünün kanıtı, ölçümü ve eksikleri ayrıntıda gösterilir. Eksik veri sıfır değildir.</p><div id="products" class="products"></div>
+<details><summary>Veri sağlığı ve kapsam</summary><pre id="health"></pre></details>
+<p class="footnote">Keyword Planner: yaklaşık pazar talebi. Search Console: arama performansı. GA4: organik oturumlar. Korelasyon nedensellik değildir. Canlı siteye otomatik değişiklik yapılmaz.</p>
+</section></main></body></html>

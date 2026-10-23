@@ -1,0 +1,28 @@
+{
+  "name": "mavi-basim-seo-karar-merkezi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --ip 127.0.0.1 --port 8787",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:import": "python3 -m unittest discover -s tests -p 'test_*.py' -v",
+    "db:migrate": "wrangler d1 migrations apply seo --local",
+    "data:prepare": "python3 scripts/import_keywords.py --output .local/keywords.sql --report .local/source-audit.json",
+    "data:import": "npm run data:prepare && wrangler d1 execute seo --local --file .local/keywords.sql",
+    "check": "npm run typecheck && npm test && npm run test:import && npm run build"
+  },
+  "dependencies": {
+    "fast-xml-parser": "5.11.2",
+    "robots-parser": "3.0.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.4.7",
+    "@cloudflare/workers-types": "5.20261023.1",
+    "typescript": "5.9.3",
+    "vitest": "4.1.0",
+    "wrangler": "4.152.0"
+  }
+}
