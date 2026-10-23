@@ -47,4 +47,17 @@ describe('owner authentication and token encryption',()=>{
     const reply=await oauthCallback(request,cfg,fetcher(async()=>Response.json({access_token:'access',refresh_token:'refresh',expires_in:3600,scope:'openid'})));
     expect(reply.status).toBe(400);expect(await env.DB.prepare('SELECT * FROM oauth_credentials').first()).toBeNull();
   });
+  it('requires separate analytics read consent only when a GA4 property is configured',async()=>{
+    const cfg=configured({GA4_PROPERTY_ID:'123456789'});
+    for(const scopes of [READ_SCOPES[0],READ_SCOPES.join(' ')]){
+      const start=await oauthStart(cfg),body=await start.json() as {authorization_url:string};
+      const url=new URL(body.authorization_url);
+      expect(url.searchParams.get('scope')?.split(' ')).toEqual(READ_SCOPES);
+      expect(url.searchParams.get('scope')).not.toContain('adwords');
+      const request=new Request(`https://app.example/api/oauth/google/callback?state=${url.searchParams.get('state')}&code=fixture`,{headers:{Cookie:start.headers.get('Set-Cookie')!}});
+      const reply=await oauthCallback(request,cfg,fetcher(async()=>Response.json({access_token:'access',refresh_token:'refresh',expires_in:3600,scope:scopes})));
+      expect(reply.status).toBe(scopes===READ_SCOPES[0]?400:303);
+      expect(!!await env.DB.prepare('SELECT provider FROM oauth_credentials').first()).toBe(scopes!==READ_SCOPES[0]);
+    }
+  });
 });

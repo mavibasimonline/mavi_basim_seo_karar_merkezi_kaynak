@@ -42,7 +42,7 @@ async function route(request:Request,env:Env):Promise<Response>{
       env.DB.prepare('SELECT url,started_at,status_code,error_code FROM crawls ORDER BY started_at DESC LIMIT 5').all(),
       env.DB.prepare('SELECT provider,scope,min(day) AS earliest,max(day) AS latest,count(*) AS days FROM dataset_coverage WHERE complete=1 GROUP BY provider,scope').all(),
     ]);
-    return json({google_connected:!!google,ga4_configured:!!env.GA4_PROPERTY_ID,ads_configured:env.ENABLE_GOOGLE_ADS==='true'&&!!env.GOOGLE_ADS_DEVELOPER_TOKEN,crawl_enabled:env.CRAWL_ENABLED==='true',health:health.results,jobs:jobs.results,crawls:crawls.results,coverage:coverage.results,
+    return json({google_connected:!!google,ga4_configured:!!env.GA4_PROPERTY_ID,ads_configured:env.ENABLE_GOOGLE_ADS==='true'&&!!env.GOOGLE_ADS_DEVELOPER_TOKEN,crawl_enabled:env.CRAWL_ENABLED==='true',automation_enabled:env.AUTOMATION_ENABLED==='true',health:health.results,jobs:jobs.results,crawls:crawls.results,coverage:coverage.results,
       note:'Yapılandırma veya OAuth kaydı başarılı API erişimi anlamına gelmez; günlük sağlık sonuçlarını kontrol edin.'});
   }
   if(request.method==='GET'&&path==='/api/report')return json(await getReport(env,url.searchParams.get('month')||lastCompleteMonth()));
@@ -84,6 +84,8 @@ async function route(request:Request,env:Env):Promise<Response>{
   return json({error:'Bu işlem bulunamadı.'},404);
 }
 export async function tick(env:Env,fetcher:typeof fetch=fetch,time=new Date()):Promise<void>{
+  // An accidental Cron configuration must not start collection before operator acceptance.
+  if(env.AUTOMATION_ENABLED!=='true')return;
   if(await enqueueDaily(env)){await enqueueAds(env);return;}
   // Dedicated slots prevent a long historical backfill from starving crawl/outcome work.
   if(time.getUTCMinutes()===45){await seedCrawl(env);await crawlOne(env,fetcher);return;}

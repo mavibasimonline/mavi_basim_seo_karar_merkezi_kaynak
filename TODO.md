@@ -1,6 +1,14 @@
 # Durum, teslim denetimi ve devam kaydı
 
-## Üretime geçiş hazırlığı — güncel
+## Bağımsız denetim — devam ediyor
+
+- Main `b31d3b1` güncel; GitHub main verify=SUCCESS (run 40037571711).
+- Üretim güvenliği: Worker açıkça `AUTOMATION_ENABLED=true` olmadan hiçbir otomatik görev çalıştırmaz. Zamanlanmış yedek için ayrıca `PRODUCTION_BACKUPS_ENABLED=true` gerekir. GA4 sayısal kimlik ve ayrı consent testleri eklendi.
+- Hedefli 14 Workers/OAuth testi ve 6 release testi geçti. Tam regresyon ve en az 30 bağımsız SEO senaryosu sonraki adımdır; denetim henüz tamamlanmadı.
+- Gerçek Cloudflare oturumu ve Google bağları mevcut değil; bu bağlantılar/uzak kabul yapılmadı. Hesap yetkileri dışında kullanıcıdan işlem beklenmiyor.
+- Bu belgeyi içeren commit: `git log -1 --oneline`.
+
+## Önceki üretime geçiş hazırlığı kaydı
 
 Yeni özellik eklenmedi; mevcut `src/`, `public/`, migration'lar ve 521 CSV korundu. Main farkı/çatışma kontrolü, bağımlılık güvenlik düzeltmeleri, SHA sabitli CI, ayrı üretim yapılandırması, OAuth/Free plan/rollback yönergesi ve gerçek veri kabul araçları hazır. Güncel sonuç: **42 Workers + 16 Python + 2 tarayıcı = 60 test geçti**, tüm bağımlılıklarda npm audit 0. Önceki 52 testlik kayıt aşağıda geliştirme aşamasının tarihçesidir.
 
