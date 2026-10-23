@@ -12,6 +12,10 @@ test('real local database, secure login, all products and truthful disconnected 
   await expect(page.locator('#status')).toContainText('Google bağlantısı yok');
   await expect(page.locator('#summary')).toContainText('521');await expect(page.locator('#summary')).toContainText('9.075');
   await expect(page.locator('.badge').first()).toHaveText('Veri bekle');
+  await page.getByText('SEO Fırsat Radarı',{exact:true}).click();
+  await expect(page.locator('#radarResults')).toContainText('Veri yetersizliği nedeniyle izlenenler');
+  await expect(page.locator('#radarResults')).toContainText('Yeterli kanıtla belirlenen ürün yok.');
+  await page.getByText('SEO Fırsat Radarı',{exact:true}).click();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   const first=page.locator('.product').first();await first.getByText('Kanıt, hesaplama ve eksikler',{exact:true}).click();
   await expect(first.locator('details').first()).toContainText('Kanıt güveni');

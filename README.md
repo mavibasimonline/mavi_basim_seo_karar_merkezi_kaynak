@@ -1,3 +1,5 @@
+Fırsat radarı: [kabul ve sınırlar](SEO_OPPORTUNITY_RADAR_REPORT.md).
+
 # Mavi Basım SEO Karar Merkezi
 
 Üretime geçiş: [hesap/dağıtım/OAuth yönergesi](docs/PRODUCTION.md), [ilk gerçek veri kabulü](docs/PRODUCTION_ACCEPTANCE.md), [main ve güvenlik denetimi](docs/RELEASE_REVIEW.md). Çalışan uygulama korunur; üretim kaynakları bu oturumda oluşturulmadı.

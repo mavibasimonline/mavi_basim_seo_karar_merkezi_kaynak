@@ -1,24 +1,25 @@
 import { Env, json, nowISO } from './types';
 import { authenticated, login, safeOrigin, securityHeaders } from './security';
 import { oauthCallback, oauthStart, ProviderError, boundedText } from './google';
-import { analyze, lastCompleteMonth, saveAnalysis, monthPeriod, AnalysisReport, ENGINE_VERSION } from './analysis';
+import { analyze, lastCompleteMonth, saveAnalysis, monthPeriod, AnalysisReport, ENGINE_VERSION, AnalysisOptions } from './analysis';
 import { validateAnalysis } from './validation';
-import { answerQuestion, prepareQuestion } from './questions';
+import { answerQuestion, prepareQuestion, parseQuestion } from './questions';
 import { enqueueDaily, enqueueAds, claimJob, processJob } from './sync';
 import { seedCrawl, crawlOne } from './crawler';
 import { measureOneOutcome, recordAppliedChange } from './outcomes';
+import { radar } from './radar';
 
-export async function getReport(env:Env,month:string):Promise<AnalysisReport>{
+export async function getReport(env:Env,month:string,options:AnalysisOptions={}):Promise<AnalysisReport>{
   monthPeriod(month);
   if(month<'2020-01'||month>new Date().toISOString().slice(0,7))throw new Error('INVALID_MONTH');
-  const cached=await env.DB.prepare(`SELECT result_json,created_at FROM analysis_runs WHERE month=? AND engine_version=?
+  const cached=await env.DB.prepare(`SELECT result_json,created_at FROM analysis_runs WHERE month=? AND engine_version=? AND json_extract(filters_json,'$.device') IS ?
     AND created_at>=COALESCE((SELECT MAX(stamp) FROM (
       SELECT MAX(fetched_at) AS stamp FROM dataset_coverage UNION ALL SELECT MAX(updated_at) FROM oauth_credentials
       UNION ALL SELECT MAX(checked_at) FROM health_checks UNION ALL SELECT MAX(url_verified_at) FROM products
       UNION ALL SELECT MAX(imported_at) FROM keyword_sources)), '')
-    ORDER BY created_at DESC LIMIT 1`).bind(month,ENGINE_VERSION).first<{result_json:string;created_at:string}>();
+    ORDER BY created_at DESC LIMIT 1`).bind(options.current?`${options.current.start}/${options.current.end}`:month,ENGINE_VERSION,options.device||null).first<{result_json:string;created_at:string}>();
   if(cached&&Date.now()-Date.parse(cached.created_at)<15*60_000)return JSON.parse(cached.result_json);
-  const report=await analyze(env,month);
+  const report=await analyze(env,month,new Date(),options);
   const errors=await validateAnalysis(env,report);
   if(errors.length)throw new Error('ANALYSIS_VALIDATION_FAILED');
   await saveAnalysis(env,report);
@@ -45,6 +46,7 @@ async function route(request:Request,env:Env):Promise<Response>{
     return json({google_connected:!!google,ga4_configured:!!env.GA4_PROPERTY_ID,ads_configured:env.ENABLE_GOOGLE_ADS==='true'&&!!env.GOOGLE_ADS_DEVELOPER_TOKEN,crawl_enabled:env.CRAWL_ENABLED==='true',automation_enabled:env.AUTOMATION_ENABLED==='true',health:health.results,jobs:jobs.results,crawls:crawls.results,coverage:coverage.results,
       note:'Yapılandırma veya OAuth kaydı başarılı API erişimi anlamına gelmez; günlük sağlık sonuçlarını kontrol edin.'});
   }
+  if(request.method==='GET'&&path==='/api/radar'){const plan=parseQuestion('Son 28 günde hangi ürünler yükseldi?',[]);return json(await radar(env,await getReport(env,plan.context.month,{current:plan.period,previous:plan.previous})));}
   if(request.method==='GET'&&path==='/api/report')return json(await getReport(env,url.searchParams.get('month')||lastCompleteMonth()));
   if(request.method==='POST'&&path==='/api/questions'){
     const body=await request.json() as {question?:unknown;month?:unknown;previous_question_id?:unknown};

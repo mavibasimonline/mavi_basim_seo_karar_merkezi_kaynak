@@ -60,3 +60,14 @@ $('logout').addEventListener('click',async()=>{try{await api('/api/session',{met
 $('question').addEventListener('submit',async e=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const answer=await api('/api/questions',{method:'POST',body:JSON.stringify({question:$('questionText').value,month:$('month').value,...(questionMonth===$('month').value&&previousQuestionId?{previous_question_id:previousQuestionId}:{})})});previousQuestionId=answer.question_id;questionMonth=$('month').value;const sections=answer.sections; $('answer').replaceChildren(node('h2','Kanıta dayalı yanıt'),node('h3','Ne oldu?'),node('p',answer.text),...(sections?[node('h3','Olası açıklamalar'),list(sections.explanations),node('h3','Ne yapmalıyım?'),node('p',sections.action),node('p',`Güven düzeyi: ${sections.confidence}`)]:[]),answerView(answer));$('answer').hidden=false;}catch(e){$('message').textContent=e.message;}finally{button.disabled=false;}});
 $('google').addEventListener('click',async()=>{try{const data=await api('/api/oauth/google/start',{method:'POST'});const url=new URL(data.authorization_url);if(url.origin==='https://accounts.google.com')location.assign(url.href);}catch(e){$('message').textContent=e.message;}});
 load();
+
+async function loadRadar(){
+ try{const r=await api('/api/radar');const root=$('radarResults');root.replaceChildren(node('p',`GSC · ${r.period.start} – ${r.period.end}; önceki ${r.comparison_period.start} – ${r.comparison_period.end}. Ölçüm: ${r.measured_at}`));
+ for(const [title,items] of [['En yüksek öncelikli 5 SEO fırsatı',r.opportunities],['Dikkat gerektiren 5 ürün',r.attention],['Yükselen ürünler',r.rising],['Gerileyen ürünler',r.declining],['Veri yetersizliği nedeniyle izlenenler',r.insufficient]]){
+ const section=node('section');section.append(node('h3',title));if(!items.length)section.append(node('p','Yeterli kanıtla belirlenen ürün yok.'));
+ for(const item of items){section.append(detail(`${item.name} · Kanıtları Gör`,node('p',`${item.url||'URL doğrulanmadı'} · ${item.status} · Öncelik ${number(item.score)}`),node('p',item.risk),list(item.missing),list(item.flags),list(item.components.map(c=>`${c.name}: ${c.points}. ${c.calculation}`)),list(item.market_demand.map(m=>`Keyword Planner · ${m.keyword}: ${number(m.avg_monthly_searches)}; ${m.path}, satır ${m.row_number}, ${m.exported_at}. Hacimler toplanmadı.`)),list(item.evidence.slice(-2).map(e=>`GSC: ${e.ref}; ${e.fetched_at}`))));}root.append(section);
+ }root.append(list(r.limitations));
+ }catch(e){$('radarResults').textContent=e.message;}
+}
+$('radar').addEventListener('toggle',()=>{if($('radar').open&&!$('dashboard').hidden)loadRadar();});
+setInterval(()=>{if(!document.hidden&&!$('dashboard').hidden&&$('radar').open)loadRadar();},300000);
