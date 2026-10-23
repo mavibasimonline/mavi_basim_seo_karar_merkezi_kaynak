@@ -1,0 +1,12 @@
+node_modules/
+.wrangler/
+.local/
+.dev.vars*
+.env
+.env.*
+!.env.example
+dist/
+coverage/
+__pycache__/
+*.pyc
+*.sqlite*
