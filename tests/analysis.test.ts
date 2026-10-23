@@ -46,7 +46,10 @@ it('keeps mobile/desktop and brand/non-brand traffic separate; missing query is 
   await seed(month);const result=await analyze(env,month);const product=result.products[0];
   expect(product.devices.find(d=>d.device==='MOBILE')!.current!.clicks).toBeLessThan(product.devices.find(d=>d.device==='MOBILE')!.previous!.clicks);
   expect(product.devices.find(d=>d.device==='DESKTOP')!.current!.clicks).toBeGreaterThan(product.devices.find(d=>d.device==='DESKTOP')!.previous!.clicks);
-  expect(product.brand.brand.clicks).toBeGreaterThan(0);expect(product.brand.non_brand.clicks).toBeGreaterThan(0);
+  expect(product.devices.find(d=>d.device==='MOBILE')!.decision).toBe('İncele');
+  expect(product.devices.find(d=>d.device==='DESKTOP')!.decision).toBe('Koru');
+  expect(product.decision).toBe('İncele');
+  expect(product.brand.brand!.clicks).toBeGreaterThan(0);expect(product.brand.non_brand!.clicks).toBeGreaterThan(0);
   const missing=product.queries.find(q=>q.query==='eski sorgu');expect(missing?.missing_current).toBe(true);expect(missing?.clicks).toBeNull();
   expect(product.queries.find(q=>q.query==='broşür baskı')?.protect).toBe(true);
   expect(await validateAnalysis(env,result)).toEqual([]);

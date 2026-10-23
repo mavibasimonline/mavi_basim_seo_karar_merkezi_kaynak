@@ -1,7 +1,8 @@
 import { Env, nowISO } from './types';
 import { insertRows } from './sync';
+import { siteURL } from './urls';
 
-export const ENGINE_VERSION = '1.0.0';
+export const ENGINE_VERSION = '1.1.1';
 export type Decision = 'Koru'|'İncele'|'İyileştir'|'Veri bekle';
 export interface Metrics { clicks:number; impressions:number; ctr:number|null; position:number|null }
 export interface Period { start:string; end:string; days:number; label:string }
@@ -45,8 +46,8 @@ interface Coverage {provider:string;day:string;scope:string;dataset_id:string;co
 export interface ProductReport {
   id:string;name:string;url:string|null;url_verified:boolean;group_name:string;
   current:Metrics|null;previous:Metrics|null;decision:Decision;reason:string;confidence:string;risk:string;calculation:unknown;
-  devices:{device:string;current:Metrics|null;previous:Metrics|null}[];
-  queries:QueryRisk[];brand:{brand:Metrics;non_brand:Metrics;note:string};
+  devices:{device:string;current:Metrics|null;previous:Metrics|null;decision:Decision;reason:string;calculation:unknown}[];
+  queries:QueryRisk[];brand:{brand:Metrics|null;non_brand:Metrics|null;note:string};
   evidence:Evidence[];missing:string[];comparisons:Record<string,unknown>;keyword_sources:number;keyword_rows:number;
 }
 export interface AnalysisReport {id:string;month:string;created_at:string;engine_version:string;period:Period;previous_period:Period;products:ProductReport[];missing:string[];sources:unknown;collisions:unknown[];region:unknown;limitations:string[]}
@@ -60,12 +61,13 @@ export async function analyze(env:Env,month=lastCompleteMonth(),time=new Date())
   const current=monthPeriod(month),previous=monthPeriod(month,-1),year=monthPeriod(month,-12);
   const oldest=monthPeriod(month,-12).start;
   const stamp=time.toISOString();
-  const [productResult,coverageResult,pageRows,queryRows,counts,credential]=await Promise.all([
+  const [productResult,coverageResult,pageRows,queryRows,counts,credential,googleHealth]=await Promise.all([
     env.DB.prepare('SELECT p.*,g.name AS group_name FROM products p JOIN product_groups g ON g.id=p.group_id ORDER BY g.name,p.name').all<{id:string;name:string;canonical_url:string|null;url_verified_at:string|null;group_name:string}>(),
     env.DB.prepare('SELECT * FROM dataset_coverage WHERE day BETWEEN ? AND ?').bind(oldest,current.end).all<Coverage>(),
     activeGsc(env.DB,'gsc_daily_by_page',oldest,current.end,'page'),activeGsc(env.DB,'gsc_daily_by_query_device',previous.start,current.end,'query'),
     env.DB.prepare('SELECT product_id,count(*) AS sources,sum(row_count) AS rows FROM keyword_sources GROUP BY product_id').all<{product_id:string;sources:number;rows:number}>(),
     env.DB.prepare("SELECT updated_at FROM oauth_credentials WHERE provider='google'").first(),
+    env.DB.prepare("SELECT status,code,checked_at FROM health_checks WHERE provider='gsc' ORDER BY day DESC LIMIT 1").first<{status:string;code:string|null;checked_at:string}>(),
   ]);
   const coverage=coverageResult.results;
   const currentComplete=coverageComplete(coverage,current),previousComplete=coverageComplete(coverage,previous);
@@ -75,6 +77,7 @@ export async function analyze(env:Env,month=lastCompleteMonth(),time=new Date())
   const finished=Date.parse(current.end+'T23:59:59Z')+3*86400_000<time.getTime();
   const missing:string[]=[];
   if(!credential)missing.push('Google bağlantısı yok; gerçek arama performansı doğrulanmadı.');
+  if(googleHealth&&googleHealth.status!=='ok')missing.push(`Son GSC sağlık kontrolü başarılı değil: ${googleHealth.code||googleHealth.status}.`);
   if(!currentComplete)missing.push('Seçilen ayın doğrulanmış GSC sayfa günleri eksik.');
   if(!previousComplete)missing.push('Önceki ayın doğrulanmış GSC sayfa günleri eksik.');
   if(!queryComplete)missing.push('Sorgu/marka kapsamı eksik; eksik sorgular sıfır sayılmadı.');
@@ -94,38 +97,41 @@ export async function analyze(env:Env,month=lastCompleteMonth(),time=new Date())
       const c=currentQueries.filter(r=>r.query===query),p=previousQueries.filter(r=>r.query===query);
       const cm=metrics(c),pm=metrics(p);
       return {query,clicks:c.length?cm.clicks:null,impressions:c.length?cm.impressions:null,previous_clicks:p.length?pm.clicks:null,is_brand:!!(c[0]||p[0])?.is_brand,
-        protect:(c.length>0&&cm.clicks>=10&&cm.impressions>=100&&(!p.length||cm.clicks>=pm.clicks*0.9)),missing_current:!c.length};
+        protect:(c.length>0&&cm.clicks>=10&&cm.impressions>=100&&(!p.length||cm.clicks>=pm.clicks*0.9))||(!c.length&&pm.clicks>=10&&pm.impressions>=100),missing_current:!c.length};
     }).sort((a,b)=>(b.clicks||0)-(a.clicks||0)).slice(0,100);
     const deviceValues=['MOBILE','DESKTOP','TABLET'].map(device=>({device,currentRows:currentRows.filter(r=>r.device===device),previousRows:previousRows.filter(r=>r.device===device)}));
-    const devices=deviceValues.map(d=>({device:d.device,current:d.currentRows.length?metrics(d.currentRows):null,previous:d.previousRows.length?metrics(d.previousRows):null}));
+    const deviceMetrics=deviceValues.map(d=>({device:d.device,current:d.currentRows.length?metrics(d.currentRows):null,previous:d.previousRows.length?metrics(d.previousRows):null}));
     const cm=metrics(currentRows),pm=metrics(previousRows);
-    const mixChanged=devices.some(d=>Math.abs((cm.impressions?(d.current?.impressions||0)/cm.impressions:0)-(pm.impressions?(d.previous?.impressions||0)/pm.impressions:0))>0.15);
+    const mixChanged=deviceMetrics.some(d=>Math.abs((cm.impressions?(d.current?.impressions||0)/cm.impressions:0)-(pm.impressions?(d.previous?.impressions||0)/pm.impressions:0))>0.15);
     const evidence:Evidence[]=coverage.filter(c=>c.complete&&c.provider==='gsc'&&c.day>=previous.start&&c.day<=current.end).map(c=>({id:`${c.dataset_id}:${c.scope}`,source:'GSC',ref:c.dataset_id,fetched_at:c.fetched_at,
       scope:{site:env.SITE_ORIGIN,date:c.day,dimensions:c.scope==='query'?['page','query','country','device']:['page','country','device'],search_type:'web',data_state:'final',query_partial:!!c.query_partial,notes:c.notes}}));
     const comparisons:Record<string,unknown>={};
     for(const months of [3,6,12]){
       const periods=Array.from({length:months},(_,i)=>monthPeriod(month,-1-i));
-      const complete=periods.every(p=>coverageComplete(coverage,p));
-      const values=periods.map(p=>({period:p,...metrics(own.filter(r=>inPeriod(r,p)))}));
-      comparisons[`${months}_months`]={complete,periods:values,mean_monthly_clicks:complete?values.reduce((n,v)=>n+v.clicks,0)/months:null,mean_daily_clicks:complete?values.reduce((n,v)=>n+v.clicks,0)/periods.reduce((n,p)=>n+p.days,0):null};
+      const complete=periods.every(p=>coverageComplete(coverage,p)&&own.some(r=>inPeriod(r,p)));
+      const values=periods.map(p=>{const rows=own.filter(r=>inPeriod(r,p));return {period:p,metrics:rows.length?metrics(rows):null};});
+      comparisons[`${months}_months`]={complete,periods:values,mean_monthly_clicks:complete?values.reduce((n,v)=>n+(v.metrics?.clicks||0),0)/months:null,mean_daily_clicks:complete?values.reduce((n,v)=>n+(v.metrics?.clicks||0),0)/periods.reduce((n,p)=>n+p.days,0):null};
     }
-    const yearComplete=coverageComplete(coverage,year);
+    const yearComplete=coverageComplete(coverage,year)&&own.some(r=>inPeriod(r,year));
     comparisons.year_over_year={period:year,complete:yearComplete,metrics:yearComplete?metrics(own.filter(r=>inPeriod(r,year))):null};
     const localMissing=[...missing];
     if(!product.canonical_url)localMissing.push('Ürün sayfa URL eşlemesi doğrulanmadı; URL tahmin edilmedi.');
     if(!currentRows.length||!previousRows.length)localMissing.push('Her iki ayda da ürün sayfa ölçümü yok; yokluk sıfır trafik sayılmadı.');
     const decision=decide({current:cm,previous:pm,complete:!localMissing.length&&currentComplete&&previousComplete&&queryComplete,fresh,periodFinished:finished,evidence,
       protectedQueries:queries,deviceMixChanged:mixChanged,seasonalityKnown:yearComplete});
+    const devices=deviceMetrics.map(d=>({...d,...decide({current:d.current||metrics([]),previous:d.previous||metrics([]),complete:!localMissing.length&&!!d.current&&!!d.previous,fresh,periodFinished:finished,evidence,protectedQueries:queries,deviceMixChanged:mixChanged,seasonalityKnown:yearComplete})}));
+    const deviceLoss=devices.find(d=>d.decision==='İncele');
+    if(decision.decision==='Koru'&&deviceLoss){decision.decision='İncele';decision.reason=`Toplam performans cihaz kaybını gizleyebilir. ${deviceLoss.device}: ${deviceLoss.reason}`;}
     const count=counts.results.find(c=>c.product_id===product.id);
     return {id:product.id,name:product.name,url:product.canonical_url,url_verified:!!product.url_verified_at,group_name:product.group_name,current:currentRows.length?cm:null,previous:previousRows.length?pm:null,...decision,
-      devices,queries,brand:{brand:metrics(currentQueries.filter(r=>r.is_brand===1)),non_brand:metrics(currentQueries.filter(r=>r.is_brand===0)),note:'GSC görünür sorgu alt kümesi; sayfa toplamlarıyla eşit olması beklenmez.'},
+      devices,queries,brand:{brand:currentQueries.some(r=>r.is_brand===1)?metrics(currentQueries.filter(r=>r.is_brand===1)):null,non_brand:currentQueries.some(r=>r.is_brand===0)?metrics(currentQueries.filter(r=>r.is_brand===0)):null,note:'GSC görünür sorgu alt kümesi; sayfa toplamlarıyla eşit olması beklenmez.'},
       evidence,missing:localMissing,comparisons,keyword_sources:count?.sources||0,keyword_rows:count?.rows||0};
   });
   const queryPages=new Map<string,Set<string>>();
   for(const row of queryRows.filter(r=>inPeriod(r,current))){const key=row.query!;const set=queryPages.get(key)||new Set<string>();set.add(row.page);queryPages.set(key,set);}
   const collisions=[...queryPages].filter(([,pages])=>pages.size>1).map(([query,pages])=>({query,pages:[...pages],meaning:'Olası sorgu çakışması; tek başına sorun veya yönlendirme gerekçesi değildir.'}));
   const gaCoverage=coverageComplete(coverage,current,'organic','ga4');
-  const region=gaCoverage?(await env.DB.prepare("SELECT d.country,d.city,d.device,d.landing_page,sum(d.sessions) AS sessions,sum(d.engaged_sessions) AS engaged_sessions FROM ga4_daily_by_city_device d JOIN dataset_coverage c ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider='ga4' AND c.complete=1 WHERE d.date BETWEEN ? AND ? GROUP BY d.country,d.city,d.device,d.landing_page ORDER BY sessions DESC LIMIT 200").bind(current.start,current.end).all()).results:null;
+  const region=gaCoverage?(await env.DB.prepare("SELECT d.country,d.city,d.device,d.landing_page,sum(d.sessions) AS sessions,sum(d.engaged_sessions) AS engaged_sessions FROM ga4_daily_by_city_device d JOIN dataset_coverage c ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider='ga4' AND c.complete=1 WHERE d.date BETWEEN ? AND ? GROUP BY d.country,d.city,d.device,d.landing_page ORDER BY sessions DESC LIMIT 200").bind(current.start,current.end).all<{country:string;city:string;device:string;landing_page:string;sessions:number;engaged_sessions:number}>()).results.map(row=>({...row,product_id:productForPage(siteURL(row.landing_page)||'')||null})):null;
   const report:AnalysisReport={id:crypto.randomUUID(),month,created_at:stamp,engine_version:ENGINE_VERSION,period:current,previous_period:previous,products,missing,
     sources:{csv_files:counts.results.reduce((n,c)=>n+c.sources,0),csv_rows:counts.results.reduce((n,c)=>n+c.rows,0),google_connected:!!credential,gsc_coverage_days:coverage.filter(c=>c.provider==='gsc'&&c.scope==='page'&&c.complete&&c.day>=current.start&&c.day<=current.end).length},
     collisions,region,limitations:['Eksik sorgu sıfır değildir.','Keyword Planner reklam rekabeti SEO zorluğu değildir.','Şehir verisi GA4 organik oturumudur; şehir bazında Google arama sorgusu değildir.','Korelasyon nedensellik değildir.','Dönemler farklı gün sayısı içerebilir; günlük ortalama ve mevsimsellik ayrıca incelenmelidir.','İyileştir kararı otomatik üretilmez; teknik bulgu ve başarıyı koruma denetimi gerekir.']};

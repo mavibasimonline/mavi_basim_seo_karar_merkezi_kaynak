@@ -28,17 +28,29 @@ export async function enqueueDaily(env: Env, time = new Date()): Promise<boolean
   if (already) return false;
   const connected = await env.DB.prepare("SELECT 1 FROM oauth_credentials WHERE provider='google'").first();
   const jobs: Row[] = [];
+  const progressStatements:D1PreparedStatement[]=[];
   if (connected) {
-    for (let days = 3; days <= 92; days++) {
-      const date = dateDaysAgo(days,time);
-      for (const [provider,scope] of [['gsc','page'],['gsc','query'], ...(env.GA4_PROPERTY_ID ? [['ga4','organic']] : [])]) {
-        jobs.push({ id: `${provider}:${date}:${scope}`, provider, day: date, scope, generation: crypto.randomUUID(), next_attempt_at: stamp, created_at: stamp, updated_at: stamp });
+    const progress=await env.DB.prepare('SELECT provider,oldest_enqueued_day FROM backfill_progress').all<{provider:string;oldest_enqueued_day:string}>();
+    for(const provider of ['gsc',...(env.GA4_PROPERTY_ID?['ga4']:[])]){
+      const previous=progress.results.find(p=>p.provider===provider)?.oldest_enqueued_day;
+      const dateSet=new Set(Array.from({length:7},(_,i)=>dateDaysAgo(i+3,time)));
+      let cursor=previous?Date.parse(previous)-86400_000:Date.parse(dateDaysAgo(3,time));
+      let oldest=previous;
+      for(let count=0;count<90&&cursor>=Date.parse(dateDaysAgo(400,time));count++,cursor-=86400_000){
+        oldest=new Date(cursor).toISOString().slice(0,10);dateSet.add(oldest);
       }
+      for(const date of dateSet)for(const scope of provider==='gsc'?['page','query']:['organic']){
+        jobs.push({id:`${provider}:${date}:${scope}`,provider,day:date,scope,generation:crypto.randomUUID(),next_attempt_at:stamp,created_at:stamp,updated_at:stamp});
+      }
+      if(oldest)progressStatements.push(env.DB.prepare('INSERT INTO backfill_progress VALUES(?,?,?) ON CONFLICT(provider) DO UPDATE SET oldest_enqueued_day=excluded.oldest_enqueued_day,updated_at=excluded.updated_at').bind(provider,oldest,stamp));
     }
   }
   const statements = insertRows(env.DB,'sync_jobs',jobs);
+  statements.push(...progressStatements);
   statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,attempts=0,next_attempt_at=?,updated_at=? WHERE status='done' AND day>=? AND day<=? AND substr(updated_at,1,10)<?")
     .bind(stamp,stamp,dateDaysAgo(9,time),dateDaysAgo(3,time),day));
+  if(connected)statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,attempts=0,next_attempt_at=?,updated_at=? WHERE status='blocked' AND substr(updated_at,1,10)<?").bind(stamp,stamp,day));
+  statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,next_attempt_at=?,updated_at=? WHERE status='done' AND provider IN ('gsc','ga4') AND NOT EXISTS(SELECT 1 FROM dataset_coverage c WHERE c.provider=sync_jobs.provider AND c.day=sync_jobs.day AND c.scope=sync_jobs.scope AND c.complete=1)").bind(stamp,stamp));
   statements.push(env.DB.prepare("INSERT OR IGNORE INTO health_checks VALUES('scheduler',?,?,?,?)").bind(day,stamp,connected ? 'queued' : 'blocked',connected ? null : 'GOOGLE_NOT_CONNECTED'));
   await env.DB.batch(statements);
   return true;
@@ -65,10 +77,10 @@ async function storePage(env: Env, job: Job, rows: GscRow[] | Ga4Row[], next: nu
   const stamp = nowISO();
   if (next === null) {
     statements.push(env.DB.prepare(`INSERT INTO dataset_coverage(provider,day,scope,dataset_id,complete,query_partial,row_count,fetched_at,notes)
-      SELECT provider,day,scope,generation,?, ?, (SELECT count(*) FROM ${table} WHERE dataset_id=sync_jobs.generation),?,?
+      SELECT provider,day,scope,generation,CASE WHEN (SELECT count(*) FROM ${table} WHERE dataset_id=sync_jobs.generation)=? THEN ? ELSE 0 END, ?, (SELECT count(*) FROM ${table} WHERE dataset_id=sync_jobs.generation),?,?
       FROM sync_jobs WHERE id=? AND lease_token=? AND status='running'
       ON CONFLICT(provider,day,scope) DO UPDATE SET dataset_id=excluded.dataset_id,complete=excluded.complete,query_partial=excluded.query_partial,row_count=excluded.row_count,fetched_at=excluded.fetched_at,notes=excluded.notes`)
-      .bind(Number(complete && !job.quality_failed),Number(job.scope === 'query'),stamp,notes,job.id,job.lease_token));
+      .bind(job.cursor+rows.length,Number(complete && !job.quality_failed),Number(job.scope === 'query'),stamp,notes,job.id,job.lease_token));
   }
   statements.push(env.DB.prepare("UPDATE sync_jobs SET status=?,cursor=?,quality_failed=max(quality_failed,?),attempts=0,lease_token=NULL,lease_until=NULL,error_code=NULL,updated_at=? WHERE id=? AND lease_token=?")
     .bind(next === null ? 'done' : 'pending',next || 0,Number(!complete),stamp,job.id,job.lease_token));

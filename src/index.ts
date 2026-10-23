@@ -1,7 +1,7 @@
 import { Env, json, nowISO } from './types';
 import { authenticated, login, safeOrigin, securityHeaders } from './security';
-import { oauthCallback, oauthStart, ProviderError } from './google';
-import { analyze, lastCompleteMonth, saveAnalysis, monthPeriod, AnalysisReport } from './analysis';
+import { oauthCallback, oauthStart, ProviderError, boundedText } from './google';
+import { analyze, lastCompleteMonth, saveAnalysis, monthPeriod, AnalysisReport, ENGINE_VERSION } from './analysis';
 import { validateAnalysis } from './validation';
 import { answerQuestion } from './questions';
 import { enqueueDaily, enqueueAds, claimJob, processJob } from './sync';
@@ -11,7 +11,12 @@ import { measureOneOutcome, recordAppliedChange } from './outcomes';
 export async function getReport(env:Env,month:string):Promise<AnalysisReport>{
   monthPeriod(month);
   if(month<'2020-01'||month>new Date().toISOString().slice(0,7))throw new Error('INVALID_MONTH');
-  const cached=await env.DB.prepare('SELECT result_json,created_at FROM analysis_runs WHERE month=? ORDER BY created_at DESC LIMIT 1').bind(month).first<{result_json:string;created_at:string}>();
+  const cached=await env.DB.prepare(`SELECT result_json,created_at FROM analysis_runs WHERE month=? AND engine_version=?
+    AND created_at>=COALESCE((SELECT MAX(stamp) FROM (
+      SELECT MAX(fetched_at) AS stamp FROM dataset_coverage UNION ALL SELECT MAX(updated_at) FROM oauth_credentials
+      UNION ALL SELECT MAX(checked_at) FROM health_checks UNION ALL SELECT MAX(url_verified_at) FROM products
+      UNION ALL SELECT MAX(imported_at) FROM keyword_sources)), '')
+    ORDER BY created_at DESC LIMIT 1`).bind(month,ENGINE_VERSION).first<{result_json:string;created_at:string}>();
   if(cached&&Date.now()-Date.parse(cached.created_at)<15*60_000)return JSON.parse(cached.result_json);
   const report=await analyze(env,month);
   const errors=await validateAnalysis(env,report);
@@ -78,8 +83,11 @@ async function route(request:Request,env:Env):Promise<Response>{
   }
   return json({error:'Bu işlem bulunamadı.'},404);
 }
-export async function tick(env:Env,fetcher:typeof fetch=fetch):Promise<void>{
+export async function tick(env:Env,fetcher:typeof fetch=fetch,time=new Date()):Promise<void>{
   if(await enqueueDaily(env)){await enqueueAds(env);return;}
+  // Dedicated slots prevent a long historical backfill from starving crawl/outcome work.
+  if(time.getUTCMinutes()===45){await seedCrawl(env);await crawlOne(env,fetcher);return;}
+  if(time.getUTCMinutes()===30&&time.getUTCHours()%4===0){await measureOneOutcome(env);return;}
   // One provider page OR one crawl per tick keeps requests bounded on the free plan.
   const job=await claimJob(env);
   if(job){await processJob(env,job,fetcher);return;}
@@ -91,6 +99,11 @@ export default {
   async fetch(request:Request,env:Env):Promise<Response>{
     try{
       if(Number(request.headers.get('content-length'))>16_384)return securityHeaders(json({error:'İstek çok büyük.'},413));
+      if(request.body){
+        let body:string;
+        try{body=await boundedText(new Response(request.body),16_384);}catch(error){if(error instanceof ProviderError&&error.code==='RESPONSE_TOO_LARGE')return securityHeaders(json({error:'İstek çok büyük.'},413));throw error;}
+        request=new Request(request.url,{method:request.method,headers:request.headers,body});
+      }
       return securityHeaders(await route(request,env));
     }catch(error){
       const code=error instanceof ProviderError?error.code:error instanceof Error?error.message:'UNKNOWN';

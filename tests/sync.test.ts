@@ -2,6 +2,7 @@ import {beforeEach,it,expect} from 'vitest';
 import {init,env,connected,enqueue,fetcher} from './helpers';
 import {claimJob,processJob,enqueueDaily} from '../src/sync';
 import {fetchGsc,fetchGa4,fetchKeywordPlanner,PAGE_SIZE,validateGscRow} from '../src/providers';
+import {accessToken,saveTokens,READ_SCOPES,requestJSON} from '../src/google';
 
 beforeEach(init);
 const rawRow=(i=0)=>({keys:['2026-09-01',`https://mavibasim.com/page-${i}`,'tur','MOBILE'],clicks:1,impressions:10,ctr:0.1,position:2});
@@ -56,4 +57,40 @@ it('deduplicates daily/backfill jobs and records missing connection honestly',as
 it('requires actual optional Ads access before making any request',async()=>{
   let calls=0;await expect(fetchKeywordPlanner(env,['broşür'],fetcher(async()=>{calls++;return Response.json({});}))).rejects.toThrow('ADS_ACCESS_NOT_CONFIGURED');
   expect(calls).toBe(0);
+});
+it('refreshes expired OAuth tokens and never exposes the provider error body',async()=>{
+  const cfg=await connected();await saveTokens(cfg,{access_token:'expired',refresh_token:'fixture-refresh',expires_at:0,scope:READ_SCOPES.join(' ')});
+  const access=await accessToken(cfg,fetcher(async(url,init)=>{expect(url).toBe('https://oauth2.googleapis.com/token');expect(new URLSearchParams(init!.body as URLSearchParams).get('grant_type')).toBe('refresh_token');return Response.json({access_token:'renewed',expires_in:3600});}));
+  expect(access).toBe('renewed');
+  await expect(requestJSON('https://oauth2.googleapis.com/token',{},fetcher(async()=>new Response('secret provider detail',{status:400})))).rejects.toThrow('GOOGLE_HTTP_400');
+  const stored=await env.DB.prepare('SELECT encrypted_tokens FROM oauth_credentials').first<{encrypted_tokens:string}>();expect(stored?.encrypted_tokens).not.toContain('renewed');
+});
+it('rejects duplicate rows spanning Google pages instead of publishing a truncated dataset',async()=>{
+  const cfg=await connected();await enqueue();const job=(await claimJob(cfg))!;
+  await processJob(cfg,job,fetcher(async()=>Response.json({responseAggregationType:'byPage',rows:Array.from({length:PAGE_SIZE},(_,i)=>rawRow(i))})));
+  const next=(await claimJob(cfg))!;await processJob(cfg,next,fetcher(async()=>Response.json({responseAggregationType:'byPage',rows:[rawRow(0)]})));
+  expect((await env.DB.prepare('SELECT complete FROM dataset_coverage').first<{complete:number}>())?.complete).toBe(0);
+});
+it('fences an expired lease so a stale worker cannot activate a dataset',async()=>{
+  const cfg=await connected();await enqueue();const old=(await claimJob(cfg))!;
+  await env.DB.prepare("UPDATE sync_jobs SET lease_until='2000-01-01'").run();const current=(await claimJob(cfg))!;expect(current.lease_token).not.toBe(old.lease_token);
+  await processJob(cfg,old,fetcher(async()=>Response.json({responseAggregationType:'byPage',rows:[rawRow()]})));
+  expect(await env.DB.prepare('SELECT * FROM dataset_coverage').first()).toBeNull();
+  await processJob(cfg,current,fetcher(async()=>Response.json({responseAggregationType:'byPage',rows:[rawRow()]})));
+  expect((await env.DB.prepare('SELECT row_count,complete FROM dataset_coverage').first())).toMatchObject({row_count:1,complete:1});
+});
+it('advances historical backfill in bounded daily slices toward year-over-year coverage',async()=>{
+  const cfg=await connected();await enqueueDaily(cfg,new Date('2026-10-23T00:00:00Z'));
+  const first=await env.DB.prepare("SELECT oldest_enqueued_day FROM backfill_progress WHERE provider='gsc'").first<{oldest_enqueued_day:string}>();
+  await enqueueDaily(cfg,new Date('2026-10-24T00:00:00Z'));
+  const next=await env.DB.prepare("SELECT oldest_enqueued_day FROM backfill_progress WHERE provider='gsc'").first<{oldest_enqueued_day:string}>();
+  expect((Date.parse(first!.oldest_enqueued_day)-Date.parse(next!.oldest_enqueued_day))/86400_000).toBe(90);
+});
+it('keeps Ads close variants and requested demand scope without starting campaigns',async()=>{
+  const cfg=await connected({ENABLE_GOOGLE_ADS:'true',GOOGLE_ADS_DEVELOPER_TOKEN:'fixture',GOOGLE_ADS_CUSTOMER_ID:'123',GOOGLE_ADS_API_VERSION:'v99'});
+  const reply=await fetchKeywordPlanner(cfg,['broşür baskı','broşür baski'],fetcher(async(url,init)=>{
+    expect(url).toContain(':generateKeywordHistoricalMetrics');const body=JSON.parse(init!.body as string);expect(body.keywords).toHaveLength(2);expect(body.keywordPlanNetwork).toBe('GOOGLE_SEARCH');
+    return Response.json({results:[{text:'broşür baskı',closeVariants:['broşür baski'],keywordMetrics:{avgMonthlySearches:'100'}}]});
+  }));
+  expect(reply.results?.[0].keywordMetrics?.avgMonthlySearches).toBe('100');expect(reply.results).toHaveLength(1);
 });

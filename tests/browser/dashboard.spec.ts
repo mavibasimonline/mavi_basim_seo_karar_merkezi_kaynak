@@ -1,0 +1,27 @@
+import {test,expect} from '@playwright/test';
+import {readFileSync} from 'node:fs';
+const token=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>line.startsWith('ADMIN_TOKEN='))?.slice('ADMIN_TOKEN='.length);
+if(!token)throw new Error('Yerel test erişim ayarı eksik; python3 scripts/local_secrets.py çalıştırın.');
+
+test('real local database, secure login, all products and truthful disconnected states',async({page,request})=>{
+  expect((await request.get('/api/report')).status()).toBe(401);
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.goto('/');await expect(page.getByRole('heading',{name:'Güvenli giriş'})).toBeVisible();
+  await page.getByLabel('Erişim anahtarı').fill(token!);await page.getByRole('button',{name:'Giriş yap',exact:true}).click();
+  await expect(page.locator('.product')).toHaveCount(29);
+  await expect(page.locator('#status')).toContainText('Google bağlantısı yok');
+  await expect(page.locator('#summary')).toContainText('521');await expect(page.locator('#summary')).toContainText('9.075');
+  await expect(page.locator('.badge').first()).toHaveText('Veri bekle');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  const first=page.locator('.product').first();await first.getByText('Kanıt, hesaplama ve eksikler',{exact:true}).click();
+  await expect(first.locator('details').first()).toContainText('Kanıt güveni');
+  const source=page.locator('.product').filter({has:page.getByRole('heading',{name:'Broşür',exact:true})});
+  await source.getByText(/Keyword Planner kaynakları/).click();await expect(source).toContainText('Yaklaşık aylık arama');
+  await page.getByPlaceholder('Broşür mobilde neden düştü?').fill('Broşür mobilde neden düştü?');await page.getByRole('button',{name:'Sor',exact:true}).click();
+  await expect(page.locator('#answer')).toContainText('kanıtlayamam');await expect(page.locator('#answer')).toContainText('kanıt');
+  await page.screenshot({path:'.local/panel-'+test.info().project.name+'.png',fullPage:false});
+  const exported=await page.request.get(await page.locator('#export').getAttribute('href')||'');expect(exported.status()).toBe(200);expect((await exported.json()).products).toHaveLength(29);
+  await page.getByRole('button',{name:"Google'ı bağla"}).click();await expect(page.locator('#message')).toContainText('eksik');
+  await page.getByRole('button',{name:'Çıkış',exact:true}).click();await expect(page.getByRole('heading',{name:'Güvenli giriş'})).toBeVisible();
+  expect(errors).toEqual([]);
+});

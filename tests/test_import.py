@@ -16,7 +16,8 @@ class ImportTests(unittest.TestCase):
     def setUpClass(cls):
         cls.report, cls.commands = importer.inspect_sources()
         cls.db = sqlite3.connect(':memory:')
-        cls.db.executescript((ROOT / 'migrations/0001_core.sql').read_text())
+        for migration in sorted((ROOT / 'migrations').glob('*.sql')):
+            cls.db.executescript(migration.read_text())
         cls.db.executescript(cls.commands)
 
     def test_all_original_sources_and_rows(self):
@@ -45,6 +46,15 @@ class ImportTests(unittest.TestCase):
     def test_unknown_scope_stays_unknown_and_urls_not_invented(self):
         self.assertEqual(self.db.execute('SELECT count(*) FROM keyword_sources WHERE location IS NOT NULL OR language IS NOT NULL OR network IS NOT NULL').fetchone()[0], 0)
         self.assertEqual(self.db.execute('SELECT count(*) FROM products WHERE canonical_url IS NOT NULL').fetchone()[0], 2)
+
+    def test_original_source_hashes_and_missing_data_report(self):
+        baseline = json.loads((ROOT / 'docs/source-audit.json').read_text(encoding='utf-8'))
+        self.assertEqual({f['path']: f['sha256'] for f in self.report['files']},
+                         {f['path']: f['sha256'] for f in baseline['files']})
+        self.assertEqual(self.report['unique_product_keywords'], 6765)
+        self.assertEqual(self.report['missing_average_searches'], 4169)
+        self.assertEqual(self.report['missing_monthly_cells'], 212148)
+        self.assertEqual(len(self.report['repeated_keywords']), 1300)
 
     def test_malformed_rows_are_reported(self):
         with tempfile.TemporaryDirectory() as temp:

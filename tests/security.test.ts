@@ -31,7 +31,7 @@ describe('owner authentication and token encryption',()=>{
   it('uses one-time state and requests least required read scopes',async()=>{
     const cfg=configured();const response=await oauthStart(cfg);
     const data=await response.json() as {authorization_url:string};const url=new URL(data.authorization_url);
-    expect(url.searchParams.get('scope')).toBe(READ_SCOPES.join(' '));
+    expect(url.searchParams.get('scope')).toBe(READ_SCOPES[0]);
     const state=url.searchParams.get('state')!;
     const request=()=>new Request(`https://app.example/api/oauth/google/callback?state=${state}&code=fixture`,{headers:{Cookie:response.headers.get('Set-Cookie')!}});
     const mock=fetcher(async()=>Response.json({access_token:'access',refresh_token:'refresh',expires_in:3600,scope:READ_SCOPES.join(' ')}));

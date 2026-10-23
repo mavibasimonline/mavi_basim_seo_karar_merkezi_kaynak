@@ -106,10 +106,23 @@ export function sitemapURLs(xml: string): {url:string;kind:'page'|'sitemap'}[] {
   const doc=new XMLParser({ignoreAttributes:true,processEntities:false,isArray:(name)=>name==='url'||name==='sitemap'}).parse(xml);
   const source=doc.sitemapindex?.sitemap||doc.urlset?.url;
   if(!Array.isArray(source))throw new ProviderError('INVALID_SITEMAP');
-  return source.slice(0,2000).flatMap((item:{loc?:unknown})=>{
+  if(source.length>2000)throw new ProviderError('SITEMAP_URL_LIMIT_EXCEEDED');
+  return source.flatMap((item:{loc?:unknown})=>{
     const url=typeof item.loc==='string'?siteURL(item.loc):null;
     return url?[{url,kind:doc.sitemapindex?'sitemap' as const:'page' as const}]:[];
   });
+}
+async function mapVerifiedPage(env:Env,url:string,snapshot:Snapshot,observed:string):Promise<void>{
+  if(snapshot.status!==200||snapshot.canonical.length!==1||siteURL(snapshot.canonical[0],url)!==url)return;
+  const slug=new URL(url).pathname.split('/').filter(Boolean).at(-1)||'';
+  const candidates=await env.DB.prepare('SELECT id,canonical_url FROM products WHERE canonical_url=? OR id=?').bind(url,slug).all<{id:string;canonical_url:string|null}>();
+  if(candidates.results.length!==1)return;
+  const product=candidates.results[0];
+  if(product.canonical_url&&product.canonical_url!==url)return;
+  await env.DB.batch([
+    env.DB.prepare('UPDATE products SET canonical_url=?,url_verified_at=? WHERE id=? AND (canonical_url IS NULL OR canonical_url=?)').bind(url,observed,product.id,url),
+    env.DB.prepare("UPDATE pages SET product_id=?,canonical_url=?,mapping_source='crawl-200-self-canonical-exact-slug' WHERE url=?").bind(product.id,url,url),
+  ]);
 }
 export async function seedCrawl(env: Env): Promise<void> {
   if(env.CRAWL_ENABLED!=='true')return;
@@ -152,11 +165,14 @@ export async function crawlOne(env: Env, fetcher: Fetch=fetch): Promise<void> {
       const redirect=siteURL(response.headers.get('location')||'',queued.url);
       if(response.status>=300&&response.status<400&&redirect)discovered.push({url:redirect,kind:'page'});
       await env.DB.prepare('INSERT OR IGNORE INTO pages(url,discovered_at,mapping_source) VALUES(?,?,?)').bind(queued.url,time,'crawl').run();
+      await mapVerifiedPage(env,queued.url,snapshot,time);
     }
     // Bounded discovery per invocation; remaining sitemap URLs are revisited on subsequent daily crawls.
-    const count=await env.DB.prepare('SELECT count(*) AS n FROM crawl_queue').first<{n:number}>();
-    const slots=Math.max(0,Math.min(20,1000-(count?.n||0)));
-    const statements=discovered.slice(0,slots).map(item=>env.DB.prepare('INSERT OR IGNORE INTO crawl_queue(url,kind,depth,next_crawl_at) VALUES(?,?,?,?)').bind(item.url,item.kind,queued.depth+1,time));
+    const existing=await env.DB.prepare('SELECT url FROM crawl_queue LIMIT 1001').all<{url:string}>();
+    const known=new Set(existing.results.map(r=>r.url));
+    const slots=Math.max(0,Math.min(20,1000-known.size));
+    const candidates=[...new Map(discovered.filter(d=>!known.has(d.url)).map(d=>[d.url,d])).values()];
+    const statements=candidates.slice(0,slots).map(item=>env.DB.prepare('INSERT OR IGNORE INTO crawl_queue(url,kind,depth,next_crawl_at) VALUES(?,?,?,?)').bind(item.url,item.kind,queued.depth+1,time));
     for(const candidate of parser.getSitemaps().slice(0,3)){const url=siteURL(candidate);if(url)statements.push(env.DB.prepare('INSERT OR IGNORE INTO crawl_queue(url,kind,next_crawl_at) VALUES(?,?,?)').bind(url,'sitemap',time));}
     statements.push(env.DB.prepare('UPDATE crawls SET finished_at=? WHERE id=?').bind(nowISO(),id));
     statements.push(env.DB.prepare('UPDATE crawl_queue SET next_crawl_at=?,attempts=0,last_error=NULL,lease_until=NULL,lease_token=NULL WHERE url=? AND lease_token=?').bind(new Date(Date.now()+86400_000).toISOString(),queued.url,lease));

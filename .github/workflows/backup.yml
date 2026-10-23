@@ -1,0 +1,61 @@
+name: Şifreli D1 yedek ve geri yükleme denetimi
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 2 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: d1-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Erişim ön koşulları
+        id: access
+        shell: bash
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$BACKUP_ENCRYPTION_KEY" ] && ! rg -q '00000000-0000-0000-0000-000000000000' wrangler.jsonc; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo '::notice::Gerçek D1 kimliği veya yedekleme kimlik bilgileri yok; gerçek yedek alınmadı.'
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.access.outputs.ready == 'true'
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        if: steps.access.outputs.ready == 'true'
+        with:
+          python-version: '3.12'
+      - if: steps.access.outputs.ready == 'true'
+        run: npm ci --no-fund
+      - name: Dışa aktar, şifrele ve ayrı veritabanında geri yükle
+        if: steps.access.outputs.ready == 'true'
+        run: |
+          node scripts/run.mjs wrangler d1 export seo --remote --output .local/backup.sql
+          node scripts/backup.mjs encrypt .local/backup.sql .local/backup.mavi > .local/backup-manifest.json
+          node scripts/backup.mjs decrypt .local/backup.mavi .local/verified.sql
+          cmp .local/backup.sql .local/verified.sql
+          python3 scripts/verify_restore.py --sql .local/verified.sql
+      - name: Yalnızca şifreli yedek sakla
+        if: steps.access.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mavi-seo-encrypted-${{ github.run_id }}
+          path: |
+            .local/backup.mavi
+            .local/backup-manifest.json
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 0
+      - name: Açık veriyi temizle
+        if: always()
+        run: rm -f .local/backup.sql .local/verified.sql

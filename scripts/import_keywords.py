@@ -61,11 +61,13 @@ def insert(table, values):
 
 
 def inspect_sources(root=ROOT):
-    report = {'files': [], 'errors': [], 'rows': 0, 'empty_cells': 0, 'zero_monthly_cells': 0,
+    report = {'files': [], 'errors': [], 'rows': 0, 'empty_cells': 0, 'zero_monthly_cells': 0, 'missing_monthly_cells': 0, 'missing_average_searches': 0,
               'duplicate_rows_within_file': 0, 'repeated_observations_across_exports': 0,
               'scope_warning': 'Lokasyon, dil ve ağ bilgisi dosyada bulunmuyorsa bilinmiyor; tahmin edilmez.'}
     statements = []
     seen_exports = set()
+    keyword_counts = Counter()
+    variants = {}
     timestamp = datetime.now(timezone.utc).isoformat()
     paths = sorted(root.glob('*/*/*.csv'))
     for path in paths:
@@ -104,6 +106,8 @@ def inspect_sources(root=ROOT):
                 values = dict(zip(header, cells))
                 keyword = cells[0]  # Original keyword remains distinct, including accent variants.
                 keyword_id = digest(product + '\0' + keyword)
+                keyword_counts[(product, keyword)] += 1
+                variants.setdefault((product, family(keyword)), set()).add(keyword)
                 repeated = tuple(cells)
                 report['duplicate_rows_within_file'] += int(repeated in seen_rows)
                 report['repeated_observations_across_exports'] += int((product, repeated) in seen_exports)
@@ -113,6 +117,8 @@ def inspect_sources(root=ROOT):
                 monthly = [{'month': k.removeprefix('Searches: '), 'value': number(v), 'raw': v}
                            for k, v in values.items() if k.startswith('Searches: ')]
                 report['zero_monthly_cells'] += sum(m['value'] == 0 for m in monthly)
+                report['missing_monthly_cells'] += sum(m['value'] is None for m in monthly)
+                report['missing_average_searches'] += int(number(values.get('Avg. monthly searches', '')) is None)
                 statements += [insert('keyword_catalog', {'id': keyword_id, 'product_id': product,
                                      'keyword': keyword, 'variant_family': family(keyword)}),
                                insert('keyword_metric_observations', {
@@ -136,6 +142,11 @@ def inspect_sources(root=ROOT):
     report['file_count'] = len(paths)
     report['product_count'] = len({p.parent for p in paths})
     report['group_count'] = len({p.parent.parent for p in paths})
+    report['unique_product_keywords'] = len(keyword_counts)
+    report['repeated_keywords'] = [{'product': product, 'keyword': word, 'observations': count}
+                                   for (product, word), count in sorted(keyword_counts.items()) if count > 1]
+    report['variant_groups'] = [{'product': product, 'family': variant, 'keywords': sorted(words)}
+                                for (product, variant), words in sorted(variants.items()) if len(words) > 1]
     return report, '\n'.join(statements) + '\n'
 
 
@@ -151,7 +162,7 @@ def main():
         raise SystemExit('İçe aktarma durduruldu; denetim raporuna bakın.')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(commands, encoding='utf-8')
-    print(json.dumps({k: v for k, v in report.items() if k not in ('files',)}, ensure_ascii=False))
+    print(json.dumps({k: v for k, v in report.items() if k not in ('files', 'repeated_keywords', 'variant_groups')}, ensure_ascii=False))
 
 
 if __name__ == '__main__':
