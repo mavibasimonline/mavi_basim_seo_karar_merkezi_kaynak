@@ -47,14 +47,16 @@ async function route(request:Request,env:Env):Promise<Response>{
   if(request.method==='GET'&&path==='/api/gsc/verify')return json(await verifyGscAccess(env));
   if(request.method==='POST'&&path==='/api/gsc/pilot')return json(await pilotGscDay(env));
   if(request.method==='GET'&&path==='/api/status'){
-    const [google,health,jobs,crawls,coverage]=await Promise.all([
+    const [google,health,jobs,crawls,coverage,jobDiagnostics,recentFailures]=await Promise.all([
       env.DB.prepare("SELECT scopes,updated_at FROM oauth_credentials WHERE provider='google'").first(),
       env.DB.prepare('SELECT * FROM health_checks ORDER BY day DESC,provider LIMIT 15').all(),
       env.DB.prepare('SELECT provider,status,count(*) AS jobs FROM sync_jobs GROUP BY provider,status').all(),
       env.DB.prepare('SELECT url,started_at,status_code,error_code FROM crawls ORDER BY started_at DESC LIMIT 5').all(),
       env.DB.prepare('SELECT provider,scope,min(day) AS earliest,max(day) AS latest,count(*) AS days FROM dataset_coverage WHERE complete=1 GROUP BY provider,scope').all(),
+      env.DB.prepare("SELECT status,max(updated_at) AS last_updated,max(CASE WHEN status='pending' THEN next_attempt_at END) AS pending_due,count(*) AS jobs FROM sync_jobs WHERE provider='gsc' GROUP BY status").all(),
+      env.DB.prepare("SELECT j.day,j.scope,j.status,j.error_code,j.updated_at,j.next_attempt_at,j.attempts FROM sync_jobs j WHERE j.provider='gsc' AND j.status IN ('retry','blocked','running') ORDER BY j.updated_at DESC LIMIT 5").all(),
     ]);
-    return json({google_connected:!!google,ga4_configured:!!env.GA4_PROPERTY_ID,ads_configured:env.ENABLE_GOOGLE_ADS==='true'&&!!env.GOOGLE_ADS_DEVELOPER_TOKEN,crawl_enabled:env.CRAWL_ENABLED==='true',automation_enabled:env.AUTOMATION_ENABLED==='true',health:health.results,jobs:jobs.results,crawls:crawls.results,coverage:coverage.results,
+    return json({google_connected:!!google,ga4_configured:!!env.GA4_PROPERTY_ID,ads_configured:env.ENABLE_GOOGLE_ADS==='true'&&!!env.GOOGLE_ADS_DEVELOPER_TOKEN,crawl_enabled:env.CRAWL_ENABLED==='true',automation_enabled:env.AUTOMATION_ENABLED==='true',health:health.results,jobs:jobs.results,crawls:crawls.results,coverage:coverage.results,job_diagnostics:jobDiagnostics.results,recent_failures:recentFailures.results,
       note:'Yapılandırma veya OAuth kaydı başarılı API erişimi anlamına gelmez; günlük sağlık sonuçlarını kontrol edin.'});
   }
   if(request.method==='GET'&&path==='/api/data-integrity')return json(await dataIntegrity(env,url.searchParams.get('month')||lastCompleteMonth()));
