@@ -2,7 +2,7 @@ import {beforeEach,it,expect} from 'vitest';
 import {init,env,connected,enqueue,fetcher} from './helpers';
 import {claimJob,processJob,enqueueDaily} from '../src/sync';
 import {fetchGsc,fetchGa4,fetchKeywordPlanner,PAGE_SIZE,validateGscRow} from '../src/providers';
-import {accessToken,saveTokens,READ_SCOPES,requestJSON} from '../src/google';
+import {accessToken,saveTokens,READ_SCOPES,requestJSON,verifyGscAccess} from '../src/google';
 
 beforeEach(init);
 const rawRow=(i=0)=>({keys:['2026-09-01',`https://mavibasim.com/page-${i}`,'tur','MOBILE'],clicks:1,impressions:10,ctr:0.1,position:2});
@@ -12,6 +12,22 @@ it('uses manual redirect mode for Google OAuth transport and rejects unsafe redi
   await expect(requestJSON('https://oauth2.googleapis.com/token',{method:'POST'},mock)).rejects.toThrow('GOOGLE_UNEXPECTED_REDIRECT');
   expect(mode).toBe('manual');
   await expect(requestJSON('https://oauth2.googleapis.com/token',{method:'POST'},fetcher(async()=>{throw new Error('unreachable');}))).rejects.toThrow('NETWORK_UNAVAILABLE');
+});
+it('verifies real GSC access read-only without storing traffic or enabling automation',async()=>{
+  const cfg=await connected();let called='';let requestBody:any;
+  const result=await verifyGscAccess(cfg,fetcher(async(url,init)=>{
+    called=url;requestBody=JSON.parse(String(init?.body));
+    expect(init?.method).toBe('POST');
+    return Response.json({rows:[]});
+  }));
+  expect(result.api_access).toBe(true);
+  expect(result.property).toBe('https://mavibasim.com/');
+  expect(result.rows_returned).toBe(0);
+  expect(called).toContain(encodeURIComponent('https://mavibasim.com/'));
+  expect(requestBody.rowLimit).toBe(1);
+  expect((await env.DB.prepare('SELECT count(*) AS n FROM dataset_coverage').first<{n:number}>())?.n).toBe(0);
+  expect((await env.DB.prepare('SELECT count(*) AS n FROM sync_jobs').first<{n:number}>())?.n).toBe(0);
+  await expect(verifyGscAccess(cfg,fetcher(async()=>new Response('',{status:403})))).rejects.toThrow('GOOGLE_HTTP_403');
 });
 it('stages pagination and activates only a completed authoritative dataset',async()=>{
   const cfg=await connected();await enqueue();
