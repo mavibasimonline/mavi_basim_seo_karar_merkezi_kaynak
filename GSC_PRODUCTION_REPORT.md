@@ -98,3 +98,9 @@ Bu belge tarihli ölçümdür. En son dağıtım commit/version kimliği canlı 
 Pilotun ardından PR #11 üretim `CRAWL_ENABLED=true` yapılandırmasını içerir. Mevcut saatlik `:45` Cron dilimi salt okunur tarayıcıyı kullanır; Google işiyle aynı slotta yarışmaz. Bayrağın gerçek yayındaki durumu ve sonraki otomatik tarama kaydı ayrı denetlenmelidir; pilot otomatik Cron taraması olarak sunulmaz. Crawler, robots ve hız sınırlarını korur; siteye yazmaz.
 
 Bu aşama tam regresyonu **265 Workers/D1 + 39 Python + 2 Chromium = 306 test** olarak genişletti. Pilotun foreign-host/auth/kapalı bayrak sınırları ve kaynak/D1 bağlama koşulları test edildi; ana üretim API'sine yeni yol eklenmedi. Otomatik GSC bütçe yenilenmesi ve bütün aylık kapsamın canlı kabulü hâlâ bekliyor.
+
+## Son üretim yapılandırması kontrolü — 18:02 UTC
+
+PR #11 main'e **4bfec9aae0ab1b55e14358d3bfb52af0137055a9** olarak birleşti. Main CI **40118789556** başarılı; 306 test/audit/kaynak/üretim paketi denetimi geçti. Salt okunur canlı tanılama **40118866686**, üretim AUTOMATION=true / CRAWL=true / Ads=false, aynı Google mülkü ve auth binding adlarını doğruladı. Bu andaki otomatik Cloudflare build version'ı **8633db1f-5b47-4fb9-a4dc-fa8c852804a9** idi; build'in commit etiketi yoktu. En son belge dahil main yayını controlled production workflow'uyla tam SHA etiketlenir ve health/postflight'ta doğrulanır.
+
+Gerçek 18:00 Cron kaydı **partial / DAILY_WRITE_BUDGET**: günlük güvenlik beklemesi kalıcı sağlık kaydında açıkça görüldü. 18:02 hesap ölçümü 377.637 okuma / 75.352 yazma; sonraki günlük bütçe ve tam üç ay bekliyor. İki gerçek ürün snapshot'ı kalıcı D1'de ve Google hatası yok. Saatlik otomatik taramanın ilk yeni olayı ve özel yönetici oturumundaki aylık rapor kabulü henüz gözlenmedi. Sonraki somut işler ve tek yeni secret ihtiyacı TODO'nun güncel üst bölümündedir.
