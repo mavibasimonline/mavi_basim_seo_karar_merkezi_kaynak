@@ -56,8 +56,10 @@ jobs:
           assert d['file_count']==521 and d['rows']==9075 and d['product_count']==29 and d['group_count']==4
           assert not d['errors']
           PY
-      - name: Require existing schema
-        run: node scripts/run.mjs wrangler d1 migrations list DB --remote --config deploy/wrangler.production.jsonc
+      - name: Verify no schema migrations remain
+        run: |
+          node scripts/run.mjs wrangler d1 migrations list DB --remote --config deploy/wrangler.production.jsonc > .local/migration-status.txt
+          grep -q 'No migrations to apply' .local/migration-status.txt
       - name: Import prepared SQL to D1
         run: node scripts/run.mjs wrangler d1 execute DB --remote --config deploy/wrangler.production.jsonc --file .local/keywords.sql
       - name: Read-only post-import verification
