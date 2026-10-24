@@ -9,6 +9,7 @@ import { seedCrawl, crawlOne } from './crawler';
 import { measureOneOutcome, recordAppliedChange } from './outcomes';
 import { radar } from './radar';
 import {changeCalendar,changeImpact} from './change-impact';
+import {dataIntegrity} from './data-integrity';
 
 export async function getReport(env:Env,month:string,options:AnalysisOptions={}):Promise<AnalysisReport>{
   monthPeriod(month);
@@ -16,6 +17,7 @@ export async function getReport(env:Env,month:string,options:AnalysisOptions={})
   const period=options.current||monthPeriod(month);
   const cached=await env.DB.prepare(`SELECT result_json,created_at,
     (SELECT checked_at FROM health_checks WHERE provider='gsc' ORDER BY day DESC LIMIT 1) health_checked_at,
+    (SELECT status FROM health_checks WHERE provider='gsc' ORDER BY day DESC LIMIT 1) health_status,
     (SELECT MAX(fetched_at) FROM dataset_coverage WHERE provider='gsc' AND scope='page' AND day BETWEEN ? AND ?) coverage_fetched_at
     FROM analysis_runs WHERE month=? AND engine_version=? AND json_extract(filters_json,'$.device') IS ?
     AND json_extract(result_json,'$.sources.google_connected')=EXISTS(SELECT 1 FROM oauth_credentials WHERE provider='google')
@@ -23,9 +25,9 @@ export async function getReport(env:Env,month:string,options:AnalysisOptions={})
       SELECT MAX(fetched_at) AS stamp FROM dataset_coverage UNION ALL SELECT MAX(updated_at) FROM oauth_credentials
       UNION ALL SELECT MAX(checked_at) FROM health_checks UNION ALL SELECT MAX(url_verified_at) FROM products
       UNION ALL SELECT MAX(imported_at) FROM keyword_sources)), '')
-    ORDER BY created_at DESC LIMIT 1`).bind(period.start,period.end,options.current?`${options.current.start}/${options.current.end}`:month,ENGINE_VERSION,options.device||null).first<{result_json:string;created_at:string;health_checked_at:string|null;coverage_fetched_at:string|null}>();
+    ORDER BY created_at DESC LIMIT 1`).bind(period.start,period.end,options.current?`${options.current.start}/${options.current.end}`:month,ENGINE_VERSION,options.device||null).first<{result_json:string;created_at:string;health_checked_at:string|null;health_status:string|null;coverage_fetched_at:string|null}>();
   if(cached){const result=JSON.parse(cached.result_json) as AnalysisReport;const recent=(stamp:string|null,limit:number)=>!!stamp&&Date.now()-Date.parse(stamp)>=0&&Date.now()-Date.parse(stamp)<limit;
-    if(recent(cached.created_at,15*60_000)&&(result.missing.length||recent(cached.health_checked_at,72*3600_000)&&recent(cached.coverage_fetched_at,72*3600_000)))return result;}
+    if(recent(cached.created_at,15*60_000)&&(result.missing.length||cached.health_status==='ok'&&recent(cached.health_checked_at,72*3600_000)&&recent(cached.coverage_fetched_at,72*3600_000)))return result;}
   const report=await analyze(env,month,new Date(),options);
   const errors=await validateAnalysis(env,report);
   if(errors.length)throw new Error('ANALYSIS_VALIDATION_FAILED');
@@ -53,6 +55,8 @@ async function route(request:Request,env:Env):Promise<Response>{
     return json({google_connected:!!google,ga4_configured:!!env.GA4_PROPERTY_ID,ads_configured:env.ENABLE_GOOGLE_ADS==='true'&&!!env.GOOGLE_ADS_DEVELOPER_TOKEN,crawl_enabled:env.CRAWL_ENABLED==='true',automation_enabled:env.AUTOMATION_ENABLED==='true',health:health.results,jobs:jobs.results,crawls:crawls.results,coverage:coverage.results,
       note:'Yapılandırma veya OAuth kaydı başarılı API erişimi anlamına gelmez; günlük sağlık sonuçlarını kontrol edin.'});
   }
+  if(request.method==='GET'&&path==='/api/data-integrity')return json(await dataIntegrity(env,url.searchParams.get('month')||lastCompleteMonth()));
+  if(request.method==='GET'&&path==='/api/audit-history')return json({rows:(await env.DB.prepare("SELECT id,kind,created_at,result_json FROM insight_runs WHERE kind IN ('data-integrity','sync-audit') AND id>? ORDER BY id LIMIT 50").bind(url.searchParams.get('after')||'').all()).results});
   if(request.method==='GET'&&path==='/api/change-calendar')return json({rows:await changeCalendar(env,url.searchParams.get('day')||new Date().toISOString().slice(0,10),url.searchParams.get('after')||''),timezone:'UTC',note:'Takvim tespit tarihidir; kesin yayın tarihi değildir.'});
   if(request.method==='GET'&&path==='/api/change-impact')return json(await changeImpact(env,url.searchParams.get('id')||''));
   if(request.method==='GET'&&path==='/api/radar'){const plan=parseQuestion('Son 28 günde hangi ürünler yükseldi?',[]);return json(await radar(env,await getReport(env,plan.context.month,{current:plan.period,previous:plan.previous})));}

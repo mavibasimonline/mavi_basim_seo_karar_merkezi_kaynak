@@ -2,7 +2,7 @@ import { Env, nowISO } from './types';
 import { insertRows } from './sync';
 import { siteURL } from './urls';
 
-export const ENGINE_VERSION = '1.2.1';
+export const ENGINE_VERSION = '1.2.2';
 export type Decision = 'Koru'|'İncele'|'İyileştir'|'Veri bekle';
 export interface Metrics { clicks:number; impressions:number; ctr:number|null; position:number|null }
 export interface Period { start:string; end:string; days:number; label:string }
