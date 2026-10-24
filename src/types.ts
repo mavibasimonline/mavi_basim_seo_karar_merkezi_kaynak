@@ -16,6 +16,7 @@ export interface Env {
   ENABLE_GOOGLE_ADS?: string;
   CRAWL_ENABLED?: string;
   AUTOMATION_ENABLED?: string;
+  COMPETITOR_CRAWL_ENABLED?: string;
 }
 export type Fetch = typeof fetch;
 export const nowISO = () => new Date().toISOString();

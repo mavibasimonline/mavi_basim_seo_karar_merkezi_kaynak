@@ -13,6 +13,10 @@ test('real local database, secure login, all products and truthful disconnected 
   await expect(page.locator('#summary')).toContainText('521');await expect(page.locator('#summary')).toContainText('9.075');
   await expect(page.locator('.badge').first()).toHaveText('Veri bekle');
   await page.getByText('SEO Fırsat Radarı',{exact:true}).click();
+  await page.getByText('Rakip Analizi',{exact:true}).click();
+  await expect(page.locator('#competitorResults')).toContainText('Gerçek kayıt: 0 rakip.');
+  await expect(page.locator('#competitorResults')).toContainText('içerik boşluğu adayı yok.');
+  await page.getByText('Rakip Analizi',{exact:true}).click();
   await page.getByText('Veri Sağlığı ve Doğruluk Denetimi',{exact:true}).click();
   await expect(page.locator('#dataAuditResults')).toContainText('Keyword Planner: Doğrulandı; 521 dosya, 9075 kaynak satırı.');
   await expect(page.locator('#dataAuditResults')).toContainText('Veri yetersiz');
@@ -41,4 +45,12 @@ test('real local database, secure login, all products and truthful disconnected 
   await page.getByRole('button',{name:"Google'ı bağla"}).click();await expect(page.locator('#message')).toContainText('eksik');
   await page.getByRole('button',{name:'Çıkış',exact:true}).click();await expect(page.getByRole('heading',{name:'Güvenli giriş'})).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test('untrusted competitor evidence remains text and fits the screen',async({page})=>{
+  const payload='<img src=x onerror="window.__competitorAttack=true">';
+  await page.route('**/api/competitors',route=>route.fulfill({json:{sites:[],products:[],crawl_enabled:false,note:'TEST FIXTURE; not a real competitor analysis',history:[],comparisons:[{name:'TEST Broşür',url:'https://mavibasim.com/brosur',competitor_url:'https://print.example.com/'+ 'x'.repeat(400),comparison_status:'TEST',status:'TEST',observed_at:'TEST',own_snapshot:null,summary:{title:payload,description:payload,topics:[{topic:'TEST',quote:payload}],headings:[],canonical:[],robots:[],structured_types:[]},market_demand:[],gaps:[]}]}}));
+  await page.goto('/');await page.getByLabel('Erişim anahtarı').fill(token!);await page.getByRole('button',{name:'Giriş yap',exact:true}).click();await expect(page.locator('.product')).toHaveCount(29);
+  await page.getByText('Rakip Analizi',{exact:true}).click();await page.locator('#competitorResults summary').first().click();await expect(page.locator('#competitorResults')).toContainText(payload);
+  expect(await page.locator('#competitorResults img').count()).toBe(0);expect(await page.evaluate(()=>(window as any).__competitorAttack)).not.toBe(true);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

@@ -1,3 +1,9 @@
+## Güncel öncelik — gerçek üretim GSC kuyruğu
+
+Kullanıcının 24 Ekim 2026 yeni talimatı: origin/main artık 621d566, gerçek Worker mavi-basim-seo-prod.mavibasimonline.workers.dev, GSC mülkü sc-domain:mavibasim.com; operatör Google bağlantısı ve otomasyonu açmış. 1 done/179 pending ve 83 satır geçmiş durumu bağımsız canlı/D1 kanıtıyla incelenmeli. Yeni özellik geliştirmesi bu olay çözülene kadar bekler. Rakip dalındaki test edilen çalışma korunur; üretim yapılandırmasıyla birleştirilmez. Kalan teknik SEO/iç bağlantı/sorgu–URL talepleri silinmedi, ertelendi.
+
+Bu çalışma ortamında Cloudflare oturumu/process secret binding yok; GitHub Actions secret listesini okuma 403. Mevcut Actions iş akışları ve salt okunur erişim yolları inceleniyor. Gizli değer istenmedi veya loglanmadı. Üretim kuyruğu için sonraki somut adım güncel main/scheduler/sync/OAuth ve mevcut D1 workflow incelemesidir. Son tamamlanan kod commit'i bu belgeyi içeren git log -1 kaydıdır.
+
 # Durum, teslim denetimi ve devam kaydı
 
 ## Türkçe soru-cevap — tamamlandı
@@ -10,7 +16,7 @@
 
 1. [x] SEO fırsat radarı: 34 senaryo ve panel tamamlandı; SEO_OPPORTUNITY_RADAR_REPORT.md. Dal feat/seo-firsat-radari; PR tabanı feat/turkce-soru-cevap. Regresyon 178 başarılı; dört migration, kaynak koruma ve üretim dry-run geçti.
 2. [x] SEO değişiklik etki analizi: mevcut geçmişe bağlı 28 gün/sorgu/cihaz/takvim ve 38 senaryo tamamlandı. SEO_CHANGE_IMPACT_REPORT.md; dal feat/seo-degisiklik-etkisi, taban radar PR #4. 195 Workers + 20 Python + 2 tarayıcı = 217 test; audit 0.
-3. Rakip SEO: güvenli alan adı/robots taraması, açık ürün eşleştirmesi, içerik kanıtları ve 30 test; COMPETITOR_SEO_REPORT.md; ayrı PR. Gerçek rakip adresi/taraması henüz yok.
+3. [x] Rakip SEO kodu ve paneli: 41 modül testi, güvenli/robots taraması, 29 ürün eşleştirmesi, immutable geçmiş ve kısa kanıtlar tamamlandı. COMPETITOR_SEO_REPORT.md; dal feat/rakip-seo-analizi. 284 Workers + 21 Python + 4 tarayıcı = 309 test; altı migration. Gerçek rakip taraması yapılmadı. Üretime uygulanmadı.
 4. Teknik SEO ve URL Inspection: mevcut envanteri genişlet; dizin kanıtını GSC gösteriminden ayır; 30 test ve TECHNICAL_SEO_AUDIT.md; ayrı PR.
 5. İç bağlantı: anchor/bölüm/nofollow ve eksik kapsamı tanıyan grafik; 30 test ve INTERNAL_LINK_AUDIT.md; ayrı PR.
 6. Sorgu–URL çakışması: mevcut olası çakışmayı dönem/cihaz/niyet kanıtlarıyla genişlet; 30 test ve KEYWORD_URL_CONFLICT_REPORT.md; ayrı PR.

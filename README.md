@@ -1,3 +1,5 @@
+Rakip karşılaştırma modülü: [COMPETITOR_SEO_REPORT.md](COMPETITOR_SEO_REPORT.md); gerçek rakip analizi yapılmadı.
+
 Veri kaynakları ve bağımsız metrik denetimi: [DATA_INTEGRITY_AUDIT.md](DATA_INTEGRITY_AUDIT.md).
 
 SEO değişiklik takvimi ve 28 günlük etki karşılaştırması: [test ve sınırlar](SEO_CHANGE_IMPACT_REPORT.md).
