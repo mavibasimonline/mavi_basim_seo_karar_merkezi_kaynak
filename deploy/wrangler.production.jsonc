@@ -14,7 +14,7 @@
   }],
   "vars": {
     "SITE_ORIGIN": "https://mavibasim.com",
-    "GSC_PROPERTY": "https://mavibasim.com/",
+    "GSC_PROPERTY": "sc-domain:mavibasim.com",
     "GA4_PROPERTY_ID": "",
     "GOOGLE_REDIRECT_URI": "https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/oauth/google/callback",
     "CRAWL_ENABLED": "false",
