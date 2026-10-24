@@ -141,9 +141,16 @@ export default {
       return securityHeaders(json({error:invalid?'İstek verisi geçersiz.':'İşlem tamamlanamadı. Veri kaynağı ve sistem durumunu kontrol edin.',code:invalid?'INVALID_INPUT':error instanceof ProviderError?error.code:'INTERNAL_ERROR'},invalid?400:503));
     }
   },
-  async scheduled(_event:ScheduledController,env:Env,context:ExecutionContext){context.waitUntil(tick(env).catch(async()=>{
-    const stamp=nowISO();
-    await env.DB.prepare("INSERT INTO health_checks VALUES('scheduler',?,?,?,?) ON CONFLICT(provider,day) DO UPDATE SET checked_at=excluded.checked_at,status=excluded.status,code=excluded.code")
-      .bind(stamp.slice(0,10),stamp,'failed','SCHEDULER_FAILED').run();
-  }));},
+  async scheduled(_event:ScheduledController,env:Env,context:ExecutionContext){context.waitUntil((async()=>{
+    try{
+      await tick(env);
+      const stamp=nowISO();
+      await env.DB.prepare("INSERT INTO health_checks VALUES('scheduler',?,?,?,?) ON CONFLICT(provider,day) DO UPDATE SET checked_at=excluded.checked_at,status=excluded.status,code=excluded.code")
+        .bind(stamp.slice(0,10),stamp,'ok',null).run();
+    }catch{
+      const stamp=nowISO();
+      await env.DB.prepare("INSERT INTO health_checks VALUES('scheduler',?,?,?,?) ON CONFLICT(provider,day) DO UPDATE SET checked_at=excluded.checked_at,status=excluded.status,code=excluded.code")
+        .bind(stamp.slice(0,10),stamp,'failed','SCHEDULER_FAILED').run();
+    }
+  })());},
 };
