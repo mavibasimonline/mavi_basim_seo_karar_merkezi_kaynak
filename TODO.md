@@ -8,7 +8,7 @@
 
 ## Aktif geliştirme kuyruğu — henüz tamamlanmadı
 
-1. SEO fırsat radarı: ortak analiz ve sorgu kanıtlarıyla 30 senaryo, panel, SEO_OPPORTUNITY_RADAR_REPORT.md; ayrı dal/PR.
+1. [x] SEO fırsat radarı: 34 senaryo ve panel tamamlandı; SEO_OPPORTUNITY_RADAR_REPORT.md. Dal feat/seo-firsat-radari; PR tabanı feat/turkce-soru-cevap. Regresyon 178 başarılı; dört migration, kaynak koruma ve üretim dry-run geçti.
 2. SEO değişiklik etki analizi: mevcut geçmiş/sonuç modülünü genişlet, 28 gün/sorgu/cihaz/takvim ve 30 test; SEO_CHANGE_IMPACT_REPORT.md; ayrı PR.
 3. Rakip SEO: güvenli alan adı/robots taraması, açık ürün eşleştirmesi, içerik kanıtları ve 30 test; COMPETITOR_SEO_REPORT.md; ayrı PR. Gerçek rakip adresi/taraması henüz yok.
 4. Teknik SEO ve URL Inspection: mevcut envanteri genişlet; dizin kanıtını GSC gösteriminden ayır; 30 test ve TECHNICAL_SEO_AUDIT.md; ayrı PR.
@@ -16,7 +16,7 @@
 6. Sorgu–URL çakışması: mevcut olası çakışmayı dönem/cihaz/niyet kanıtlarıyla genişlet; 30 test ve KEYWORD_URL_CONFLICT_REPORT.md; ayrı PR.
 7. Veri doğruluk denetçisi: mevcut bağımsız SQL/kaynak/sağlık denetimlerini tamamla, ürün/kaynak paneli ve 40 senaryo; DATA_INTEGRITY_AUDIT.md; ayrı PR.
 
-Bu kuyruk maddeleri talep kaydıdır; kodu/testi bitmiş sayılmaz. Hesap yetkisi olmadan gerçek Google veya canlı sistem kabulü verilmeyecek. Sonraki somut adım radar modülüdür. Gerçek bağlantılar için yalnız hesap sahibinin Cloudflare Workers Free ve Google okuma/OAuth izinleri beklenir.
+Bu kuyruk maddeleri talep kaydıdır; kodu/testi bitmiş sayılmaz. Hesap yetkisi olmadan gerçek Google veya canlı sistem kabulü verilmeyecek. Sonraki somut adım mevcut geçmişe dayalı 28 günlük değişiklik etki analizidir. Gerçek bağlantılar için yalnız hesap sahibinin Cloudflare Workers Free ve Google okuma/OAuth izinleri beklenir.
 
 ## Bağımsız denetim — tamamlandı
 

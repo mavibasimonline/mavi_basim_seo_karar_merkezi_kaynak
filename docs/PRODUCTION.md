@@ -57,7 +57,7 @@ node scripts/run.mjs --capture .local/production-import.log wrangler d1 execute 
 node scripts/run.mjs wrangler d1 execute DB --remote --config deploy/wrangler.production.jsonc --file deploy/acceptance-source.sql
 ```
 
-Beklenen: 3 uygulama migration'ı, 4 grup, 29 ürün, 521 kaynak, 9.075 gözlem. Aktarım sadece yeni SEO D1'e gider; kaynak CSV'lere veya canlı siteye yazmaz. Kaynak SQL'i yalnızca yerel `.local/` içinde oluşturulur. Çıktıdaki sıfır Google/tarama kaydı ilk kurulum için doğrudur. Tekrar aktarım sayıları çoğaltmamalı; günlük yazma kotası nedeniyle gereksiz tekrar yapmayın.
+Beklenen: 4 uygulama migration'ı, 4 grup, 29 ürün, 521 kaynak, 9.075 gözlem. Aktarım sadece yeni SEO D1'e gider; kaynak CSV'lere veya canlı siteye yazmaz. Kaynak SQL'i yalnızca yerel `.local/` içinde oluşturulur. Çıktıdaki sıfır Google/tarama kaydı ilk kurulum için doğrudur. Tekrar aktarım sayıları çoğaltmamalı; günlük yazma kotası nedeniyle gereksiz tekrar yapmayın.
 
 ## 4. Güvenli secret ve ilk yayın
 
