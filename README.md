@@ -16,6 +16,12 @@ Türkçe tek ekran paneli, Cloudflare Worker API'si, D1/SQLite veri modeli, gün
 
 **Güncel üretim durumu (24 Ekim 2026):** Ayrı [Workers uygulaması](https://mavi-basim-seo-prod.mavibasimonline.workers.dev) ve gerçek D1 mevcuttur. Mevcut Google OAuth bağlantısından gerçek GSC kayıtları alınmıştır; 17:42 UTC tanılamasında 36 günlük sayfa/sorgu veri kümesi tamamlanmıştır; Temmuz–Eylül hedefi 12/184 düzeyindedir. Bu, Temmuz–Eylül aylarının tamamlandığı veya ürün raporlarının kabulden geçtiği anlamına gelmez. 300 test ve gerçek commit/version doğrulamasıyla kontrollü yayın başarılıdır; aktarım günlük güvenlik bütçesiyle devam eder. Üretim kuyruğu düzeltmesi, kota ve canlı kabul kaydı: [GSC_PRODUCTION_REPORT.md](GSC_PRODUCTION_REPORT.md). Bu belgenin aşağıdaki eski kurulum engelleri tarihçedir; güncel durum için raporu kullanın. GA4 ve Ads kapalıdır. Mevcut tarayıcının broşür/el ilanı gerçek pilotu ve D1 snapshot kanıtı başarılı; otomatik üretim taraması 18:02 UTC gerçek Cloudflare ayarında etkin doğrulanmıştır; ilk sonraki saatlik olay ayrıca izlenmelidir. 29 ürünün tamamı taranmış sayılmaz. Test fixture'ları gerçek veri olarak içe aktarılmaz.
 
+## Yenilenen Türkçe panel
+
+Daraltılabilir menüden Genel Bakış, Ürün Performansı, Arama Sorguları, Fırsat Radarı, Değişiklik Takvimi, Veri Sağlığı ve SEO Soru-Cevap açılır. Üstteki dönem/cihaz seçimi KPI, günlük grafik, ürün raporu ve sorgu tablosuna uygulanır. Soru-cevap kendi doğal dil tarih/cihaz bağlamını korur. Ürün satırları kanıt ayrıntısını açar; sorgular sunucuda filtrelenir, sıralanır ve sayfalanır.
+
+Grafikler yalnız doğrulanmış gerçek GSC ölçümlerini içerir; eksik günler çizgiyle birleştirilmez ve sıfırla doldurulmaz. Kısmi ayın gözlenen kapsamı görünürdür, tam dönem karşılaştırması yapılmaz. Google bağlantısı olmadan arşiv ölçümleri güncel bağlantı gibi gösterilmez. Planner hacimleri GSC KPI'larına eklenmez. Mobil ve klavye erişimi, yerel fontlar ve güvenli oturum mevcut uygulama içinde korunur. [334 testlik kabul ve gerçek D1 doğrulaması](FRONTEND_REDESIGN_REPORT.md).
+
 ## Kaynakların sonucu
 
 | Ölçüm | Doğrulanan değer |

@@ -1,21 +1,715 @@
 <!doctype html>
 <html lang="tr">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Mavi Basım · SEO Karar Merkezi</title><link rel="stylesheet" href="/app.css"><script src="/app.js" defer></script></head>
-<body>
-<header><div><p class="eyebrow">MAVİ BASIM</p><h1>SEO Karar Merkezi</h1><p>Önce kanıt, sonra karar.</p></div><button id="logout" hidden>Çıkış</button></header>
-<main>
-<form id="login"><h2>Güvenli giriş</h2><label for="token">Erişim anahtarı</label><input id="token" name="token" type="password" autocomplete="current-password" required><button>Giriş yap</button><p>Arama verileriniz yalnızca yetkili kullanıcıya açıktır.</p></form>
-<p id="message" role="status" aria-live="polite"></p>
-<section id="dashboard" hidden>
-<div class="toolbar"><label for="month">Rapor dönemi <input id="month" type="month"></label><button id="refresh">Raporu göster</button><a id="export" href="/api/export">Raporu indir</a><button id="google">Google'ı bağla</button><button id="pilot" type="button">İlk GSC verisini al</button></div>
-<div id="status" class="notice"></div><div id="summary" class="summary"></div>
-<section><h2>Öncelik ve koruma</h2><div id="priorities"></div><p id="protect"></p></section>
-<form id="question"><label for="questionText">SEO verilerine sorun</label><div class="question-row"><input id="questionText" maxlength="1000" placeholder="Broşür mobilde neden düştü?" required><button>Sor</button></div></form>
-<article id="answer" aria-live="polite" hidden></article>
-<details id="radar"><summary>SEO Fırsat Radarı</summary><div id="radarResults">Veri kapsamı açıldığında denetlenir.</div></details>
-<details id="changeCalendar"><summary>SEO Değişiklik Takvimi</summary><label for="changeDay">Tespit günü (UTC)</label><input id="changeDay" type="date"><button id="showChanges">Göster</button><div id="changeResults"></div></details>
-<details id="dataHealth"><summary>Veri Sağlığı ve Doğruluk Denetimi</summary><button id="runDataAudit">Denetimi Yenile</button><div id="dataAuditResults"></div></details>
-<h2>Ürünlerin durumu</h2><p>Her ürünün kanıtı, ölçümü ve eksikleri ayrıntıda gösterilir. Eksik veri sıfır değildir.</p><div id="products" class="products"></div>
-<details><summary>Veri sağlığı ve kapsam</summary><pre id="health"></pre></details>
-<p class="footnote">Keyword Planner: yaklaşık pazar talebi. Search Console: arama performansı. GA4: organik oturumlar. Korelasyon nedensellik değildir. Canlı siteye otomatik değişiklik yapılmaz.</p>
-</section></main></body></html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#14243e" />
+    <title>Mavi Basım · SEO Karar Merkezi</title>
+    <link rel="stylesheet" href="/app.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#loginScreen">İçeriğe geç</a>
+    <main id="loginScreen" class="login-screen" tabindex="-1">
+      <div class="login-brand">
+        <div class="brand-mark" aria-hidden="true">m<span>.</span></div>
+        <span>MAVİ BASIM <small>SEO KARAR MERKEZİ</small></span>
+      </div>
+      <div class="login-layout">
+        <div class="login-intro">
+          <span class="overline">İŞİNİZİ BÜYÜTEN İÇGÖRÜLER</span>
+          <h1>Arama verileriniz.<br />Daha net kararlar.</h1>
+          <p>
+            Ürünlerinizin performansını görün, başarılı çalışmalarınızı koruyun.
+            Her kararı gerçek verilerle destekleyin.
+          </p>
+          <div class="login-promise">
+            <svg class="icon" aria-hidden="true">
+              <use href="/icons.svg#shield" />
+            </svg>
+            Güvenli erişim · Kanıta dayalı analiz
+          </div>
+        </div>
+        <form id="login" class="login-card" method="post" action="/api/session">
+          <span class="login-lock"
+            ><svg class="icon" aria-hidden="true">
+              <use href="/icons.svg#shield" /></svg
+          ></span>
+          <h2>Güvenli giriş</h2>
+          <p>SEO çalışma alanınıza hoş geldiniz.</p>
+          <label for="token">Erişim anahtarı</label
+          ><input
+            id="token"
+            name="token"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Erişim anahtarınızı girin"
+            required
+          /><button class="button primary" type="submit">
+            Giriş yap
+            <svg class="icon" aria-hidden="true">
+              <use href="/icons.svg#arrow" />
+            </svg>
+          </button>
+          <p class="login-note">
+            Arama verileriniz yalnızca yetkili kullanıcıya açıktır. Anahtarınız
+            bu tarayıcıda saklanmaz.
+          </p>
+        </form>
+      </div>
+      <p class="login-footer">Mavi Basım · Veriden kanıta, kanıttan karara.</p>
+    </main>
+    <div id="app" class="app-shell" hidden>
+      <aside
+        id="sidebar"
+        class="sidebar"
+        aria-label="Çalışma alanı navigasyonu"
+      >
+        <a
+          class="brand"
+          href="#overview"
+          title="Mavi Basım SEO Karar Merkezi — Genel bakış"
+          ><div class="brand-mark" aria-hidden="true">m<span>.</span></div>
+          <span class="nav-label"
+            >Mavi Basım<small>SEO Karar Merkezi</small></span
+          ></a
+        >
+        <div class="workspace">
+          <span class="workspace-icon">M</span
+          ><span class="nav-label"
+            ><strong>Mavi Basım</strong><small>mavibasim.com</small></span
+          ><span class="workspace-dot" aria-hidden="true"></span>
+        </div>
+        <p class="nav-caption nav-label">ÇALIŞMA ALANINIZ</p>
+        <nav id="navigation" aria-label="Ana menü">
+          <a
+            href="#overview"
+            data-view="overview"
+            aria-label="Genel Bakış"
+            aria-current="page"
+            ><svg class="icon" aria-hidden="true">
+              <use href="/icons.svg#grid" /></svg
+            ><span class="nav-label">Genel Bakış</span></a
+          ><a
+            href="#products"
+            data-view="products"
+            aria-label="Ürün Performansı"
+            ><svg class="icon" aria-hidden="true">
+              <use href="/icons.svg#box" /></svg
+            ><span class="nav-label">Ürün Performansı</span></a
+          ><a href="#queries" data-view="queries" aria-label="Arama Sorguları"
+            ><svg class="icon" aria-hidden="true">
+              <use href="/icons.svg#search" /></svg
+            ><span class="nav-label">Arama Sorguları</span></a
+          ><a href="#radar" data-view="radar" aria-label="SEO Fırsat Radarı"
+            ><svg class="icon" aria-hidden="true">
+              <use href="/icons.svg#radar" /></svg
+            ><span class="nav-label">SEO Fırsat Radarı</span></a
+          ><a
+            href="#changes"
+            data-view="changes"
+            aria-label="Değişiklik Takvimi"
+            ><svg class="icon" aria-hidden="true">
+              <use href="/icons.svg#calendar" /></svg
+            ><span class="nav-label">Değişiklik Takvimi</span></a
+          ><a href="#health" data-view="health" aria-label="Veri Sağlığı"
+            ><svg class="icon" aria-hidden="true">
+              <use href="/icons.svg#shield" /></svg
+            ><span class="nav-label">Veri Sağlığı</span></a
+          ><a
+            href="#questions"
+            data-view="questions"
+            aria-label="SEO Soru-Cevap"
+            ><svg class="icon" aria-hidden="true">
+              <use href="/icons.svg#chat" /></svg
+            ><span class="nav-label">SEO Soru-Cevap</span></a
+          >
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="sidebar-note nav-label">
+            <svg class="icon" aria-hidden="true">
+              <use href="/icons.svg#shield" /></svg
+            ><strong>Başarılı çalışmayı koruyun.</strong>
+            <p>Önce kanıt, sonra SEO kararı.</p>
+          </div>
+          <button id="logout" class="nav-logout" aria-label="Güvenli çıkış">
+            <svg class="icon" aria-hidden="true">
+              <use href="/icons.svg#logout" /></svg
+            ><span class="nav-label">Güvenli çıkış</span>
+          </button>
+          <p class="sidebar-version nav-label">
+            MAVİ BASIM · SEO ÇALIŞMA ALANI
+          </p>
+        </div>
+      </aside>
+      <button
+        id="navBackdrop"
+        class="nav-backdrop"
+        aria-label="Menüyü kapat"
+        hidden
+      ></button>
+      <div id="appMain" class="app-main">
+        <header class="topbar">
+          <div class="breadcrumb">
+            <button
+              id="sidebarToggle"
+              class="icon-button"
+              aria-label="Menüyü daralt"
+              aria-expanded="true"
+              aria-controls="sidebar"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="/icons.svg#menu" />
+              </svg></button
+            ><span class="breadcrumb-workspace">Çalışma alanı</span
+            ><span class="breadcrumb-divider">/</span
+            ><strong id="breadcrumb">Genel Bakış</strong>
+          </div>
+          <div class="topbar-actions">
+            <span id="freshness" class="freshness"
+              ><span class="status-dot"></span> Veri durumu kontrol
+              ediliyor</span
+            ><button
+              id="help"
+              class="icon-button"
+              aria-label="Veri kaynakları hakkında"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="/icons.svg#info" />
+              </svg></button
+            ><span
+              class="avatar"
+              role="img"
+              aria-label="Mavi Basım çalışma alanı"
+              >MB</span
+            >
+          </div>
+        </header>
+        <main id="mainContent" tabindex="-1">
+          <section id="dashboard">
+            <div class="page-heading">
+              <div>
+                <p class="overline">SEO KARAR MERKEZİ</p>
+                <h1 id="viewTitle">SEO’ya genel bakış</h1>
+                <p id="viewDescription">
+                  Arama performansınızı izleyin. Bir sonraki adımınızı kanıtla
+                  belirleyin.
+                </p>
+              </div>
+              <div class="page-actions">
+                <a id="export" class="button secondary" href="/api/export"
+                  ><svg class="icon" aria-hidden="true">
+                    <use href="/icons.svg#down" /></svg
+                  ><span>Raporu indir</span></a
+                ><button id="refresh" class="button primary">
+                  <svg class="icon" aria-hidden="true">
+                    <use href="/icons.svg#refresh" />
+                  </svg>
+                  Verileri yenile
+                </button>
+              </div>
+            </div>
+            <div class="filterbar">
+              <div id="periodControl" class="period-selector">
+                <svg class="icon" aria-hidden="true">
+                  <use href="/icons.svg#calendar" /></svg
+                ><label for="month">Rapor dönemi</label
+                ><select id="month" aria-label="Rapor dönemi"></select>
+              </div>
+              <div id="deviceControl" class="device-selector">
+                <label for="device">Cihaz</label
+                ><select id="device" aria-label="Cihaz">
+                  <option value="ALL">Tüm cihazlar</option>
+                  <option value="MOBILE">Mobil</option>
+                  <option value="DESKTOP">Masaüstü</option>
+                  <option value="TABLET">Tablet</option>
+                </select>
+              </div>
+              <span id="scopeLabel" class="filter-scope"
+                >Google Search Console · Web araması</span
+              >
+            </div>
+            <div id="status" class="data-notice" role="status"></div>
+            <section id="view-overview" class="view" aria-label="Genel bakış">
+              <div
+                id="kpis"
+                class="kpi-grid"
+                aria-label="Arama performansı göstergeleri"
+              ></div>
+              <div class="analytics-grid">
+                <section class="panel performance-panel">
+                  <div class="panel-heading">
+                    <div>
+                      <h2>Arama performansı</h2>
+                      <p id="chartPeriod">Doğrulanmış günlük GSC ölçümleri</p>
+                    </div>
+                    <span class="source-label"
+                      ><span class="status-dot blue"></span> Search
+                      Console</span
+                    >
+                  </div>
+                  <div
+                    id="chartMetrics"
+                    class="segmented"
+                    role="group"
+                    aria-label="Grafik metriği"
+                  >
+                    <button data-metric="clicks" aria-pressed="true">
+                      Tıklama</button
+                    ><button data-metric="impressions" aria-pressed="false">
+                      Gösterim</button
+                    ><button data-metric="ctr" aria-pressed="false">CTR</button
+                    ><button data-metric="position" aria-pressed="false">
+                      Ort. konum
+                    </button>
+                  </div>
+                  <div
+                    id="performanceChart"
+                    class="chart-container"
+                    aria-busy="true"
+                  ></div>
+                  <div class="chart-footer">
+                    <span
+                      ><span class="legend-line"></span> Doğrulanmış
+                      günler</span
+                    ><span id="chartCoverage"
+                      >Eksik günler sıfır değildir.</span
+                    >
+                  </div>
+                  <details class="chart-data">
+                    <summary>Günlük ölçümleri tablo olarak gör</summary>
+                    <div
+                      id="chartTable"
+                      class="table-scroll"
+                      role="region"
+                      tabindex="0"
+                      aria-label="Günlük ölçüm tablosu"
+                    ></div>
+                  </details>
+                </section>
+                <aside class="panel coverage-panel">
+                  <div class="panel-heading">
+                    <h2>Veri kapsamı</h2>
+                    <svg class="icon" aria-hidden="true">
+                      <use href="/icons.svg#shield" />
+                    </svg>
+                  </div>
+                  <div id="coverageRing" class="coverage-ring"></div>
+                  <p id="coverageText" class="coverage-text"></p>
+                  <div id="connectionSummary" class="connection-summary"></div>
+                  <button class="text-button" data-go="health">
+                    Veri sağlığını incele
+                    <svg class="icon" aria-hidden="true">
+                      <use href="/icons.svg#arrow" />
+                    </svg>
+                  </button>
+                </aside>
+              </div>
+              <div class="section-heading">
+                <div>
+                  <h2>Öncelikleriniz</h2>
+                  <p>
+                    Verinin desteklediği fırsatlar ve korunması gereken
+                    çalışmalar.
+                  </p>
+                </div>
+                <button class="text-button" data-go="radar">
+                  Fırsat radarını aç
+                  <svg class="icon" aria-hidden="true">
+                    <use href="/icons.svg#arrow" />
+                  </svg>
+                </button>
+              </div>
+              <div class="priorities-grid">
+                <section class="panel">
+                  <div class="mini-heading">
+                    <span class="icon-tile amber"
+                      ><svg class="icon" aria-hidden="true">
+                        <use href="/icons.svg#radar" /></svg
+                    ></span>
+                    <h3>Önce neye bakalım?</h3>
+                  </div>
+                  <div id="priorities"></div>
+                </section>
+                <section class="panel protect-panel">
+                  <div class="mini-heading">
+                    <span class="icon-tile green"
+                      ><svg class="icon" aria-hidden="true">
+                        <use href="/icons.svg#shield" /></svg
+                    ></span>
+                    <h3>Başarılı çalışmaları koruyun</h3>
+                  </div>
+                  <p id="protect"></p>
+                  <button class="text-button" data-go="products">
+                    Ürünleri incele
+                    <svg class="icon" aria-hidden="true">
+                      <use href="/icons.svg#arrow" />
+                    </svg>
+                  </button>
+                </section>
+              </div>
+              <section class="question-callout">
+                <span class="callout-icon"
+                  ><svg class="icon" aria-hidden="true">
+                    <use href="/icons.svg#chat" /></svg
+                ></span>
+                <div>
+                  <h3>Verilerinize bir soru sorun.</h3>
+                  <p>
+                    “Broşür mobilde neden düştü?” Yanıtı, kaynaklarıyla birlikte
+                    inceleyin.
+                  </p>
+                </div>
+                <button class="button secondary" data-go="questions">
+                  SEO Soru-Cevap
+                  <svg class="icon" aria-hidden="true">
+                    <use href="/icons.svg#arrow" />
+                  </svg>
+                </button>
+              </section>
+            </section>
+            <section
+              id="view-products"
+              class="view"
+              hidden
+              aria-label="Ürün performansı"
+            >
+              <div class="panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>
+                      Ürünlerin performansı
+                      <span id="productCount" class="count-badge"></span>
+                    </h2>
+                    <p id="productPeriod">Eksik veride SEO kararı üretilmez.</p>
+                  </div>
+                </div>
+                <div class="table-toolbar">
+                  <div class="search-field">
+                    <svg class="icon" aria-hidden="true">
+                      <use href="/icons.svg#search" /></svg
+                    ><input
+                      id="productSearch"
+                      type="search"
+                      placeholder="Ürün veya URL ara…"
+                      aria-label="Ürün veya URL ara"
+                    />
+                  </div>
+                  <label class="sr-only" for="decisionFilter">SEO kararı</label
+                  ><select id="decisionFilter">
+                    <option value="">Tüm kararlar</option>
+                    <option>Koru</option>
+                    <option>İncele</option>
+                    <option>İyileştir</option>
+                    <option>Veri bekle</option></select
+                  ><label class="sr-only" for="groupFilter">Ürün grubu</label
+                  ><select id="groupFilter">
+                    <option value="">Tüm ürün grupları</option>
+                  </select>
+                </div>
+                <div
+                  id="products"
+                  class="table-scroll"
+                  role="region"
+                  tabindex="0"
+                  aria-label="Ürün performans tablosu"
+                ></div>
+                <div id="productTableFoot" class="table-footer"></div>
+              </div>
+            </section>
+            <section
+              id="view-queries"
+              class="view"
+              hidden
+              aria-label="Arama sorguları"
+            >
+              <div class="panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Görünür arama sorguları</h2>
+                    <p>
+                      Gerçek GSC sorgu, sayfa ve cihaz ölçümleri. Keyword
+                      Planner hacimleri içermez.
+                    </p>
+                  </div>
+                  <span class="source-label">Google Search Console</span>
+                </div>
+                <form id="queryFilters" class="table-toolbar">
+                  <div class="search-field">
+                    <svg class="icon" aria-hidden="true">
+                      <use href="/icons.svg#search" /></svg
+                    ><input
+                      id="querySearch"
+                      type="search"
+                      placeholder="Arama sorgusu ara…"
+                      aria-label="Arama sorgusu ara"
+                    />
+                  </div>
+                  <label class="sr-only" for="queryProduct">Sorgu ürünü</label
+                  ><select id="queryProduct">
+                    <option value="">Tüm ürünler</option></select
+                  ><label class="sr-only" for="queryBrand">Marka ayrımı</label
+                  ><select id="queryBrand">
+                    <option value="all">Tüm sorgular</option>
+                    <option value="non_brand">Markasız</option>
+                    <option value="brand">Markalı</option></select
+                  ><button class="button secondary" type="submit">
+                    Filtrele
+                  </button>
+                </form>
+                <div
+                  id="queryTable"
+                  class="table-scroll"
+                  role="region"
+                  tabindex="0"
+                  aria-label="Arama sorguları tablosu"
+                ></div>
+                <div class="table-footer">
+                  <span id="queryCount"></span>
+                  <div class="pagination">
+                    <button
+                      id="queryPrevious"
+                      class="button secondary"
+                      disabled
+                    >
+                      Önceki</button
+                    ><span id="queryPage">1. sayfa</span
+                    ><button id="queryNext" class="button secondary" disabled>
+                      Sonraki
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <p id="queryNote" class="source-note"></p>
+            </section>
+            <section
+              id="view-radar"
+              class="view"
+              hidden
+              aria-label="SEO Fırsat Radarı"
+            >
+              <div class="section-intro">
+                <svg class="icon" aria-hidden="true">
+                  <use href="/icons.svg#radar" />
+                </svg>
+                <p>
+                  Son 28 kesinleşmiş gün incelenir. Bir fırsatın nedeni, riski
+                  ve kaynakları birlikte değerlendirilir.
+                </p>
+              </div>
+              <div id="radarResults" class="module-results">
+                <p class="empty-message">Fırsat verileri henüz yüklenmedi.</p>
+              </div>
+            </section>
+            <section
+              id="view-changes"
+              class="view"
+              hidden
+              aria-label="SEO Değişiklik Takvimi"
+            >
+              <div class="panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>SEO Değişiklik Takvimi</h2>
+                    <p>Tarama tespit tarihi, gerçek yayın tarihi değildir.</p>
+                  </div>
+                  <div class="inline-controls">
+                    <label class="sr-only" for="changeDay"
+                      >Tespit günü (UTC)</label
+                    ><input id="changeDay" type="date" /><button
+                      id="showChanges"
+                      class="button secondary"
+                    >
+                      Göster
+                    </button>
+                  </div>
+                </div>
+                <div id="changeResults" class="module-results padded">
+                  <p class="empty-message">
+                    Değişiklik tespitlerini görmek için bir gün seçin.
+                  </p>
+                </div>
+              </div>
+            </section>
+            <section
+              id="view-health"
+              class="view"
+              hidden
+              aria-label="Veri Sağlığı"
+            >
+              <div class="section-intro">
+                <svg class="icon" aria-hidden="true">
+                  <use href="/icons.svg#shield" />
+                </svg>
+                <p>
+                  GSC, GA4, Keyword Planner ve tarama kaynakları ayrı
+                  doğrulanır. Eksik veri, sıfır performans anlamına gelmez.
+                </p>
+              </div>
+              <div id="summary" class="archive-stats"></div>
+              <section class="panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Veri Sağlığı ve Doğruluk Denetimi</h2>
+                    <p>Kaynak, metrik, ürün ve kayıt kontrolleri.</p>
+                  </div>
+                  <button id="runDataAudit" class="button secondary">
+                    <svg class="icon" aria-hidden="true">
+                      <use href="/icons.svg#refresh" />
+                    </svg>
+                    Denetimi yenile
+                  </button>
+                </div>
+                <div id="dataAuditResults" class="module-results padded"></div>
+              </section>
+              <details class="panel connection-details">
+                <summary>Bağlantılar ve otomatik toplama durumu</summary>
+                <div class="inline-controls">
+                  <button id="google" class="button secondary">
+                    Google'ı bağla</button
+                  ><button id="pilot" class="button secondary">
+                    Bir günlük GSC verisini doğrula
+                  </button>
+                </div>
+                <pre id="health"></pre>
+              </details>
+            </section>
+            <section
+              id="view-questions"
+              class="view"
+              hidden
+              aria-label="SEO Soru-Cevap"
+            >
+              <div class="question-workspace">
+                <div class="question-intro">
+                  <span class="icon-tile blue-tile"
+                    ><svg class="icon" aria-hidden="true">
+                      <use href="/icons.svg#chat" /></svg
+                  ></span>
+                  <h2>Birlikte veriye bakalım.</h2>
+                  <p>
+                    Ürün, cihaz veya dönem hakkında sorun. Yanıtlar mevcut
+                    ölçümlerden üretilir; eksik kanıt varsa açıkça belirtilir.
+                  </p>
+                </div>
+                <div class="suggested-questions">
+                  <button data-question="Broşür mobilde neden düştü?">
+                    Broşür mobilde neden düştü?</button
+                  ><button
+                    data-question="Bu ay hangi üç ürüne öncelik vermeliyim?"
+                  >
+                    Bu ay neye öncelik vermeliyim?</button
+                  ><button
+                    data-question="Kartvizit sayfamda hangi kelimeleri korumalıyım?"
+                  >
+                    Hangi kelimeleri korumalıyım?
+                  </button>
+                </div>
+                <form
+                  id="question"
+                  class="question-form"
+                  method="post"
+                  action="/api/questions"
+                >
+                  <label for="questionText">SEO verilerine sorun</label>
+                  <div class="question-row">
+                    <input
+                      id="questionText"
+                      maxlength="1000"
+                      placeholder="Broşür mobilde neden düştü?"
+                      required
+                    /><button class="button primary" type="submit">
+                      Sor
+                      <svg class="icon" aria-hidden="true">
+                        <use href="/icons.svg#arrow" />
+                      </svg>
+                    </button>
+                  </div>
+                  <p>
+                    Sorunuzdaki ve önceki yanıtınızdaki ürün / cihaz bağlamı
+                    kullanılır. Ücretli yapay zekâ servisi yoktur.
+                  </p>
+                </form>
+                <article
+                  id="answer"
+                  class="answer-panel"
+                  aria-live="polite"
+                  hidden
+                ></article>
+              </div>
+            </section>
+            <footer class="app-footer">
+              <span
+                >Mavi Basım <span class="footer-separator">/</span> SEO Karar
+                Merkezi</span
+              ><span
+                ><svg class="icon" aria-hidden="true">
+                  <use href="/icons.svg#shield" />
+                </svg>
+                Canlı siteye yalnızca salt okunur erişim</span
+              >
+            </footer>
+          </section>
+        </main>
+      </div>
+    </div>
+    <p id="message" class="toast" role="status" aria-live="polite" hidden></p>
+    <dialog
+      id="productDialog"
+      class="evidence-dialog"
+      aria-labelledby="dialogTitle"
+    >
+      <div class="dialog-heading">
+        <div>
+          <p class="overline">ÜRÜN KANITLARI</p>
+          <h2 id="dialogTitle">Ürün ayrıntısı</h2>
+        </div>
+        <button
+          id="closeDialog"
+          class="icon-button"
+          aria-label="Ürün ayrıntısını kapat"
+          autofocus
+        >
+          <svg class="icon" aria-hidden="true">
+            <use href="/icons.svg#close" />
+          </svg>
+        </button>
+      </div>
+      <div id="productDetail" class="dialog-body"></div>
+    </dialog>
+    <dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle">
+      <div class="dialog-heading">
+        <h2 id="helpTitle">Doğru veri, doğru yorum</h2>
+        <button
+          id="closeHelp"
+          class="icon-button"
+          aria-label="Kaynak bilgisini kapat"
+          autofocus
+        >
+          <svg class="icon" aria-hidden="true">
+            <use href="/icons.svg#close" />
+          </svg>
+        </button>
+      </div>
+      <div class="dialog-body">
+        <p>
+          <strong>Search Console</strong> gerçek arama ölçümleridir. Grafikler
+          yalnız doğrulanmış aktif günlük veri kümelerini gösterir.
+        </p>
+        <p>
+          <strong>Keyword Planner</strong> yaklaşık pazar talebidir. Tekrarlanan
+          hacimler toplanmaz; reklam rekabeti SEO zorluğu değildir.
+        </p>
+        <p>
+          <strong>GA4</strong> organik oturum ve şehir verisidir; GSC tıklaması
+          veya sorgusuyla eşdeğer değildir.
+        </p>
+        <p>
+          Eksik günler sıfırla doldurulmaz. Korelasyon nedensellik değildir.
+          Öneriler canlı siteye otomatik uygulanmaz.
+        </p>
+      </div>
+    </dialog>
+  </body>
+</html>
