@@ -1,0 +1,64 @@
+name: D1 kaynak aktarimi
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Gercek D1 kaynagini doldurmak icin APPLY_KEYWORD_SOURCES yazin"
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: mavi-d1-source-import
+  cancel-in-progress: false
+jobs:
+  import:
+    if: github.ref_name == 'main' && inputs.confirmation == 'APPLY_KEYWORD_SOURCES'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Validate approved destination
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test "$CLOUDFLARE_ACCOUNT_ID" = "0625d95f2a6f531e22b905c619ba1de5"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          c=json.loads(Path('deploy/wrangler.production.jsonc').read_text())
+          d=c['d1_databases'][0]
+          assert d['binding']=='DB' and d['database_name']=='mavi-basim-seo'
+          assert d['database_id']=='18f8c90d-4af1-430c-ac86-ddf184c75a0b'
+          assert c['vars']['AUTOMATION_ENABLED']=='false'
+          assert c['vars']['CRAWL_ENABLED']=='false'
+          assert c['triggers']['crons']==[]
+          assert not c.get('routes') and not c.get('route')
+          PY
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Prepare verified SQL without changing source CSV
+        run: |
+          python3 scripts/import_keywords.py --output .local/keywords.sql --report .local/source-audit.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('.local/source-audit.json').read_text())
+          assert d['file_count']==521 and d['rows']==9075 and d['product_count']==29 and d['group_count']==4
+          assert not d['errors']
+          PY
+      - name: Require existing schema
+        run: node scripts/run.mjs wrangler d1 migrations list DB --remote --config deploy/wrangler.production.jsonc
+      - name: Import prepared SQL to D1
+        run: node scripts/run.mjs wrangler d1 execute DB --remote --config deploy/wrangler.production.jsonc --file .local/keywords.sql
+      - name: Read-only post-import verification
+        run: node scripts/run.mjs wrangler d1 execute DB --remote --config deploy/wrangler.production.jsonc --file deploy/acceptance-source.sql
