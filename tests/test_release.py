@@ -16,8 +16,12 @@ class ReleaseTests(unittest.TestCase):
 
     def test_production_template_is_separate_and_inert(self):
         self.assertEqual(release.config_errors(self.config), [])
-        self.assertIn('D1_ACCOUNT_AUTHORIZATION_REQUIRED', release.config_errors(self.config, ready=True))
+        # A real D1 ID may already be configured; the OAuth callback is still a placeholder.
+        self.assertNotIn('D1_ACCOUNT_AUTHORIZATION_REQUIRED', release.config_errors(self.config, ready=True))
         self.assertIn('OAUTH_ACCOUNT_CALLBACK_REQUIRED', release.config_errors(self.config, ready=True))
+        placeholder = copy.deepcopy(self.config)
+        placeholder['d1_databases'][0]['database_id'] = '00000000-0000-0000-0000-000000000000'
+        self.assertIn('D1_ACCOUNT_AUTHORIZATION_REQUIRED', release.config_errors(placeholder, ready=True))
 
     def test_actual_resource_ids_are_required_but_not_payment_permission(self):
         self.config['d1_databases'][0]['database_id'] = '12345678-1234-1234-1234-123456789abc'
@@ -47,8 +51,11 @@ class ReleaseTests(unittest.TestCase):
         self.config['triggers']['crons'] = ['*/15 * * * *']
         self.assertIn('AUTOMATION_OPT_IN_REQUIRED', release.config_errors(self.config))
         self.config['vars']['AUTOMATION_ENABLED'] = 'true'
-        self.assertIn('D1_ACCOUNT_AUTHORIZATION_REQUIRED', release.config_errors(self.config))
+        self.assertNotIn('D1_ACCOUNT_AUTHORIZATION_REQUIRED', release.config_errors(self.config))
         self.assertIn('OAUTH_ACCOUNT_CALLBACK_REQUIRED', release.config_errors(self.config))
+        placeholder = copy.deepcopy(self.config)
+        placeholder['d1_databases'][0]['database_id'] = '00000000-0000-0000-0000-000000000000'
+        self.assertIn('D1_ACCOUNT_AUTHORIZATION_REQUIRED', release.config_errors(placeholder))
         self.assertIn('AUTOMATION_NOT_HELD_FOR_ACCEPTANCE', release.config_errors(self.config, bootstrap=True))
 
     def test_ga4_and_gsc_configuration_cannot_silently_target_wrong_properties(self):
