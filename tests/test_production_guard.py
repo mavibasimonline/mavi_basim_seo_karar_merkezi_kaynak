@@ -37,7 +37,10 @@ class ProductionGuardTests(unittest.TestCase):
  def test_smoke_requires_the_exact_commit_in_a_real_http_payload(self):
   commit='c'*40
   class Opener:
-   def open(self,req,timeout):return io.BytesIO(json.dumps({'deployment':{'commit':commit,'runtime_revision':'gsc-catchup-v1'}}).encode())
+   def open(inner,req,timeout):
+    self.assertEqual(req.get_header('User-agent'),'MaviBasimReleaseCheck/1.0')
+    self.assertEqual(req.get_header('Accept'),'application/json')
+    return io.BytesIO(json.dumps({'deployment':{'commit':commit,'runtime_revision':'gsc-catchup-v1'}}).encode())
   self.assertEqual(guard.smoke(commit,Opener())['commit'],commit)
   with self.assertRaisesRegex(ValueError,'COMMIT_MISMATCH'):guard.smoke('d'*40,Opener())
  def test_free_quota_can_block_release_without_mutating_any_resource(self):
@@ -47,3 +50,8 @@ class ProductionGuardTests(unittest.TestCase):
  def test_missing_account_analytics_is_not_treated_as_unused_quota(self):
   self.client.daily_usage=lambda:{'ok':False}
   with self.assertRaisesRegex(ValueError,'QUOTA_READ_REQUIRED'):guard.preflight(self.client,self.config,VERSION)
+ def test_postflight_checks_live_version_and_existing_auth_bindings(self):
+  saved=guard.preflight(self.client,self.config,VERSION);commit='c'*40
+  class Opener:
+   def open(self,req,timeout):return io.BytesIO(json.dumps({'deployment':{'version_id':VERSION,'commit':commit,'runtime_revision':'gsc-catchup-v1'}}).encode())
+  verified=guard.postflight(self.client,self.config,saved,commit,Opener());self.assertTrue(verified['existing_bindings_preserved'])

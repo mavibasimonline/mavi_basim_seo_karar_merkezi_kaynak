@@ -50,7 +50,7 @@ def restore_cron(client,saved):
 
 def smoke(commit,opener=None):
  if not re.fullmatch(r'[a-f0-9]{40}',commit):raise ValueError('INVALID_COMMIT')
- request=urllib.request.Request(APP+'/api/health?release='+commit)
+ request=urllib.request.Request(APP+'/api/health?release='+commit,headers={'User-Agent':'MaviBasimReleaseCheck/1.0','Accept':'application/json'})
  with (opener or urllib.request.build_opener()).open(request,timeout=30) as r:
   payload=json.loads(r.read(20000))
  if payload.get('deployment',{}).get('commit')!=commit or payload.get('deployment',{}).get('runtime_revision')!='gsc-catchup-v1':raise ValueError('DEPLOYED_COMMIT_MISMATCH')
