@@ -56,6 +56,22 @@ class Cloudflare:
   return {'ok':True,'rows':[row for statement in result['result'] for row in statement.get('results',[])],
           'rows_read':sum(s.get('meta',{}).get('rows_read',0) for s in result['result'])}
 
+ def daily_usage(self):
+  # Account-wide UTC quota, including today's source import and other databases.
+  now=datetime.now(timezone.utc);start=now.replace(hour=0,minute=0,second=0,microsecond=0).isoformat()
+  query='query DailyD1($accountTag: string, $filter: ZoneWorkersRequestsFilter_InputObject) { viewer { accounts(filter: {accountTag: $accountTag}) { d1AnalyticsAdaptiveGroups(limit: 10000, filter: $filter) { sum { rowsRead rowsWritten } dimensions { datetimeHour } } } } }'
+  body={'query':query,'variables':{'accountTag':self.account,'filter':{'AND':[{'datetimeHour_geq':start,'datetimeHour_leq':now.isoformat()}]}}}
+  req=urllib.request.Request('https://api.cloudflare.com/client/v4/graphql',data=json.dumps(body).encode(),method='POST',headers={'Authorization':'Bearer '+self.token,'Content-Type':'application/json'})
+  try:
+   with self.opener.open(req,timeout=45) as response:raw=response.read(2_000_001)
+   if len(raw)>2_000_000:return {'ok':False,'code':'CF_RESPONSE_LIMIT'}
+   data=json.loads(raw)
+   if data.get('errors'):return {'ok':False,'code':'CF_ANALYTICS_UNAVAILABLE'}
+   rows=[r for a in data['data']['viewer']['accounts'] for r in a['d1AnalyticsAdaptiveGroups']]
+   return {'ok':True,'utc_start':start,'observed_at':now.isoformat(),'account_wide':True,'rows_read':sum(r['sum']['rowsRead'] for r in rows),'rows_written':sum(r['sum']['rowsWritten'] for r in rows),'hours':len(rows),'note':'Adaptive analytics may be delayed; daily Free limits are 5,000,000 reads / 100,000 writes.'}
+  except urllib.error.HTTPError as error:return {'ok':False,'code':'CF_ANALYTICS_HTTP_'+str(error.code)}
+  except (OSError,ValueError,KeyError,TypeError):return {'ok':False,'code':'CF_ANALYTICS_UNAVAILABLE'}
+
 def collect(client, config):
  if config.get('name')!='mavi-basim-seo-prod' or config.get('route') or config.get('routes'):
   raise ValueError('UNEXPECTED_WORKER_OR_SITE_ROUTE')
@@ -65,6 +81,7 @@ def collect(client, config):
  database=databases[0]['database_id']
  result={'observed_at':datetime.now(timezone.utc).isoformat(),'git_commit':os.environ.get('GITHUB_SHA'),
          'worker':'mavi-basim-seo-prod','database':'mavi-basim-seo','read_only':True,'queries':{}}
+ result['daily_d1_usage']=client.daily_usage()
  for name,sql in QUERIES.items():result['queries'][name]=client.query(database,sql)
  base=f'/accounts/{client.account}/workers/scripts/mavi-basim-seo-prod'
  settings=client.request('GET',base+'/settings')

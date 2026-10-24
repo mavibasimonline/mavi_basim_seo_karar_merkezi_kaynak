@@ -10,6 +10,7 @@ module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 ACCOUNT='a'*32
 class FakeClient:
  account=ACCOUNT
+ def daily_usage(self):return {'ok':False,'code':'CF_ANALYTICS_UNAVAILABLE'}
  def query(self,database,sql):return {'ok':True,'rows':[]}
  def request(self,method,path):
   if path.endswith('/settings'):return {'ok':True,'result':{'bindings':[{'name':'AUTOMATION_ENABLED','type':'plain_text','text':'true'},{'name':'GOOGLE_CLIENT_SECRET','type':'plain_text','text':'NEVER-LOG-THIS-FIXTURE'}]}}
@@ -32,3 +33,13 @@ class DiagnosticTests(unittest.TestCase):
   class Limited(FakeClient):
    def request(self,*args):return {'ok':False,'code':'CF_HTTP_403'}
   r=module.collect(Limited(),self.config());self.assertTrue(r['queries']['jobs']['ok']);self.assertEqual(r['runtime']['code'],'CF_HTTP_403')
+ def test_account_quota_is_aggregate_only_and_does_not_expose_errors(self):
+  class Response(io.BytesIO):
+   def __enter__(self):return self
+   def __exit__(self,*args):self.close()
+  class Opener:
+   def open(self,request,timeout):
+    self.request=request
+    return Response(json.dumps({'data':{'viewer':{'accounts':[{'d1AnalyticsAdaptiveGroups':[{'sum':{'rowsRead':100,'rowsWritten':200}},{'sum':{'rowsRead':50,'rowsWritten':30}}]}]}}}).encode())
+  opener=Opener();result=module.Cloudflare('FIXTURE',ACCOUNT,opener).daily_usage()
+  self.assertEqual((result['rows_read'],result['rows_written']),(150,230));self.assertTrue(result['account_wide']);self.assertNotIn('databaseId',opener.request.data.decode());self.assertNotIn('FIXTURE',json.dumps(result))
