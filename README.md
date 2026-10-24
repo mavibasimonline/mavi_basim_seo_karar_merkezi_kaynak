@@ -14,7 +14,7 @@ Bağımsız denetim: [AUDIT_REPORT.md](AUDIT_REPORT.md). Motor 1.2.0; marka/ciha
 
 Türkçe tek ekran paneli, Cloudflare Worker API'si, D1/SQLite veri modeli, günlük Google senkron kuyruğu, salt okunur site tarayıcısı ve kanıtla sınırlanan karar motoru. Ücretli LLM veya ücretli API zorunluluğu yoktur. Uygulama canlı siteye yazmaz.
 
-**Gerçek durum:** Uygulama yerel Workers/D1 ortamında çalıştırıldı ve otomatik testlerden geçti. Kaynak CSV'ler gerçektir. Google hesabı bağlanmadı, canlı tarama bu ortamın ağ politikası nedeniyle doğrulanamadı ve Cloudflare üretim dağıtımı yapılmadı. Panel eksik bağlantıyı **Veri bekle** olarak gösterir. Testlerdeki sentetik Google yanıtları yalnızca test fixtures içindedir; gerçek kullanıcı veritabanına yüklenmez.
+**Güncel üretim durumu (24 Ekim 2026):** Ayrı [Workers uygulaması](https://mavi-basim-seo-prod.mavibasimonline.workers.dev) ve gerçek D1 mevcuttur. Mevcut Google OAuth bağlantısından gerçek GSC kayıtları alınmıştır; 17:18 UTC tanılamasında 18 günlük sayfa/sorgu veri kümesi tamamlanmıştır. Bu, Temmuz–Eylül aylarının tamamlandığı veya ürün raporlarının kabulden geçtiği anlamına gelmez. Üretim kuyruğu düzeltmesi, kota ve canlı kabul kaydı: [GSC_PRODUCTION_REPORT.md](GSC_PRODUCTION_REPORT.md). Bu belgenin aşağıdaki eski kurulum engelleri tarihçedir; güncel durum için raporu kullanın. GA4, Ads ve site taraması etkinleştirilmedi. Test fixture'ları gerçek veri olarak içe aktarılmaz.
 
 ## Kaynakların sonucu
 
@@ -79,7 +79,7 @@ Başlangıç eşikleri denetlenebilir muhafazakâr kurallardır; istatistiksel a
 
 ## Otomatik çalışma ve günlük denetim
 
-`wrangler.jsonc` 15 dakikalık Cron içerir; `AUTOMATION_ENABLED=false` varsayılanıyla hiçbir toplama görevi çalışmaz. Üretim dosyasında Cron ayrıca boştur. Üretim yönergesindeki kabul ön koşulları geçmeden açılmaz. **Cloudflare'a dağıtılınca** bilgisayar kapalıyken çalışır; yerel geliştirmede zamanlayıcı kendiliğinden tetiklenmez. Günlük tekilleştirilmiş planlama:
+`wrangler.jsonc` 15 dakikalık Cron içerir; `AUTOMATION_ENABLED=false` varsayılanıyla hiçbir toplama görevi çalışmaz. Gerçek üretim dosyasında otomasyon açıktır. `CATCHUP_ENABLED=true` iken eksik son üç kapanmış ay için Cron dakikalı çalışır; kapsam tamamlanınca veri işleme otomatik 15 dakikaya düşer. Günlük yazma bütçesi bittiğinde yeni Google işi alınmaz ve sonraki UTC gününde devam edilir; Cron tanımı dakikalı kalır. **Cloudflare'a dağıtılınca** bilgisayar kapalıyken çalışır; yerel geliştirmede zamanlayıcı kendiliğinden tetiklenmez. Günlük tekilleştirilmiş planlama:
 
 1. Son kesinleşmiş günler yeniden uzlaştırılır. İlk geçmiş aktarımı her gün en fazla 90 günlük yeni görev ekleyerek 400 güne kadar ilerler; ücretsiz bütçe için istekler parçalara ayrılır.
 2. Her işte en fazla 200 Google satırı alınır. Veriler yeni veri kümesine yazılır; son sayfa ve satır sayısı doğrulanmadan aktif küme değiştirilmez. Hatalı veya eksik yeni aktarım eskisini bozmaz.
@@ -89,7 +89,7 @@ Başlangıç eşikleri denetlenebilir muhafazakâr kurallardır; istatistiksel a
 
 Kaynak/istek sınırları: tek site, en az 5 saniye tarama aralığı (robots daha uzunsa o süre), 1.500.000 bayt sayfa, 2.000 URL/sitemap, 1.000 URL kuyruk, tur başına en fazla 20 yeni URL ve bağlantı derinliği 4. Sınırı aşan sitemap hata kaydına girer; kapsam tamamlandı denmez. JS render, gerçek cihaz hız ölçümü ve tüm sitemap boyutları bu sürümde desteklenmez. Veri saklama maliyeti için üretim büyüklüğünde ölçüm hâlâ gereklidir.
 
-## Google bağlantısı — henüz gerçek hesapla doğrulanmadı
+## Google bağlantısı — mevcut OAuth korunur
 
 Sunucuda `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `TOKEN_ENCRYPTION_KEY`, `ADMIN_TOKEN` ayarlanır. Google Cloud'da Search Console API etkin ve OAuth yönlendirme URI'si tam eşleşmelidir; hesap GSC mülkünü okuyabilmelidir. Panelde bir kez Google bağlantısı verilir. GA4 için Data API ve sayısal `GA4_PROPERTY_ID` gerekir; sonradan eklendiyse kapsam için tekrar izin verilir. Kullanıcıdan günlük dosya veya komut istenmez.
 
@@ -97,7 +97,7 @@ Keyword Planner otomasyonu yalnızca `ENABLE_GOOGLE_ADS=true`, geçerli ve o tar
 
 ## Dağıtım, ücretsiz kullanım ve yetkiler
 
-Üretim dağıtımı veya ücretli hizmet etkinleştirmesi bu oturumda yapılmadı. D1 kimliği güvenli yerel geliştirme için sıfır yer tutucudur; gerçek hesapta D1 oluşturulup kimlik ve ayrı uygulama alan adı tanımlanmadan dağıtmayın. `workers_dev=false`; canlı `mavibasim.com` için route tanımlanmaz. İlgili hesap erişimiyle geliştirici sırasıyla migration'ları ve kaynak SQL'ini gerçek D1'e uygulamalı, gizli değerleri `wrangler secret put` ile girmeli, ayrı SEO uygulamasını dağıtmalı ve gerçek GSC/GA4/cron/geri dönüş kabulünü yapmalıdır.
+Mevcut üretim D1 kimliği ve ayrı `workers.dev` hedefi yapılandırılmıştır; yeniden D1 oluşturmayın veya kaynakları tekrar içe aktarmayın. Canlı `mavibasim.com` için route tanımlanmaz. Kontrollü kod yayını `.github/workflows/production.yml` ile mevcut Worker, D1 ve secret binding isimlerini doğrular; şema veya secret değiştirmez. Doğrulanmayan yayın önceki Worker sürümüne ve Cron ayarına döner. İlgili hesap erişimiyle geliştirici sırasıyla migration'ları ve kaynak SQL'ini gerçek D1'e uygulamalı, gizli değerleri `wrangler secret put` ile girmeli, ayrı SEO uygulamasını dağıtmalı ve gerçek GSC/GA4/cron/geri dönüş kabulünü yapmalıdır.
 
 Ücretsiz plan seçimi, mevcut D1 depolaması/satır okuma-yazma, Workers CPU/istek ve GitHub Actions dakika/artifact kullanımı hesap panelinden doğrulanmalıdır. Cloudflare doküman sitesine 403 alınsa da resmi doküman GitHub deposundan Free sınırları doğrulandı; kesin kaynak commit'i ve limitler üretim yönergesindedir. Hesabın kalan kotası ve 10 ms CPU uyumu henüz ölçülmedi. Kod ücretli planı açmaz veya kota artışı satın almaz. CI tek Linux işi, iptal edilebilir eşzamanlılık, 12 dakika üst sınır ve matris kullanmadan çalışır. Yedek işi 8 dakika sınırı ve 7 gün saklama kullanır; bunlar sınırsız ücretsiz kullanım garantisi değildir.
 

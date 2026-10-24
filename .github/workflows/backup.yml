@@ -1,6 +1,12 @@
 name: Şifreli D1 yedek ve geri yükleme denetimi
 on:
   workflow_dispatch:
+    inputs:
+      operation:
+        description: Salt okunur tanılama veya mevcut şifreli yedek
+        type: choice
+        default: backup
+        options: [backup, diagnose]
   schedule:
     - cron: '17 2 * * *'
 permissions:
@@ -11,7 +17,7 @@ concurrency:
 jobs:
   backup:
     # First restoration is an explicit manual run; scheduled backups require a separate opt-in.
-    if: github.event_name == 'workflow_dispatch' || vars.PRODUCTION_BACKUPS_ENABLED == 'true'
+    if: (github.event_name == 'workflow_dispatch' && (inputs.operation == 'backup' || inputs.operation == '')) || (github.event_name == 'schedule' && vars.PRODUCTION_BACKUPS_ENABLED == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
@@ -63,3 +69,23 @@ jobs:
       - name: Açık veriyi temizle
         if: always()
         run: rm -f .local/backup.sql .local/verified.sql
+
+  diagnose:
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'diagnose'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Salt okunur üretim tanılaması — secret veya ham sorgu çıktısı yok
+        run: python3 scripts/cloudflare_diagnostics.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: production-diagnostics-${{ github.run_id }}
+          path: .local/production-diagnostics.json
+          retention-days: 3
+          if-no-files-found: error

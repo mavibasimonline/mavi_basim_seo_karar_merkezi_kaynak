@@ -16,6 +16,11 @@ export interface Env {
   ENABLE_GOOGLE_ADS?: string;
   CRAWL_ENABLED?: string;
   AUTOMATION_ENABLED?: string;
+  CATCHUP_ENABLED?: string;
+  SYNC_DAILY_WRITE_LIMIT?:string;
+  SYNC_INITIAL_BUDGET_DAY?:string;
+  SYNC_INITIAL_WRITE_LIMIT?:string;
+  CF_VERSION_METADATA?: {id:string;tag?:string;timestamp?:string};
 }
 export type Fetch = typeof fetch;
 export const nowISO = () => new Date().toISOString();

@@ -68,6 +68,19 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn('D1_ACCOUNT_AUTHORIZATION_REQUIRED', release.config_errors(placeholder))
         self.assertIn('AUTOMATION_NOT_HELD_FOR_ACCEPTANCE', release.config_errors(self.config, bootstrap=True))
 
+    def test_one_minute_cron_requires_catchup_opt_in(self):
+        self.config['triggers']['crons']=['* * * * *']
+        self.config['vars']['CATCHUP_ENABLED']='false'
+        self.assertIn('CATCHUP_OPT_IN_REQUIRED',release.config_errors(self.config))
+        self.config['vars']['CATCHUP_ENABLED']='true'
+        self.assertNotIn('CATCHUP_OPT_IN_REQUIRED',release.config_errors(self.config))
+
+    def test_fast_catchup_requires_bounded_daily_and_initial_write_limits(self):
+        self.config['vars']['CATCHUP_ENABLED']='true'
+        for limit in ('0','100000','n/a'):
+            self.config['vars']['SYNC_DAILY_WRITE_LIMIT']=limit
+            self.assertIn('CONSERVATIVE_D1_WRITE_BUDGET_REQUIRED',release.config_errors(self.config))
+
     def test_ga4_and_gsc_configuration_cannot_silently_target_wrong_properties(self):
         self.config['vars']['GSC_PROPERTY'] = 'sc-domain:mavibasim.com'
         self.config['vars']['GA4_PROPERTY_ID'] = '123456789'

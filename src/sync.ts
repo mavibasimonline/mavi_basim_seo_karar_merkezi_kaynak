@@ -1,6 +1,7 @@
 import { Env, Fetch, dateDaysAgo, nowISO } from './types';
 import { ProviderError } from './google';
 import { fetchGsc, fetchGa4, fetchKeywordPlanner, GscRow, Ga4Row } from './providers';
+import {writtenRows} from './sync-budget';
 
 export interface Job { id: string; provider: string; day: string; scope: string; generation: string; cursor: number; attempts: number; lease_token: string; quality_failed: number }
 type Row = Record<string, string | number | null>;
@@ -21,11 +22,25 @@ export function insertRows(db: D1Database, table: string, rows: Row[], guard?: J
   }
   return queries;
 }
+/** Finalized days in the last three closed calendar months; query/page coverage stays separate. */
+export function priorityPeriod(time=new Date()){
+  const start=new Date(Date.UTC(time.getUTCFullYear(),time.getUTCMonth()-3,1)).toISOString().slice(0,10);
+  const closed=new Date(Date.UTC(time.getUTCFullYear(),time.getUTCMonth(),0)).toISOString().slice(0,10);
+  const end=[closed,dateDaysAgo(3,time)].sort()[0];
+  return {start,end,days:Math.round((Date.parse(end)-Date.parse(start))/86400_000)+1};
+}
+export async function priorityProgress(env:Env,time=new Date()){
+  const period=priorityPeriod(time);
+  const scopes=(await env.DB.prepare("SELECT scope,count(*) days,sum(row_count) rows,max(fetched_at) last_verified FROM dataset_coverage WHERE provider='gsc' AND scope IN ('page','query') AND complete=1 AND day BETWEEN ? AND ? GROUP BY scope").bind(period.start,period.end).all<{scope:string;days:number;rows:number;last_verified:string}>()).results;
+  const completed=scopes.reduce((n,s)=>n+s.days,0),expected=period.days*2;
+  return {...period,expected_datasets:expected,completed_datasets:completed,complete:completed===expected,scopes,note:'Gün/scope aktarım kapsamıdır; anonimleştirilmiş tüm sorguların bulunduğu anlamına gelmez.'};
+}
 export async function enqueueDaily(env: Env, time = new Date()): Promise<boolean> {
   const day = time.toISOString().slice(0,10);
   const stamp = time.toISOString();
-  const monthEnds=[0,-1].map(offset=>new Date(Date.UTC(time.getUTCFullYear(),time.getUTCMonth()+offset,0)).toISOString().slice(0,10));
-  const already = await env.DB.prepare("SELECT 1 FROM health_checks WHERE provider='scheduler' AND day=?").bind(day).first();
+  const monthEnds=[0,-1].map(offset=>new Date(Date.UTC(time.getUTCFullYear(),time.getUTCMonth()+offset,0)).toISOString().slice(0,10)).filter(day=>day<=dateDaysAgo(3,time));
+  const priority=priorityPeriod(time);
+  const already = await env.DB.prepare("SELECT 1 FROM health_checks WHERE provider='planner' AND day=?").bind(day).first();
   if (already) return false;
   const connected = await env.DB.prepare("SELECT 1 FROM oauth_credentials WHERE provider='google'").first();
   const jobs: Row[] = [];
@@ -37,6 +52,7 @@ export async function enqueueDaily(env: Env, time = new Date()): Promise<boolean
       const dateSet=new Set(Array.from({length:7},(_,i)=>dateDaysAgo(i+3,time)));
       // Keep the last closed monthly reports verifiable after daily reconciliation moves on.
       for(const end of monthEnds)dateSet.add(end);
+      if(provider==='gsc')for(let at=Date.parse(priority.start);at<=Date.parse(priority.end);at+=86400_000)dateSet.add(new Date(at).toISOString().slice(0,10));
       let cursor=previous?Date.parse(previous)-86400_000:Date.parse(dateDaysAgo(3,time));
       let oldest=previous;
       for(let count=0;count<90&&cursor>=Date.parse(dateDaysAgo(400,time));count++,cursor-=86400_000){
@@ -45,28 +61,30 @@ export async function enqueueDaily(env: Env, time = new Date()): Promise<boolean
       for(const date of dateSet)for(const scope of provider==='gsc'?['page','query']:['organic']){
         jobs.push({id:`${provider}:${date}:${scope}`,provider,day:date,scope,generation:crypto.randomUUID(),next_attempt_at:stamp,created_at:stamp,updated_at:stamp});
       }
+      if(provider==='gsc'&&oldest&&priority.start<oldest)oldest=priority.start;
       if(oldest)progressStatements.push(env.DB.prepare('INSERT INTO backfill_progress VALUES(?,?,?) ON CONFLICT(provider) DO UPDATE SET oldest_enqueued_day=excluded.oldest_enqueued_day,updated_at=excluded.updated_at').bind(provider,oldest,stamp));
     }
   }
   const statements = insertRows(env.DB,'sync_jobs',jobs);
   statements.push(...progressStatements);
   statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,attempts=0,next_attempt_at=?,updated_at=? WHERE status='done' AND provider IN ('gsc','ga4') AND ((day>=? AND day<=?) OR day IN (?,?)) AND substr(updated_at,1,10)<?")
-    .bind(stamp,stamp,dateDaysAgo(9,time),dateDaysAgo(3,time),monthEnds[0],monthEnds[1],day));
+    .bind(stamp,stamp,dateDaysAgo(9,time),dateDaysAgo(3,time),monthEnds[0]||'',monthEnds[1]||'',day));
   if(connected)statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,attempts=0,next_attempt_at=?,updated_at=? WHERE status='blocked' AND substr(updated_at,1,10)<?").bind(stamp,stamp,day));
   statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,next_attempt_at=?,updated_at=? WHERE status='done' AND provider IN ('gsc','ga4') AND NOT EXISTS(SELECT 1 FROM dataset_coverage c WHERE c.provider=sync_jobs.provider AND c.day=sync_jobs.day AND c.scope=sync_jobs.scope AND c.complete=1)").bind(stamp,stamp));
+  statements.push(env.DB.prepare("INSERT OR IGNORE INTO health_checks VALUES('planner',?,?,?,?)").bind(day,stamp,connected?'queued':'blocked',connected?null:'GOOGLE_NOT_CONNECTED'));
   statements.push(env.DB.prepare("INSERT OR IGNORE INTO health_checks VALUES('scheduler',?,?,?,?)").bind(day,stamp,connected ? 'queued' : 'blocked',connected ? null : 'GOOGLE_NOT_CONNECTED'));
   await env.DB.batch(statements);
   return true;
 }
-export async function claimJob(env: Env, time = new Date()): Promise<Job | null> {
+export async function claimJob(env: Env, time = new Date(),priority:'recent'|'history'='recent'): Promise<Job | null> {
   const stamp = time.toISOString();
-  const token = crypto.randomUUID();
+  const token = crypto.randomUUID(),period=priorityPeriod(time);
   return env.DB.prepare(`UPDATE sync_jobs SET status='running',lease_token=?,lease_until=?,updated_at=?
     WHERE id=(SELECT id FROM sync_jobs WHERE ((status IN ('pending','retry') AND next_attempt_at<=?) OR (status='running' AND lease_until<?))
-    ORDER BY day DESC, provider, scope LIMIT 1) RETURNING *`)
-    .bind(token,new Date(time.getTime()+180_000).toISOString(),stamp,stamp,stamp).first<Job>();
+    ORDER BY CASE WHEN ?='history' AND provider='gsc' AND day BETWEEN ? AND ? THEN 0 ELSE 1 END,day DESC,provider,scope LIMIT 1) RETURNING *`)
+    .bind(token,new Date(time.getTime()+180_000).toISOString(),stamp,stamp,stamp,priority,period.start,period.end).first<Job>();
 }
-async function storePage(env: Env, job: Job, rows: GscRow[] | Ga4Row[], next: number | null, complete: boolean, notes: string, run: string): Promise<void> {
+async function storePage(env: Env, job: Job, rows: GscRow[] | Ga4Row[], next: number | null, complete: boolean, notes: string, run: string): Promise<number> {
   let table: string;
   let records: Row[];
   if (job.provider === 'gsc') {
@@ -101,28 +119,29 @@ async function storePage(env: Env, job: Job, rows: GscRow[] | Ga4Row[], next: nu
   statements.push(env.DB.prepare("UPDATE sync_jobs SET status=?,cursor=?,quality_failed=max(quality_failed,?),attempts=0,lease_token=NULL,lease_until=NULL,error_code=NULL,updated_at=? WHERE id=? AND lease_token=?")
     .bind(next === null ? 'done' : 'pending',next || 0,Number(!complete),stamp,job.id,job.lease_token));
   statements.push(env.DB.prepare("UPDATE sync_runs SET status='done',finished_at=?,rows_received=? WHERE id=?").bind(stamp,rows.length,run));
-  await env.DB.batch(statements);
+  return writtenRows(await env.DB.batch(statements));
 }
-export async function processJob(env: Env, job: Job, fetcher: Fetch = fetch): Promise<void> {
+export async function processJob(env: Env, job: Job, fetcher: Fetch = fetch): Promise<number> {
   const run = crypto.randomUUID();
-  await env.DB.prepare("INSERT INTO sync_runs(id,job_id,started_at,status) VALUES(?,?,?,'running')").bind(run,job.id,nowISO()).run();
+  const started=await env.DB.prepare("INSERT INTO sync_runs(id,job_id,started_at,status) VALUES(?,?,?,'running')").bind(run,job.id,nowISO()).run();
+  const initial=writtenRows([started]);
   try {
     if (job.provider === 'gsc') {
       const page = await fetchGsc(env,job.day,job.scope,job.cursor,fetcher);
       if (job.cursor + page.rows.length >= 50_000 && page.next !== null) throw new ProviderError('GSC_DAILY_ROW_LIMIT');
-      await storePage(env,job,page.rows,page.next,page.complete,page.notes,run);
+      return initial+await storePage(env,job,page.rows,page.next,page.complete,page.notes,run);
     } else if (job.provider === 'ga4') {
       const page = await fetchGa4(env,job.day,job.cursor,fetcher);
-      await storePage(env,job,page.rows,page.next,page.complete,page.notes,run);
+      return initial+await storePage(env,job,page.rows,page.next,page.complete,page.notes,run);
     } else if (job.provider === 'ads') {
       const words = await env.DB.prepare('SELECT keyword FROM keyword_catalog WHERE product_id=? ORDER BY keyword LIMIT 1000').bind(job.scope).all<{keyword:string}>();
       const reply = await fetchKeywordPlanner(env,words.results.map(r=>r.keyword),fetcher);
       const stamp=nowISO();
-      await env.DB.batch([
+      return initial+writtenRows(await env.DB.batch([
         env.DB.prepare("INSERT OR IGNORE INTO ads_observations VALUES(?,?,?,?,?)").bind(job.generation,job.scope,stamp,JSON.stringify({network:'GOOGLE_SEARCH',language:'tr',country:'TR',variants:'Google closeVariants birleştirebilir; hacimleri toplama.'}),JSON.stringify(reply)),
         env.DB.prepare("UPDATE sync_jobs SET status='done',lease_until=NULL,lease_token=NULL,updated_at=? WHERE id=? AND lease_token=?").bind(stamp,job.id,job.lease_token),
         env.DB.prepare("UPDATE sync_runs SET status='done',finished_at=? WHERE id=?").bind(stamp,run),
-      ]);
+      ]));
     } else throw new ProviderError('UNKNOWN_PROVIDER');
   } catch (error) {
     const failure = error instanceof ProviderError ? error : new ProviderError('INTERNAL_SYNC_ERROR',true);
@@ -131,14 +150,14 @@ export async function processJob(env: Env, job: Job, fetcher: Fetch = fetch): Pr
     const wait = Math.max(failure.retryAfterSeconds,Math.min(3600,60*2**(attempts-1))) + Math.floor(Math.random()*20);
     const stamp = nowISO();
     const next = new Date(Date.now()+wait*1000).toISOString();
-    await env.DB.batch([
+    return initial+writtenRows(await env.DB.batch([
       env.DB.prepare('UPDATE sync_jobs SET status=?,attempts=?,next_attempt_at=?,lease_token=NULL,lease_until=NULL,error_code=?,updated_at=? WHERE id=? AND lease_token=?')
         .bind(retry?'retry':'blocked',attempts,next,failure.code,stamp,job.id,job.lease_token),
       env.DB.prepare("UPDATE sync_runs SET status='failed',finished_at=? WHERE id=?").bind(stamp,run),
       env.DB.prepare('INSERT INTO sync_errors(run_id,code,retry_at,created_at) VALUES(?,?,?,?)').bind(run,failure.code,retry?next:null,stamp),
       env.DB.prepare('INSERT INTO health_checks VALUES(?,?,?,?,?) ON CONFLICT(provider,day) DO UPDATE SET checked_at=excluded.checked_at,status=excluded.status,code=excluded.code')
         .bind(job.provider,stamp.slice(0,10),stamp,'failed',failure.code),
-    ]);
+    ]));
   }
 }
 /** Explicit one-day GSC acceptance pilot; never activates Cron, crawler, GA4 or Ads. */

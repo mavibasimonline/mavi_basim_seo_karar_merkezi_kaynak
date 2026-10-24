@@ -9,22 +9,22 @@ export async function recordAppliedChange(env:Env,input:{recommendation_id:strin
   await env.DB.batch(statements);
   return id;
 }
-export async function measureOneOutcome(env:Env,time=new Date()):Promise<void>{
+export async function measureOneOutcome(env:Env,time=new Date()):Promise<boolean>{
   const next=await env.DB.prepare(`SELECT w.*,a.applied_at,a.recommendation_id,r.product_id,p.canonical_url
     FROM outcome_windows w JOIN applied_changes a ON a.id=w.applied_change_id JOIN recommendations r ON r.id=a.recommendation_id JOIN products p ON p.id=r.product_id
     WHERE w.status='waiting' AND w.next_check_at<=? AND julianday(?)>=julianday(a.applied_at)+w.days+3 ORDER BY a.applied_at,w.days LIMIT 1`)
     .bind(time.toISOString(),time.toISOString()).first<{applied_change_id:string;days:number;applied_at:string;canonical_url:string|null;product_id:string}>();
-  if(!next)return;
+  if(!next)return false;
   const defer=async(reason:string)=>env.DB.prepare('UPDATE outcome_windows SET next_check_at=?,result_json=? WHERE applied_change_id=? AND days=?')
     .bind(new Date(time.getTime()+86400_000).toISOString(),JSON.stringify({missing:reason,limitation:'Eksik kayıt sıfır veya başarısızlık sayılmaz; veri gelince tekrar ölçülecek.'}),next.applied_change_id,next.days).run();
-  if(!next.canonical_url){await defer('Ürün URL eşlemesi eksik.');return;}
+  if(!next.canonical_url){await defer('Ürün URL eşlemesi eksik.');return true;}
   // Exclude the application day: its exposure contains both versions.
   const base=new Date(next.applied_at.slice(0,10)+'T00:00:00Z').getTime();
   const date=(offset:number)=>new Date(base+offset*86400_000).toISOString().slice(0,10);
   const ranges={before:{start:date(-next.days),end:date(-1)},after:{start:date(1),end:date(next.days)}};
   const coverage=await env.DB.prepare("SELECT day FROM dataset_coverage WHERE provider='gsc' AND scope='page' AND complete=1 AND day BETWEEN ? AND ?").bind(ranges.before.start,ranges.after.end).all<{day:string}>();
   for(const period of [ranges.before,ranges.after]){
-    for(let day=Date.parse(period.start);day<=Date.parse(period.end);day+=86400_000)if(!coverage.results.some(c=>c.day===new Date(day).toISOString().slice(0,10))){await defer('Önce/sonra döneminin Google günlük kapsamı eksik.');return;}
+    for(let day=Date.parse(period.start);day<=Date.parse(period.end);day+=86400_000)if(!coverage.results.some(c=>c.day===new Date(day).toISOString().slice(0,10))){await defer('Önce/sonra döneminin Google günlük kapsamı eksik.');return true;}
   }
   const result:Record<string,unknown>={ranges,application_day_excluded:true,limitation:'Önce/sonra farkı nedensellik kanıtı değildir. Diğer sayfalar yalnızca gözlemsel kontrol grubudur; mevsimsellik kesin olarak elenemez.'};
   for(const [label,range] of Object.entries(ranges)){
@@ -34,7 +34,8 @@ export async function measureOneOutcome(env:Env,time=new Date()):Promise<void>{
       WHERE d.date BETWEEN ? AND ? GROUP BY cohort`).bind(next.canonical_url,range.start,range.end).all()).results;
   }
   // Missing target rows cannot be interpreted as zero traffic.
-  if(!(result.before as {cohort:string}[]).some(r=>r.cohort==='target')||!(result.after as {cohort:string}[]).some(r=>r.cohort==='target')){await defer('Hedef sayfanın önce/sonra gözlemi eksik.');return;}
+  if(!(result.before as {cohort:string}[]).some(r=>r.cohort==='target')||!(result.after as {cohort:string}[]).some(r=>r.cohort==='target')){await defer('Hedef sayfanın önce/sonra gözlemi eksik.');return true;}
   await env.DB.prepare("UPDATE outcome_windows SET measured_at=?,status='measured',result_json=? WHERE applied_change_id=? AND days=?")
     .bind(time.toISOString(),JSON.stringify(result),next.applied_change_id,next.days).run();
+  return true;
 }

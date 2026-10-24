@@ -75,7 +75,7 @@ it('deduplicates daily/backfill jobs and records missing connection honestly',as
   await connected();
   expect(await enqueueDaily(env,new Date('2026-10-24T00:00:00Z'))).toBe(true);
   expect(await enqueueDaily(env,new Date('2026-10-24T01:00:00Z'))).toBe(false);
-  expect((await env.DB.prepare('SELECT count(*) AS n FROM sync_jobs').first<{n:number}>())?.n).toBe(180);
+  expect((await env.DB.prepare('SELECT count(*) AS n FROM sync_jobs').first<{n:number}>())?.n).toBe(226);
 });
 it('requires actual optional Ads access before making any request',async()=>{
   let calls=0;await expect(fetchKeywordPlanner(env,['broşür'],fetcher(async()=>{calls++;return Response.json({});}))).rejects.toThrow('ADS_ACCESS_NOT_CONFIGURED');

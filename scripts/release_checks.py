@@ -45,8 +45,17 @@ def config_errors(config, ready=False, bootstrap=False):
         errors.append('INVALID_GA4_PROPERTY_ID')
     cron = config.get('triggers', {}).get('crons', [])
     enabled = variables.get('AUTOMATION_ENABLED') == 'true'
-    if cron not in ([], ['*/15 * * * *']) or variables.get('CRAWL_ENABLED') not in ('false', 'true') or variables.get('AUTOMATION_ENABLED') not in ('false', 'true'):
+    if cron not in ([], ['*/15 * * * *'], ['* * * * *']) or variables.get('CRAWL_ENABLED') not in ('false', 'true') or variables.get('AUTOMATION_ENABLED') not in ('false', 'true'):
         errors.append('UNREVIEWED_AUTOMATION_SETTINGS')
+    if cron==['* * * * *'] and variables.get('CATCHUP_ENABLED')!='true':
+        errors.append('CATCHUP_OPT_IN_REQUIRED')
+    if variables.get('CATCHUP_ENABLED')=='true':
+        if any(not re.fullmatch(r'[0-9]+',variables.get(key,'')) or not 1500<=int(variables[key])<=60000 for key in ('SYNC_DAILY_WRITE_LIMIT','SYNC_INITIAL_WRITE_LIMIT')):
+            errors.append('CONSERVATIVE_D1_WRITE_BUDGET_REQUIRED')
+        if not re.fullmatch(r'20[0-9]{2}-[0-9]{2}-[0-9]{2}',variables.get('SYNC_INITIAL_BUDGET_DAY','')):
+            errors.append('INITIAL_D1_BUDGET_DAY_REQUIRED')
+    if variables.get('CATCHUP_ENABLED','false') not in ('false','true'):
+        errors.append('INVALID_CATCHUP_SETTING')
     if not enabled and (cron or variables.get('CRAWL_ENABLED') == 'true'):
         errors.append('AUTOMATION_OPT_IN_REQUIRED')
     if (ready or bootstrap) and (variables.get('CRAWL_ENABLED') != 'false' or cron or enabled):
