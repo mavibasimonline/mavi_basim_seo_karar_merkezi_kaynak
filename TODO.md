@@ -14,9 +14,9 @@
 4. Teknik SEO ve URL Inspection: mevcut envanteri genişlet; dizin kanıtını GSC gösteriminden ayır; 30 test ve TECHNICAL_SEO_AUDIT.md; ayrı PR.
 5. İç bağlantı: anchor/bölüm/nofollow ve eksik kapsamı tanıyan grafik; 30 test ve INTERNAL_LINK_AUDIT.md; ayrı PR.
 6. Sorgu–URL çakışması: mevcut olası çakışmayı dönem/cihaz/niyet kanıtlarıyla genişlet; 30 test ve KEYWORD_URL_CONFLICT_REPORT.md; ayrı PR.
-7. Veri doğruluk denetçisi: mevcut bağımsız SQL/kaynak/sağlık denetimlerini tamamla, ürün/kaynak paneli ve 40 senaryo; DATA_INTEGRITY_AUDIT.md; ayrı PR.
+7. [x] Veri doğruluk denetçisi: 48 senaryo, bağımsız ürün/cihaz/sorgu/marka/oran kontrolü, kaynak/ürün paneli ve otomatik sync makbuzu tamamlandı. DATA_INTEGRITY_AUDIT.md; dal feat/veri-dogruluk-denetcisi, taban PR #5. 243 Workers + 21 Python + 2 tarayıcı = 266 test; kaynak koruma/audit/üretim dry-run başarılı.
 
-Bu kuyruk maddeleri talep kaydıdır; kodu/testi bitmiş sayılmaz. Hesap yetkisi olmadan gerçek Google veya canlı sistem kabulü verilmeyecek. Sonraki somut adım, yeni analizlerin güvenilir temeli olarak kaynak/metrik doğruluk denetçisini tamamlamaktır; ardından rakip, teknik, iç bağlantı ve çakışma modülleri ayrı PR ile işlenecek. Gerçek bağlantılar için yalnız hesap sahibinin Cloudflare Workers Free ve Google okuma/OAuth izinleri beklenir.
+Bu kuyruk maddeleri talep kaydıdır; kodu/testi bitmiş sayılmaz. Hesap yetkisi olmadan gerçek Google veya canlı sistem kabulü verilmeyecek. Sonraki somut adım rakip yönetimi/güvenli tarama modülüdür; ardından teknik SEO, iç bağlantı ve sorgu–URL modülleri ayrı PR ile işlenecek. Son tamamlanan commit için git log -1; önceki aşama 05921f1. Gerçek bağlantılar için yalnız hesap sahibinin Cloudflare Workers Free ve Google okuma/OAuth izinleri beklenir.
 
 ## Bağımsız denetim — tamamlandı
 

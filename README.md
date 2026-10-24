@@ -1,3 +1,5 @@
+Veri kaynakları ve bağımsız metrik denetimi: [DATA_INTEGRITY_AUDIT.md](DATA_INTEGRITY_AUDIT.md).
+
 SEO değişiklik takvimi ve 28 günlük etki karşılaştırması: [test ve sınırlar](SEO_CHANGE_IMPACT_REPORT.md).
 
 Fırsat radarı: [kabul ve sınırlar](SEO_OPPORTUNITY_RADAR_REPORT.md).

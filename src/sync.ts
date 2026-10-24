@@ -24,6 +24,7 @@ export function insertRows(db: D1Database, table: string, rows: Row[], guard?: J
 export async function enqueueDaily(env: Env, time = new Date()): Promise<boolean> {
   const day = time.toISOString().slice(0,10);
   const stamp = time.toISOString();
+  const monthEnds=[0,-1].map(offset=>new Date(Date.UTC(time.getUTCFullYear(),time.getUTCMonth()+offset,0)).toISOString().slice(0,10));
   const already = await env.DB.prepare("SELECT 1 FROM health_checks WHERE provider='scheduler' AND day=?").bind(day).first();
   if (already) return false;
   const connected = await env.DB.prepare("SELECT 1 FROM oauth_credentials WHERE provider='google'").first();
@@ -34,6 +35,8 @@ export async function enqueueDaily(env: Env, time = new Date()): Promise<boolean
     for(const provider of ['gsc',...(env.GA4_PROPERTY_ID?['ga4']:[])]){
       const previous=progress.results.find(p=>p.provider===provider)?.oldest_enqueued_day;
       const dateSet=new Set(Array.from({length:7},(_,i)=>dateDaysAgo(i+3,time)));
+      // Keep the last closed monthly reports verifiable after daily reconciliation moves on.
+      for(const end of monthEnds)dateSet.add(end);
       let cursor=previous?Date.parse(previous)-86400_000:Date.parse(dateDaysAgo(3,time));
       let oldest=previous;
       for(let count=0;count<90&&cursor>=Date.parse(dateDaysAgo(400,time));count++,cursor-=86400_000){
@@ -47,8 +50,8 @@ export async function enqueueDaily(env: Env, time = new Date()): Promise<boolean
   }
   const statements = insertRows(env.DB,'sync_jobs',jobs);
   statements.push(...progressStatements);
-  statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,attempts=0,next_attempt_at=?,updated_at=? WHERE status='done' AND day>=? AND day<=? AND substr(updated_at,1,10)<?")
-    .bind(stamp,stamp,dateDaysAgo(9,time),dateDaysAgo(3,time),day));
+  statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,attempts=0,next_attempt_at=?,updated_at=? WHERE status='done' AND provider IN ('gsc','ga4') AND ((day>=? AND day<=?) OR day IN (?,?)) AND substr(updated_at,1,10)<?")
+    .bind(stamp,stamp,dateDaysAgo(9,time),dateDaysAgo(3,time),monthEnds[0],monthEnds[1],day));
   if(connected)statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,attempts=0,next_attempt_at=?,updated_at=? WHERE status='blocked' AND substr(updated_at,1,10)<?").bind(stamp,stamp,day));
   statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,next_attempt_at=?,updated_at=? WHERE status='done' AND provider IN ('gsc','ga4') AND NOT EXISTS(SELECT 1 FROM dataset_coverage c WHERE c.provider=sync_jobs.provider AND c.day=sync_jobs.day AND c.scope=sync_jobs.scope AND c.complete=1)").bind(stamp,stamp));
   statements.push(env.DB.prepare("INSERT OR IGNORE INTO health_checks VALUES('scheduler',?,?,?,?)").bind(day,stamp,connected ? 'queued' : 'blocked',connected ? null : 'GOOGLE_NOT_CONNECTED'));
@@ -83,6 +86,11 @@ async function storePage(env: Env, job: Job, rows: GscRow[] | Ga4Row[], next: nu
       WHERE excluded.complete=1 OR dataset_coverage.complete=0`)
       .bind(job.cursor+rows.length,Number(complete && !job.quality_failed),Number(job.scope === 'query'),stamp,notes,job.id,job.lease_token));
   }
+  if(next===null)statements.push(env.DB.prepare(`INSERT OR IGNORE INTO insight_runs(id,kind,source_key,created_at,result_json)
+    SELECT 'sync-audit:'||sync_jobs.id||':'||generation,'sync-audit',sync_jobs.id||':'||generation,?,
+      json_object('source',provider,'day',day,'scope',scope,'dataset_id',generation,'expected_rows',?,'actual_rows',c.row_count,'status','Doğrulandı','rule','provider field validation + fenced final dataset count; metrics remain source-specific')
+    FROM sync_jobs JOIN dataset_coverage c USING(provider,day,scope)
+    WHERE sync_jobs.id=? AND lease_token=? AND sync_jobs.status='running' AND c.dataset_id=generation AND c.complete=1`).bind(stamp,job.cursor+rows.length,job.id,job.lease_token));
   const usable=complete&&!job.quality_failed;
   statements.push(env.DB.prepare(`INSERT INTO health_checks(provider,day,checked_at,status,code)
     SELECT provider,?,?,CASE WHEN ?=1 AND (?=0 OR EXISTS(SELECT 1 FROM dataset_coverage WHERE dataset_id=sync_jobs.generation AND complete=1)) THEN 'ok' ELSE 'partial' END,

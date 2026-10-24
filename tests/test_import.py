@@ -57,6 +57,12 @@ class ImportTests(unittest.TestCase):
         self.assertEqual(self.report['missing_monthly_cells'], 212148)
         self.assertEqual(len(self.report['repeated_keywords']), 1300)
 
+    def test_worker_manifest_matches_all_original_file_hashes_and_counts(self):
+        manifest = json.loads((ROOT / 'src/source-manifest.json').read_text())
+        self.assertEqual(len(manifest), 521)
+        self.assertEqual({f['path']: (f['sha256'], f['row_count'], f['product_id']) for f in manifest},
+                         {f['path']: (f['sha256'], f['rows'], f['product']) for f in self.report['files']})
+
     def test_malformed_rows_are_reported(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'group/product/Keyword Stats 2026-10-01 at 01_02_03.csv'
