@@ -1,6 +1,17 @@
 # Durum, teslim denetimi ve devam kaydı
 
-## Üretime geçiş hazırlığı — güncel
+## Bağımsız denetim — tamamlandı
+
+- Dal `audit/seo-reliability`; sonuçlar [AUDIT_REPORT.md](AUDIT_REPORT.md).
+- 41 bağımsız senaryo: ilk 40 koşusunda 13 hata yeniden üretildi ve düzeltildi; son 41/41 başarılı.
+- Tam regresyon: 86 Workers/D1 + 20 Python + 2 Chromium = 108 başarılı; npm audit 0; tip kontrolü, kaynak koruma, üretim dry-run başarılı. Başarısız/atlanmış otomatik test yok.
+- 29 ürün / 521 dosya / 9.075 satır tekrar incelendi; kaynaklar ve talimatlar değişmedi.
+- Son uygulama motoru 1.2.0; bu belgeyi içeren commit `git log -1 --oneline`. İlk güvenlik aşaması f4a5d1b.
+- Main b31d3b1 uzak verify=SUCCESS. Denetim düzeltmeleri ayrı PR'a gönderilecek; main'e otomatik birleştirme yapılmaz.
+- Bir sonraki somut adım: Türkçe soru-cevap ve takip bağlamı (30 soru), ardından fırsat radarı (30 senaryo) ve değişiklik etki analizi (30 senaryo); ayrı PR'lar.
+- Gerçek Cloudflare ve Google bağlantısı yok; gerçek senkron/tarama/rapor/CPU/kota/uzak yedek kabulü yapılmadı. Gerekli hesap izinleri üretim yönergesinde.
+
+## Önceki üretime geçiş hazırlığı kaydı
 
 Yeni özellik eklenmedi; mevcut `src/`, `public/`, migration'lar ve 521 CSV korundu. Main farkı/çatışma kontrolü, bağımlılık güvenlik düzeltmeleri, SHA sabitli CI, ayrı üretim yapılandırması, OAuth/Free plan/rollback yönergesi ve gerçek veri kabul araçları hazır. Güncel sonuç: **42 Workers + 16 Python + 2 tarayıcı = 60 test geçti**, tüm bağımlılıklarda npm audit 0. Önceki 52 testlik kayıt aşağıda geliştirme aşamasının tarihçesidir.
 
@@ -89,3 +100,5 @@ GSC salt okunur OAuth ve site ağ erişimi sağlanınca mevcut adaptörlerle bir
 ## Oturumlar arasında devam
 
 README komutları tekrarlanabilir. `.dev.vars`, `.local/` ve `.wrangler/` özel/yerel çıktılardır; Git'e girmez. Mevcut kullanıcı dosyalarını ve kimlik bilgilerini koruyun. Son commit: `git log -1 --oneline`. Oturumun kendiliğinden yeniden başlayacağı garanti edilmez.
+
+Güvenlik güncellemesi: 2026-10-23 CI'de yeni undici uyarıları görüldü; miniflare için 7.30.1 sabitlendi. npm ci ve audit tekrar geçti (0 açık). Ayrıntı SECURITY_CHANGELOG.md; sonraki dal CI sonuçları ayrıca doğrulanacak.

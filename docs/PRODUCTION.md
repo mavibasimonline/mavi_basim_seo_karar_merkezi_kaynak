@@ -1,10 +1,10 @@
 # Güvenli üretim geçişi
 
-Bu yönerge dağıtım hazırlığıdır. Bu oturumda gerçek Cloudflare kaynağı oluşturulmadı, Google hesabı bağlanmadı ve canlı site değiştirilmedi. Yeni uygulama özelliği eklenmedi; `src/` ve `public/` mevcut çalışan sürümde korunur. Uygulama sürümü incelemesi: `docs/RELEASE_REVIEW.md`; kabul: `docs/PRODUCTION_ACCEPTANCE.md`.
+Bu yönerge dağıtım hazırlığıdır. Bu oturumda gerçek Cloudflare kaynağı oluşturulmadı, Google hesabı bağlanmadı ve canlı site değiştirilmedi. Mevcut uygulama korunur; zamanlayıcıya varsayılan kapalı bir güvenlik kontrolü eklenmiştir. Uygulama sürümü incelemesi: `docs/RELEASE_REVIEW.md`; kabul: `docs/PRODUCTION_ACCEPTANCE.md`.
 
 ## 1. Birleştirme kapısı
 
-- Hedef `main`, kaynak `feat/seo-karar-merkezi`; [PR #1](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/1) oluşturuldu, açıklaması `docs/PULL_REQUEST.md` içindedir. Merge veya auto-merge açılmadı.
+- [PR #1](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/1) hesap sahibi tarafından birleştirildi. `main`: `b31d3b1b0f37a1d83a43bc4a719f1456e8e56511`; [main CI verify=SUCCESS](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40037571711/job/120700694073). Yeni değişikliklerin CI sonucu ayrıca doğrulanır.
 - PR'nin son HEAD'i için CI, kaynak koruması, güvenlik ve mobil/masaüstü testleri yeşil olmalı. Yerel geçiş uzak CI sonucu yerine kullanılamaz.
 - `main` sonradan değişirse fetch ve merge denetimini tekrarlayın; kullanıcı değişikliklerini reset/rebase ile silmeyin.
 
@@ -44,9 +44,9 @@ node scripts/run.mjs wrangler whoami
 node scripts/run.mjs wrangler d1 create mavi-basim-seo-prod
 ```
 
-Son iki komut gerçek hesap yetkisi geldikten sonra uygulanır; burada çalıştırılmadı. `whoami` hesabın Free olduğunun kanıtı değildir; plan ayrıca panelden doğrulanır. `deploy/wrangler.production.jsonc` içindeki D1 kimliğini oluşturulan gerçek UUID ile değiştirin. Ayrı uygulama adresi `https://mavi-basim-seo-prod.<hesap-alt-adı>.workers.dev` olacaktır; callback yer tutucusunu bununla doldurun. `workers_dev=true`, `preview_urls=false`; hiçbir `routes`, zone veya canlı site alan adı eklenmez. Mevcut geliştirme `wrangler.jsonc` dosyası korunur.
+`whoami` salt okunur denendi ve oturum bulunmadı; D1 oluşturma çalıştırılmadı. `whoami` hesabın Free olduğunun kanıtı değildir; plan ayrıca panelden doğrulanır. `deploy/wrangler.production.jsonc` içindeki D1 kimliğini oluşturulan gerçek UUID ile değiştirin. Ayrı uygulama adresi `https://mavi-basim-seo-prod.<hesap-alt-adı>.workers.dev` olacaktır; callback yer tutucusunu bununla doldurun. `workers_dev=true`, `preview_urls=false`; hiçbir `routes`, zone veya canlı site alan adı eklenmez. Mevcut geliştirme `wrangler.jsonc` dosyası korunur.
 
-İlk yapılandırmada Cron listesi boş, tarama ve Ads kapalıdır. Gerçek kimlikler geldikten sonra:
+İlk yapılandırmada Cron listesi boş; `AUTOMATION_ENABLED=false`, tarama ve Ads kapalıdır. Eksik veya yanlış açma değeriyle Worker zamanlayıcısı veritabanına veya ağa dokunmaz. Gerçek kimlikler geldikten sonra:
 
 ```sh
 python3 scripts/release_checks.py --base origin/main --ready
@@ -93,19 +93,25 @@ Panelde yönetici girişinden sonra **Google'ı bağla** seçilir. İstenen GSC 
 
 Callback'in başarılı olması yalnızca şifreli bir OAuth kaydı oluşturulduğunu gösterir. Gerçek API erişimi ilk kesinleşmiş günlük dataset ve sağlık kontrolüyle doğrulanır. Token içeriğini D1 sorgusunda göstermeyin. Test modunun token süresi, grant iptali ve uygulama sahibinin hesabı düzenli kontrol edilmelidir. Kaynaklar: [Google web OAuth](https://developers.google.com/identity/protocols/oauth2/web-server), [OAuth production](https://developers.google.com/identity/protocols/oauth2/production-readiness/policy-compliance), [Search Analytics](https://developers.google.com/webmaster-tools/v1/searchanalytics/query).
 
-## 6. İlk gerçek senkron ve taramayı kontrollü açma
+## 6. Opsiyonel GA4
 
-GSC izninden sonra `triggers.crons` değerini `["*/15 * * * *"]` yapıp aynı ayrı Worker'a deploy edin. **Tarama hâlâ false** olsun. Cron değişikliği 15 dakikaya kadar yayılabilir; art arda deploy/tetikleme yapmayın. İlk tur işleri planlar; sonraki turlar sayfa/sorgu parçalarını alır. Sıfır veya kısmi yanıt gerçek performans kabulü değildir. Ayrıntılı senkron SQL'i ve ilk gün karşılaştırması kabul belgesindedir.
+Mevcut adaptör ayrı bir sağlayıcıdır; GSC sorgularıyla birleştirilmez. GA4 isteniyorsa aynı Google projesinde **Google Analytics Data API** etkinleştirilir. Mevcut mülkte Viewer okuma izni yeterlidir; siteye etiket eklemek veya mülk ayarlarını değiştirmek gerekmez. Üretim dosyasında `GA4_PROPERTY_ID` alanına sayısal property ID yazılır (`G-...` ölçüm kimliği kabul edilmez). Boş alan GA4'ü kapalı tutar.
+
+Önce Cron'u boş, otomasyonu ve taramayı false tutarak `--ready` denetimi ve dry-run uygulanır. Aynı Worker'a yayınlandıktan sonra Google bağlantısı tekrar verilir; bu kez GSC read-only yanında `analytics.readonly` istenir. Bu kapsam eksikse callback kaydı reddeder. Bağlantı kaydı gerçek GA4 ölçümü değildir: `health_checks` içinde ga4=ok, tam organic günlük kapsamı ve GA4 panelindeki aynı tarih/saat dilimi/Organic Search şehir-cihaz oturum sayımı karşılaştırılmalıdır. Eksik veya örneklenmiş yanıt kabul edilmez; dönüşüm tanımı doğrulanmadığı için key events null kalır. GA4 olmaması GSC senkronunu engellemez.
+
+## 7. İlk gerçek senkron ve taramayı kontrollü açma
+
+Yerel CI/güvenlik, Workers Free ve kalan bütçe, ayrı kaynak sayımları, giriş/bağlantısız kabulü, callback ve verilen GSC kapsamı doğrulandıktan sonra ilk kontrollü senkron denemesi yapılır. Bu ön koşulları ve deployment ID'sini kabul kaydına yazın. `AUTOMATION_ENABLED=true` ve `triggers.crons` değerini `["*/15 * * * *"]` yapıp aynı ayrı Worker'a deploy edin. **Tarama hâlâ false** olsun. Cron değişikliği 15 dakikaya kadar yayılabilir; art arda deploy/tetikleme yapmayın. İlk tur işleri planlar; sonraki turlar sayfa/sorgu parçalarını alır. Sıfır veya kısmi yanıt gerçek performans kabulü değildir. Ayrıntılı senkron SQL'i ve ilk gün karşılaştırması kabul belgesindedir.
 
 Bir kesinleşmiş günün sayfa ve sorgu veri kümeleri geçince, siteye yalnızca okuma yapılacağı ve robots politikasının uygun olduğu doğrulanarak `CRAWL_ENABLED=true` yapılır. Aynı Worker'a deploy edin. Saatin `:45` dilimi taramaya ayrılır; ilk robots alımında crawl-delay beklenmesi normaldir. Kabul, `/brosur` ve `/el-ilani` için gerçek 200 HTML/snapshot ile yapılır. Otomatik geçmiş tarama sırasında site içerikleri değiştirilmez. Ads false kalır.
 
 İlk tam aylık rapor için seçilen ay ve önceki ayın **her günü** page/query dataset kapsamı, mevcut ürün sayfası ölçümleri ve tazelik kapısı gerekir. Backfill tamamlanmadan aylık analiz çalıştı denmez. Daha eski ay istenirse API'nin 72 saat tazelik şartını sağlamak üzere ilgili tarih aralığının tekrar alınması gerekebilir; eşiği gevşetmeyin.
 
-## 7. Yedek, durdurma ve geri dönüş
+## 8. Yedek, durdurma ve geri dönüş
 
-Gerçek D1 kimliği aynı üretim dosyasına kaydedilince mevcut `backup.yml` artık doğru D1'i hedefler. GitHub'da yalnızca D1 okumasına yeterli ayrı `CLOUDFLARE_API_TOKEN`, hesap ID'si ve bağımsız `BACKUP_ENCRYPTION_KEY` güvenli Secret olarak girilir. Otomatik iş ilk kez main'de etkinleştirilmeden önce workflow_dispatch ile şifreli export/geri çözme/ayrı SQLite doğrulaması yapılır. Hesap ve GitHub dakika/artifact kullanımı kontrol edilir. GitHub işi üçüncü tarafı çağıran Cloudflare geniş token'ı almaz; dependency lifecycle script'leri kapalıdır.
+Gerçek D1 kimliği aynı üretim dosyasına kaydedilince mevcut `backup.yml` artık doğru D1'i hedefler. GitHub'da yalnızca D1 okumasına yeterli ayrı `CLOUDFLARE_API_TOKEN`, hesap ID'si ve bağımsız `BACKUP_ENCRYPTION_KEY` güvenli Secret olarak girilir. Zamanlanmış yedek işi `PRODUCTION_BACKUPS_ENABLED` depo değişkeni tam `true` olmadıkça başlamaz; secret eklemek tek başına açmaz. Bu değişkeni açmadan önce workflow_dispatch ile şifreli export/geri çözme/ayrı SQLite doğrulaması yapılır. Hesap ve GitHub dakika/artifact kullanımı kontrol edilir. GitHub işi üçüncü tarafı çağıran Cloudflare geniş token'ı almaz; dependency lifecycle script'leri kapalıdır.
 
-Bir sonraki sürüm öncesi mevcut Worker deployment ID'sini ve doğrulanmış şifreli yedeği saklayın. Rollback önce Cron `[]`, tarama false ve aynı Worker'a deploy ile toplama işini durdurur. `wrangler deployments list --config deploy/wrangler.production.jsonc` ile bilinen sağlam ID belirlenir; `wrangler rollback <VERSION_ID> --config deploy/wrangler.production.jsonc` yalnızca yetkili kişi tarafından uygulanır. Kod rollback D1 migration'larını veya veri yazılarını geri almaz. Şifreleme anahtarını değiştirmeyin; Google token'ları çözülemez.
+Bir sonraki sürüm öncesi mevcut Worker deployment ID'sini ve doğrulanmış şifreli yedeği saklayın. Rollback önce `AUTOMATION_ENABLED=false`, Cron `[]`, tarama false ve aynı Worker'a deploy ile toplama işini durdurur. `wrangler deployments list --config deploy/wrangler.production.jsonc` ile bilinen sağlam ID belirlenir; `wrangler rollback <VERSION_ID> --config deploy/wrangler.production.jsonc` yalnızca yetkili kişi tarafından uygulanır. Kod rollback D1 migration'larını veya veri yazılarını geri almaz. Şifreleme anahtarını değiştirmeyin; Google token'ları çözülemez.
 
 D1 Time Travel veya şifreli yedek önce **ayrı kurtarma D1** üzerinde değerlendirilir; kaynak D1'i silmeyin veya doğrudan üzerine yazmayın. Free hesapta ayrı D1'in de mevcut hesap/500 MB bütçesine sığması gerekir. Yeni veritabanında bütünlük/sayım/uygulama kabulü yapılmadan binding değiştirilmez. `mavibasim.com` için DNS, route veya yayın geri dönüş işlemi bu yönergenin parçası değildir.
 
@@ -117,4 +123,4 @@ D1 Time Travel veya şifreli yedek önce **ayrı kurtarma D1** üzerinde değerl
 
 Diğer hazırlıklar dosyalarda ve otomatik kontrollerdedir. Gizli değerler sohbette istenmez; yetki olmadan hesap bağlandı, dağıtıldı veya üretim çalışıyor denmez.
 
-GitHub işlemleri mevcut kimlikle GraphQL üzerinden çalıştı; kullanıcıdan yeni GitHub token'ı veya ağ değişikliği gerekmiyor. Son PR HEAD'inin verify kontrolü burada hazırlanan CI komutlarını uzakta çalıştırır; main'e birleştirme otomatik yapılmaz.
+GitHub işlemleri mevcut kimlikle GraphQL üzerinden çalıştı; kullanıcıdan yeni GitHub token'ı veya ağ değişikliği gerekmiyor. Son PR HEAD'inin verify kontrolü burada hazırlanan CI komutlarını uzakta çalıştırır; Yeni denetim düzeltmeleri ayrı bir PR ile sunulur; otomatik birleştirme yapılmaz.

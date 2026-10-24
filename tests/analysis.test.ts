@@ -13,6 +13,9 @@ function input(clicks:number,previous:number,impressions=1000,previousImpression
 };}
 async function seed(month:string,query=true){
   await connected();const period=monthPeriod(month),previous=monthPeriod(month,-1),stamp=new Date().toISOString();
+  // Simulated successful API check and crawler URL verification, not real account data.
+  await env.DB.prepare('UPDATE products SET url_verified_at=?').bind(stamp).run();
+  await env.DB.prepare("INSERT INTO health_checks VALUES('gsc',?,?,'ok',NULL)").bind(stamp.slice(0,10),stamp).run();
   for(const p of [period,previous]){
     const coverage=dates(p).flatMap(day=>['page',...(query?['query']:[])].map(scope=>({provider:'gsc',day,scope,dataset_id:`${day}:${scope}`,complete:1,query_partial:Number(scope==='query'),row_count:2,fetched_at:stamp,notes:'TEST FIXTURE; not live data'})));
     await env.DB.batch(insertRows(env.DB,'dataset_coverage',coverage));

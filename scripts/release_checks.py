@@ -3,6 +3,7 @@ import argparse
 import json
 import re
 import subprocess
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,14 +39,25 @@ def config_errors(config, ready=False, bootstrap=False):
         errors.append('SECRET_IN_CONFIG')
     if variables.get('SITE_ORIGIN') != 'https://mavibasim.com' or variables.get('ENABLE_GOOGLE_ADS') != 'false':
         errors.append('UNEXPECTED_SOURCE_OR_ADS_ENABLED')
+    if variables.get('GSC_PROPERTY') not in ('https://mavibasim.com/', 'sc-domain:mavibasim.com'):
+        errors.append('UNEXPECTED_GSC_PROPERTY')
+    if variables.get('GA4_PROPERTY_ID', '') and not re.fullmatch(r'[1-9][0-9]*', variables['GA4_PROPERTY_ID']):
+        errors.append('INVALID_GA4_PROPERTY_ID')
     cron = config.get('triggers', {}).get('crons', [])
-    if cron not in ([], ['*/15 * * * *']) or variables.get('CRAWL_ENABLED') not in ('false', 'true'):
+    enabled = variables.get('AUTOMATION_ENABLED') == 'true'
+    if cron not in ([], ['*/15 * * * *']) or variables.get('CRAWL_ENABLED') not in ('false', 'true') or variables.get('AUTOMATION_ENABLED') not in ('false', 'true'):
         errors.append('UNREVIEWED_AUTOMATION_SETTINGS')
-    if (ready or bootstrap) and (variables.get('CRAWL_ENABLED') != 'false' or cron):
+    if not enabled and (cron or variables.get('CRAWL_ENABLED') == 'true'):
+        errors.append('AUTOMATION_OPT_IN_REQUIRED')
+    if (ready or bootstrap) and (variables.get('CRAWL_ENABLED') != 'false' or cron or enabled):
         errors.append('AUTOMATION_NOT_HELD_FOR_ACCEPTANCE')
-    if ready:
+    if ready or enabled:
         database_id = bindings[0].get('database_id', '') if len(bindings) == 1 else ''
-        if not re.fullmatch(r'[0-9a-fA-F-]{36}', database_id) or database_id == '00000000-0000-0000-0000-000000000000':
+        try:
+            valid_id = str(uuid.UUID(database_id)) == database_id.lower() and uuid.UUID(database_id).int != 0
+        except (ValueError, AttributeError):
+            valid_id = False
+        if not valid_id:
             errors.append('D1_ACCOUNT_AUTHORIZATION_REQUIRED')
         redirect = variables.get('GOOGLE_REDIRECT_URI', '')
         if not re.fullmatch(r'https://mavi-basim-seo-prod\.[a-z0-9-]+\.workers\.dev/api/oauth/google/callback', redirect):

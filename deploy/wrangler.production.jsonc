@@ -15,8 +15,10 @@
   "vars": {
     "SITE_ORIGIN": "https://mavibasim.com",
     "GSC_PROPERTY": "https://mavibasim.com/",
+    "GA4_PROPERTY_ID": "",
     "GOOGLE_REDIRECT_URI": "https://mavi-basim-seo-prod.REPLACE_ACCOUNT.workers.dev/api/oauth/google/callback",
     "CRAWL_ENABLED": "false",
+    "AUTOMATION_ENABLED": "false",
     "ENABLE_GOOGLE_ADS": "false"
   },
   "triggers": { "crons": [] },

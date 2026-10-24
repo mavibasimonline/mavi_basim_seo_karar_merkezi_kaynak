@@ -2,6 +2,8 @@
 
 Üretime geçiş: [hesap/dağıtım/OAuth yönergesi](docs/PRODUCTION.md), [ilk gerçek veri kabulü](docs/PRODUCTION_ACCEPTANCE.md), [main ve güvenlik denetimi](docs/RELEASE_REVIEW.md). Çalışan uygulama korunur; üretim kaynakları bu oturumda oluşturulmadı.
 
+Bağımsız denetim: [AUDIT_REPORT.md](AUDIT_REPORT.md). Motor 1.2.0; marka/cihaz ayrımı, sağlık ve URL kanıtı olmadan karar durur.
+
 Türkçe tek ekran paneli, Cloudflare Worker API'si, D1/SQLite veri modeli, günlük Google senkron kuyruğu, salt okunur site tarayıcısı ve kanıtla sınırlanan karar motoru. Ücretli LLM veya ücretli API zorunluluğu yoktur. Uygulama canlı siteye yazmaz.
 
 **Gerçek durum:** Uygulama yerel Workers/D1 ortamında çalıştırıldı ve otomatik testlerden geçti. Kaynak CSV'ler gerçektir. Google hesabı bağlanmadı, canlı tarama bu ortamın ağ politikası nedeniyle doğrulanamadı ve Cloudflare üretim dağıtımı yapılmadı. Panel eksik bağlantıyı **Veri bekle** olarak gösterir. Testlerdeki sentetik Google yanıtları yalnızca test fixtures içindedir; gerçek kullanıcı veritabanına yüklenmez.
@@ -69,7 +71,7 @@ Başlangıç eşikleri denetlenebilir muhafazakâr kurallardır; istatistiksel a
 
 ## Otomatik çalışma ve günlük denetim
 
-`wrangler.jsonc` 15 dakikalık Cron içerir. **Cloudflare'a dağıtılınca** bilgisayar kapalıyken çalışır; yerel geliştirmede zamanlayıcı kendiliğinden tetiklenmez. Günlük tekilleştirilmiş planlama:
+`wrangler.jsonc` 15 dakikalık Cron içerir; `AUTOMATION_ENABLED=false` varsayılanıyla hiçbir toplama görevi çalışmaz. Üretim dosyasında Cron ayrıca boştur. Üretim yönergesindeki kabul ön koşulları geçmeden açılmaz. **Cloudflare'a dağıtılınca** bilgisayar kapalıyken çalışır; yerel geliştirmede zamanlayıcı kendiliğinden tetiklenmez. Günlük tekilleştirilmiş planlama:
 
 1. Son kesinleşmiş günler yeniden uzlaştırılır. İlk geçmiş aktarımı her gün en fazla 90 günlük yeni görev ekleyerek 400 güne kadar ilerler; ücretsiz bütçe için istekler parçalara ayrılır.
 2. Her işte en fazla 200 Google satırı alınır. Veriler yeni veri kümesine yazılır; son sayfa ve satır sayısı doğrulanmadan aktif küme değiştirilmez. Hatalı veya eksik yeni aktarım eskisini bozmaz.
@@ -107,7 +109,7 @@ python3 scripts/verify_restore.py --sql .local/restore.sql
 
 Şifreleme aracı mevcut çıktı dosyasının üzerine yazmaz. Gerçek felaket kurtarmada önce ayrı D1'e geri yükleyip ilişki, satır sayıları, OAuth anahtarı ve uygulama kabulünü doğrulayın; mevcut üretim veritabanını doğrudan ezmeyin. Anahtar kaybolursa şifreli token/yedek çözülemez; Google yeniden bağlama ve saklanan bağımsız anahtar gerekir.
 
-`.github/workflows/backup.yml` günlük uzak D1 export, şifreleme, ayrı SQLite'a geri yükleme denetimi ve yalnızca şifreli artifact saklama işini içerir. `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, ayrı `BACKUP_ENCRYPTION_KEY` ve gerçek D1 kimliği olmadan **yedek alınmadı** bildirip atlar. Otomatik üretim yedeklemesi henüz etkin değildir. Açık SQL, kullanıcı analizleri ve token'lar Git'e yüklenmez. Bağımsız ikinci yedek hedefi ve saklama politikası üretim öncesi belirlenmelidir.
+`.github/workflows/backup.yml` günlük uzak D1 export, şifreleme, ayrı SQLite'a geri yükleme denetimi ve yalnızca şifreli artifact saklama işini içerir. `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, ayrı `BACKUP_ENCRYPTION_KEY` ve gerçek D1 kimliği olmadan **yedek alınmadı** bildirip atlar. Zamanlanmış yedek ayrıca `PRODUCTION_BACKUPS_ENABLED=true` depo değişkeni gerektirir; ilk manuel geri yükleme kabulünden sonra açılır. Otomatik üretim yedeklemesi henüz etkin değildir. Açık SQL, kullanıcı analizleri ve token'lar Git'e yüklenmez. Bağımsız ikinci yedek hedefi ve saklama politikası üretim öncesi belirlenmelidir.
 
 ## API ve devam kaydı
 
@@ -115,4 +117,4 @@ python3 scripts/verify_restore.py --sql .local/restore.sql
 
 `/api/applied-changes` yalnızca geçmişte uygulanmış değişikliğin beyanını ve kanıtını kaydeder; site/CMS değiştirmez. Snapshot farkları için kesin yayın zamanı bilinmiyorsa `published_at=null`, `observed_from` ve `observed_to` kullanılır.
 
-Testler, gerçek entegrasyon engelleri ve sonraki somut işler [TODO.md](TODO.md) dosyasındadır. Kaynak kodu `feat/seo-karar-merkezi` dalında saklanır. Oturumun kendiliğinden yeniden başlatılacağına dair garanti yoktur.
+Testler, gerçek entegrasyon engelleri ve sonraki somut işler [TODO.md](TODO.md) dosyasındadır. İlk uygulama PR #1 ile main dalına birleştirildi; sonraki denetim düzeltmeleri ayrı PR ile sunulur. Oturumun kendiliğinden yeniden başlatılacağına dair garanti yoktur.

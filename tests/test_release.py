@@ -43,6 +43,23 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(release.secret_rules('GOOGLE_CLIENT_SECRET=\nADMIN_TOKEN=\n'), [])
         self.assertEqual(release.secret_rules('ADMIN_TOKEN=\nGOOGLE_CLIENT_SECRET=\nTOKEN_ENCRYPTION_KEY=\n'), [])
 
+    def test_automation_requires_explicit_opt_in_and_real_resource_ids(self):
+        self.config['triggers']['crons'] = ['*/15 * * * *']
+        self.assertIn('AUTOMATION_OPT_IN_REQUIRED', release.config_errors(self.config))
+        self.config['vars']['AUTOMATION_ENABLED'] = 'true'
+        self.assertIn('D1_ACCOUNT_AUTHORIZATION_REQUIRED', release.config_errors(self.config))
+        self.assertIn('OAUTH_ACCOUNT_CALLBACK_REQUIRED', release.config_errors(self.config))
+        self.assertIn('AUTOMATION_NOT_HELD_FOR_ACCEPTANCE', release.config_errors(self.config, bootstrap=True))
+
+    def test_ga4_and_gsc_configuration_cannot_silently_target_wrong_properties(self):
+        self.config['vars']['GSC_PROPERTY'] = 'sc-domain:mavibasim.com'
+        self.config['vars']['GA4_PROPERTY_ID'] = '123456789'
+        self.assertEqual(release.config_errors(self.config), [])
+        self.config['vars']['GSC_PROPERTY'] = 'https://another.example/'
+        self.config['vars']['GA4_PROPERTY_ID'] = 'G-TRACKING-ID'
+        self.assertIn('UNEXPECTED_GSC_PROPERTY', release.config_errors(self.config))
+        self.assertIn('INVALID_GA4_PROPERTY_ID', release.config_errors(self.config))
+
 
 if __name__ == '__main__':
     unittest.main()
