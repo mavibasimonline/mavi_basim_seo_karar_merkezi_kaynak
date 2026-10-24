@@ -1,3 +1,15 @@
+# Gerçek üretim devamı — 25 Ekim 2026, 01:16 Türkiye
+
+- [x] Gerçek D1 tanılaması **40137124437**: GSC 36 done / 324 pending, Temmuz–Eylül **12/184**. Günlük 8.552/10.000 güvenlik bütçesi bekletiyor; Google hata kaydı yok. 03:00 henüz gerçekleşmedi.
+- [x] Kalan 27 ürün mevcut crawler ile gerçek GET/robots/canonical kontrollerinden geçti. **40137757129: 29/29** URL ve snapshot kabulü başarılı; arşiv **29/521/9.075** korundu. Önceki iki sınırlı koşu 14/29 ve 26/29'da eksik kabul döndürdü. Bunlar kontrollü taramalardır; 29 ürünün otomatik Cron tekrarının tamamlandığı anlamına gelmez.
+- [x] Gerçek rapor motoru **40137484150**: Eylül, 29 ürün, 3 kapsam eksiği; **29 Veri bekle**, tam aylık kabul false. Bağımsız metrik/cihaz/null/kanıt korumaları başarılı. Ham Google ölçümleri yayımlanmadı ve özel yönetici oturumu kullanılmadı.
+- [x] Mevcut tarayıcıda gerçek GSC ürün keşfi ve kuyruk önceliği düzeltildi; seed tek SQL'e indirildi. Yerel 286 Workers + 45 Python; 8 tarayıcı senaryosu uzak CI'da. Son kod 662a5c8; bu belgeyi içeren commit git log -1 ile izlenir. PR #15.
+- [x] Mevcut tanılama için günlük **03:07 / 05:17 Türkiye** salt okunur kanıt toplama hazırlandı. Yeni gün bütçesi ve gerçek boş olmayan senkron tamamlanması ayrı denetlenir. GitHub zamanlaması gecikebilir; sonuç henüz gerçekleşmiş sayılmaz. GSC Cron, OAuth, bütçe ve veri kayıtları korunur.
+
+**Sonraki somut adım:** 03:00 sonrası gerçek koşu ve tamamlanmış veri kümelerinin arttığını 03:07/05:17 tanılama artifact'iyle doğrula; 172/184 eksik kapsamı bütçe içinde izlemeye devam et. Tam Temmuz–Eylül, gerçek dolu aylık rapor ve 29 ürünün otomatik tekrar kabulü henüz tamamlanmadı. Ücretli hizmet veya kota korumasını aşan işlem yok. Ayrıntı: [PRODUCTION_CONTINUITY_REPORT.md](PRODUCTION_CONTINUITY_REPORT.md). Aşağıdaki eski sayılar tarihli kayıttır.
+
+---
+
 # Profesyonel panel devam kaydı — 25 Ekim 2026 (Türkiye)
 
 - [x] Mevcut uygulamada tutarlı Türkçe tasarım: daraltılabilir menü, mobil gezinme, dönem/cihaz seçimi, dört KPI, gerçek GSC günlük grafiği, filtreli/sıralı ürün ve sorgu tabloları; mevcut radar/takvim/veri sağlığı/soru-cevap korunup yeni tasarıma taşındı.

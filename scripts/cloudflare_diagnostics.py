@@ -116,7 +116,7 @@ def collect(client, config):
  if settings['ok']:
   flags={}
   for b in settings['result'].get('bindings',[]):
-   if b.get('name') in ('AUTOMATION_ENABLED','CRAWL_ENABLED','ENABLE_GOOGLE_ADS','GSC_PROPERTY','SITE_ORIGIN') and b.get('type')=='plain_text':flags[b['name']]=b.get('text')
+   if b.get('name') in ('AUTOMATION_ENABLED','CRAWL_ENABLED','ENABLE_GOOGLE_ADS','GSC_PROPERTY','SITE_ORIGIN','CATCHUP_ENABLED','SYNC_DAILY_WRITE_LIMIT','SYNC_INITIAL_BUDGET_DAY','SYNC_INITIAL_WRITE_LIMIT') and b.get('type')=='plain_text':flags[b['name']]=b.get('text')
   result['runtime']={'ok':True,'flags':flags,'binding_names':sorted(b.get('name','') for b in settings['result'].get('bindings',[]))}
  else:result['runtime']=settings
  schedules=client.request('GET',base+'/schedules')
