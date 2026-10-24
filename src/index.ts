@@ -111,9 +111,16 @@ export async function tick(env:Env,fetcher:typeof fetch=fetch,time=new Date()):P
   // Dedicated slots prevent a long historical backfill from starving crawl/outcome work.
   if(time.getUTCMinutes()===45){await seedCrawl(env);await crawlOne(env,fetcher);return;}
   if(time.getUTCMinutes()===30&&time.getUTCHours()%4===0){await measureOneOutcome(env);return;}
-  // One provider page OR one crawl per tick keeps requests bounded on the free plan.
-  const job=await claimJob(env);
-  if(job){await processJob(env,job,fetcher);return;}
+  // Process up to three provider pages per scheduled tick while respecting free-tier limits.
+  // Each job retains its own lease, retry, and validated dataset generation.
+  let processed=0;
+  for(let i=0;i<3;i++){
+    const job=await claimJob(env,time);
+    if(!job)break;
+    await processJob(env,job,fetcher);
+    processed++;
+  }
+  if(processed)return;
   await seedCrawl(env);
   await crawlOne(env,fetcher);
   await measureOneOutcome(env);
