@@ -109,7 +109,7 @@ export async function tick(env:Env,fetcher:typeof fetch=fetch,time=new Date()):P
   if(env.AUTOMATION_ENABLED!=='true')return;
   if(await enqueueDaily(env)){await enqueueAds(env);return;}
   // Dedicated slots prevent a long historical backfill from starving crawl/outcome work.
-  if(time.getUTCMinutes()===45){await seedCrawl(env);await crawlOne(env,fetcher);return;}
+  if(env.CRAWL_ENABLED==='true'&&time.getUTCMinutes()===45){await seedCrawl(env);await crawlOne(env,fetcher);return;}
   if(time.getUTCMinutes()===30&&time.getUTCHours()%4===0){await measureOneOutcome(env);return;}
   // Process up to three provider pages per scheduled tick while respecting free-tier limits.
   // Each job retains its own lease, retry, and validated dataset generation.
