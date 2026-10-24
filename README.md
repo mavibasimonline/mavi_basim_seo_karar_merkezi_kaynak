@@ -18,6 +18,8 @@ Türkçe tek ekran paneli, Cloudflare Worker API'si, D1/SQLite veri modeli, gün
 
 **Panel yayını (25 Ekim 2026, Türkiye):** [Canlı uygulama](https://mavi-basim-seo-prod.mavibasimonline.workers.dev) yenilendi; PR #13 ve main CI başarılı, kontrollü yayın **40135545161** ve canlı masaüstü/mobil giriş kabulü geçti. Mevcut otomatik aktarım ve kaynaklar korunur; aşağıdaki tarihli geçmiş veri sınırları sürer.
 
+Gerçek üretim devamı (25 Ekim 01:16 Türkiye): [29 ürünün gerçek tarama kabulü, eksik aylık GSC kapsamı ve sonraki otomatik kontrol](PRODUCTION_CONTINUITY_REPORT.md). Tam aylık rapor kabulü henüz geçmedi.
+
 ## Yenilenen Türkçe panel
 
 Daraltılabilir menüden Genel Bakış, Ürün Performansı, Arama Sorguları, Fırsat Radarı, Değişiklik Takvimi, Veri Sağlığı ve SEO Soru-Cevap açılır. Üstteki dönem/cihaz seçimi KPI, günlük grafik, ürün raporu ve sorgu tablosuna uygulanır. Soru-cevap kendi doğal dil tarih/cihaz bağlamını korur. Ürün satırları kanıt ayrıntısını açar; sorgular sunucuda filtrelenir, sıralanır ve sayfalanır.

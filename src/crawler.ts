@@ -129,15 +129,21 @@ async function mapVerifiedPage(env:Env,url:string,snapshot:Snapshot,observed:str
 export async function seedCrawl(env: Env): Promise<void> {
   if(env.CRAWL_ENABLED!=='true')return;
   const stamp=nowISO();
-  const products=await env.DB.prepare('SELECT canonical_url FROM products WHERE canonical_url IS NOT NULL').all<{canonical_url:string}>();
+  const products=await env.DB.prepare('SELECT id,canonical_url FROM products').all<{id:string;canonical_url:string|null}>();
   const gsc=await env.DB.prepare('SELECT DISTINCT page FROM gsc_daily_by_page ORDER BY date DESC LIMIT 20').all<{page:string}>();
-  const seeds=[{url:'https://mavibasim.com/sitemap.xml',kind:'sitemap'}, {url:'https://mavibasim.com/',kind:'page'}, ...products.results.map(p=>({url:p.canonical_url,kind:'page'})),...gsc.results.map(p=>({url:p.page,kind:'page'}))];
-  await env.DB.batch(seeds.flatMap(s=>{const url=siteURL(s.url);return url?[env.DB.prepare('INSERT OR IGNORE INTO crawl_queue(url,kind,next_crawl_at) VALUES(?,?,?)').bind(url,s.kind,stamp)]:[];}));
+  const unknown=products.results.filter(p=>!p.canonical_url).map(p=>'https://mavibasim.com/'+p.id);
+  // These are lookup keys only. Seed only URLs actually returned by GSC;
+  // skip the historical scan entirely once every product is mapped.
+  const observedProducts=unknown.length?await env.DB.prepare(`SELECT DISTINCT page FROM gsc_daily_by_page WHERE rtrim(page,'/') IN (${unknown.map(()=>'?').join(',')}) ORDER BY page LIMIT 29`).bind(...unknown).all<{page:string}>():{results:[]};
+  const seeds=[{url:'https://mavibasim.com/sitemap.xml',kind:'sitemap'}, {url:'https://mavibasim.com/',kind:'page'}, ...observedProducts.results.map(p=>({url:p.page,kind:'page'})),...products.results.filter(p=>p.canonical_url).map(p=>({url:p.canonical_url!,kind:'page'})),...gsc.results.map(p=>({url:p.page,kind:'page'}))];
+  const unique=[...new Map(seeds.flatMap(s=>{const url=siteURL(s.url);return url?[[url,{url,kind:s.kind}]] as const:[];})).values()];
+  // One D1 statement, even when all products have been observed by Google.
+  await env.DB.prepare("INSERT OR IGNORE INTO crawl_queue(url,kind,next_crawl_at) SELECT json_extract(value,'$.url'),json_extract(value,'$.kind'),? FROM json_each(?)").bind(stamp,JSON.stringify(unique)).run();
 }
 export async function crawlOne(env: Env, fetcher: Fetch=fetch): Promise<void> {
   if(env.CRAWL_ENABLED!=='true')return;
   const time=nowISO(),lease=crypto.randomUUID();
-  const queued=await env.DB.prepare('UPDATE crawl_queue SET lease_token=?,lease_until=? WHERE url=(SELECT url FROM crawl_queue WHERE next_crawl_at<=? AND (lease_until IS NULL OR lease_until<?) ORDER BY next_crawl_at,url LIMIT 1) RETURNING *')
+  const queued=await env.DB.prepare(`UPDATE crawl_queue SET lease_token=?,lease_until=? WHERE url=(SELECT url FROM crawl_queue WHERE next_crawl_at<=? AND (lease_until IS NULL OR lease_until<?) ORDER BY CASE WHEN EXISTS(SELECT 1 FROM products p WHERE rtrim(crawl_queue.url,'/')='https://mavibasim.com/'||p.id) THEN 0 WHEN kind='sitemap' THEN 1 ELSE 2 END,next_crawl_at,url LIMIT 1) RETURNING *`)
     .bind(lease,new Date(Date.now()+120_000).toISOString(),time,time).first<{url:string;kind:string;attempts:number;depth:number}>();
   if(!queued)return;
   const id=crypto.randomUUID();

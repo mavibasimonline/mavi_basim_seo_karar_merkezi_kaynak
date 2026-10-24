@@ -6,9 +6,10 @@ on:
         description: Salt okunur tanılama veya mevcut şifreli yedek
         type: choice
         default: backup
-        options: [backup, diagnose, crawl-pilot, frontend-check]
+        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl]
   schedule:
     - cron: '17 2 * * *'
+    - cron: '7 0 * * *' # 03:07 Turkey: read-only rollover evidence, may be delayed by GitHub
 permissions:
   contents: read
 concurrency:
@@ -17,7 +18,7 @@ concurrency:
 jobs:
   backup:
     # First restoration is an explicit manual run; scheduled backups require a separate opt-in.
-    if: (github.event_name == 'workflow_dispatch' && (inputs.operation == 'backup' || inputs.operation == '')) || (github.event_name == 'schedule' && vars.PRODUCTION_BACKUPS_ENABLED == 'true')
+    if: (github.event_name == 'workflow_dispatch' && (inputs.operation == 'backup' || inputs.operation == '')) || (github.event_name == 'schedule' && github.event.schedule == '17 2 * * *' && vars.PRODUCTION_BACKUPS_ENABLED == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
@@ -71,7 +72,7 @@ jobs:
         run: rm -f .local/backup.sql .local/verified.sql
 
   diagnose:
-    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'diagnose'
+    if: (github.event_name == 'workflow_dispatch' && inputs.operation == 'diagnose') || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -91,7 +92,7 @@ jobs:
           if-no-files-found: error
 
   crawl-pilot:
-    if: github.event_name == 'workflow_dispatch' && (inputs.operation == 'crawl-pilot' || inputs.operation == 'frontend-check')
+    if: github.event_name == 'workflow_dispatch' && (inputs.operation == 'crawl-pilot' || inputs.operation == 'frontend-check' || inputs.operation == 'product-crawl')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
@@ -110,6 +111,9 @@ jobs:
       - name: Mevcut tarayıcıyla en fazla 12 gerçek salt okunur site sayfası
         if: inputs.operation == 'crawl-pilot'
         run: python3 scripts/crawl_pilot.py --max-pages 12
+      - name: Mevcut tarayıcıyla 29 ürün kabulünü en fazla 12 istekle ilerlet
+        if: inputs.operation == 'product-crawl'
+        run: python3 scripts/crawl_pilot.py --all-products --max-pages 12
       - name: Gerçek D1 verileriyle grafik ve sorgu API kontrolü — yalnız sayım ve boolean çıktısı
         if: inputs.operation == 'frontend-check'
         run: python3 scripts/crawl_pilot.py --performance-only

@@ -43,3 +43,13 @@ class DiagnosticTests(unittest.TestCase):
     return Response(json.dumps({'data':{'viewer':{'accounts':[{'d1AnalyticsAdaptiveGroups':[{'sum':{'rowsRead':100,'rowsWritten':200}},{'sum':{'rowsRead':50,'rowsWritten':30}}]}]}}}).encode())
   opener=Opener();result=module.Cloudflare('FIXTURE',ACCOUNT,opener).daily_usage()
   self.assertEqual((result['rows_read'],result['rows_written']),(150,230));self.assertTrue(result['account_wide']);self.assertNotIn('databaseId',opener.request.data.decode());self.assertNotIn('FIXTURE',json.dumps(result))
+
+ def test_rollover_requires_actual_future_time_budget_and_completed_nonempty_run(self):
+  from datetime import datetime,timezone
+  r={'queries':{'sync_budget_history':{'ok':True,'rows':[{'day':'2026-10-25','checked_at':'2026-10-25T00:01:00Z'}]},'recent_runs':{'ok':True,'rows':[{'status':'done','finished_at':'2026-10-25T00:02:00Z','rows_received':1}]}}}
+  self.assertEqual(module.acceptance(r,datetime(2026,10,24,22,tzinfo=timezone.utc))['rollover'],'not_yet_due')
+  self.assertEqual(module.acceptance(r,datetime(2026,10,25,1,tzinfo=timezone.utc))['rollover'],'verified')
+  r['queries']['recent_runs']['rows'][0]['rows_received']=0
+  self.assertEqual(module.acceptance(r,datetime(2026,10,25,1,tzinfo=timezone.utc))['rollover'],'waiting_for_real_progress')
+ def test_incomplete_or_failed_diagnostics_never_pass_month_or_products(self):
+  r=module.acceptance({'queries':{} });self.assertFalse(r['priority_coverage']['passed']);self.assertFalse(r['product_crawl']['passed']);self.assertEqual(r['monthly_report'],'blocked_missing_coverage')
