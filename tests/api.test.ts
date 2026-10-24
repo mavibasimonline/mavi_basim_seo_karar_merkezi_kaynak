@@ -1,5 +1,5 @@
 import {beforeEach,it,expect,vi} from 'vitest';
-import {init,env} from './helpers';
+import {init,env,connected} from './helpers';
 import worker,{tick} from '../src/index';
 import {monthPeriod} from '../src/analysis';
 import type {Env} from '../src/types';
@@ -7,7 +7,7 @@ import type {Env} from '../src/types';
 beforeEach(init);
 const request=(path:string,method='GET',body?:unknown,extra:Record<string,string>={})=>new Request('https://app.example'+path,{method,headers:{Authorization:`Bearer ${env.ADMIN_TOKEN}`,...extra},...(body===undefined?{}:{body:JSON.stringify(body)})});
 it('protects all data endpoints and exposes only minimal public health',async()=>{
-  for(const path of ['/api/report','/api/radar','/api/status','/api/history','/api/inventory','/api/keywords?product=brosur','/api/outcomes','/api/export'])expect((await worker.fetch(new Request('https://app.example'+path),env)).status).toBe(401);
+  for(const path of ['/api/report','/api/change-calendar','/api/change-impact','/api/radar','/api/status','/api/history','/api/inventory','/api/keywords?product=brosur','/api/outcomes','/api/export'])expect((await worker.fetch(new Request('https://app.example'+path),env)).status).toBe(401);
   const health=await worker.fetch(new Request('https://app.example/api/health'),env);expect(health.status).toBe(200);expect(await health.text()).not.toContain('TOKEN');
 });
 it('serves a validated report and export without synthetic live data',async()=>{
@@ -53,4 +53,8 @@ it('invalidates report cache immediately after a failed GSC health check',async(
   const first=await worker.fetch(request('/api/report'),env);const a=await first.json() as {id:string};
   const stamp=new Date(Date.now()+1000).toISOString();await env.DB.prepare("INSERT INTO health_checks VALUES('gsc',?,?,'failed','GOOGLE_HTTP_403')").bind(stamp.slice(0,10),stamp).run();
   const second=await worker.fetch(request('/api/report'),env);const b=await second.json() as {id:string;missing:string[]};expect(b.id).not.toBe(a.id);expect(b.missing.join()).toContain('GOOGLE_HTTP_403');
+});
+it('invalidates a cached Google connection immediately when its authorization record is removed',async()=>{
+  await connected();const first=await worker.fetch(request('/api/report'),env);expect((await first.json() as any).sources.google_connected).toBe(true);
+  await env.DB.prepare('DELETE FROM oauth_credentials').run();const second=await worker.fetch(request('/api/report'),env);expect((await second.json() as any).sources.google_connected).toBe(false);
 });

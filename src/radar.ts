@@ -1,5 +1,6 @@
 import {AnalysisReport,ProductReport,validMetrics} from './analysis';
-import {Env,hash,nowISO} from './types';
+import {Env,hash} from './types';
+import {saveInsight} from './insights';
 import {isBrand,variantFamily} from './urls';
 export const RADAR_VERSION='1.0.0';
 export function commercialIntent(query:string):'commercial'|'informational'|'unknown'{
@@ -54,5 +55,5 @@ export async function radar(env:Env,report:AnalysisReport){
  const existing=await env.DB.prepare("SELECT id,result_json FROM insight_runs WHERE kind='radar' AND source_key=?").bind(key).first<{id:string;result_json:string}>();
  if(existing)return JSON.parse(existing.result_json);
  const result={id:crypto.randomUUID(),...buildRadar(report,market.results,history.results.map(r=>r.url))};
- await env.DB.prepare("INSERT OR IGNORE INTO insight_runs VALUES(?,'radar',?,?,?,?)").bind(result.id,report.id,key,nowISO(),JSON.stringify(result)).run();return result;
+ return saveInsight(env,'radar',key,result,report.id);
 }

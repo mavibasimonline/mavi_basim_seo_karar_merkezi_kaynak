@@ -12,7 +12,7 @@ export async function validateAnalysis(env:Env,report:AnalysisReport):Promise<st
     FROM gsc_daily_by_page d JOIN dataset_coverage c ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider='gsc' AND c.scope='page' AND c.complete=1
     LEFT JOIN products p ON p.canonical_url=d.page LEFT JOIN pages pg ON pg.url=d.page
     LEFT JOIN page_aliases a ON a.alias_url=d.page LEFT JOIN products pc ON pc.canonical_url=a.canonical_url
-    WHERE d.date BETWEEN ? AND ? AND (? IS NULL OR d.device=?) GROUP BY product_id,period`).bind(report.period.start,report.previous_period.start,report.period.end,report.filters?.device||null,report.filters?.device||null)
+    WHERE ((d.date BETWEEN ? AND ?) OR (d.date BETWEEN ? AND ?)) AND (? IS NULL OR d.device=?) GROUP BY product_id,period`).bind(report.period.start,report.previous_period.start,report.previous_period.end,report.period.start,report.period.end,report.filters?.device||null,report.filters?.device||null)
     .all<Metrics&{product_id:string|null;period:string}>();
   for(const product of report.products){
     if(product.decision!=='Veri bekle'&&(product.missing.length||!product.current||!product.previous||!product.evidence.length))errors.push(`${product.id}:MISSING_EVIDENCE_GATE`);

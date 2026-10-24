@@ -8,17 +8,24 @@ import { enqueueDaily, enqueueAds, claimJob, processJob } from './sync';
 import { seedCrawl, crawlOne } from './crawler';
 import { measureOneOutcome, recordAppliedChange } from './outcomes';
 import { radar } from './radar';
+import {changeCalendar,changeImpact} from './change-impact';
 
 export async function getReport(env:Env,month:string,options:AnalysisOptions={}):Promise<AnalysisReport>{
   monthPeriod(month);
   if(month<'2020-01'||month>new Date().toISOString().slice(0,7))throw new Error('INVALID_MONTH');
-  const cached=await env.DB.prepare(`SELECT result_json,created_at FROM analysis_runs WHERE month=? AND engine_version=? AND json_extract(filters_json,'$.device') IS ?
+  const period=options.current||monthPeriod(month);
+  const cached=await env.DB.prepare(`SELECT result_json,created_at,
+    (SELECT checked_at FROM health_checks WHERE provider='gsc' ORDER BY day DESC LIMIT 1) health_checked_at,
+    (SELECT MAX(fetched_at) FROM dataset_coverage WHERE provider='gsc' AND scope='page' AND day BETWEEN ? AND ?) coverage_fetched_at
+    FROM analysis_runs WHERE month=? AND engine_version=? AND json_extract(filters_json,'$.device') IS ?
+    AND json_extract(result_json,'$.sources.google_connected')=EXISTS(SELECT 1 FROM oauth_credentials WHERE provider='google')
     AND created_at>=COALESCE((SELECT MAX(stamp) FROM (
       SELECT MAX(fetched_at) AS stamp FROM dataset_coverage UNION ALL SELECT MAX(updated_at) FROM oauth_credentials
       UNION ALL SELECT MAX(checked_at) FROM health_checks UNION ALL SELECT MAX(url_verified_at) FROM products
       UNION ALL SELECT MAX(imported_at) FROM keyword_sources)), '')
-    ORDER BY created_at DESC LIMIT 1`).bind(options.current?`${options.current.start}/${options.current.end}`:month,ENGINE_VERSION,options.device||null).first<{result_json:string;created_at:string}>();
-  if(cached&&Date.now()-Date.parse(cached.created_at)<15*60_000)return JSON.parse(cached.result_json);
+    ORDER BY created_at DESC LIMIT 1`).bind(period.start,period.end,options.current?`${options.current.start}/${options.current.end}`:month,ENGINE_VERSION,options.device||null).first<{result_json:string;created_at:string;health_checked_at:string|null;coverage_fetched_at:string|null}>();
+  if(cached){const result=JSON.parse(cached.result_json) as AnalysisReport;const recent=(stamp:string|null,limit:number)=>!!stamp&&Date.now()-Date.parse(stamp)>=0&&Date.now()-Date.parse(stamp)<limit;
+    if(recent(cached.created_at,15*60_000)&&(result.missing.length||recent(cached.health_checked_at,72*3600_000)&&recent(cached.coverage_fetched_at,72*3600_000)))return result;}
   const report=await analyze(env,month,new Date(),options);
   const errors=await validateAnalysis(env,report);
   if(errors.length)throw new Error('ANALYSIS_VALIDATION_FAILED');
@@ -46,6 +53,8 @@ async function route(request:Request,env:Env):Promise<Response>{
     return json({google_connected:!!google,ga4_configured:!!env.GA4_PROPERTY_ID,ads_configured:env.ENABLE_GOOGLE_ADS==='true'&&!!env.GOOGLE_ADS_DEVELOPER_TOKEN,crawl_enabled:env.CRAWL_ENABLED==='true',automation_enabled:env.AUTOMATION_ENABLED==='true',health:health.results,jobs:jobs.results,crawls:crawls.results,coverage:coverage.results,
       note:'Yapılandırma veya OAuth kaydı başarılı API erişimi anlamına gelmez; günlük sağlık sonuçlarını kontrol edin.'});
   }
+  if(request.method==='GET'&&path==='/api/change-calendar')return json({rows:await changeCalendar(env,url.searchParams.get('day')||new Date().toISOString().slice(0,10),url.searchParams.get('after')||''),timezone:'UTC',note:'Takvim tespit tarihidir; kesin yayın tarihi değildir.'});
+  if(request.method==='GET'&&path==='/api/change-impact')return json(await changeImpact(env,url.searchParams.get('id')||''));
   if(request.method==='GET'&&path==='/api/radar'){const plan=parseQuestion('Son 28 günde hangi ürünler yükseldi?',[]);return json(await radar(env,await getReport(env,plan.context.month,{current:plan.period,previous:plan.previous})));}
   if(request.method==='GET'&&path==='/api/report')return json(await getReport(env,url.searchParams.get('month')||lastCompleteMonth()));
   if(request.method==='POST'&&path==='/api/questions'){
@@ -115,7 +124,7 @@ export default {
       return securityHeaders(await route(request,env));
     }catch(error){
       const code=error instanceof ProviderError?error.code:error instanceof Error?error.message:'UNKNOWN';
-      const invalid=['INVALID_MONTH','INVALID_QUESTION','INVALID_QUESTION_CONTEXT','INVALID_APPLIED_CHANGE'].includes(code)||error instanceof SyntaxError;
+      const invalid=['INVALID_MONTH','INVALID_QUESTION','INVALID_QUESTION_CONTEXT','INVALID_APPLIED_CHANGE','INVALID_CHANGE_DAY','INVALID_CHANGE_ID','CHANGE_NOT_FOUND'].includes(code)||error instanceof SyntaxError;
       return securityHeaders(json({error:invalid?'İstek verisi geçersiz.':'İşlem tamamlanamadı. Veri kaynağı ve sistem durumunu kontrol edin.',code:invalid?'INVALID_INPUT':error instanceof ProviderError?error.code:'INTERNAL_ERROR'},invalid?400:503));
     }
   },

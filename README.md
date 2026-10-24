@@ -1,3 +1,5 @@
+SEO değişiklik takvimi ve 28 günlük etki karşılaştırması: [test ve sınırlar](SEO_CHANGE_IMPACT_REPORT.md).
+
 Fırsat radarı: [kabul ve sınırlar](SEO_OPPORTUNITY_RADAR_REPORT.md).
 
 # Mavi Basım SEO Karar Merkezi

@@ -118,7 +118,7 @@ export async function analyze(env:Env,month=lastCompleteMonth(),time=new Date(),
     const deviceMetrics=deviceValues.map(d=>({device:d.device,current:d.currentRows.length?metrics(d.currentRows):null,previous:d.previousRows.length?metrics(d.previousRows):null}));
     const cm=metrics(currentRows),pm=metrics(previousRows);
     const mixChanged=deviceMetrics.some(d=>Math.abs((cm.impressions?(d.current?.impressions||0)/cm.impressions:0)-(pm.impressions?(d.previous?.impressions||0)/pm.impressions:0))>0.15);
-    const evidence:Evidence[]=coverage.filter(c=>c.complete&&c.provider==='gsc'&&c.day>=previous.start&&c.day<=current.end).map(c=>({id:`${c.dataset_id}:${c.scope}`,source:'GSC',ref:c.dataset_id,fetched_at:c.fetched_at,
+    const evidence:Evidence[]=coverage.filter(c=>c.complete&&c.provider==='gsc'&&((c.day>=previous.start&&c.day<=previous.end)||(c.day>=current.start&&c.day<=current.end))).map(c=>({id:`${c.dataset_id}:${c.scope}`,source:'GSC',ref:c.dataset_id,fetched_at:c.fetched_at,
       scope:{site:env.SITE_ORIGIN,date:c.day,dimensions:c.scope==='query'?['page','query','country','device']:['page','country','device'],search_type:'web',data_state:'final',query_partial:!!c.query_partial,notes:c.notes,device_filter:options.device||null}}));
     const comparisons:Record<string,unknown>={};
     for(const months of [3,6,12]){
