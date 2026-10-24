@@ -1,14 +1,27 @@
-# Son ek kabul — gerçek tarayıcı (24 Ekim 2026, 17:57 UTC)
+# Üretim devam kaydı — 24 Ekim 2026, 18:02 UTC
 
-- [x] Mevcut tarayıcı gerçek D1 ile loopback kabulünde çalıştı: 40118110004 başarılı. İlk robots beklemesi ve broşür/el ilanı 200 self-canonical snapshot'ları kaydedildi. Ayrı kanıt kabulü 40118410575 title/body_hash/rendering/HTTP/canonical ve değişmeyen 29/521/9075 arşivini doğruladı.
-- [x] **2/29 ürün URL'si doğrulandı**; diğer 27 bekliyor. Gerçek sitemap 293 URL içeriyor; 29 kaynak kimliğinin tamamı sitemap'te var. URL uydurma gerekmedi. Önceki antetli/dosyalar farkı yorumu kaynak manifestiyle çürütüldü ve düzeltildi.
-- [x] Yeni public uygulama endpoint'i olmadan sınırlı operatör pilotu; otomatik üretim taraması için **CRAWL_ENABLED=true** PR #11'de. Mevcut saatlik :45 dilimi kullanılır. Yalnız bayrağın yayına alınması sonraki otomatik taramanın çalıştığı kanıtı değildir; canlı kaydını kontrol et.
-- [x] Son regresyon hedefi/yerel sonucu: **265 Workers/D1 + 39 Python + 2 Chromium = 306**; tip/build/audit/kaynak kontrolleri. Son uzak CI ve kontrollü yayın sonucu Actions'tan kontrol edilmelidir.
-- Son kod aşaması **2d55f97**, dal `ops/read-only-crawl-acceptance`; bu belgeyi içeren commit `git log -1 --oneline`. PR #8/9/10 main'de; PR #7 taslak korunuyor.
+- [x] PR **#8, #9, #10, #11** main'e birleşti. Son işlevsel kod/ayar commit'i **4bfec9aae0ab1b55e14358d3bfb52af0137055a9**; uzak main CI **40118789556 başarılı**. Bu belgeyi içeren commit `git log -1 --oneline`; en son tam yayın SHA/version kimliği canlı `/api/health` ve kontrollü üretim workflow'unda.
+- [x] **306 test başarılı:** 265 Workers/D1 + 39 Python + 2 mobil/masaüstü Chromium. Npm audit 0; tip/build/üretim dry-run, migration ve 521 CSV/hash aktarım kontrolleri geçti. Son başarısız test yok. Önceki iki yayın engeli ve gerçek rollback raporda kayıtlı.
+- [x] Gerçek GSC ilerlemesi 18 → **36 done**; aynı 360 işte pending 342 → **324**. Üç aylık kapsam **12/184**: Eylül 25–30 sayfa+sorgu. Temmuz/Ağustos henüz alınmadı; eksik veri sıfır değildir.
+- [x] Gerçek readonly Google bağlantısı/17:34 OAuth refresh çalıştı; yeni hesap izni veya token gerekmiyor. Arşiv **29 ürün / 521 CSV / 9.075 kaynak satırı** korundu.
+- [x] Günlük güvenlik bütçesi **8.552/10.000**, yeni 1.500 rezervasyon sığmadığı için bekliyor. Gerçek Cron 18:00'de **partial / DAILY_WRITE_BUDGET** kaydetti. Hesap geneli 18:02 ölçümü **75.352/100.000 yazma**, **377.637/5.000.000 okuma**; hard kotanın tamamen bittiği söylenmiyor.
+- [x] Mevcut tarayıcının gerçek pilotu **40118110004**, snapshot kanıtı **40118410575** başarılı: broşür/el ilanı 200/self canonical/title/body hash/static HTML. İlk robots beklemesine uyuldu. **2/29 URL doğrulandı**; 293 sitemap URL'si içinde 29 kaynak kimliği birebir bulundu. Siteye yalnız GET yapıldı.
+- [x] 18:02 Cloudflare runtime tanılaması **40118866686**: AUTOMATION=true, CRAWL=true, Ads=false, aynı D1 ve auth binding'leri. Mevcut saatlik :45 tarama slotu artık etkin yapılandırılmıştır. Sonraki otomatik tarama olayı henüz gözlenmedi; gerçek pilotla karıştırma.
+- [x] Public panel dosyası hash'i kodla eşleşti; oturumsuz veri endpoint'i 401. Yönetici oturumu/anahtarı atlanmadı veya dışa aktarılmadı. İlk kontrollü yayında exact commit/version postflight ve otomatik gerçek rollback doğrulandı; yeni main belge yayını da aynı workflow ile etiketlenir.
 
-**Sonraki somut adım:** PR #11'in yeşil CI'sinden sonra main'e birleştir, otomatik Cloudflare sürümü/binding'leri yeniden oku ve kontrollü yayınla tam main commit'ini doğrula. Sonra kalan 172 GSC kapsamı ve 27 ürün URL'sini izle; tam ay oluşunca yönetici oturumunda gerçek rapor/soru kabulü. GSC için yeni kullanıcı izni gerekmiyor. Uzak şifreli yedek için ayrı BACKUP_ENCRYPTION_KEY hâlâ hesap sahibi işlemi. Gelecek UTC günü/bütün kapsam/otomatik tarama/aylık rapor henüz doğrulandı denmeyecek.
+## Kalan işler ve bir sonraki somut adım
+
+1. **25 Ekim 00:00 UTC / Türkiye 03:00** yeni günlük 60.000 senkron bütçesiyle gerçek devamı, en yeni kesinleşmiş gün ve kalan **172/184** Temmuz–Eylül kapsamını D1 ile doğrula. Kodun UTC'de devam etme testi geçti; gelecek gerçek gün henüz doğrulanmadı. Oturumun kendiliğinden yeniden başlayacağı garanti edilmez; Cloudflare Cron bağımsızdır.
+2. Sonraki saatlik :45 gerçek otomatik tarama kaydını izle; mevcut kuyrukla kalan **27 ürün URL'sini** HTTP/canonical kanıtıyla doğrula. Sitemap'te bulunmayı Google dizin kanıtı sayma; URL uydurma veya yeni crawler yazma.
+3. Tam aylar ve URL kanıtı oluşunca mevcut yönetici oturumunda **gerçek aylık rapor / soru-cevap / başarılı sorgu koruma** kabulünü tamamla. Bu özel oturum kabulü henüz yapılmadı; Google key veya admin token'ı sohbet/Git'e isteme. Kısmi veriyi tamamlandı gösterme.
+4. **Hesap sahibi işlemi:** bağımsız 32 bayt base64 **BACKUP_ENCRYPTION_KEY** GitHub Actions secret'ı eksik. Mevcut CF token/account ve GSC çalışıyor. Ayrı anahtar güvenli secret alanına kaydedilince mevcut backup workflow'u ile ilk gerçek şifreli uzak yedek ve ayrı DB geri dönüş kabulünü yap; OAuth şifreleme anahtarını değiştirme. Gerçek uzak yedek henüz alınmış sayılmaz.
+5. Rakip **PR #7 taslak** korunuyor (a0629f2), üretime alınmadı. Teknik SEO, iç bağlantı ve sorgu–URL görevleri bekleyen geliştirmelerdir; önce mevcut kodu incele, kopya modül üretme.
+
+Ayrıntılı gerçek kanıtlar ve tarihli ölçümler: [GSC_PRODUCTION_REPORT.md](GSC_PRODUCTION_REPORT.md). Ücretli plan/API başlatılmadı; mavibasim.com içeriği, OAuth anahtarları ve özgün CSV'ler korunuyor. Uygulamanın tamamı bitmiş sayılmaz; yukarıdaki kabul eksikleri açıktır.
 
 ---
+
+# Önceki tarihli kayıtlar
 
 # Güncel durum — gerçek üretim GSC kuyruğu (24 Ekim 2026, 17:42 UTC)
 
