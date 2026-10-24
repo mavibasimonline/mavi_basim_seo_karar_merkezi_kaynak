@@ -141,6 +141,25 @@ export async function processJob(env: Env, job: Job, fetcher: Fetch = fetch): Pr
     ]);
   }
 }
+/** Explicit one-day GSC acceptance pilot; never activates Cron, crawler, GA4 or Ads. */
+export async function pilotGscDay(env: Env, fetcher: Fetch = fetch): Promise<{day:string;scope:string;status:string;row_count:number|null;error_code:string|null;note:string}> {
+  const day=dateDaysAgo(7),scope='page',id=`gsc:${day}:${scope}`,stamp=nowISO();
+  const connected=await env.DB.prepare("SELECT 1 FROM oauth_credentials WHERE provider='google'").first();
+  if(!connected)throw new ProviderError('GOOGLE_NOT_CONNECTED');
+  await env.DB.prepare("INSERT OR IGNORE INTO sync_jobs(id,provider,day,scope,generation,next_attempt_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)")
+    .bind(id,'gsc',day,scope,crypto.randomUUID(),stamp,stamp,stamp).run();
+  const token=crypto.randomUUID();
+  const job=await env.DB.prepare(`UPDATE sync_jobs SET status='running',lease_token=?,lease_until=?,updated_at=?
+    WHERE id=? AND ((status IN ('pending','retry') AND next_attempt_at<=?) OR (status='running' AND lease_until<?)) RETURNING *`)
+    .bind(token,new Date(Date.now()+180_000).toISOString(),stamp,id,stamp,stamp).first<Job>();
+  if(job)await processJob(env,job,fetcher);
+  const result=await env.DB.prepare(`SELECT j.status,j.error_code,c.row_count,c.complete
+    FROM sync_jobs j LEFT JOIN dataset_coverage c ON c.provider=j.provider AND c.day=j.day AND c.scope=j.scope
+    WHERE j.id=?`).bind(id).first<{status:string;error_code:string|null;row_count:number|null;complete:number|null}>();
+  return {day,scope,status:result?.status||'unknown',row_count:result?.complete===1?result.row_count:null,error_code:result?.error_code||null,
+    note:result?.complete===1?'Bir günlük GSC sayfa kaydı doğrulandı. Aylık veriler henüz tamamlanmadı.':'Pilot henüz tamamlanmadı; eksik veriler sıfır olarak yorumlanmaz.'};
+}
+
 export async function enqueueAds(env: Env): Promise<void> {
   if (env.ENABLE_GOOGLE_ADS !== 'true' || !env.GOOGLE_ADS_DEVELOPER_TOKEN) return;
   const stamp=nowISO(), month=stamp.slice(0,7);
