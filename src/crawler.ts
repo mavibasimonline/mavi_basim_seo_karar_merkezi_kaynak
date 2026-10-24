@@ -129,10 +129,13 @@ async function mapVerifiedPage(env:Env,url:string,snapshot:Snapshot,observed:str
 export async function seedCrawl(env: Env): Promise<void> {
   if(env.CRAWL_ENABLED!=='true')return;
   const stamp=nowISO();
-  const products=await env.DB.prepare('SELECT canonical_url FROM products WHERE canonical_url IS NOT NULL').all<{canonical_url:string}>();
+  const products=await env.DB.prepare('SELECT id,canonical_url FROM products').all<{id:string;canonical_url:string|null}>();
   const gsc=await env.DB.prepare('SELECT DISTINCT page FROM gsc_daily_by_page ORDER BY date DESC LIMIT 20').all<{page:string}>();
-  const observedProducts=await env.DB.prepare("SELECT DISTINCT g.page FROM gsc_daily_by_page g JOIN products p ON rtrim(g.page,'/')='https://mavibasim.com/'||p.id ORDER BY g.page LIMIT 29").all<{page:string}>();
-  const seeds=[{url:'https://mavibasim.com/sitemap.xml',kind:'sitemap'}, {url:'https://mavibasim.com/',kind:'page'}, ...observedProducts.results.map(p=>({url:p.page,kind:'page'})),...products.results.map(p=>({url:p.canonical_url,kind:'page'})),...gsc.results.map(p=>({url:p.page,kind:'page'}))];
+  const unknown=products.results.filter(p=>!p.canonical_url).map(p=>'https://mavibasim.com/'+p.id);
+  // These are lookup keys only. Seed only URLs actually returned by GSC;
+  // skip the historical scan entirely once every product is mapped.
+  const observedProducts=unknown.length?await env.DB.prepare(`SELECT DISTINCT page FROM gsc_daily_by_page WHERE rtrim(page,'/') IN (${unknown.map(()=>'?').join(',')}) ORDER BY page LIMIT 29`).bind(...unknown).all<{page:string}>():{results:[]};
+  const seeds=[{url:'https://mavibasim.com/sitemap.xml',kind:'sitemap'}, {url:'https://mavibasim.com/',kind:'page'}, ...observedProducts.results.map(p=>({url:p.page,kind:'page'})),...products.results.filter(p=>p.canonical_url).map(p=>({url:p.canonical_url!,kind:'page'})),...gsc.results.map(p=>({url:p.page,kind:'page'}))];
   const unique=[...new Map(seeds.flatMap(s=>{const url=siteURL(s.url);return url?[[url,{url,kind:s.kind}]] as const:[];})).values()];
   // One D1 statement, even when all products have been observed by Google.
   await env.DB.prepare("INSERT OR IGNORE INTO crawl_queue(url,kind,next_crawl_at) SELECT json_extract(value,'$.url'),json_extract(value,'$.kind'),? FROM json_each(?)").bind(stamp,JSON.stringify(unique)).run();

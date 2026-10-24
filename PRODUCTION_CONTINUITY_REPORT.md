@@ -14,6 +14,8 @@ Tarama kuyruğunda zamanı gelmiş gerçek ürün URL'leri önce işlenir; retry
 
 Mevcut tanılama workflow'u **03:07 ve 05:17 Türkiye saatlerinde** otomatik salt okunur kontrol yapacak şekilde düzenlendi. GitHub zamanlaması gecikebilir. Şifreli yedek yalnız önceki 05:17 ve ayrı opt-in şartında kalır; eksik yedek anahtarı uydurulmaz. Tanılama yeni gün bütçesini, 03:00 sonrasında gerçek tamamlanmış ve boş olmayan senkronu, ay kapsamını ve ürün snapshot'larını ayrı kaydeder. Gelecek zaman gelmeden `not_yet_due`, yeterli gerçek ilerleme yoksa `waiting_for_real_progress` döner. Google veya site isteği tetiklemez, bütçeyi yükseltmez.
 
+Sonraki bağımsız tanılama **40137836659** (01:16 Türkiye) 29/29 eşleme/snapshot kabulünü doğruladı; `rollover=not_yet_due`, kapsam 12/184, aylık kabul `blocked_missing_coverage`. Hesap geneli 2.413.674 okuma / 77.358 yazma; ücretsiz limitler korunuyor. 29 ürün eşlemesi tamamlandıktan sonraki gerçek rapor kontrolü **40137932194** de başarılı: 29 Veri bekle, 3 kapsam eksiği, tam aylık kabul false. Kaynak arşivi değişmedi. GSC ürün araması yalnız eşlenmemiş ürünler için tek taramayla yapılır; 29 ürün eşlenince bu ek tarihsel GSC taraması atlanır.
+
 ## Testler ve kalan kapılar
 
 - Yerel **286 Workers/D1 + 45 Python** başarılı; tip/build, npm audit 0 ve kaynak koruma denetimi başarılı. CI ayrıca mevcut 8 masaüstü/mobil kabulünü çalıştırır; tam sonuç PR #15 Checks kaydındadır.

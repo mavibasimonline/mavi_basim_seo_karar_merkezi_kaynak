@@ -6,6 +6,8 @@
 - [x] Mevcut tarayıcıda gerçek GSC ürün keşfi ve kuyruk önceliği düzeltildi; seed tek SQL'e indirildi. Yerel 286 Workers + 45 Python; 8 tarayıcı senaryosu uzak CI'da. Son kod 662a5c8; bu belgeyi içeren commit git log -1 ile izlenir. PR #15.
 - [x] Mevcut tanılama için günlük **03:07 / 05:17 Türkiye** salt okunur kanıt toplama hazırlandı. Yeni gün bütçesi ve gerçek boş olmayan senkron tamamlanması ayrı denetlenir. GitHub zamanlaması gecikebilir; sonuç henüz gerçekleşmiş sayılmaz. GSC Cron, OAuth, bütçe ve veri kayıtları korunur.
 
+- [x] Bağımsız gerçek tanılama **40137836659**: 29/29 snapshot kabulü, 12/184 GSC, henüz gelmeyen bütçe zamanı. Sonraki gerçek rapor kontrolü **40137932194** de 29 Veri bekle / tam aylık kabul false. Ücretsiz kullanım: 2.413.674 okuma, 77.358 yazma (01:16 ölçümü).
+
 **Sonraki somut adım:** 03:00 sonrası gerçek koşu ve tamamlanmış veri kümelerinin arttığını 03:07/05:17 tanılama artifact'iyle doğrula; 172/184 eksik kapsamı bütçe içinde izlemeye devam et. Tam Temmuz–Eylül, gerçek dolu aylık rapor ve 29 ürünün otomatik tekrar kabulü henüz tamamlanmadı. Ücretli hizmet veya kota korumasını aşan işlem yok. Ayrıntı: [PRODUCTION_CONTINUITY_REPORT.md](PRODUCTION_CONTINUITY_REPORT.md). Aşağıdaki eski sayılar tarihli kayıttır.
 
 ---
