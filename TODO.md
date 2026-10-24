@@ -1,24 +1,25 @@
-# Güncel öncelik — gerçek üretim GSC kuyruğu (24 Ekim 2026)
+# Güncel durum — gerçek üretim GSC kuyruğu (24 Ekim 2026, 17:42 UTC)
 
-Bu bölüm en güncel kayıttır; aşağıdaki eski bağlantı/yetki engelleri geliştirme tarihçesidir.
+Aşağıdaki eski bağlantı/yetki engelleri tarihçedir. Güncel ayrıntı ve kanıtlar [GSC_PRODUCTION_REPORT.md](GSC_PRODUCTION_REPORT.md).
 
-- Üretim dalı `main` (başlangıç `621d566`), düzeltme dalı `fix/gsc-production-queue`. Mevcut Worker/D1 ve Google bağlantısı var; CI kimlikleriyle salt okunur tanılama yapılabildi. Yeni token istenmez.
-- Canlı 17:18 UTC ölçümü: 18 done / 162 pending; Google hatası yok; Temmuz–Eylül kapsamı 0/184. Önceki 1/179 görüntüsü kalıcı takılmayı kanıtlamıyor. Az sayıda API sayfası, yakın tarihten geriye sıralama ve boş sonuç ölçüm dilimi gecikmeye yol açıyor.
-- Test edilmiş düzeltmeler: üç kapanmış ayı hemen planlama/öncelik, ayrılmış günlük planlama kaydı, gerçek Cron zamanı, boş sonuç dilimini kullanma, imleç/sürüm/kapsam bilgisi, atomik günlük D1 yazma bütçesi ve UTC'de devam etme. Veri/anahtar/migration silinmez veya değiştirilmez.
-- Test: 262 Workers/D1 + 35 Python + 2 mobil/masaüstü Chromium = 299 test başarılı; tip/build/audit, kaynak koruma ve üretim dry-run başarılı. Uzak CI sonucu tamamlanınca rapora eklenir. İlk tanılama envelope hatası düzeltildi; yeniden koşusu başarılı.
-- Ücretsiz D1 hesap ölçümü: bugün 66.775 yazma / 209.054 okuma. Başlangıç gününde ek senkron bütçesi 10.000, sonraki günlerde 60.000; sayfa başına önce 1.500 güvenlik rezervasyonu, sunucunun gerçek rows_written değeri ve 50 yazma payıyla mahsuplaşma. Diğer uygulamalar için tüm hesap kotası ayrıca kontrol edilir. Ücretsiz plan yükseltilmez.
-- Son kaydedilmiş aşama `dda34c7` (salt okunur hesap kotası); bu bölümü içeren son commit `git log -1 --oneline`. Ayrıntılar GSC_PRODUCTION_REPORT.md.
+- [x] PR #8 ve #9 main'e birleşti; son fonksiyonel main commit'i **70d6476a0859fb8652f2b40d132bb04e3f918879**. Bu durum belgesini içeren son commit için `git log -1 --oneline`.
+- [x] Main CI **40116927721** başarılı: **262 Workers/D1 + 36 Python + 2 Chromium mobil/masaüstü = 300 test**. Tip/build/üretim dry-run, npm audit 0 ve tüm kaynak/hash koruma kontrolleri geçti.
+- [x] Gerçek Cloudflare yayını **40116985614** başarılı; HTTP tam commit ve Worker **d482659d-56a2-44e4-8645-fbdd66f0f724** eşleşti. Sonraki belge yayını aynı kontrollü workflow/health kimliğiyle izlenir.
+- [x] Gerçek Cron/kuyruk: 18 → 29 → 35 → **36 done**, aynı 360 işte pending 342 → 331 → 325 → **324**. Hedef üç ay 0 → **12/184** günlük/scope kapsamı; Google hata kaydı yok. Yeni 90 gün planlandığı için toplam kuyruk büyüdü; veri kaybı değil.
+- [x] 17:34 UTC'de gerçek OAuth refresh ve readonly kapsam korunarak sonraki Google istekleri başarılı. D1/secret'lar/kaynaklar korunuyor: **29 / 521 / 9.075**.
+- [x] Atomik günlük senkron bütçesi: **8.552/10.000**; yeni sayfanın 1.500 rezervasyonu sığmadığı için bekliyor. Hesap geneli **75.186/100.000 yazma**, **326.436/5.000.000 okuma**; hard kota tamamen tükendi denmiyor. Sonraki UTC gününde 60.000 bütçeyle devam kodu test edildi; gerçek ertesi gün devamı henüz gözlenmedi.
+- [x] Public app.js hash'i aynı; oturumsuz veri endpoint'i 401. Canlı sağlık kontrolü açık servis kimliğiyle 200; 1010 istemci hatası düzeltildi. 40116195577 sürüm değişikliği ön kontrolünde durdu; 40116326806'da **otomatik gerçek rollback** çalıştı. Son yayın/test başarılı.
+- [x] Salt okunur gerçek robots/sitemap/broşür GET kontrolleri 200. Üretim tarama kabulü yerine geçmez.
 
-## Sonraki somut adımlar
+## Tamamlanmamış işler — sıradaki somut adımlar
 
-1. Test edilmiş düzeltmeyi ayrı PR ile main'e taşı; mevcut sürümü doğrulayıp kontrollü workflow ile yayımla.
-2. Yeni gerçek commit/version, Cron ve D1 snapshot'larında pending → done ve hedef ay kapsamı ilerlemesini doğrula.
-3. Günlük güvenlik bütçesi dolarsa kalan işlerin sonraki UTC gününde ilerlediğini doğrula; eksik ayı tamamlandı veya eksik sorguyu sıfır gösterme.
-4. Tam aylar ve ürün URL kanıtı oluşunca gerçek korumalı panel/rapor/soru kabulünü tamamla. Yönetici anahtarını sohbet/Git'e koyma.
-5. Uzak şifreli yedek koşusu gerekli bağlar eksik olduğundan yedek almadı. Hesap sahibinin ayrı BACKUP_ENCRYPTION_KEY tanımlaması ve ilk gerçek geri dönüş kabulü gerekir; OAuth anahtarını değiştirme.
-6. Rakip modülü PR #7 taslak olarak saklandı (a0629f2), üretim düzeltmesine dahil değil. Teknik SEO, iç bağlantı ve sorgu–URL görevleri bu olay çözülene kadar bekliyor; yeniden yazılmayacak.
+1. Ücretsiz güvenlik bütçesi yenilendikten sonra kalan **172/184** Temmuz–Eylül kapsamını ve en yeni günlük veriyi D1 snapshot'larıyla doğrula. Eksik gün/sorgu sıfır değildir. 25 Ekim 00:00 UTC / Türkiye 03:00 bütçe yenilenmesi beklenir; gelecekteki gerçek olay doğrulanmış sayılmaz.
+2. Mevcut tarayıcıyı kontrollü gerçek pilotla doğrula, sonra otomatik salt okunur taramayı aç. Şimdiki üretim `CRAWL_ENABLED=false`: **2 eşlenmiş / 0 taramayla doğrulanmış ürün URL'si**. 29 ürünü sitemap ve gerçek sayfa/canonical kanıtıyla eşle; bazı slug'lar (`antetli`, `dosyalar`) kaynak klasöründen farklı. URL uydurma veya mevcut modülü yeniden yazma.
+3. Tam geçmiş ve URL kanıtıyla yönetici oturumunda gerçek aylık rapor/soru/koruma kabulünü yap. Veri yetersizken kesin öneri veya tamamlandı iddiası üretme. Gerçek oturum kabulü için kullanıcı anahtarını sohbete isteme.
+4. **Hesap sahibi yetkisi gereken tek yeni secret:** bağımsız BACKUP_ENCRYPTION_KEY GitHub secret'ı. Mevcut Cloudflare/GSC yetkileri çalışıyor; yeniden OAuth veya yeni CF token gerekmedi. Mevcut yedek workflow'u anahtar yokken export yapmadı. Secret tanımlanınca şifreli uzak yedek ve ayrı DB geri dönüş kabulünü tamamla; OAuth anahtarını değiştirme.
+5. Rakip modülü PR #7 taslak (**a0629f2**), üretime alınmadı. Teknik SEO, iç bağlantı, sorgu–URL modülleri bu olayı takiben bekliyor; önce yazılan kodu incele.
 
-Henüz tamamlandı sayılmayanlar: üç aylık gerçek GSC kapsamı, tüm ürün URL'lerinin canlı doğrulanması, canlı panelin uçtan uca kabulü, gerçek tarama ve uzak şifreli yedek/geri dönüş. Oturumun kendiliğinden yeniden başlayacağı garanti edilmez; bulut Cron kodu bağımsızdır.
+Tüm uygulama tamamlandı sayılmaz: üç ay, gerçek otomatik tarama/ürün eşlemesi, korumalı gerçek aylık rapor ve uzak yedek kabulü eksik. Oturumun yeniden başlayacağı garanti edilmez; dağıtılan Cloudflare Cron bağımsız çalışır. Ücretli plan açılmadı; canlı site ve özgün CSV'ler değiştirilmedi.
 
 ---
 
