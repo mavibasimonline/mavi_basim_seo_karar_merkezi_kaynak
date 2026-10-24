@@ -23,7 +23,7 @@ Aşamalar ilgili ön koşuldan sonra ayrı çalıştırılır. `passed` yalnızc
 node scripts/run.mjs --capture .local/acceptance/01-source.log wrangler d1 execute DB --remote --config deploy/wrangler.production.jsonc --file deploy/acceptance-source.sql
 ```
 
-4. Beklenen 4/29/521/9.075/6.765; foreign key hatası yok. Dört migration'ın adı doğru. OAuth ve tarama ilk kurulumda yok; panel 29 ürünü Veri bekle gösterir. Test fixture veya yerel kullanıcı sorusu üretime aktarılmaz.
+4. Beklenen 4/29/521/9.075/6.765; foreign key hatası yok. Altı migration'ın adı doğru. OAuth ve tarama ilk kurulumda yok; panel 29 ürünü Veri bekle gösterir. Test fixture veya yerel kullanıcı sorusu üretime aktarılmaz.
 
 ## B — İlk gerçek Google senkronu
 

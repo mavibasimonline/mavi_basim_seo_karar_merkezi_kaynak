@@ -7,7 +7,7 @@ import type {Env} from '../src/types';
 beforeEach(init);
 const request=(path:string,method='GET',body?:unknown,extra:Record<string,string>={})=>new Request('https://app.example'+path,{method,headers:{Authorization:`Bearer ${env.ADMIN_TOKEN}`,...extra},...(body===undefined?{}:{body:JSON.stringify(body)})});
 it('protects all data endpoints and exposes only minimal public health',async()=>{
-  for(const path of ['/api/report','/api/data-integrity','/api/audit-history','/api/change-calendar','/api/change-impact','/api/radar','/api/status','/api/history','/api/inventory','/api/keywords?product=brosur','/api/outcomes','/api/export'])expect((await worker.fetch(new Request('https://app.example'+path),env)).status).toBe(401);
+  for(const path of ['/api/report','/api/competitors','/api/competitor-targets','/api/data-integrity','/api/audit-history','/api/change-calendar','/api/change-impact','/api/radar','/api/status','/api/history','/api/inventory','/api/keywords?product=brosur','/api/outcomes','/api/export'])expect((await worker.fetch(new Request('https://app.example'+path),env)).status).toBe(401);
   const health=await worker.fetch(new Request('https://app.example/api/health'),env);expect(health.status).toBe(200);expect(await health.text()).not.toContain('TOKEN');
 });
 it('serves a validated report and export without synthetic live data',async()=>{

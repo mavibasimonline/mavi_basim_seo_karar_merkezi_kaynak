@@ -47,9 +47,11 @@ def config_errors(config, ready=False, bootstrap=False):
     enabled = variables.get('AUTOMATION_ENABLED') == 'true'
     if cron not in ([], ['*/15 * * * *']) or variables.get('CRAWL_ENABLED') not in ('false', 'true') or variables.get('AUTOMATION_ENABLED') not in ('false', 'true'):
         errors.append('UNREVIEWED_AUTOMATION_SETTINGS')
-    if not enabled and (cron or variables.get('CRAWL_ENABLED') == 'true'):
+    if variables.get('COMPETITOR_CRAWL_ENABLED','false') not in ('false','true'):
+        errors.append('UNREVIEWED_COMPETITOR_SETTINGS')
+    if not enabled and (cron or variables.get('CRAWL_ENABLED') == 'true' or variables.get('COMPETITOR_CRAWL_ENABLED') == 'true'):
         errors.append('AUTOMATION_OPT_IN_REQUIRED')
-    if (ready or bootstrap) and (variables.get('CRAWL_ENABLED') != 'false' or cron or enabled):
+    if (ready or bootstrap) and (variables.get('CRAWL_ENABLED') != 'false' or variables.get('COMPETITOR_CRAWL_ENABLED','false') != 'false' or cron or enabled):
         errors.append('AUTOMATION_NOT_HELD_FOR_ACCEPTANCE')
     if ready or enabled:
         database_id = bindings[0].get('database_id', '') if len(bindings) == 1 else ''

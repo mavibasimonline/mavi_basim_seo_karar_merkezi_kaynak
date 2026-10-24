@@ -10,6 +10,7 @@ import { measureOneOutcome, recordAppliedChange } from './outcomes';
 import { radar } from './radar';
 import {changeCalendar,changeImpact} from './change-impact';
 import {dataIntegrity} from './data-integrity';
+import {addCompetitor,addCompetitorTarget,competitorsView,crawlCompetitorOne} from './competitors';
 
 export async function getReport(env:Env,month:string,options:AnalysisOptions={}):Promise<AnalysisReport>{
   monthPeriod(month);
@@ -55,6 +56,9 @@ async function route(request:Request,env:Env):Promise<Response>{
     return json({google_connected:!!google,ga4_configured:!!env.GA4_PROPERTY_ID,ads_configured:env.ENABLE_GOOGLE_ADS==='true'&&!!env.GOOGLE_ADS_DEVELOPER_TOKEN,crawl_enabled:env.CRAWL_ENABLED==='true',automation_enabled:env.AUTOMATION_ENABLED==='true',health:health.results,jobs:jobs.results,crawls:crawls.results,coverage:coverage.results,
       note:'Yapılandırma veya OAuth kaydı başarılı API erişimi anlamına gelmez; günlük sağlık sonuçlarını kontrol edin.'});
   }
+  if(request.method==='GET'&&path==='/api/competitors')return json(await competitorsView(env,url.searchParams.get('after')||''));
+  if(request.method==='POST'&&path==='/api/competitors'){const body=await request.json() as {name?:unknown;origin?:unknown};return json(await addCompetitor(env,body.name,body.origin),201);}
+  if(request.method==='POST'&&path==='/api/competitor-targets')return json(await addCompetitorTarget(env,await request.json()),201);
   if(request.method==='GET'&&path==='/api/data-integrity')return json(await dataIntegrity(env,url.searchParams.get('month')||lastCompleteMonth()));
   if(request.method==='GET'&&path==='/api/audit-history')return json({rows:(await env.DB.prepare("SELECT id,kind,created_at,result_json FROM insight_runs WHERE kind IN ('data-integrity','sync-audit') AND id>? ORDER BY id LIMIT 50").bind(url.searchParams.get('after')||'').all()).results});
   if(request.method==='GET'&&path==='/api/change-calendar')return json({rows:await changeCalendar(env,url.searchParams.get('day')||new Date().toISOString().slice(0,10),url.searchParams.get('after')||''),timezone:'UTC',note:'Takvim tespit tarihidir; kesin yayın tarihi değildir.'});
@@ -106,6 +110,7 @@ export async function tick(env:Env,fetcher:typeof fetch=fetch,time=new Date()):P
   // An accidental Cron configuration must not start collection before operator acceptance.
   if(env.AUTOMATION_ENABLED!=='true')return;
   if(await enqueueDaily(env)){await enqueueAds(env);return;}
+  if(time.getUTCMinutes()===15&&env.COMPETITOR_CRAWL_ENABLED==='true'){await crawlCompetitorOne(env,fetcher);return;}
   // Dedicated slots prevent a long historical backfill from starving crawl/outcome work.
   if(time.getUTCMinutes()===45){await seedCrawl(env);await crawlOne(env,fetcher);return;}
   if(time.getUTCMinutes()===30&&time.getUTCHours()%4===0){await measureOneOutcome(env);return;}
@@ -128,7 +133,7 @@ export default {
       return securityHeaders(await route(request,env));
     }catch(error){
       const code=error instanceof ProviderError?error.code:error instanceof Error?error.message:'UNKNOWN';
-      const invalid=['INVALID_MONTH','INVALID_QUESTION','INVALID_QUESTION_CONTEXT','INVALID_APPLIED_CHANGE','INVALID_CHANGE_DAY','INVALID_CHANGE_ID','CHANGE_NOT_FOUND'].includes(code)||error instanceof SyntaxError;
+      const invalid=['INVALID_MONTH','INVALID_QUESTION','INVALID_QUESTION_CONTEXT','INVALID_APPLIED_CHANGE','INVALID_CHANGE_DAY','INVALID_CHANGE_ID','CHANGE_NOT_FOUND','INVALID_COMPETITOR_URL','COMPETITOR_LIMIT_OR_DUPLICATE'].includes(code)||error instanceof SyntaxError;
       return securityHeaders(json({error:invalid?'İstek verisi geçersiz.':'İşlem tamamlanamadı. Veri kaynağı ve sistem durumunu kontrol edin.',code:invalid?'INVALID_INPUT':error instanceof ProviderError?error.code:'INTERNAL_ERROR'},invalid?400:503));
     }
   },

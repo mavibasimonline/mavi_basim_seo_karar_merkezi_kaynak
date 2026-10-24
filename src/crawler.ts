@@ -2,9 +2,10 @@ import robotsParser from 'robots-parser';
 import { XMLParser } from 'fast-xml-parser';
 import { Env, Fetch, hash, nowISO } from './types';
 import { boundedText, ProviderError } from './google';
-import { siteURL } from './urls';
+import { siteURL,sameOriginURL } from './urls';
 
-const AGENT = 'MaviBasimSeoBot';
+export const CRAWLER_AGENT = 'MaviBasimSeoBot';
+const AGENT=CRAWLER_AGENT;
 export interface Snapshot {
   status: number; redirect: string | null; canonical: string[]; robots: string[]; x_robots: string | null;
   title: string; description: string; headings: { level: number; text: string }[];
@@ -12,7 +13,7 @@ export interface Snapshot {
   images: { src: string; alt: string | null }[]; structured_data: unknown[];
   viewport: string | null; lang: string | null; body_hash: string; excerpt: string; rendering: 'static-html';
 }
-export async function parseHTML(html: string, url: string, status = 200, headers = new Headers()): Promise<Snapshot> {
+export async function parseHTML(html: string, url: string, status = 200, headers = new Headers(),linkOrigin='https://mavibasim.com'): Promise<Snapshot> {
   const result: Snapshot = { status,redirect:headers.get('location'),canonical:[],robots:[],x_robots:headers.get('x-robots-tag'),title:'',description:'',headings:[],links:[],hreflang:[],images:[],structured_data:[],viewport:null,lang:null,body_hash:'',excerpt:'',rendering:'static-html' };
   const body: string[] = [];
   const links = new Set<string>();
@@ -31,7 +32,7 @@ export async function parseHTML(html: string, url: string, status = 200, headers
       if (rel.includes('canonical')) { try { result.canonical.push(new URL(href,url).href); } catch { result.canonical.push(href); } }
       if (rel.includes('alternate') && e.getAttribute('hreflang')) result.hreflang.push({language:e.getAttribute('hreflang')!,href});
     } })
-    .on('a[href]', { element(e) { const link=siteURL(e.getAttribute('href')!,url); if (link && links.size<500) links.add(link); } })
+    .on('a[href]', { element(e) { const link=sameOriginURL(e.getAttribute('href')!,url,linkOrigin); if (link && links.size<500) links.add(link); } })
     .on('img', { element(e) { if(result.images.length<100)result.images.push({src:e.getAttribute('src') || '',alt:e.getAttribute('alt')}); } })
     .on('body', { text(t) { body.push(t.text); } });
   for(let level=1;level<=6;level++) {
