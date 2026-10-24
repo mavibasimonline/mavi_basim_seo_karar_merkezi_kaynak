@@ -72,14 +72,29 @@ Günlük senkron muhasebesi **8.552/10.000** yazma rezervasyonu/maliyeti göster
 
 Bu ortamdan standart, dürüst bot kimliğiyle salt okunur GET yapıldı: `robots.txt`, `sitemap.xml` ve `/brosur` **HTTP 200**. Robots genel erişime izin veriyor ve sitemap bildiriyor; broşür canonical değeri `https://mavibasim.com/brosur`. Sitemap lastmod değeri kesin SEO yayın zamanı sayılmaz. Bu üç kontrol üretim tarayıcısının kabulü veya 29 sayfanın doğrulanması değildir.
 
-Gerçek D1'de **29 ürün, 2 başlangıç URL eşlemesi, 0 taramayla doğrulanmış ürün URL'si** var. Otomatik tarama mevcut operatör ayarıyla kapalı korundu. Bazı gerçek sitemap slug'ları klasör adından farklı (`/antetli`, `/dosyalar`); kanıt olmadan ürün URL'si tahmin edilmemelidir. Tarama/sayfa kanıtı eksikken motor ürünleri Veri bekle durumunda tutmalıdır; korumalı aylık raporun uçtan uca kabulü henüz yapılmadı. Bunun için yanlış gerçek veri veya demo sonuç yazılmadı.
+Gerçek D1'de **29 ürün, 2 başlangıç URL eşlemesi, 0 taramayla doğrulanmış ürün URL'si** var. Otomatik tarama mevcut operatör ayarıyla kapalı korundu. Kaynak manifesti ve gerçek sitemap yeniden karşılaştırıldı: 293 sitemap URL'si içinde 29 ürün kimliğinin tamamının birebir slug'ı var. Önceki belgedeki antetli/dosyalar farkı örnekleri hatalıydı; düzeltildi. Sitemap'te görünme HTTP/canonical doğrulaması yerine geçmez. Tarama/sayfa kanıtı eksikken motor ürünleri Veri bekle durumunda tutmalıdır; korumalı aylık raporun uçtan uca kabulü henüz yapılmadı. Bunun için yanlış gerçek veri veya demo sonuç yazılmadı.
 
 ## Devam ve yetki gereksinimi
 
 1. Kalan **172/184** hedef günlük/scope aktarımının sonraki bütçelerde tamamlanmasını gerçek D1 ile kontrol et; Google boş/anonim sorgularını tam veri veya sıfır trafik sayma. Günlük en yeni kesinleşmiş gün ve gecikmeli uzlaştırma aynı kuyrukta korunur.
-2. Mevcut salt okunur tarayıcının gerçek pilotunu çalıştır; site/robots kanıtından sonra otomatik taramayı kontrollü aç ve 29 ürün eşlemesini kanıtla tamamla. Bu kod mevcut; yeni tarayıcı yazılmayacak. Canlı siteye yazma yapılmayacak.
+2. Gerçek broşür/el ilanı pilotu aşağıdaki ek kabulde tamamlandı. 29 ürünün kalan eşlemelerini mevcut otomatik kuyrukla takip et ve kanıtla tamamla. Bu kod mevcut; yeni tarayıcı yazılmayacak. Canlı siteye yazma yapılmayacak.
 3. Tam dönemler ve ürün kanıtı oluşunca yönetici oturumuyla gerçek aylık rapor, soru-cevap ve başarılı sorgu koruma kabulünü tamamla. Giriş anahtarını sohbet/Git'e koyma veya güvenliği atlama.
 4. Gerçek şifreli uzak yedek için bağımsız **BACKUP_ENCRYPTION_KEY** GitHub secret'ı eksik. Cloudflare token/account zaten çalışıyor; yeni Google OAuth veya Cloudflare token istenmiyor. Hesap sahibi bağımsız 32 bayt base64 anahtarı güvenli secret alanına kaydetmeli; sonra mevcut backup workflow'u ile ilk gerçek geri yükleme kabulü yapılmalı. OAuth şifreleme anahtarını değiştirmeyin.
 5. Rakip PR #7 taslak, teknik SEO/iç bağlantı/sorgu-URL istekleri bekleyen iş kaydıdır; bu üretim olayında yayımlanmadılar.
 
 Bu belge tarihli ölçümdür. En son dağıtım commit/version kimliği canlı `/api/health` ve kontrollü üretim workflow'undan doğrulanmalıdır; yalnız GitHub CI başarısı canlı kabul sayılmaz. Oturumun kendiliğinden yeniden başlayacağı garanti edilmez. Ücretli plan/API açılmadı, canlı mavibasim.com içeriği ve 521 CSV değiştirilmedi.
+
+## Ek gerçek tarama kabulü — 17:53 / 17:57 UTC
+
+[Gerçek pilot 40118110004](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40118110004) başarılı: mevcut `crawler.ts` değiştirilmeden, GitHub Actions içindeki loopback Worker ve aynı gerçek D1 binding'i kullanıldı. Yeni public endpoint veya yeni üretim Worker açılmadı; Google/OAuth/yönetici anahtarı okunmadı. En fazla 12 deneme sınırından yalnız 3'ü kullanıldı. İlk istek robots için 5 saniye bekleme kuralına uydu (CRAWL_DELAY); sonraki iki gerçek sayfa başarılı oldu.
+
+| Gerçek sayfa | HTTP / canonical | Snapshot gözlem zamanı |
+|---|---|---|
+| https://mavibasim.com/brosur | 200 / kendisi | 2026-10-24 17:52:59 UTC |
+| https://mavibasim.com/el-ilani | 200 / kendisi | 2026-10-24 17:53:08 UTC |
+
+[Kanıt kabulü 40118410575](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40118410575) aynı D1 snapshot'larında title, HTTP 200, self canonical, static-html rendering ve SHA-256 içerik hash'lerini ayrıca doğruladı. Kaynaklar önce/sonra **29/521/9075** aynı kaldı. Artık **2/29 ürün URL'si taramayla doğrulanmıştır**; bu iki tespit zamanı gerçek SEO yayın zamanı sayılmaz. Diğer 27 ürün ve tüm site taraması tamamlandı sayılmaz.
+
+Pilotun ardından PR #11 üretim `CRAWL_ENABLED=true` yapılandırmasını içerir. Mevcut saatlik `:45` Cron dilimi salt okunur tarayıcıyı kullanır; Google işiyle aynı slotta yarışmaz. Bayrağın gerçek yayındaki durumu ve sonraki otomatik tarama kaydı ayrı denetlenmelidir; pilot otomatik Cron taraması olarak sunulmaz. Crawler, robots ve hız sınırlarını korur; siteye yazmaz.
+
+Bu aşama tam regresyonu **265 Workers/D1 + 39 Python + 2 Chromium = 306 test** olarak genişletti. Pilotun foreign-host/auth/kapalı bayrak sınırları ve kaynak/D1 bağlama koşulları test edildi; ana üretim API'sine yeni yol eklenmedi. Otomatik GSC bütçe yenilenmesi ve bütün aylık kapsamın canlı kabulü hâlâ bekliyor.

@@ -29,6 +29,7 @@ class ReleaseTests(unittest.TestCase):
     def test_actual_resource_ids_are_required_but_not_payment_permission(self):
         # Readiness without operator acceptance is checked in a held configuration.
         self.config['vars']['AUTOMATION_ENABLED'] = 'false'
+        self.config['vars']['CRAWL_ENABLED'] = 'false'
         self.config['triggers']['crons'] = []
         self.config['d1_databases'][0]['database_id'] = '12345678-1234-1234-1234-123456789abc'
         self.config['vars']['GOOGLE_REDIRECT_URI'] = 'https://mavi-basim-seo-prod.example.workers.dev/api/oauth/google/callback'

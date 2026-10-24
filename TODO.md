@@ -1,3 +1,15 @@
+# Son ek kabul — gerçek tarayıcı (24 Ekim 2026, 17:57 UTC)
+
+- [x] Mevcut tarayıcı gerçek D1 ile loopback kabulünde çalıştı: 40118110004 başarılı. İlk robots beklemesi ve broşür/el ilanı 200 self-canonical snapshot'ları kaydedildi. Ayrı kanıt kabulü 40118410575 title/body_hash/rendering/HTTP/canonical ve değişmeyen 29/521/9075 arşivini doğruladı.
+- [x] **2/29 ürün URL'si doğrulandı**; diğer 27 bekliyor. Gerçek sitemap 293 URL içeriyor; 29 kaynak kimliğinin tamamı sitemap'te var. URL uydurma gerekmedi. Önceki antetli/dosyalar farkı yorumu kaynak manifestiyle çürütüldü ve düzeltildi.
+- [x] Yeni public uygulama endpoint'i olmadan sınırlı operatör pilotu; otomatik üretim taraması için **CRAWL_ENABLED=true** PR #11'de. Mevcut saatlik :45 dilimi kullanılır. Yalnız bayrağın yayına alınması sonraki otomatik taramanın çalıştığı kanıtı değildir; canlı kaydını kontrol et.
+- [x] Son regresyon hedefi/yerel sonucu: **265 Workers/D1 + 39 Python + 2 Chromium = 306**; tip/build/audit/kaynak kontrolleri. Son uzak CI ve kontrollü yayın sonucu Actions'tan kontrol edilmelidir.
+- Son kod aşaması **2d55f97**, dal `ops/read-only-crawl-acceptance`; bu belgeyi içeren commit `git log -1 --oneline`. PR #8/9/10 main'de; PR #7 taslak korunuyor.
+
+**Sonraki somut adım:** PR #11'in yeşil CI'sinden sonra main'e birleştir, otomatik Cloudflare sürümü/binding'leri yeniden oku ve kontrollü yayınla tam main commit'ini doğrula. Sonra kalan 172 GSC kapsamı ve 27 ürün URL'sini izle; tam ay oluşunca yönetici oturumunda gerçek rapor/soru kabulü. GSC için yeni kullanıcı izni gerekmiyor. Uzak şifreli yedek için ayrı BACKUP_ENCRYPTION_KEY hâlâ hesap sahibi işlemi. Gelecek UTC günü/bütün kapsam/otomatik tarama/aylık rapor henüz doğrulandı denmeyecek.
+
+---
+
 # Güncel durum — gerçek üretim GSC kuyruğu (24 Ekim 2026, 17:42 UTC)
 
 Aşağıdaki eski bağlantı/yetki engelleri tarihçedir. Güncel ayrıntı ve kanıtlar [GSC_PRODUCTION_REPORT.md](GSC_PRODUCTION_REPORT.md).
@@ -14,7 +26,7 @@ Aşağıdaki eski bağlantı/yetki engelleri tarihçedir. Güncel ayrıntı ve k
 ## Tamamlanmamış işler — sıradaki somut adımlar
 
 1. Ücretsiz güvenlik bütçesi yenilendikten sonra kalan **172/184** Temmuz–Eylül kapsamını ve en yeni günlük veriyi D1 snapshot'larıyla doğrula. Eksik gün/sorgu sıfır değildir. 25 Ekim 00:00 UTC / Türkiye 03:00 bütçe yenilenmesi beklenir; gelecekteki gerçek olay doğrulanmış sayılmaz.
-2. Mevcut tarayıcıyı kontrollü gerçek pilotla doğrula, sonra otomatik salt okunur taramayı aç. Şimdiki üretim `CRAWL_ENABLED=false`: **2 eşlenmiş / 0 taramayla doğrulanmış ürün URL'si**. 29 ürünü sitemap ve gerçek sayfa/canonical kanıtıyla eşle; bazı slug'lar (`antetli`, `dosyalar`) kaynak klasöründen farklı. URL uydurma veya mevcut modülü yeniden yazma.
+2. Mevcut tarayıcıyı kontrollü gerçek pilotla doğrula, sonra otomatik salt okunur taramayı aç. Şimdiki üretim `CRAWL_ENABLED=false`: **2 eşlenmiş / 0 taramayla doğrulanmış ürün URL'si (17:42 ölçümü)**. 29 ürünü sitemap ve gerçek sayfa/canonical kanıtıyla eşle; Manifest ile gerçek sitemap karşılaştırmasında 29 kimliğin tamamı mevcut; önceki slug farkı örnekleri düzeltildi. URL uydurma veya mevcut modülü yeniden yazma.
 3. Tam geçmiş ve URL kanıtıyla yönetici oturumunda gerçek aylık rapor/soru/koruma kabulünü yap. Veri yetersizken kesin öneri veya tamamlandı iddiası üretme. Gerçek oturum kabulü için kullanıcı anahtarını sohbete isteme.
 4. **Hesap sahibi yetkisi gereken tek yeni secret:** bağımsız BACKUP_ENCRYPTION_KEY GitHub secret'ı. Mevcut Cloudflare/GSC yetkileri çalışıyor; yeniden OAuth veya yeni CF token gerekmedi. Mevcut yedek workflow'u anahtar yokken export yapmadı. Secret tanımlanınca şifreli uzak yedek ve ayrı DB geri dönüş kabulünü tamamla; OAuth anahtarını değiştirme.
 5. Rakip modülü PR #7 taslak (**a0629f2**), üretime alınmadı. Teknik SEO, iç bağlantı, sorgu–URL modülleri bu olayı takiben bekliyor; önce yazılan kodu incele.
