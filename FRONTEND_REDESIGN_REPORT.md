@@ -32,3 +32,11 @@ Toplam **334 başarılı otomatik test**. Son koşuda başarısız/atlanmış te
 ## Yayın kapısı
 
 PR ve main CI başarılı olduktan sonra mevcut `production.yml` kullanılır: gerçek önceki Worker sürümü, aynı D1, kaynak sayıları, secret binding'leri, Cron/otomasyon ayarları ve ücretsiz kota payı ön kontrolde doğrulanır. Yayın `--keep-vars` ile yapılır; HTTP tam commit/sürüm kontrolü başarısızsa mevcut otomatik geri dönüş çalışır. Yayın sonrası gerçek kimlikler TODO kaydına eklenir. Canlı `mavibasim.com` içeriğine yazılmaz ve veri aktarımı durdurulmaz.
+
+## Doğrulanmış canlı yayın
+
+- [PR #13](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/13) birleşti. PR CI **40135274391** ve main CI **40135421456** başarılı; kaynak main commit'i **23c27520ab0d7b293232ec0678572d7af404dc34**.
+- [Kontrollü yayın 40135545161](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40135545161) başarılı. Gerçek HTTP kimliği Worker **bfbd0c8a-715e-4e08-9688-2a6fe3386ba4** ve tam kaynak commit'iyle eşleşti. Postflight aynı D1, 29/521/9.075 ve mevcut auth binding'lerinin korunmasını doğruladı. Secret değerleri alınmadı, üretim migration'ı yapılmadı.
+- [Canlı uygulama](https://mavi-basim-seo-prod.mavibasimonline.workers.dev): 11 statik dosyanın SHA-256 değeri checkout ile aynı. Masaüstü 1440×1000 ve mobil 390×844 giriş ekranı 200; yerel fontlar yüklendi, taşma/JavaScript hatası/axe ihlali yok. Yeni performans ve sorgu API'leri oturumsuz 401; özel panel gizli.
+- Bu ortamın Chromium NSS deposunda yönetilen proxy CA'sı bulunmadığından ilk doğrudan tarayıcı denemesi sertifika hatasında durdu. Doğrulama, ortamın mevcut CA'sına güvenen Playwright Node HTTP istemcisinden alınan **gerçek canlı yanıtlar** tarayıcıda işlenerek tamamlandı. TLS doğrulaması kapatılmadı; canlı kontrolünde fixture veya sahte veri kullanılmadı. Özel yönetici oturumuna girilmedi.
+- Bu kabulün ardından yalnız teslim belgeleri güncellenir. Son belge yayınının tam SHA/Worker kimliği canlı `/api/health` ve mevcut kontrollü yayın workflow'unda saklanır; yukarıdaki sürüm işlevsel panel kabulünün tarihli kanıtıdır.
