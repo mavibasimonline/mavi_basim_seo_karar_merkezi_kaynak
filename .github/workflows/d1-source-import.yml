@@ -62,5 +62,7 @@ jobs:
           grep -q 'No migrations to apply' .local/migration-status.txt
       - name: Import prepared SQL to D1
         run: node scripts/run.mjs wrangler d1 execute DB --remote --config deploy/wrangler.production.jsonc --file .local/keywords.sql
-      - name: Read-only post-import verification
+      - name: Fail-closed exact source count and foreign key verification
+        run: node scripts/run.mjs wrangler d1 execute DB --remote --config deploy/wrangler.production.jsonc --file deploy/verify-source-counts.sql
+      - name: Read-only source audit details
         run: node scripts/run.mjs wrangler d1 execute DB --remote --config deploy/wrangler.production.jsonc --file deploy/acceptance-source.sql
