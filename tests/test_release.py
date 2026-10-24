@@ -16,9 +16,12 @@ class ReleaseTests(unittest.TestCase):
 
     def test_production_template_is_separate_and_inert(self):
         self.assertEqual(release.config_errors(self.config), [])
-        # A real D1 ID may already be configured; the OAuth callback is still a placeholder.
+        # Production has real D1 and OAuth callback values; keep explicit placeholder rejection tests.
         self.assertNotIn('D1_ACCOUNT_AUTHORIZATION_REQUIRED', release.config_errors(self.config, ready=True))
-        self.assertIn('OAUTH_ACCOUNT_CALLBACK_REQUIRED', release.config_errors(self.config, ready=True))
+        self.assertNotIn('OAUTH_ACCOUNT_CALLBACK_REQUIRED', release.config_errors(self.config, ready=True))
+        bad_oauth = copy.deepcopy(self.config)
+        bad_oauth['vars']['GOOGLE_REDIRECT_URI'] = 'https://mavi-basim-seo-prod.REPLACE_ACCOUNT.workers.dev/api/oauth/google/callback'
+        self.assertIn('OAUTH_ACCOUNT_CALLBACK_REQUIRED', release.config_errors(bad_oauth, ready=True))
         placeholder = copy.deepcopy(self.config)
         placeholder['d1_databases'][0]['database_id'] = '00000000-0000-0000-0000-000000000000'
         self.assertIn('D1_ACCOUNT_AUTHORIZATION_REQUIRED', release.config_errors(placeholder, ready=True))
@@ -52,7 +55,10 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn('AUTOMATION_OPT_IN_REQUIRED', release.config_errors(self.config))
         self.config['vars']['AUTOMATION_ENABLED'] = 'true'
         self.assertNotIn('D1_ACCOUNT_AUTHORIZATION_REQUIRED', release.config_errors(self.config))
-        self.assertIn('OAUTH_ACCOUNT_CALLBACK_REQUIRED', release.config_errors(self.config))
+        self.assertNotIn('OAUTH_ACCOUNT_CALLBACK_REQUIRED', release.config_errors(self.config))
+        bad_oauth = copy.deepcopy(self.config)
+        bad_oauth['vars']['GOOGLE_REDIRECT_URI'] = 'https://mavi-basim-seo-prod.REPLACE_ACCOUNT.workers.dev/api/oauth/google/callback'
+        self.assertIn('OAUTH_ACCOUNT_CALLBACK_REQUIRED', release.config_errors(bad_oauth))
         placeholder = copy.deepcopy(self.config)
         placeholder['d1_databases'][0]['database_id'] = '00000000-0000-0000-0000-000000000000'
         self.assertIn('D1_ACCOUNT_AUTHORIZATION_REQUIRED', release.config_errors(placeholder))
