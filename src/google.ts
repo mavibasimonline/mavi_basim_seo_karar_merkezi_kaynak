@@ -26,8 +26,18 @@ export async function boundedText(response: Response, limit = 2_000_000): Promis
 }
 export async function requestJSON<T>(url: string, init: RequestInit, fetcher: Fetch = fetch): Promise<T> {
   let response: Response;
-  try { response = await fetcher(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(20_000) }); }
-  catch { throw new ProviderError('NETWORK_UNAVAILABLE', true); }
+  try { response = await fetcher(url, { ...init, redirect: 'manual', signal: AbortSignal.timeout(20_000) }); }
+  catch (error) {
+    // Never print request URLs, authorization codes, tokens or error messages.
+    // A timeout is different from DNS/TLS/network failure and deserves its own code.
+    const timeout = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+    throw new ProviderError(timeout ? 'GOOGLE_NETWORK_TIMEOUT' : 'NETWORK_UNAVAILABLE', true);
+  }
+  // Do not follow redirects with credentials; manual mode is supported by Workers.
+  if (response.status >= 300 && response.status < 400) {
+    await response.body?.cancel();
+    throw new ProviderError('GOOGLE_UNEXPECTED_REDIRECT');
+  }
   if (!response.ok) {
     await response.body?.cancel();
     const retryHeader = response.headers.get('Retry-After');
