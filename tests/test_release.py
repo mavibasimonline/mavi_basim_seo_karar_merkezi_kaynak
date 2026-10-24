@@ -27,6 +27,9 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn('D1_ACCOUNT_AUTHORIZATION_REQUIRED', release.config_errors(placeholder, ready=True))
 
     def test_actual_resource_ids_are_required_but_not_payment_permission(self):
+        # Readiness without operator acceptance is checked in a held configuration.
+        self.config['vars']['AUTOMATION_ENABLED'] = 'false'
+        self.config['triggers']['crons'] = []
         self.config['d1_databases'][0]['database_id'] = '12345678-1234-1234-1234-123456789abc'
         self.config['vars']['GOOGLE_REDIRECT_URI'] = 'https://mavi-basim-seo-prod.example.workers.dev/api/oauth/google/callback'
         self.assertEqual(release.config_errors(self.config, ready=True), [])
@@ -51,6 +54,7 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(release.secret_rules('ADMIN_TOKEN=\nGOOGLE_CLIENT_SECRET=\nTOKEN_ENCRYPTION_KEY=\n'), [])
 
     def test_automation_requires_explicit_opt_in_and_real_resource_ids(self):
+        self.config['vars']['AUTOMATION_ENABLED'] = 'false'
         self.config['triggers']['crons'] = ['*/15 * * * *']
         self.assertIn('AUTOMATION_OPT_IN_REQUIRED', release.config_errors(self.config))
         self.config['vars']['AUTOMATION_ENABLED'] = 'true'
