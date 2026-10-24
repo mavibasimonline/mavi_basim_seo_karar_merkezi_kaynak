@@ -33,7 +33,7 @@ def accepted(state):
   for product in ('brosur','el-ilani'))
 
 def main():
- parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--max-pages',type=int,default=12);args=parser.parse_args()
+ parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--max-pages',type=int,default=12);parser.add_argument('--performance-only',action='store_true');args=parser.parse_args()
  if not 1<=args.max_pages<=12:raise ValueError('PILOT_PAGE_BOUND_REQUIRED')
  if not os.environ.get('CLOUDFLARE_API_TOKEN') or not os.environ.get('CLOUDFLARE_ACCOUNT_ID'):raise ValueError('CLOUDFLARE_BINDINGS_MISSING')
  config=pilot_config(json.loads((ROOT/'deploy/wrangler.production.jsonc').read_text()))
@@ -54,15 +54,19 @@ def main():
   if not ready:raise ValueError('LOCAL_PILOT_RUNTIME_NOT_READY')
   before=request('/state');summary['before']=before
   if before.get('source_counts')!=EXPECTED:raise ValueError('SOURCE_COUNTS_MISMATCH')
-  latest=before
-  for page in range(args.max_pages):
-   if accepted(latest):break
-   if page:time.sleep(6) # Existing crawler also enforces robots delay atomically.
-   latest=request('/run','POST');summary['attempts']=page+1
-   print(json.dumps({'attempt':page+1,'recent':latest['recent'],'verified_targets':[t['id'] for t in latest['targets'] if t.get('url_verified_at')]}),flush=True)
+  if args.performance_only:
+   result=request('/performance-check');summary['performance_checks']=result;summary['site_crawl_triggered']=False
+   if not all(result['checks'].values()) or not result['has_real_observations'] or result['catalog_products']!=29:raise ValueError('REAL_PERFORMANCE_CHECK_FAILED')
+  else:
+   latest=before
+   for page in range(args.max_pages):
+    if accepted(latest):break
+    if page:time.sleep(6) # Existing crawler also enforces robots delay atomically.
+    latest=request('/run','POST');summary['attempts']=page+1
+    print(json.dumps({'attempt':page+1,'recent':latest['recent'],'verified_targets':[t['id'] for t in latest['targets'] if t.get('url_verified_at')]}),flush=True)
   after=request('/state');summary['after']=after
   if after.get('source_counts')!=EXPECTED:raise ValueError('SOURCE_COUNTS_CHANGED')
-  summary['passed']=accepted(after)
+  summary['passed']=args.performance_only or accepted(after)
   if not summary['passed']:raise ValueError('REAL_CRAWL_ACCEPTANCE_INCOMPLETE')
  finally:
   summary['finished_at']=datetime.now(timezone.utc).isoformat();(ROOT/'.local/crawl-pilot-summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2))
@@ -71,7 +75,7 @@ def main():
    try:process.wait(timeout=10)
    except subprocess.TimeoutExpired:process.kill();process.wait()
   log.close();secret_path.unlink(missing_ok=True)
- print('Real crawler pilot passed; production flags unchanged; source archive preserved')
+ print('Real performance check passed; no site crawl or Google sync triggered' if args.performance_only else 'Real crawler pilot passed; production flags unchanged; source archive preserved')
 
 if __name__=='__main__':
  try:main()
