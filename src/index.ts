@@ -11,6 +11,7 @@ import { radar } from './radar';
 import {changeCalendar,changeImpact} from './change-impact';
 import {dataIntegrity} from './data-integrity';
 import {reserveSyncPage,settleSyncPage,syncBudget} from './sync-budget';
+import {performance,performanceQueries,deviceFilter} from './performance';
 
 const RUNTIME_REVISION='gsc-catchup-v1';
 function deploymentInfo(env:Env){const metadata=env.CF_VERSION_METADATA;return {runtime_revision:RUNTIME_REVISION,version_id:metadata?.id&&/^[a-f0-9-]{36}$/i.test(metadata.id)?metadata.id:null,commit:metadata?.tag&&/^[a-f0-9]{40}$/.test(metadata.tag)?metadata.tag:null};}
@@ -70,7 +71,9 @@ async function route(request:Request,env:Env):Promise<Response>{
   if(request.method==='GET'&&path==='/api/change-calendar')return json({rows:await changeCalendar(env,url.searchParams.get('day')||new Date().toISOString().slice(0,10),url.searchParams.get('after')||''),timezone:'UTC',note:'Takvim tespit tarihidir; kesin yayın tarihi değildir.'});
   if(request.method==='GET'&&path==='/api/change-impact')return json(await changeImpact(env,url.searchParams.get('id')||''));
   if(request.method==='GET'&&path==='/api/radar'){const plan=parseQuestion('Son 28 günde hangi ürünler yükseldi?',[]);return json(await radar(env,await getReport(env,plan.context.month,{current:plan.period,previous:plan.previous})));}
-  if(request.method==='GET'&&path==='/api/report')return json(await getReport(env,url.searchParams.get('month')||lastCompleteMonth()));
+  if(request.method==='GET'&&path==='/api/performance')return json(await performance(env,url.searchParams.get('month')||lastCompleteMonth(),deviceFilter(url.searchParams.get('device'))));
+  if(request.method==='GET'&&path==='/api/performance/queries')return json(await performanceQueries(env,url.searchParams));
+  if(request.method==='GET'&&path==='/api/report')return json(await getReport(env,url.searchParams.get('month')||lastCompleteMonth(),{device:deviceFilter(url.searchParams.get('device'))}));
   if(request.method==='POST'&&path==='/api/questions'){
     const body=await request.json() as {question?:unknown;month?:unknown;previous_question_id?:unknown};
     if(typeof body.question!=='string'||body.question.length>1000)return json({error:'Soru en fazla 1000 karakter olmalı.'},400);
@@ -107,7 +110,7 @@ async function route(request:Request,env:Env):Promise<Response>{
   }
   if(request.method==='GET'&&path==='/api/outcomes')return json((await env.DB.prepare('SELECT * FROM outcome_windows ORDER BY applied_change_id,days LIMIT 100').all()).results);
   if(request.method==='GET'&&path==='/api/export'){
-    const report=await getReport(env,url.searchParams.get('month')||lastCompleteMonth());
+    const report=await getReport(env,url.searchParams.get('month')||lastCompleteMonth(),{device:deviceFilter(url.searchParams.get('device'))});
     return new Response(JSON.stringify(report,null,2),{headers:{'Content-Type':'application/json','Content-Disposition':`attachment; filename="mavi-seo-${report.month}.json"`,'Cache-Control':'no-store'}});
   }
   return json({error:'Bu işlem bulunamadı.'},404);
@@ -147,7 +150,7 @@ export default {
       return securityHeaders(await route(request,env));
     }catch(error){
       const code=error instanceof ProviderError?error.code:error instanceof Error?error.message:'UNKNOWN';
-      const invalid=['INVALID_MONTH','INVALID_QUESTION','INVALID_QUESTION_CONTEXT','INVALID_APPLIED_CHANGE','INVALID_CHANGE_DAY','INVALID_CHANGE_ID','CHANGE_NOT_FOUND'].includes(code)||error instanceof SyntaxError;
+      const invalid=['INVALID_MONTH','INVALID_DEVICE','INVALID_QUERY_SORT','INVALID_QUERY_PAGE','INVALID_QUERY_FILTER','INVALID_QUESTION','INVALID_QUESTION_CONTEXT','INVALID_APPLIED_CHANGE','INVALID_CHANGE_DAY','INVALID_CHANGE_ID','CHANGE_NOT_FOUND'].includes(code)||error instanceof SyntaxError;
       return securityHeaders(json({error:invalid?'İstek verisi geçersiz.':'İşlem tamamlanamadı. Veri kaynağı ve sistem durumunu kontrol edin.',code:invalid?'INVALID_INPUT':error instanceof ProviderError?error.code:'INTERNAL_ERROR'},invalid?400:503));
     }
   },
