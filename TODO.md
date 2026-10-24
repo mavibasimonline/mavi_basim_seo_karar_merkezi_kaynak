@@ -1,5 +1,23 @@
 # Durum, teslim denetimi ve devam kaydı
 
+## Türkçe soru-cevap — tamamlandı
+
+- Dal feat/turkce-soru-cevap; PR tabanı audit/seo-reliability (PR #2). 36 soru/follow-up testi ve mobil/masaüstü gerçek arayüz kontrolü başarılı.
+- Son regresyon: 122 Workers/D1 + 20 Python + 2 tarayıcı = 144 başarılı; audit 0, tip/build/kaynak kontrolleri başarılı. Son başarısız test yok; ilk 30 gün tarih hatası düzeltildi.
+- Ayrıntılar QUESTION_ANSWER_TEST_REPORT.md. Motor 1.2.1. Son commit bu belgeyi içeren git log -1 kaydıdır; önceki aşama e56a0e3.
+
+## Aktif geliştirme kuyruğu — henüz tamamlanmadı
+
+1. SEO fırsat radarı: ortak analiz ve sorgu kanıtlarıyla 30 senaryo, panel, SEO_OPPORTUNITY_RADAR_REPORT.md; ayrı dal/PR.
+2. SEO değişiklik etki analizi: mevcut geçmiş/sonuç modülünü genişlet, 28 gün/sorgu/cihaz/takvim ve 30 test; SEO_CHANGE_IMPACT_REPORT.md; ayrı PR.
+3. Rakip SEO: güvenli alan adı/robots taraması, açık ürün eşleştirmesi, içerik kanıtları ve 30 test; COMPETITOR_SEO_REPORT.md; ayrı PR. Gerçek rakip adresi/taraması henüz yok.
+4. Teknik SEO ve URL Inspection: mevcut envanteri genişlet; dizin kanıtını GSC gösteriminden ayır; 30 test ve TECHNICAL_SEO_AUDIT.md; ayrı PR.
+5. İç bağlantı: anchor/bölüm/nofollow ve eksik kapsamı tanıyan grafik; 30 test ve INTERNAL_LINK_AUDIT.md; ayrı PR.
+6. Sorgu–URL çakışması: mevcut olası çakışmayı dönem/cihaz/niyet kanıtlarıyla genişlet; 30 test ve KEYWORD_URL_CONFLICT_REPORT.md; ayrı PR.
+7. Veri doğruluk denetçisi: mevcut bağımsız SQL/kaynak/sağlık denetimlerini tamamla, ürün/kaynak paneli ve 40 senaryo; DATA_INTEGRITY_AUDIT.md; ayrı PR.
+
+Bu kuyruk maddeleri talep kaydıdır; kodu/testi bitmiş sayılmaz. Hesap yetkisi olmadan gerçek Google veya canlı sistem kabulü verilmeyecek. Sonraki somut adım radar modülüdür. Gerçek bağlantılar için yalnız hesap sahibinin Cloudflare Workers Free ve Google okuma/OAuth izinleri beklenir.
+
 ## Bağımsız denetim — tamamlandı
 
 - Dal `audit/seo-reliability`; sonuçlar [AUDIT_REPORT.md](AUDIT_REPORT.md).

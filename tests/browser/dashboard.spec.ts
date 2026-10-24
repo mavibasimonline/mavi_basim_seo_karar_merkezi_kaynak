@@ -20,6 +20,11 @@ test('real local database, secure login, all products and truthful disconnected 
   await source.getByText(/Keyword Planner kaynakları/).click();await expect(source).toContainText('Yaklaşık aylık arama');
   await page.getByPlaceholder('Broşür mobilde neden düştü?').fill('Broşür mobilde neden düştü?');await page.getByRole('button',{name:'Sor',exact:true}).click();
   await expect(page.locator('#answer')).toContainText('kanıtlayamam');await expect(page.locator('#answer')).toContainText('kanıt');
+  await page.getByPlaceholder('Broşür mobilde neden düştü?').fill('Peki masaüstünde?');
+  const followup=page.waitForResponse(r=>r.url().endsWith('/api/questions')&&r.request().method()==='POST');
+  await page.getByRole('button',{name:'Sor',exact:true}).click();
+  const follow=await (await followup).json();expect(follow.context.product_id).toBe('brosur');expect(follow.context.device).toBe('DESKTOP');
+  await expect(page.locator('#answer')).toContainText('Masaüstü');await expect(page.locator('#answer')).toContainText('Ne yapmalıyım?');
   await page.screenshot({path:'.local/panel-'+test.info().project.name+'.png',fullPage:false});
   const exported=await page.request.get(await page.locator('#export').getAttribute('href')||'');expect(exported.status()).toBe(200);expect((await exported.json()).products).toHaveLength(29);
   await page.getByRole('button',{name:"Google'ı bağla"}).click();await expect(page.locator('#message')).toContainText('eksik');

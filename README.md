@@ -2,6 +2,8 @@
 
 Üretime geçiş: [hesap/dağıtım/OAuth yönergesi](docs/PRODUCTION.md), [ilk gerçek veri kabulü](docs/PRODUCTION_ACCEPTANCE.md), [main ve güvenlik denetimi](docs/RELEASE_REVIEW.md). Çalışan uygulama korunur; üretim kaynakları bu oturumda oluşturulmadı.
 
+Türkçe soru-cevap ve takip bağlamı: [kabul raporu](QUESTION_ANSWER_TEST_REPORT.md). Son 28/30 kesinleşmiş gün, cihaz, koruma, öncelik ve mevcut değişiklik sonuçları desteklenir; ücretli model kullanılmaz.
+
 Bağımsız denetim: [AUDIT_REPORT.md](AUDIT_REPORT.md). Motor 1.2.0; marka/cihaz ayrımı, sağlık ve URL kanıtı olmadan karar durur.
 
 Türkçe tek ekran paneli, Cloudflare Worker API'si, D1/SQLite veri modeli, günlük Google senkron kuyruğu, salt okunur site tarayıcısı ve kanıtla sınırlanan karar motoru. Ücretli LLM veya ücretli API zorunluluğu yoktur. Uygulama canlı siteye yazmaz.

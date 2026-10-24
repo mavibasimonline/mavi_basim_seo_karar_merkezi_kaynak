@@ -3,7 +3,7 @@ import { authenticated, login, safeOrigin, securityHeaders } from './security';
 import { oauthCallback, oauthStart, ProviderError, boundedText } from './google';
 import { analyze, lastCompleteMonth, saveAnalysis, monthPeriod, AnalysisReport, ENGINE_VERSION } from './analysis';
 import { validateAnalysis } from './validation';
-import { answerQuestion } from './questions';
+import { answerQuestion, prepareQuestion } from './questions';
 import { enqueueDaily, enqueueAds, claimJob, processJob } from './sync';
 import { seedCrawl, crawlOne } from './crawler';
 import { measureOneOutcome, recordAppliedChange } from './outcomes';
@@ -47,10 +47,14 @@ async function route(request:Request,env:Env):Promise<Response>{
   }
   if(request.method==='GET'&&path==='/api/report')return json(await getReport(env,url.searchParams.get('month')||lastCompleteMonth()));
   if(request.method==='POST'&&path==='/api/questions'){
-    const body=await request.json() as {question?:unknown;month?:unknown};
+    const body=await request.json() as {question?:unknown;month?:unknown;previous_question_id?:unknown};
     if(typeof body.question!=='string'||body.question.length>1000)return json({error:'Soru en fazla 1000 karakter olmalı.'},400);
-    const report=await getReport(env,typeof body.month==='string'?body.month:lastCompleteMonth());
-    return json(await answerQuestion(env,report,body.question));
+    if(body.previous_question_id!==undefined&&typeof body.previous_question_id!=='string')return json({error:'Takip sorusu bağlamı geçersiz.'},400);
+    const plan=await prepareQuestion(env,body.question,typeof body.month==='string'?body.month:undefined,body.previous_question_id as string|undefined);
+    const filtered=!!plan.context.device||!!plan.period;
+    const report=filtered?await analyze(env,plan.context.month,new Date(),{current:plan.period,previous:plan.previous,device:plan.context.device}):await getReport(env,plan.context.month);
+    if(filtered){if((await validateAnalysis(env,report)).length)throw new Error('ANALYSIS_VALIDATION_FAILED');await saveAnalysis(env,report);}
+    return json(await answerQuestion(env,report,body.question,plan));
   }
   if(request.method==='GET'&&path==='/api/keywords'){
     const product=url.searchParams.get('product'),after=url.searchParams.get('after')||'';
@@ -109,7 +113,7 @@ export default {
       return securityHeaders(await route(request,env));
     }catch(error){
       const code=error instanceof ProviderError?error.code:error instanceof Error?error.message:'UNKNOWN';
-      const invalid=['INVALID_MONTH','INVALID_QUESTION','INVALID_APPLIED_CHANGE'].includes(code)||error instanceof SyntaxError;
+      const invalid=['INVALID_MONTH','INVALID_QUESTION','INVALID_QUESTION_CONTEXT','INVALID_APPLIED_CHANGE'].includes(code)||error instanceof SyntaxError;
       return securityHeaders(json({error:invalid?'İstek verisi geçersiz.':'İşlem tamamlanamadı. Veri kaynağı ve sistem durumunu kontrol edin.',code:invalid?'INVALID_INPUT':error instanceof ProviderError?error.code:'INTERNAL_ERROR'},invalid?400:503));
     }
   },
