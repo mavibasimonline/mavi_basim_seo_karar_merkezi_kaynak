@@ -4,7 +4,7 @@ import { oauthCallback, oauthStart, ProviderError, boundedText, verifyGscAccess 
 import { analyze, lastCompleteMonth, saveAnalysis, monthPeriod, AnalysisReport, ENGINE_VERSION, AnalysisOptions } from './analysis';
 import { validateAnalysis } from './validation';
 import { answerQuestion, prepareQuestion, parseQuestion } from './questions';
-import { enqueueDaily, enqueueAds, claimJob, processJob } from './sync';
+import { enqueueDaily, enqueueAds, claimJob, processJob, pilotGscDay } from './sync';
 import { seedCrawl, crawlOne } from './crawler';
 import { measureOneOutcome, recordAppliedChange } from './outcomes';
 import { radar } from './radar';
@@ -45,6 +45,7 @@ async function route(request:Request,env:Env):Promise<Response>{
   if(request.method==='DELETE'&&path==='/api/session')return new Response(null,{status:204,headers:{'Set-Cookie':'mavi_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'}});
   if(request.method==='POST'&&path==='/api/oauth/google/start')return oauthStart(env);
   if(request.method==='GET'&&path==='/api/gsc/verify')return json(await verifyGscAccess(env));
+  if(request.method==='POST'&&path==='/api/gsc/pilot')return json(await pilotGscDay(env));
   if(request.method==='GET'&&path==='/api/status'){
     const [google,health,jobs,crawls,coverage]=await Promise.all([
       env.DB.prepare("SELECT scopes,updated_at FROM oauth_credentials WHERE provider='google'").first(),
