@@ -82,6 +82,24 @@ export async function googleJSON<T>(env: Env, url: string, body: unknown, fetche
     return requestJSON<T>(url, { method: 'POST', headers: { ...extraHeaders, Authorization: `Bearer ${refreshed}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, fetcher);
   }
 }
+/** Read-only live Search Console permission check; does not import or invent traffic. */
+export async function verifyGscAccess(env: Env, fetcher: Fetch = fetch): Promise<{ api_access: true; property: string; queried_day: string; rows_returned: number; note: string }> {
+  if (!env.GSC_PROPERTY) throw new ProviderError('GSC_CONFIGURATION_MISSING');
+  const day = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
+  const token = await accessToken(env, fetcher);
+  const url = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(env.GSC_PROPERTY)}/searchAnalytics/query`;
+  const body = JSON.stringify({startDate:day,endDate:day,dimensions:['date'],type:'web',dataState:'final',rowLimit:1});
+  const send = (access: string) => requestJSON<{rows?: unknown[]}>(url,{method:'POST',headers:{Authorization:`Bearer ${access}`,'Content-Type':'application/json'},body},fetcher);
+  let result;
+  try { result = await send(token); }
+  catch (error) {
+    if (!(error instanceof ProviderError) || error.code !== 'GOOGLE_HTTP_401') throw error;
+    result = await send(await accessToken(env,fetcher,true));
+  }
+  if (!result || (result.rows !== undefined && !Array.isArray(result.rows))) throw new ProviderError('INVALID_GSC_RESPONSE');
+  return {api_access:true,property:env.GSC_PROPERTY,queried_day:day,rows_returned:result.rows?.length||0,
+    note:'API sorgusu başarılı. Bu izin testi veri aktarımı veya gün kapsamı doğrulaması değildir; sıfır satır sıfır trafik demek değildir.'};
+}
 export async function oauthStart(env: Env): Promise<Response> {
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_REDIRECT_URI || !env.TOKEN_ENCRYPTION_KEY) return json({ error: 'Google OAuth ve token şifreleme ayarları eksik.' }, 503);
   const redirect = new URL(env.GOOGLE_REDIRECT_URI);
