@@ -19,6 +19,11 @@ QUERIES = {
  'backfill': 'SELECT provider,oldest_enqueued_day,updated_at FROM backfill_progress',
  'source_counts': 'SELECT (SELECT count(*) FROM products) products,(SELECT count(*) FROM keyword_sources) csv_files,(SELECT count(*) FROM keyword_metric_observations) csv_rows',
  'product_url_verification': 'SELECT count(*) products,sum(CASE WHEN canonical_url IS NOT NULL THEN 1 ELSE 0 END) mapped,sum(CASE WHEN url_verified_at IS NOT NULL THEN 1 ELSE 0 END) verified FROM products',
+ 'crawl_queue': "SELECT kind,count(*) queued,sum(CASE WHEN next_crawl_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now') THEN 1 ELSE 0 END) due,min(next_crawl_at) next_due FROM crawl_queue GROUP BY kind",
+ 'crawl_runs': "SELECT url,started_at,finished_at,status_code,error_code FROM crawls ORDER BY started_at DESC LIMIT 35",
+ 'product_snapshots': "SELECT p.id,p.canonical_url,p.url_verified_at,s.observed_at,json_extract(s.snapshot_json,'$.status') http_status,json_extract(s.snapshot_json,'$.canonical[0]') canonical,json_extract(s.snapshot_json,'$.rendering') rendering FROM products p LEFT JOIN seo_snapshots s ON s.id=(SELECT id FROM seo_snapshots WHERE url=p.canonical_url ORDER BY observed_at DESC,rowid DESC LIMIT 1) ORDER BY p.id",
+ 'sync_budget_history': "SELECT day,checked_at,status,code FROM health_checks WHERE provider='sync-budget' ORDER BY day DESC LIMIT 3",
+ 'report_history': "SELECT month,engine_version,created_at FROM analysis_runs ORDER BY created_at DESC LIMIT 3",
  'authorization_record': "SELECT provider,scopes,updated_at FROM oauth_credentials WHERE provider='google'",
 }
 
@@ -73,6 +78,28 @@ class Cloudflare:
   except urllib.error.HTTPError as error:return {'ok':False,'code':'CF_ANALYTICS_HTTP_'+str(error.code)}
   except (OSError,ValueError,KeyError,TypeError):return {'ok':False,'code':'CF_ANALYTICS_UNAVAILABLE'}
 
+
+def acceptance(result, now=None):
+ now=now or datetime.now(timezone.utc)
+ cutoff=datetime(2026,10,25,tzinfo=timezone.utc)
+ def rows(name):
+  value=result.get('queries',{}).get(name,{})
+  return value.get('rows',[]) if value.get('ok') else []
+ after=now>=cutoff
+ budget=any(r.get('day','')>='2026-10-25' and r.get('checked_at','')>='2026-10-25T00:00:00' for r in rows('sync_budget_history'))
+ progress=any(r.get('status')=='done' and (r.get('finished_at') or '')>='2026-10-25T00:00:00' and (r.get('rows_received') or 0)>0 for r in rows('recent_runs'))
+ months=rows('priority_months')
+ covered=sum(r.get('complete_days',0) for r in months)
+ snapshots=rows('product_snapshots')
+ verified=sum(bool(r.get('url_verified_at')) and r.get('http_status')==200 and r.get('canonical')==r.get('canonical_url') and r.get('rendering')=='static-html' for r in snapshots)
+ return {'observed_at':now.isoformat(),'cutoff_turkey':'2026-10-25T03:00:00+03:00',
+  'rollover': 'verified' if after and budget and progress else 'not_yet_due' if not after else 'waiting_for_real_progress',
+  'new_day_budget_observed':budget,'completed_nonempty_run_after_cutoff':progress,
+  'priority_coverage':{'completed':covered,'expected':184,'passed':len(months)==6 and covered==184},
+  'product_crawl':{'verified':verified,'expected':29,'passed':len(snapshots)==29 and verified==29},
+  'monthly_report':'blocked_missing_coverage' if covered!=184 else 'requires_authenticated_report_and_independent_metric_acceptance',
+  'note':'Real read-only production observations; no Google sync, crawl or report generation triggered. Scheduled diagnosis is evidence collection, not a guarantee of completion.'}
+
 def collect(client, config):
  if config.get('name')!='mavi-basim-seo-prod' or config.get('route') or config.get('routes'):
   raise ValueError('UNEXPECTED_WORKER_OR_SITE_ROUTE')
@@ -102,6 +129,7 @@ def collect(client, config):
   rows=deployments['result'].get('deployments',[]) if isinstance(deployments['result'],dict) else deployments['result']
   result['deployments']={'ok':True,'versions':[{'id':r.get('id'),'created_on':r.get('created_on'),'versions':[{'version_id':v.get('version_id'),'percentage':v.get('percentage')} for v in r.get('versions',[])],'commit_labels':re.findall(r'\b[a-f0-9]{40}\b',json.dumps(r.get('annotations',{})))} for r in rows[:3]]}
  else:result['deployments']=deployments
+ result['acceptance']=acceptance(result)
  return result
 
 if __name__=='__main__':

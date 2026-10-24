@@ -1,6 +1,6 @@
 import {beforeEach,it,expect} from 'vitest';
 import {init,env,fetcher} from './helpers';
-import {parseHTML,snapshotDiff,saveSnapshot,findings,sitemapURLs,crawlOne} from '../src/crawler';
+import {parseHTML,snapshotDiff,saveSnapshot,findings,sitemapURLs,crawlOne,seedCrawl} from '../src/crawler';
 
 beforeEach(init);
 const html=`<!doctype html><html lang="tr"><head><title>Broşür baskı</title><meta name="description" content="Kaynak açıklama"><meta name="viewport" content="width=device-width"><link rel="canonical" href="/brosur"><link rel="alternate" hreflang="tr" href="/brosur"><script type="application/ld+json">{"@type":"Product"}</script></head><body><h1>Broşür</h1><h2>Ölçüler</h2><h6>Not</h6><p>Özgün içerik</p><img src="/a.jpg"><a href="/el-ilani">El ilanı</a><a href="https://evil.example/">dış</a></body></html>`;
@@ -40,4 +40,19 @@ it('records real fetched HTML and queues internal discovery without cross-origin
   await crawlOne({...env,CRAWL_ENABLED:'true'},fetcher(async url=>{expect(url).toBe('https://mavibasim.com/brosur');return new Response(html,{headers:{'content-type':'text/html'}});}));
   expect((await env.DB.prepare('SELECT count(*) AS n FROM seo_snapshots').first<{n:number}>())?.n).toBe(1);
   expect((await env.DB.prepare("SELECT url FROM crawl_queue WHERE url LIKE '%el-ilani'").first())).toMatchObject({url:'https://mavibasim.com/el-ilani'});
+});
+
+it('prioritizes a due product over unrelated older pages without bypassing its retry deadline',async()=>{
+  await env.DB.prepare("INSERT INTO crawl_policies VALUES('https://mavibasim.com','User-agent: *\nAllow: /',?,'2020-01-01')").bind(new Date().toISOString()).run();
+  await env.DB.prepare("INSERT INTO crawl_queue(url,kind,next_crawl_at) VALUES('https://mavibasim.com/blog','page','2019-01-01'),('https://mavibasim.com/brosur','page','2020-01-01'),('https://mavibasim.com/el-ilani','page','2099-01-01')").run();
+  await crawlOne({...env,CRAWL_ENABLED:'true'},fetcher(async url=>{expect(url).toBe('https://mavibasim.com/brosur');return new Response(html,{headers:{'content-type':'text/html'}});}));
+  expect(await env.DB.prepare("SELECT next_crawl_at FROM crawl_queue WHERE url LIKE '%el-ilani'").first()).toMatchObject({next_crawl_at:'2099-01-01'});
+});
+it('seeds a previously unmapped product only from an observed same-site Google URL, idempotently',async()=>{
+  await env.DB.prepare("INSERT INTO products(id,group_id,name,source_folder) VALUES('zarf','print','Zarf','test/zarf'),('kutu','print','Kutu','test/kutu')").run();
+  await env.DB.prepare("INSERT INTO gsc_daily_by_page VALUES('fixture','2026-09-01','https://mavibasim.com/zarf','tur','MOBILE',1,10,0.1,5)").run();
+  await seedCrawl({...env,CRAWL_ENABLED:'true'});await seedCrawl({...env,CRAWL_ENABLED:'true'});
+  expect(await env.DB.prepare("SELECT count(*) n FROM crawl_queue WHERE url='https://mavibasim.com/zarf'").first()).toMatchObject({n:1});
+  expect(await env.DB.prepare("SELECT count(*) n FROM crawl_queue WHERE url='https://mavibasim.com/kutu'").first()).toMatchObject({n:0});
+  expect(await env.DB.prepare("SELECT url_verified_at FROM products WHERE id='zarf'").first()).toMatchObject({url_verified_at:null});
 });

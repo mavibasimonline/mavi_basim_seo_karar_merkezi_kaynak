@@ -14,3 +14,8 @@ class CrawlPilotTests(unittest.TestCase):
   with self.assertRaisesRegex(ValueError,'CONFIG_REJECTED'):crawl_pilot.pilot_config(self.config)
  def test_acceptance_requires_both_real_url_verification_stamps(self):
   state={'targets':[{'id':p,'canonical_url':'https://mavibasim.com/'+p,'url_verified_at':'2026-10-24T17:00:00Z'} for p in ('brosur','el-ilani')],'snapshot_evidence':[{'product':p,'status':200,'canonical':'https://mavibasim.com/'+p,'title':'TEST title','body_hash':'a'*64,'rendering':'static-html'} for p in ('brosur','el-ilani')]};self.assertTrue(crawl_pilot.accepted(state));bad=copy.deepcopy(state);bad['targets'][0]['url_verified_at']=None;self.assertFalse(crawl_pilot.accepted(bad));bad=copy.deepcopy(state);bad['snapshot_evidence'][0]['body_hash']='';self.assertFalse(crawl_pilot.accepted(bad));state['targets'][1]['canonical_url']='https://mavibasim.com/brosur';self.assertFalse(crawl_pilot.accepted(state))
+
+ def test_all_product_acceptance_does_not_pass_with_only_two_or_empty_targets(self):
+  self.assertFalse(crawl_pilot.accepted({'targets':[]},True))
+  state={'targets':[{'id':str(i),'canonical_url':'https://mavibasim.com/'+str(i),'url_verified_at':'2026-10-24T22:00:00Z'} for i in range(29)],'snapshot_evidence':[{'product':str(i),'status':200,'canonical':'https://mavibasim.com/'+str(i),'title':'fixture','body_hash':'a'*64,'rendering':'static-html'} for i in range(29)]}
+  self.assertTrue(crawl_pilot.accepted(state,True));state['snapshot_evidence'].pop();self.assertFalse(crawl_pilot.accepted(state,True))
