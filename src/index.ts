@@ -1,6 +1,6 @@
 import { Env, json, nowISO } from './types';
 import { authenticated, login, safeOrigin, securityHeaders } from './security';
-import { oauthCallback, oauthStart, ProviderError, boundedText } from './google';
+import { oauthCallback, oauthStart, ProviderError, boundedText, verifyGscAccess } from './google';
 import { analyze, lastCompleteMonth, saveAnalysis, monthPeriod, AnalysisReport, ENGINE_VERSION, AnalysisOptions } from './analysis';
 import { validateAnalysis } from './validation';
 import { answerQuestion, prepareQuestion, parseQuestion } from './questions';
@@ -44,6 +44,7 @@ async function route(request:Request,env:Env):Promise<Response>{
   if(!['GET','HEAD'].includes(request.method)&&!safeOrigin(request))return json({error:'Geçersiz istek kaynağı.'},403);
   if(request.method==='DELETE'&&path==='/api/session')return new Response(null,{status:204,headers:{'Set-Cookie':'mavi_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'}});
   if(request.method==='POST'&&path==='/api/oauth/google/start')return oauthStart(env);
+  if(request.method==='GET'&&path==='/api/gsc/verify')return json(await verifyGscAccess(env));
   if(request.method==='GET'&&path==='/api/status'){
     const [google,health,jobs,crawls,coverage]=await Promise.all([
       env.DB.prepare("SELECT scopes,updated_at FROM oauth_credentials WHERE provider='google'").first(),
