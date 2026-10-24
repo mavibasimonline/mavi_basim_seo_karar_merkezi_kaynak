@@ -6,6 +6,13 @@ import {accessToken,saveTokens,READ_SCOPES,requestJSON} from '../src/google';
 
 beforeEach(init);
 const rawRow=(i=0)=>({keys:['2026-09-01',`https://mavibasim.com/page-${i}`,'tur','MOBILE'],clicks:1,impressions:10,ctr:0.1,position:2});
+it('uses manual redirect mode for Google OAuth transport and rejects unsafe redirects',async()=>{
+  let mode: RequestRedirect|undefined;
+  const mock=fetcher(async(_url,init)=>{mode=init?.redirect;return new Response(null,{status:302,headers:{Location:'https://example.org'}});});
+  await expect(requestJSON('https://oauth2.googleapis.com/token',{method:'POST'},mock)).rejects.toThrow('GOOGLE_UNEXPECTED_REDIRECT');
+  expect(mode).toBe('manual');
+  await expect(requestJSON('https://oauth2.googleapis.com/token',{method:'POST'},fetcher(async()=>{throw new Error('unreachable');}))).rejects.toThrow('NETWORK_UNAVAILABLE');
+});
 it('stages pagination and activates only a completed authoritative dataset',async()=>{
   const cfg=await connected();await enqueue();
   const job=await claimJob(cfg);expect(job).toBeTruthy();
