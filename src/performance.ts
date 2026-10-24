@@ -86,6 +86,7 @@ function aggregate(row: {
   if (!row.selected_rows) return null; // No observed row is not a measured zero.
   const clicks = row.clicks!,
     impressions = row.impressions!;
+  if (impressions > 0 && !Number.isFinite(row.weighted_position)) return null;
   const result = {
     clicks,
     impressions,

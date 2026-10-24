@@ -1,3 +1,16 @@
+# Profesyonel panel devam kaydı — 25 Ekim 2026 (Türkiye)
+
+- [x] Mevcut uygulamada tutarlı Türkçe tasarım: daraltılabilir menü, mobil gezinme, dönem/cihaz seçimi, dört KPI, gerçek GSC günlük grafiği, filtreli/sıralı ürün ve sorgu tabloları; mevcut radar/takvim/veri sağlığı/soru-cevap korunup yeni tasarıma taşındı.
+- [x] Salt okunur performans API'si: bağımsız ağırlıklı metrik doğrulama, eksik günleri boş bırakma, tam dönem olmayan karşılaştırmayı engelleme, parametreli sorgu ve güvenli sayfalama. OAuth, Cron, günlük yazma bütçesi, tarama ve üretim yapılandırması değiştirilmedi.
+- [x] **334 test başarılı:** 284 Workers/D1 + 42 Python + 8 masaüstü/mobil Chromium. Tüm bölümlerde axe WCAG kontrolleri başarılı; npm audit 0. Son başarısız/atlanmış test yok. Gerçek yerel API ve yalnız tarayıcıya ait fixture'lar ayrı test edildi; örnek veri üretime aktarılmadı.
+- [x] Gerçek üretim D1'iyle salt okunur API kabulü **40125531435** başarılı; bağımsız SQL eşleşti, 29/521/9.075 korundu. Google senkronu veya site taraması tetiklenmedi. Özel üretim yönetici oturumu atlanmadı.
+- [x] Son kaydedilen API/operatör commit'i **c0e969b**; bu panel ve belgeyi içeren commit `git log -1 --oneline` ile izlenir. Dal `feat/professional-seo-dashboard`.
+- [ ] Sıradaki somut adım: panel commit'i için PR/main CI, mevcut sürüm/kota/ayar ön kontrolüyle kontrollü Cloudflare yayını; canlı statik dosya hash'leri, masaüstü/mobil giriş ekranı ve oturumsuz API korumasını doğrula. Yayın kimlikleri buraya kaydedilecek.
+
+Önceki tarihli üretim kapsamı aşağıdadır; bu arayüz çalışması tam geçmiş aylık veri veya 29 ürün tarama kabulü değildir. GA4/Ads etkinleştirilmedi. **BACKUP_ENCRYPTION_KEY** için önceki hesap sahibi gereksinimi sürüyor; mevcut OAuth/Cloudflare izinleri çalışıyor, yeni token veya yeniden yetkilendirme istenmiyor. Detay: [FRONTEND_REDESIGN_REPORT.md](FRONTEND_REDESIGN_REPORT.md).
+
+---
+
 # Üretim devam kaydı — 24 Ekim 2026, 18:02 UTC
 
 - [x] PR **#8, #9, #10, #11** main'e birleşti. Son işlevsel kod/ayar commit'i **4bfec9aae0ab1b55e14358d3bfb52af0137055a9**; uzak main CI **40118789556 başarılı**. Bu belgeyi içeren commit `git log -1 --oneline`; en son tam yayın SHA/version kimliği canlı `/api/health` ve kontrollü üretim workflow'unda.

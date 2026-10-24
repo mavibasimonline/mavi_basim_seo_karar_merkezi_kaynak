@@ -156,6 +156,14 @@ it("rejects a corrupt CTR and an unknown device despite a completed marker", asy
   expect(r.current).toBeNull();
   expect(r.coverage.invalid_days).toHaveLength(2);
 });
+it("rejects an overflowing weighted position instead of silently turning it into zero", async () => {
+  await seed("2026-09-01", [
+    { clicks: 1, impressions: 100, position: Number.MAX_VALUE },
+  ]);
+  const r = await performance(env, "2026-09", null, TIME);
+  expect(r.current).toBeNull();
+  expect(r.series[0].metrics).toBeNull();
+});
 it("keeps mobile and desktop series and totals independent", async () => {
   await seed("2026-09-01", [
     { clicks: 2, impressions: 100, position: 12 },
