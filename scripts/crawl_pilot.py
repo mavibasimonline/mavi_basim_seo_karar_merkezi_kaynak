@@ -6,6 +6,7 @@ No Google credential, production auth key, migration or CSV import is needed.
 import argparse
 import json
 import os
+import re
 import secrets
 import subprocess
 import time
@@ -27,7 +28,9 @@ def pilot_config(config):
   'd1_databases':[{'binding':'DB','database_name':database['database_name'],'database_id':database['database_id'],'remote':True}]}
 
 def accepted(state):
- return all(any(t.get('id')==product and t.get('canonical_url')=='https://mavibasim.com/'+product and t.get('url_verified_at') for t in state.get('targets',[])) for product in ('brosur','el-ilani'))
+ return all(any(t.get('id')==product and t.get('canonical_url')=='https://mavibasim.com/'+product and t.get('url_verified_at') for t in state.get('targets',[]))
+  and any(e.get('product')==product and e.get('status')==200 and e.get('canonical')=='https://mavibasim.com/'+product and e.get('title') and re.fullmatch(r'[a-f0-9]{64}',e.get('body_hash','')) and e.get('rendering')=='static-html' for e in state.get('snapshot_evidence',[]))
+  for product in ('brosur','el-ilani'))
 
 def main():
  parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--max-pages',type=int,default=12);args=parser.parse_args()
