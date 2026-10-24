@@ -48,7 +48,7 @@ class Cloudflare:
   return {'ok':True,'result':result.get('result')}
 
  def query(self, database, sql):
-  if not sql.lstrip().upper().startswith(('SELECT ', 'WITH ')):
+  if sql not in QUERIES.values():
    raise ValueError('READ_ONLY_QUERY_REQUIRED')
   if not re.fullmatch(r'[a-f0-9-]{36}', database):raise ValueError('INVALID_DATABASE_ID')
   result=self.request('POST',f'/accounts/{self.account}/d1/database/{database}/query',{'sql':sql,'params':[]})
@@ -75,11 +75,14 @@ def collect(client, config):
   result['runtime']={'ok':True,'flags':flags,'binding_names':sorted(b.get('name','') for b in settings['result'].get('bindings',[]))}
  else:result['runtime']=settings
  schedules=client.request('GET',base+'/schedules')
- result['schedules']={'ok':True,'crons':[s.get('cron') for s in schedules['result']]} if schedules['ok'] else schedules
+ if schedules['ok']:
+  schedule_rows=schedules['result'].get('schedules',[]) if isinstance(schedules['result'],dict) else schedules['result']
+  result['schedules']={'ok':True,'crons':[s.get('cron') for s in (schedule_rows or []) if isinstance(s,dict)]}
+ else:result['schedules']=schedules
  deployments=client.request('GET',base+'/deployments')
  if deployments['ok']:
   rows=deployments['result'].get('deployments',[]) if isinstance(deployments['result'],dict) else deployments['result']
-  result['deployments']={'ok':True,'versions':[{'id':r.get('id'),'created_on':r.get('created_on'),'versions':r.get('versions'),'commit_labels':re.findall(r'\b[a-f0-9]{40}\b',json.dumps(r.get('annotations',{})))} for r in rows[:3]]}
+  result['deployments']={'ok':True,'versions':[{'id':r.get('id'),'created_on':r.get('created_on'),'versions':[{'version_id':v.get('version_id'),'percentage':v.get('percentage')} for v in r.get('versions',[])],'commit_labels':re.findall(r'\b[a-f0-9]{40}\b',json.dumps(r.get('annotations',{})))} for r in rows[:3]]}
  else:result['deployments']=deployments
  return result
 
@@ -89,5 +92,6 @@ if __name__=='__main__':
   result=collect(Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID')),config)
   output=Path('.local/production-diagnostics.json');output.parent.mkdir(exist_ok=True);output.write_text(json.dumps(result,ensure_ascii=False,indent=2))
   print(json.dumps(result,ensure_ascii=False,indent=2))
- except Exception:
-  raise SystemExit('READ_ONLY_DIAGNOSTICS_FAILED; no credentials or raw provider errors printed')
+ except Exception as error:
+  code=str(error) if isinstance(error,ValueError) and re.fullmatch(r'[A-Z_]+',str(error)) else type(error).__name__
+  raise SystemExit('READ_ONLY_DIAGNOSTICS_FAILED:'+code+'; no credentials or raw provider errors printed')
