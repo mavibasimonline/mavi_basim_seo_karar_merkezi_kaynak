@@ -18,6 +18,7 @@ QUERIES = {
  'priority_months': "WITH RECURSIVE days(day) AS (SELECT '2026-07-01' UNION ALL SELECT date(day,'+1 day') FROM days WHERE day<'2026-09-30'),scopes(scope) AS (VALUES('page'),('query')) SELECT substr(d.day,1,7) month,s.scope,count(*) expected_days,sum(CASE WHEN c.complete=1 THEN 1 ELSE 0 END) complete_days FROM days d CROSS JOIN scopes s LEFT JOIN dataset_coverage c ON c.provider='gsc' AND c.day=d.day AND c.scope=s.scope GROUP BY month,s.scope ORDER BY month,s.scope",
  'backfill': 'SELECT provider,oldest_enqueued_day,updated_at FROM backfill_progress',
  'source_counts': 'SELECT (SELECT count(*) FROM products) products,(SELECT count(*) FROM keyword_sources) csv_files,(SELECT count(*) FROM keyword_metric_observations) csv_rows',
+ 'product_url_verification': 'SELECT count(*) products,sum(CASE WHEN canonical_url IS NOT NULL THEN 1 ELSE 0 END) mapped,sum(CASE WHEN url_verified_at IS NOT NULL THEN 1 ELSE 0 END) verified FROM products',
  'authorization_record': "SELECT provider,scopes,updated_at FROM oauth_credentials WHERE provider='google'",
 }
 

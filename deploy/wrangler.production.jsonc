@@ -25,14 +25,21 @@
     "GOOGLE_REDIRECT_URI": "https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/oauth/google/callback",
     "CRAWL_ENABLED": "false",
     "AUTOMATION_ENABLED": "true",
-    "ENABLE_GOOGLE_ADS": "false"
+    "ENABLE_GOOGLE_ADS": "false",
+    "CATCHUP_ENABLED": "true",
+    "SYNC_DAILY_WRITE_LIMIT": "60000",
+    "SYNC_INITIAL_BUDGET_DAY": "2026-10-24",
+    "SYNC_INITIAL_WRITE_LIMIT": "10000"
   },
   "triggers": {
     "crons": [
-      "*/15 * * * *"
+      "* * * * *"
     ]
   },
   "observability": {
     "enabled": false
+  },
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
   }
 }

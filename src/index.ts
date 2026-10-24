@@ -4,12 +4,16 @@ import { oauthCallback, oauthStart, ProviderError, boundedText, verifyGscAccess 
 import { analyze, lastCompleteMonth, saveAnalysis, monthPeriod, AnalysisReport, ENGINE_VERSION, AnalysisOptions } from './analysis';
 import { validateAnalysis } from './validation';
 import { answerQuestion, prepareQuestion, parseQuestion } from './questions';
-import { enqueueDaily, enqueueAds, claimJob, processJob, pilotGscDay } from './sync';
+import { enqueueDaily, enqueueAds, claimJob, processJob, pilotGscDay, priorityProgress } from './sync';
 import { seedCrawl, crawlOne } from './crawler';
 import { measureOneOutcome, recordAppliedChange } from './outcomes';
 import { radar } from './radar';
 import {changeCalendar,changeImpact} from './change-impact';
 import {dataIntegrity} from './data-integrity';
+import {reserveSyncPage,settleSyncPage,syncBudget} from './sync-budget';
+
+const RUNTIME_REVISION='gsc-catchup-v1';
+function deploymentInfo(env:Env){const metadata=env.CF_VERSION_METADATA;return {runtime_revision:RUNTIME_REVISION,version_id:metadata?.id&&/^[a-f0-9-]{36}$/i.test(metadata.id)?metadata.id:null,commit:metadata?.tag&&/^[a-f0-9]{40}$/.test(metadata.tag)?metadata.tag:null};}
 
 export async function getReport(env:Env,month:string,options:AnalysisOptions={}):Promise<AnalysisReport>{
   monthPeriod(month);
@@ -36,7 +40,7 @@ export async function getReport(env:Env,month:string,options:AnalysisOptions={})
 }
 async function route(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url),path=url.pathname;
-  if(request.method==='GET'&&path==='/api/health')return json({ok:true,service:'Mavi Basım SEO Karar Merkezi'});
+  if(request.method==='GET'&&path==='/api/health')return json({ok:true,service:'Mavi Basım SEO Karar Merkezi',deployment:deploymentInfo(env)});
   if(request.method==='POST'&&path==='/api/session')return login(request,env);
   if(request.method==='GET'&&path==='/api/oauth/google/callback')return oauthCallback(request,env);
   if(!path.startsWith('/api/'))return env.ASSETS.fetch(request);
@@ -47,16 +51,18 @@ async function route(request:Request,env:Env):Promise<Response>{
   if(request.method==='GET'&&path==='/api/gsc/verify')return json(await verifyGscAccess(env));
   if(request.method==='POST'&&path==='/api/gsc/pilot')return json(await pilotGscDay(env));
   if(request.method==='GET'&&path==='/api/status'){
-    const [google,health,jobs,crawls,coverage,jobDiagnostics,recentFailures]=await Promise.all([
+    const [google,health,jobs,crawls,coverage,jobDiagnostics,recentFailures,priority,lastRuns]=await Promise.all([
       env.DB.prepare("SELECT scopes,updated_at FROM oauth_credentials WHERE provider='google'").first(),
       env.DB.prepare('SELECT * FROM health_checks ORDER BY day DESC,provider LIMIT 15').all(),
       env.DB.prepare('SELECT provider,status,count(*) AS jobs FROM sync_jobs GROUP BY provider,status').all(),
       env.DB.prepare('SELECT url,started_at,status_code,error_code FROM crawls ORDER BY started_at DESC LIMIT 5').all(),
       env.DB.prepare('SELECT provider,scope,min(day) AS earliest,max(day) AS latest,count(*) AS days FROM dataset_coverage WHERE complete=1 GROUP BY provider,scope').all(),
       env.DB.prepare("SELECT status,max(updated_at) AS last_updated,max(CASE WHEN status='pending' THEN next_attempt_at END) AS pending_due,count(*) AS jobs FROM sync_jobs WHERE provider='gsc' GROUP BY status").all(),
-      env.DB.prepare("SELECT j.day,j.scope,j.status,j.error_code,j.updated_at,j.next_attempt_at,j.attempts FROM sync_jobs j WHERE j.provider='gsc' AND j.status IN ('retry','blocked','running') ORDER BY j.updated_at DESC LIMIT 5").all(),
+      env.DB.prepare("SELECT j.day,j.scope,j.status,j.cursor,j.error_code,j.updated_at,j.next_attempt_at,j.attempts FROM sync_jobs j WHERE j.provider='gsc' AND j.status IN ('retry','blocked','running') ORDER BY j.updated_at DESC LIMIT 5").all(),
+      priorityProgress(env),
+      env.DB.prepare("SELECT j.day,j.scope,r.started_at,r.finished_at,r.status,r.rows_received FROM sync_runs r JOIN sync_jobs j ON j.id=r.job_id WHERE j.provider='gsc' ORDER BY r.started_at DESC LIMIT 8").all(),
     ]);
-    return json({google_connected:!!google,ga4_configured:!!env.GA4_PROPERTY_ID,ads_configured:env.ENABLE_GOOGLE_ADS==='true'&&!!env.GOOGLE_ADS_DEVELOPER_TOKEN,crawl_enabled:env.CRAWL_ENABLED==='true',automation_enabled:env.AUTOMATION_ENABLED==='true',health:health.results,jobs:jobs.results,crawls:crawls.results,coverage:coverage.results,job_diagnostics:jobDiagnostics.results,recent_failures:recentFailures.results,
+    return json({sync_budget:await syncBudget(env),deployment:deploymentInfo(env),catchup_enabled:env.CATCHUP_ENABLED==='true',priority_progress:priority,recent_sync_runs:lastRuns.results,google_connected:!!google,ga4_configured:!!env.GA4_PROPERTY_ID,ads_configured:env.ENABLE_GOOGLE_ADS==='true'&&!!env.GOOGLE_ADS_DEVELOPER_TOKEN,crawl_enabled:env.CRAWL_ENABLED==='true',automation_enabled:env.AUTOMATION_ENABLED==='true',health:health.results,jobs:jobs.results,crawls:crawls.results,coverage:coverage.results,job_diagnostics:jobDiagnostics.results,recent_failures:recentFailures.results,
       note:'Yapılandırma veya OAuth kaydı başarılı API erişimi anlamına gelmez; günlük sağlık sonuçlarını kontrol edin.'});
   }
   if(request.method==='GET'&&path==='/api/data-integrity')return json(await dataIntegrity(env,url.searchParams.get('month')||lastCompleteMonth()));
@@ -106,26 +112,28 @@ async function route(request:Request,env:Env):Promise<Response>{
   }
   return json({error:'Bu işlem bulunamadı.'},404);
 }
-export async function tick(env:Env,fetcher:typeof fetch=fetch,time=new Date()):Promise<void>{
-  // An accidental Cron configuration must not start collection before operator acceptance.
-  if(env.AUTOMATION_ENABLED!=='true')return;
-  if(await enqueueDaily(env)){await enqueueAds(env);return;}
-  // Dedicated slots prevent a long historical backfill from starving crawl/outcome work.
-  if(env.CRAWL_ENABLED==='true'&&time.getUTCMinutes()===45){await seedCrawl(env);await crawlOne(env,fetcher);return;}
-  if(time.getUTCMinutes()===30&&time.getUTCHours()%4===0){await measureOneOutcome(env);return;}
-  // Process up to three provider pages per scheduled tick while respecting free-tier limits.
-  // Each job retains its own lease, retry, and validated dataset generation.
-  let processed=0;
-  for(let i=0;i<3;i++){
-    const job=await claimJob(env,time);
-    if(!job)break;
-    await processJob(env,job,fetcher);
-    processed++;
+export interface TickResult {phase:'disabled'|'idle'|'planned'|'crawl'|'outcome'|'processed'|'budget';pages:number}
+export async function tick(env:Env,fetcher:typeof fetch=fetch,time=new Date(),source:'manual'|'cron'='manual'):Promise<TickResult>{
+  if(env.AUTOMATION_ENABLED!=='true')return {phase:'disabled',pages:0};
+  if(source==='cron'&&time.getUTCMinutes()%15!==0){
+    if(env.CATCHUP_ENABLED!=='true'||(await priorityProgress(env,time)).complete)return {phase:'idle',pages:0};
   }
-  if(processed)return;
-  await seedCrawl(env);
-  await crawlOne(env,fetcher);
-  await measureOneOutcome(env);
+  if(await enqueueDaily(env,time)){await enqueueAds(env);return {phase:'planned',pages:0};}
+  if(env.CRAWL_ENABLED==='true'&&time.getUTCMinutes()===45){await seedCrawl(env);await crawlOne(env,fetcher);return {phase:'crawl',pages:0};}
+  if(time.getUTCMinutes()===30&&time.getUTCHours()%4===0&&await measureOneOutcome(env,time))return {phase:'outcome',pages:0};
+  let processed=0,budgetPaused=false;
+  for(let i=0;i<3;i++){
+    const budgeted=env.CATCHUP_ENABLED==='true';
+    if(budgeted&&!await reserveSyncPage(env,time)){budgetPaused=true;break;}
+    const job=await claimJob(env,time,i%2===0?'history':'recent');
+    if(!job){if(budgeted)await settleSyncPage(env,time,0);break;}
+    const written=await processJob(env,job,fetcher);processed++;
+    if(budgeted)await settleSyncPage(env,time,written);
+  }
+  if(processed)return {phase:'processed',pages:processed};
+  if(budgetPaused)return {phase:'budget',pages:0};
+  await seedCrawl(env);await crawlOne(env,fetcher);await measureOneOutcome(env,time);
+  return {phase:'idle',pages:0};
 }
 export default {
   async fetch(request:Request,env:Env):Promise<Response>{
@@ -145,14 +153,16 @@ export default {
   },
   async scheduled(_event:ScheduledController,env:Env,context:ExecutionContext){if(env.AUTOMATION_ENABLED!=='true')return;context.waitUntil((async()=>{
     try{
-      await tick(env);
+      const time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
+      const result=await tick(env,fetch,time,'cron');
+      if((result.phase==='idle'||result.phase==='budget')&&time.getUTCMinutes()%15!==0)return;
       const stamp=nowISO();
       await env.DB.prepare("INSERT INTO health_checks VALUES('scheduler',?,?,?,?) ON CONFLICT(provider,day) DO UPDATE SET checked_at=excluded.checked_at,status=excluded.status,code=excluded.code")
-        .bind(stamp.slice(0,10),stamp,'ok',null).run();
+        .bind(stamp.slice(0,10),stamp,result.phase==='budget'?'partial':'ok',result.phase==='planned'?'PLANNED':result.pages?'PAGES_'+result.pages:result.phase==='budget'?'DAILY_WRITE_BUDGET':'IDLE_NO_READY_JOB').run();
     }catch{
       const stamp=nowISO();
       await env.DB.prepare("INSERT INTO health_checks VALUES('scheduler',?,?,?,?) ON CONFLICT(provider,day) DO UPDATE SET checked_at=excluded.checked_at,status=excluded.status,code=excluded.code")
-        .bind(stamp.slice(0,10),stamp,'failed','SCHEDULER_FAILED').run();
+        .bind(stamp.slice(0,10),stamp,'failed','SCHEDULER_FAILED').run().catch(()=>{throw new Error('SCHEDULER_PERSISTENCE_UNAVAILABLE');});
     }
   })());},
 };
