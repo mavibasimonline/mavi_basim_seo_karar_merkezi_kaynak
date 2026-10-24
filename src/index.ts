@@ -141,7 +141,7 @@ export default {
       return securityHeaders(json({error:invalid?'İstek verisi geçersiz.':'İşlem tamamlanamadı. Veri kaynağı ve sistem durumunu kontrol edin.',code:invalid?'INVALID_INPUT':error instanceof ProviderError?error.code:'INTERNAL_ERROR'},invalid?400:503));
     }
   },
-  async scheduled(_event:ScheduledController,env:Env,context:ExecutionContext){context.waitUntil((async()=>{
+  async scheduled(_event:ScheduledController,env:Env,context:ExecutionContext){if(env.AUTOMATION_ENABLED!=='true')return;context.waitUntil((async()=>{
     try{
       await tick(env);
       const stamp=nowISO();
