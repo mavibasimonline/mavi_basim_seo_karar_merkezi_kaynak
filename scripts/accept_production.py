@@ -73,7 +73,8 @@ def main():
     opener = urllib.request.build_opener(NoRedirect)
 
     def request(path, authorized=True):
-        headers = {'Authorization': 'Bearer ' + token} if authorized else {}
+        headers = {'User-Agent':'MaviBasimReleaseCheck/1.0','Accept':'application/json'}
+        if authorized: headers['Authorization'] = 'Bearer ' + token
         req = urllib.request.Request(args.origin.rstrip('/') + path, headers=headers)
         try:
             with opener.open(req, timeout=30) as response:
