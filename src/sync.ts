@@ -1,3 +1,4 @@
+import {D1BudgetError} from './d1-read-budget';
 import { Env, Fetch, dateDaysAgo, nowISO } from './types';
 import { ProviderError } from './google';
 import { fetchGsc, fetchGa4, fetchKeywordPlanner, GscRow, Ga4Row } from './providers';
@@ -144,6 +145,7 @@ export async function processJob(env: Env, job: Job, fetcher: Fetch = fetch): Pr
       ]));
     } else throw new ProviderError('UNKNOWN_PROVIDER');
   } catch (error) {
+    if(error instanceof D1BudgetError)throw error;
     const failure = error instanceof ProviderError ? error : new ProviderError('INTERNAL_SYNC_ERROR',true);
     const attempts = job.attempts + 1;
     const retry = failure.retryable && attempts < 6;

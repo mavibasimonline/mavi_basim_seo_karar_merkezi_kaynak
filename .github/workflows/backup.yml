@@ -6,7 +6,7 @@ on:
         description: Salt okunur tanılama veya mevcut şifreli yedek
         type: choice
         default: backup
-        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl, quota-inspect, quota-contain]
+        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl, quota-inspect, quota-contain, quota-builds]
   schedule:
     - cron: '17 2 * * *'
     - cron: '7 0 * * *' # 03:07 Turkey: read-only rollover evidence, may be delayed by GitHub
@@ -126,7 +126,7 @@ jobs:
           if-no-files-found: warn
 
   quota-incident:
-    if: github.event_name == 'workflow_dispatch' && (inputs.operation == 'quota-inspect' || inputs.operation == 'quota-contain')
+    if: github.event_name == 'workflow_dispatch' && (inputs.operation == 'quota-inspect' || inputs.operation == 'quota-contain' || inputs.operation == 'quota-builds')
     runs-on: ubuntu-latest
     timeout-minutes: 3
     env:

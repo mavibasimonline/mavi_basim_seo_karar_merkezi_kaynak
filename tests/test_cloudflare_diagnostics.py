@@ -10,7 +10,7 @@ module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 ACCOUNT='a'*32
 class FakeClient:
  account=ACCOUNT
- def daily_usage(self):return {'ok':False,'code':'CF_ANALYTICS_UNAVAILABLE'}
+ def daily_usage(self):return {'ok':True,'hours':1,'rows_read':1000}
  def query(self,database,sql):return {'ok':True,'rows':[]}
  def request(self,method,path):
   if path.endswith('/settings'):return {'ok':True,'result':{'bindings':[{'name':'AUTOMATION_ENABLED','type':'plain_text','text':'true'},{'name':'GOOGLE_CLIENT_SECRET','type':'plain_text','text':'NEVER-LOG-THIS-FIXTURE'}]}}

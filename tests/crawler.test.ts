@@ -51,6 +51,7 @@ it('prioritizes a due product over unrelated older pages without bypassing its r
 it('seeds a previously unmapped product only from an observed same-site Google URL, idempotently',async()=>{
   await env.DB.prepare("INSERT INTO products(id,group_id,name,source_folder) VALUES('zarf','print','Zarf','test/zarf'),('kutu','print','Kutu','test/kutu')").run();
   await env.DB.prepare("INSERT INTO gsc_daily_by_page VALUES('fixture','2026-09-01','https://mavibasim.com/zarf','tur','MOBILE',1,10,0.1,5)").run();
+  await env.DB.prepare("INSERT OR IGNORE INTO dataset_coverage VALUES('gsc','2026-09-01','page','fixture',1,0,1,'2026-09-04T00:00:00Z','TEST finalized discovery source')").run();
   await seedCrawl({...env,CRAWL_ENABLED:'true'});await seedCrawl({...env,CRAWL_ENABLED:'true'});
   expect(await env.DB.prepare("SELECT count(*) n FROM crawl_queue WHERE url='https://mavibasim.com/zarf'").first()).toMatchObject({n:1});
   expect(await env.DB.prepare("SELECT count(*) n FROM crawl_queue WHERE url='https://mavibasim.com/kutu'").first()).toMatchObject({n:0});

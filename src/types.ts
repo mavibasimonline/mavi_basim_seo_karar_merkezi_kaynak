@@ -20,6 +20,8 @@ export interface Env {
   SYNC_DAILY_WRITE_LIMIT?:string;
   SYNC_INITIAL_BUDGET_DAY?:string;
   SYNC_INITIAL_WRITE_LIMIT?:string;
+  D1_READ_GUARD_ENABLED?:string;
+  SYNC_MAX_PAGES_PER_TICK?:string;
   CF_VERSION_METADATA?: {id:string;tag?:string;timestamp?:string};
 }
 export type Fetch = typeof fetch;

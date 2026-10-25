@@ -84,11 +84,22 @@ def contain(client):
  return {'before':crons,'after':actual,'database_queries':0,'database_or_oauth_changed':False,'note':'Emergency frequency reduction only; SQL/read-budget fixes still required.'}
 
 
+def build_status(client):
+ scripts=client.request('GET',f'/accounts/{client.account}/workers/scripts')
+ if not scripts['ok']:return scripts
+ worker=next((s for s in scripts['result'] if s.get('id')==WORKER),None)
+ if not worker or not re.fullmatch(r'[a-f0-9]{32}',worker.get('tag','')):return {'ok':False,'code':'WORKER_TAG_UNAVAILABLE'}
+ result=client.request('GET',f"/accounts/{client.account}/builds/workers/{worker['tag']}/triggers")
+ if not result['ok']:return result
+ rows=result['result'] if isinstance(result['result'],list) else result['result'].get('triggers',[])
+ return {'ok':True,'triggers':[{'trigger_uuid':r.get('trigger_uuid'),'branch_includes':r.get('branch_includes'),'branch_excludes':r.get('branch_excludes'),'deploy_command':shape(r.get('deploy_command',''))} for r in rows]}
+
+
 if __name__=='__main__':
  client=Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID'))
  mode=os.environ.get('QUOTA_OPERATION','quota-inspect')
- result=inspect(client)
+ result={'builds':build_status(client)} if mode=='quota-builds' else inspect(client)
  if mode=='quota-contain':result['containment']=contain(client)
- elif mode!='quota-inspect':raise SystemExit('UNEXPECTED_OPERATION')
+ elif mode not in ('quota-inspect','quota-builds'):raise SystemExit('UNEXPECTED_OPERATION')
  output=Path('.local/d1-quota-incident.json');output.parent.mkdir(exist_ok=True);output.write_text(json.dumps(result,indent=2))
  print(json.dumps(result,indent=2))

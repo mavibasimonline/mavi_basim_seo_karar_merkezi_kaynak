@@ -110,13 +110,15 @@ def collect(client, config):
  result={'observed_at':datetime.now(timezone.utc).isoformat(),'git_commit':os.environ.get('GITHUB_SHA'),
          'worker':'mavi-basim-seo-prod','database':'mavi-basim-seo','read_only':True,'queries':{}}
  result['daily_d1_usage']=client.daily_usage()
- for name,sql in QUERIES.items():result['queries'][name]=client.query(database,sql)
+ usage=result['daily_d1_usage']
+ safe=usage.get('ok') and usage.get('hours',0)>0 and usage.get('rows_read',5_000_000)<3_500_000
+ for name,sql in QUERIES.items():result['queries'][name]=client.query(database,sql) if safe else {'ok':False,'code':'D1_READ_QUOTA_HOLD'}
  base=f'/accounts/{client.account}/workers/scripts/mavi-basim-seo-prod'
  settings=client.request('GET',base+'/settings')
  if settings['ok']:
   flags={}
   for b in settings['result'].get('bindings',[]):
-   if b.get('name') in ('AUTOMATION_ENABLED','CRAWL_ENABLED','ENABLE_GOOGLE_ADS','GSC_PROPERTY','SITE_ORIGIN','CATCHUP_ENABLED','SYNC_DAILY_WRITE_LIMIT','SYNC_INITIAL_BUDGET_DAY','SYNC_INITIAL_WRITE_LIMIT') and b.get('type')=='plain_text':flags[b['name']]=b.get('text')
+   if b.get('name') in ('AUTOMATION_ENABLED','CRAWL_ENABLED','ENABLE_GOOGLE_ADS','GSC_PROPERTY','SITE_ORIGIN','CATCHUP_ENABLED','SYNC_DAILY_WRITE_LIMIT','SYNC_INITIAL_BUDGET_DAY','SYNC_INITIAL_WRITE_LIMIT','D1_READ_GUARD_ENABLED','SYNC_MAX_PAGES_PER_TICK') and b.get('type')=='plain_text':flags[b['name']]=b.get('text')
   result['runtime']={'ok':True,'flags':flags,'binding_names':sorted(b.get('name','') for b in settings['result'].get('bindings',[]))}
  else:result['runtime']=settings
  schedules=client.request('GET',base+'/schedules')

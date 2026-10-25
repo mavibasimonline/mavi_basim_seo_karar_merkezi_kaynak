@@ -3,6 +3,8 @@ import io
 import json
 import sys
 import unittest
+from unittest.mock import patch
+from datetime import datetime,timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
@@ -23,7 +25,12 @@ class Fake:
   bindings += [{'name':'DB','type':'d1','id':'other' if self.db_mismatch else self.config['d1_databases'][0]['database_id']}]
   return {'ok':True,'result':{'bindings':bindings}}
 class ProductionGuardTests(unittest.TestCase):
- def setUp(self):self.config=json.loads((ROOT/'deploy/wrangler.production.jsonc').read_text());self.client=Fake(self.config)
+ def setUp(self):
+  class Clock(datetime):
+   @classmethod
+   def now(cls,tz=None):return datetime(2026,10,26,3,tzinfo=timezone.utc)
+  self.clock=patch.object(guard,'datetime',Clock);self.clock.start();self.addCleanup(self.clock.stop)
+  self.config=json.loads((ROOT/'deploy/wrangler.production.jsonc').read_text());self.client=Fake(self.config)
  def test_preflight_is_read_only_and_records_a_usable_rollback(self):
   r=guard.preflight(self.client,self.config,VERSION);self.assertEqual(r['previous_version'],VERSION);self.assertEqual(r['previous_crons'],['*/15 * * * *']);self.assertFalse(r['schema_changes']);self.assertTrue(all(c[0]=='GET' for c in self.client.calls));self.assertNotIn('secret_value',json.dumps(r))
  def test_concurrent_operator_version_change_blocks_deployment(self):
@@ -58,7 +65,7 @@ class ProductionGuardTests(unittest.TestCase):
 
  def test_spent_sync_writes_are_not_reserved_twice_and_limits_do_not_change(self):
   from datetime import datetime,timezone
-  day=datetime.now(timezone.utc).date().isoformat();self.config['vars']['SYNC_INITIAL_BUDGET_DAY']='2000-01-01'
+  day=guard.datetime.now(timezone.utc).date().isoformat();self.config['vars']['SYNC_INITIAL_BUDGET_DAY']='2000-01-01'
   original=json.dumps(self.config);query=self.client.query
   self.client.query=lambda db,sql: {'ok':True,'rows':[{'day':day,'code':'58000.0'}]} if sql==guard.QUERIES['sync_budget_history'] else query(db,sql)
   self.client.daily_usage=lambda:{'ok':True,'hours':1,'rows_written':54317,'rows_read':1000}
@@ -70,10 +77,21 @@ class ProductionGuardTests(unittest.TestCase):
   with self.assertRaisesRegex(ValueError,'BUDGET_UNAVAILABLE'):guard.preflight(self.client,self.config,VERSION)
  def test_invalid_budget_counter_fails_closed(self):
   from datetime import datetime,timezone
-  day=datetime.now(timezone.utc).date().isoformat();query=self.client.query
+  day=guard.datetime.now(timezone.utc).date().isoformat();query=self.client.query
   for code in ('invalid','NaN','Infinity','-1'):
    self.client.query=lambda db,sql: {'ok':True,'rows':[{'day':day,'code':code}]} if sql==guard.QUERIES['sync_budget_history'] else query(db,sql)
    with self.assertRaisesRegex(ValueError,'SYNC_BUDGET_READ_REQUIRED'):guard.preflight(self.client,self.config,VERSION)
  def test_unreadable_budget_counter_does_not_allow_a_release(self):
   query=self.client.query;self.client.query=lambda db,sql: {'ok':False} if sql==guard.QUERIES['sync_budget_history'] else query(db,sql)
   with self.assertRaisesRegex(ValueError,'SYNC_BUDGET_READ_REQUIRED'):guard.preflight(self.client,self.config,VERSION)
+
+ def test_exhausted_analytics_never_scans_source_or_jobs(self):
+  self.client.daily_usage=lambda:{'ok':True,'hours':1,'rows_written':0,'rows_read':5000001}
+  self.client.query=lambda *args: self.fail('NO_D1_QUERY_BEFORE_QUOTA_CHECK')
+  with self.assertRaisesRegex(ValueError,'BUDGET_UNAVAILABLE'):guard.preflight(self.client,self.config,VERSION)
+ def test_release_cannot_begin_before_incident_utc_reset(self):
+  class Clock(datetime):
+   @classmethod
+   def now(cls,tz=None):return datetime(2026,10,25,23,59,tzinfo=timezone.utc)
+  with patch.object(guard,'datetime',Clock):
+   with self.assertRaisesRegex(ValueError,'QUOTA_RESET_REQUIRED'):guard.preflight(self.client,self.config,VERSION)

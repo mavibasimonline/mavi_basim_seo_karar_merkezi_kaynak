@@ -376,7 +376,7 @@ it("bounded range audit never treats intentionally truncated analysis as corrupt
         return typeof value === "function" ? value.bind(target) : value;
       }
       return (sql: string) => {
-        if (sql.includes("SELECT d.* FROM gsc_daily_by_page"))
+        if (sql.includes("SELECT d.*") && sql.includes("gsc_daily_by_page"))
           return {
             bind() {
               return this;

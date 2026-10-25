@@ -45,9 +45,14 @@ jobs:
           retention-days: 7
       - name: Kaynak ve bağımsız Worker hedefini doğrula
         run: python3 scripts/release_checks.py --base HEAD
+      - name: Kota yenilenmeden migration veya yeni aktarım başlatma
+        run: |
+          python3 -c "from datetime import datetime,timezone; from pathlib import Path; import sys; sys.path.insert(0,'scripts'); from d1_quota_checkpoint import NOT_BEFORE; assert datetime.now(timezone.utc)>=NOT_BEFORE, 'WAIT_FOR_UTC_QUOTA_RESET'"
+          node scripts/run.mjs wrangler d1 migrations apply DB --remote --config deploy/wrangler.production.jsonc
+          python3 scripts/d1_quota_checkpoint.py
       - name: Aynı Worker'a, mevcut secret ve D1 binding'lerini koruyarak yayımla
         id: publish
-        run: node scripts/run.mjs wrangler deploy --config deploy/wrangler.production.jsonc --keep-vars --tag "$GITHUB_SHA" --message "GSC queue $GITHUB_SHA"
+        run: node scripts/run.mjs wrangler deploy --config deploy/wrangler.production.jsonc --keep-vars --var D1_READ_GUARD_ENABLED:true --var SYNC_MAX_PAGES_PER_TICK:1 --tag "$GITHUB_SHA" --message "GSC queue $GITHUB_SHA"
       - name: Gerçek HTTP yanıtında tam commit'i doğrula
         id: smoke
         run: python3 scripts/production_guard.py smoke
