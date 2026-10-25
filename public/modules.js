@@ -1,3 +1,4 @@
+import { scopeParams } from "./period.js";
 import { $, node, number, percent, detail, list, sourceName } from "./ui.js";
 export function setupModules(api, notify) {
   let auditRequest = 0,
@@ -5,10 +6,7 @@ export function setupModules(api, notify) {
     radarRequest = 0;
   async function loadRadar() {
     const request = ++radarRequest,
-      scope = new URLSearchParams({
-        month: $("month").value,
-        device: $("device").value,
-      }).toString();
+      scope = scopeParams().toString();
     try {
       const r = await api("/api/radar?" + scope);
       if (request !== radarRequest) return;
@@ -144,13 +142,12 @@ export function setupModules(api, notify) {
 
   async function loadDataAudit() {
     const request = ++auditRequest,
-      month = $("month").value;
+      month = scopeParams().toString();
     try {
-      const r = await api(
-        "/api/data-integrity?month=" + encodeURIComponent($("month").value),
-      );
+      const r = await api("/api/data-integrity?" + scopeParams().toString());
       const root = $("dataAuditResults");
-      if (request !== auditRequest || month !== $("month").value) return;
+      if (request !== auditRequest || month !== scopeParams().toString())
+        return;
       root.replaceChildren(
         node("h3", "Kaynak Kontrolleri"),
         node(
@@ -192,7 +189,8 @@ export function setupModules(api, notify) {
         list(r.limitations),
       );
       const history = await api("/api/audit-history");
-      if (request !== auditRequest || month !== $("month").value) return;
+      if (request !== auditRequest || month !== scopeParams().toString())
+        return;
       root.append(
         detail(
           "Denetim Geçmişi",

@@ -9,7 +9,7 @@ async function aggregate(env:Env,report:AnalysisReport,scope:'page'|'query',dime
  FROM ${table} d JOIN dataset_coverage c ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider='gsc' AND c.scope=? AND c.complete=1
  LEFT JOIN products p ON p.canonical_url=d.page LEFT JOIN pages pg ON pg.url=d.page LEFT JOIN page_aliases a ON a.alias_url=d.page LEFT JOIN products pc ON pc.canonical_url=a.canonical_url
  WHERE ((d.date BETWEEN ? AND ?) OR (d.date BETWEEN ? AND ?)) AND (? IS NULL OR d.device=?)
- GROUP BY product_id,period${extra} LIMIT 50001`).bind(report.period.start,scope,report.previous_period.start,report.previous_period.end,report.period.start,report.period.end,report.filters?.device||null,report.filters?.device||null).all<SumRow>();
+ GROUP BY COALESCE(p.id,pg.product_id,pc.id),period${extra} LIMIT 50001`).bind(report.period.start,scope,report.previous_period.start,report.previous_period.end,report.period.start,report.period.end,report.filters?.device||null,report.filters?.device||null).all<SumRow>();
  if(rows.results.length>50000)throw new Error('VALIDATION_ROW_LIMIT');return rows.results;
 }
 export function metricErrors(actual:Metrics|null|undefined,expected:Metrics|null|undefined,ref:string):string[]{

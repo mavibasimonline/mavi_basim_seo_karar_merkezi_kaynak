@@ -1,3 +1,4 @@
+import {calendarMonth} from './periods';
 import {Env,hash,nowISO} from './types';
 import {analyze,saveAnalysis,AnalysisReport,dates} from './analysis';
 import {validateAnalysis} from './validation';
@@ -22,9 +23,11 @@ export function archiveIssues(rows:SourceRecord[],expected:SourceRecord[]=manife
 export function reliability(input:{connected:boolean;missing:boolean;failed:boolean;errors:boolean;partial:boolean;queryDifference:boolean}):Reliability{
  if(input.failed)return 'Senkronizasyon hatası';if(input.errors)return 'Kısmen doğrulandı';if(!input.connected||input.missing)return 'Veri yetersiz';if(input.partial)return 'Kısmen doğrulandı';if(input.queryDifference)return 'Kaynaklar arasında açıklanması gereken fark';return 'Doğrulandı';
 }
-export async function dataIntegrity(env:Env,month:string,time=new Date()){
- if(month<'2020-01'||month>time.toISOString().slice(0,7))throw new Error('INVALID_MONTH');
- const report=await analyze(env,month,time),errors=await validateAnalysis(env,report);
+export async function dataIntegrity(env:Env,month:string,time=new Date(),options:import('./analysis').AnalysisOptions={}){
+ if(month<'2020-01'||month>calendarMonth(time))throw new Error('INVALID_MONTH');
+ const report=await analyze(env,month,time,options);
+ if(report.missing.some(m=>m.includes('Analiz satır güvenlik sınırı')))throw new Error('AUDIT_ROW_LIMIT');
+ const errors=await validateAnalysis(env,report);
  const [sources,coverage,health,crawls,jobs]=await Promise.all([
   env.DB.prepare('SELECT s.*,p.source_folder,(SELECT count(*) FROM keyword_metric_observations o WHERE o.source_id=s.id) actual_rows FROM keyword_sources s JOIN products p ON p.id=s.product_id ORDER BY s.path,s.exported_at').all<SourceRecord>(),
   env.DB.prepare('SELECT * FROM dataset_coverage WHERE day BETWEEN ? AND ? ORDER BY provider,scope,day').bind(report.previous_period.start,report.period.end).all<{provider:string;scope:string;day:string;complete:number;row_count:number;fetched_at:string}>(),

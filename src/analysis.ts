@@ -68,7 +68,7 @@ export interface AnalysisOptions {current?:Period;previous?:Period;device?:strin
 export async function analyze(env:Env,month=lastCompleteMonth(),time=new Date(),options:AnalysisOptions={}):Promise<AnalysisReport> {
   const current=options.current||monthPeriod(month),previous=options.previous||monthPeriod(month,-1),year=monthPeriod(month,-12);
   const rolling=!!options.current;
-  const oldest=monthPeriod(month,-12).start;
+  const oldest=options.current?previous.start:monthPeriod(month,-12).start;
   const stamp=time.toISOString();
   const [productResult,coverageResult,rawPageRows,rawQueryRows,counts,credential,googleHealth]=await Promise.all([
     env.DB.prepare('SELECT p.*,g.name AS group_name FROM products p JOIN product_groups g ON g.id=p.group_id ORDER BY g.name,p.name').all<{id:string;name:string;canonical_url:string|null;url_verified_at:string|null;group_name:string}>(),

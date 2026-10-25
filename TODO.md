@@ -1,3 +1,15 @@
+# Açık ay çubuğu ve liderler — 25 Ekim 2026
+
+- [x] 12 açık ay, seçili ay/yıl, gelecek ay engeli; ayrı 3/6/12 ay modu ve cihaz filtresi. Mevcut ay dâhil N takvim ayı kullanılır; aralık açık gösterilir. Tercihler ay/dönem/cihaz/sekme olarak hatırlanır; başka kullanıcı verisi saklanmaz.
+- [x] İlk 10 Lider Ürün: doğrulanmış ürün URL'si ve gerçek sayfa ölçümlerinden tıklama/gösterim sıralaması, en fazla 10 satır, ağırlıklı CTR/konum, gün sayısı ve mevcut kanıt penceresi. Eksik ürünler sıfırla doldurulmaz; kısmi sıralama belirtilir.
+- [x] Ortak dönem parser'ı performans/sorgu/rapor/radar/export/veri sağlığına uygulandı. Soru-cevap açık soruyu koruyarak varsayılan kapsamı kullanır. 12 ay önceki pencere, 100'den fazla dataset ve iki ürünün ayrılması test edildi. SQL gruplama alias çakışması giderildi. Büyük ayrıntılı denetim sınırında yanlış Google sağlık hatası yazılması engellendi.
+- [x] 299 Workers/D1 + 49 Python + 18 masaüstü/mobil Chromium = **366 başarılı test**; WCAG, tip/build, üretim dry-run, kaynak koruma, npm audit 0. Son kaynak commit'i cd8de35; belge commit'i git log ile izlenir. Dal feat/month-strip-and-product-leaders.
+- [x] Gerçek D1 kabulü **40183641688** başarılı: 3/6/12 ayın tarihleri ve 28 ölçümlü ürünün bağımsız hesapları eşleşti; 60 doğrulanmış gün var, pencereler tam değil. Arşiv **29/521/9.075** korundu; Google veya site isteği tetiklenmedi. Tam aylık SEO raporu kabulü geçmedi. Yayın/CI kanıtı bu değişikliğin PR ve production workflow kaydında tutulur.
+
+Kalan veri görevi: eksik Temmuz–Eylül günlerini mevcut bütçeli otomasyondan izlemek; tam/taze veri oluştuğunda gerçek aylık rapor ve başarılı sorgu koruma kabulünü tamamlamak. Özel yönetici oturumu ve uzak şifreli yedek kabul sınırları sürer. Yeni mini trend üretilmedi; kanıtsız eğilim gösterilmez. Ayrıntılı dosyalar ve kabul: [FILTER_BAR_REPORT.md](FILTER_BAR_REPORT.md). OAuth/D1/Cron/bütçe/tarama/dağıtım yapılandırması ve 521 CSV korunur.
+
+---
+
 # Kullanım kolaylığı — 25 Ekim 2026
 
 - [x] Sabit üst çubukta tek tık/dokunuş ay seçici; ilk ziyaret mevcut ay, gelecek ay engeli, önceki/sonraki okları. Ay/cihaz değişimi otomatik yükler; yalnız ay/cihaz/sekme tercihi saklanır.

@@ -1,3 +1,4 @@
+import { selectedPeriods, rangeCount, periodSelection } from "./periods";
 import { Env, dateDaysAgo } from "./types";
 import {
   dates,
@@ -12,12 +13,6 @@ export function deviceFilter(value: string | null) {
   if (!["MOBILE", "DESKTOP", "TABLET"].includes(value))
     throw Error("INVALID_DEVICE");
   return value;
-}
-function periodFor(month: string, time: Date) {
-  const p = monthPeriod(month);
-  if (month < "2020-01" || month > time.toISOString().slice(0, 7))
-    throw Error("INVALID_MONTH");
-  return p;
 }
 type Daily = {
   day: string;
@@ -116,15 +111,72 @@ function sum(rows: Daily[]) {
   );
 }
 
+async function productMetrics(
+  env: Env,
+  usable: Daily[],
+  period: { start: string; end: string; days: number },
+  previous: { start: string; end: string; days: number },
+  device: string | null,
+) {
+  const ids = usable.map((r) => r.dataset_id);
+  if (!ids.length) return [];
+  const rows = (
+    await env.DB.prepare(
+      `SELECT COALESCE(p.id,pg.product_id,pc.id) product_id,
+ CASE WHEN d.date>=? THEN 'current' ELSE 'previous' END period,
+ count(*) selected_rows,count(DISTINCT d.date) observed_days,sum(d.clicks) clicks,sum(d.impressions) impressions,
+ sum(d.position*d.impressions) weighted_position,max(c.fetched_at) fetched_at
+ FROM gsc_daily_by_page d JOIN dataset_coverage c ON c.provider='gsc' AND c.scope='page' AND c.complete=1 AND c.dataset_id=d.dataset_id AND c.day=d.date
+ LEFT JOIN products p ON p.canonical_url=d.page
+ LEFT JOIN pages pg ON pg.url=d.page
+ LEFT JOIN page_aliases a ON a.alias_url=d.page
+ LEFT JOIN products pc ON pc.canonical_url=a.canonical_url
+ WHERE d.dataset_id IN (SELECT value FROM json_each(?)) AND d.date BETWEEN ? AND ? AND (? IS NULL OR d.device=?)
+ GROUP BY 1,2`,
+    )
+      .bind(
+        period.start,
+        JSON.stringify(ids),
+        previous.start,
+        period.end,
+        device,
+        device,
+      )
+      .all<
+        Daily & {
+          product_id: string | null;
+          period: string;
+          observed_days: number;
+        }
+      >()
+  ).results;
+  return [
+    ...new Set(
+      rows.map((r) => r.product_id).filter((id): id is string => !!id),
+    ),
+  ].map((id) => {
+    const c = rows.find((r) => r.product_id === id && r.period === "current"),
+      p = rows.find((r) => r.product_id === id && r.period === "previous");
+    return {
+      id,
+      current: c ? aggregate(c) : null,
+      previous: p ? aggregate(p) : null,
+      observed_days: c?.observed_days || 0,
+      previous_observed_days: p?.observed_days || 0,
+      last_fetched_at: c?.fetched_at || null,
+    };
+  });
+}
+
 export async function performance(
   env: Env,
   month = lastCompleteMonth(),
   device: string | null = null,
   time = new Date(),
+  months = 1,
 ) {
   device = deviceFilter(device);
-  const period = periodFor(month, time),
-    previous = monthPeriod(month, -1);
+  const { period, previous } = selectedPeriods(month, months, time);
   const [rows, credential, health, catalog, archive] = await Promise.all([
     daily(env, previous.start, period.end, "page", device, time),
     env.DB.prepare(
@@ -165,7 +217,10 @@ export async function performance(
     recent(fetched);
   const finished =
     Date.parse(period.end + "T23:59:59Z") + 3 * 86400_000 < time.getTime();
+  const products = await productMetrics(env, usable, period, previous, device);
   return {
+    range_months: months,
+    products,
     source: "Google Search Console",
     scope: "page/country/device",
     timezone: "America/Los_Angeles",
@@ -224,10 +279,7 @@ export async function performanceQueries(
   params: URLSearchParams,
   time = new Date(),
 ) {
-  const period = periodFor(
-      params.get("month") || lastCompleteMonth(time),
-      time,
-    ),
+  const { period } = periodSelection(params, time),
     device = deviceFilter(params.get("device"));
   const search = params.get("q") || "",
     product = params.get("product") || "",
@@ -283,13 +335,13 @@ export async function performanceQueries(
     CASE WHEN sum(d.impressions)>0 THEN sum(d.position*d.impressions)/sum(d.impressions) END position,max(c.fetched_at) fetched_at
     FROM gsc_daily_by_query_device d JOIN dataset_coverage c ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider='gsc' AND c.scope='query' AND c.complete=1
     LEFT JOIN products p ON p.canonical_url=d.page AND p.url_verified_at IS NOT NULL
-    WHERE d.dataset_id IN (${ids.map(() => "?").join(",")}) AND (? IS NULL OR d.device=?)
+    WHERE d.dataset_id IN (SELECT value FROM json_each(?)) AND (? IS NULL OR d.device=?)
     AND lower(replace(replace(d.query,'İ','i'),'I','ı')) LIKE ? ESCAPE '\\'
     AND (?='' OR p.id=?) AND (?='all' OR d.is_brand=?)
     GROUP BY d.query,d.page,d.device,d.is_brand,p.id,p.name ORDER BY ${sorts[sort as keyof typeof sorts]} ${direction},d.query,d.page,d.device LIMIT 51 OFFSET ?`,
     )
       .bind(
-        ...ids,
+        JSON.stringify(ids),
         device,
         device,
         pattern,

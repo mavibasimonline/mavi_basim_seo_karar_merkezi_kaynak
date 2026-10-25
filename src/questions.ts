@@ -1,3 +1,4 @@
+import {calendarMonth} from './periods';
 import {AnalysisReport,ProductReport,Period,Metrics,monthPeriod,lastCompleteMonth} from './analysis';
 import {Env,nowISO} from './types';
 import {variantFamily} from './urls';
@@ -25,7 +26,7 @@ export function parseQuestion(question:string,products:NamedProduct[],selected=l
   else if(/gecen ayi|onceki ayi/.test(q))month=monthPeriod(reuse?previous!.month:selected,-1).label;
   else if(recent)window=Number(recent[1]);
   else if(reuse&&!all){month=previous!.month;window=previous!.window;}
-  if(month<'2020-01'||month>time.toISOString().slice(0,7))throw new Error('INVALID_MONTH');
+  if(month<'2020-01'||month>calendarMonth(time))throw new Error('INVALID_MONTH');
   let intent:QuestionIntent=match||product_id?'performance':'unsupported';
   if(/istanbul|sehir|bolge/.test(q))intent='region';
   else if(/degisiklik|degisiklikler|ise yaradi|etki/.test(q))intent='outcomes';

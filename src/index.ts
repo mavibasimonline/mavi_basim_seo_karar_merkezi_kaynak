@@ -12,13 +12,14 @@ import {changeCalendar,changeImpact} from './change-impact';
 import {dataIntegrity} from './data-integrity';
 import {reserveSyncPage,settleSyncPage,syncBudget} from './sync-budget';
 import {performance,performanceQueries,deviceFilter} from './performance';
+import {calendarMonth,periodSelection,rangeCount} from './periods';
 
 const RUNTIME_REVISION='gsc-catchup-v1';
 function deploymentInfo(env:Env){const metadata=env.CF_VERSION_METADATA;return {runtime_revision:RUNTIME_REVISION,version_id:metadata?.id&&/^[a-f0-9-]{36}$/i.test(metadata.id)?metadata.id:null,commit:metadata?.tag&&/^[a-f0-9]{40}$/.test(metadata.tag)?metadata.tag:null};}
 
 export async function getReport(env:Env,month:string,options:AnalysisOptions={}):Promise<AnalysisReport>{
   monthPeriod(month);
-  if(month<'2020-01'||month>new Date().toISOString().slice(0,7))throw new Error('INVALID_MONTH');
+  if(month<'2020-01'||month>calendarMonth())throw new Error('INVALID_MONTH');
   const period=options.current||monthPeriod(month);
   const cached=await env.DB.prepare(`SELECT result_json,created_at,
     (SELECT checked_at FROM health_checks WHERE provider='gsc' ORDER BY day DESC LIMIT 1) health_checked_at,
@@ -39,6 +40,7 @@ export async function getReport(env:Env,month:string,options:AnalysisOptions={})
   await saveAnalysis(env,report);
   return report;
 }
+function reportSelection(params:URLSearchParams){const selected=periodSelection(params);return {...selected,options:{...selected.options,device:deviceFilter(selected.options.device)}};}
 async function route(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url),path=url.pathname;
   if(request.method==='GET'&&path==='/api/health')return json({ok:true,service:'Mavi Basım SEO Karar Merkezi',deployment:deploymentInfo(env)});
@@ -66,19 +68,22 @@ async function route(request:Request,env:Env):Promise<Response>{
     return json({sync_budget:await syncBudget(env),deployment:deploymentInfo(env),catchup_enabled:env.CATCHUP_ENABLED==='true',priority_progress:priority,recent_sync_runs:lastRuns.results,google_connected:!!google,ga4_configured:!!env.GA4_PROPERTY_ID,ads_configured:env.ENABLE_GOOGLE_ADS==='true'&&!!env.GOOGLE_ADS_DEVELOPER_TOKEN,crawl_enabled:env.CRAWL_ENABLED==='true',automation_enabled:env.AUTOMATION_ENABLED==='true',health:health.results,jobs:jobs.results,crawls:crawls.results,coverage:coverage.results,job_diagnostics:jobDiagnostics.results,recent_failures:recentFailures.results,
       note:'Yapılandırma veya OAuth kaydı başarılı API erişimi anlamına gelmez; günlük sağlık sonuçlarını kontrol edin.'});
   }
-  if(request.method==='GET'&&path==='/api/data-integrity')return json(await dataIntegrity(env,url.searchParams.get('month')||lastCompleteMonth()));
+  if(request.method==='GET'&&path==='/api/data-integrity'){const selected=reportSelection(url.searchParams);return json(await dataIntegrity(env,selected.month,new Date(),selected.options));}
   if(request.method==='GET'&&path==='/api/audit-history')return json({rows:(await env.DB.prepare("SELECT id,kind,created_at,result_json FROM insight_runs WHERE kind IN ('data-integrity','sync-audit') AND id>? ORDER BY id LIMIT 50").bind(url.searchParams.get('after')||'').all()).results});
   if(request.method==='GET'&&path==='/api/change-calendar')return json({rows:await changeCalendar(env,url.searchParams.get('day')||new Date().toISOString().slice(0,10),url.searchParams.get('after')||''),timezone:'UTC',note:'Takvim tespit tarihidir; kesin yayın tarihi değildir.'});
   if(request.method==='GET'&&path==='/api/change-impact')return json(await changeImpact(env,url.searchParams.get('id')||''));
-  if(request.method==='GET'&&path==='/api/radar'){if(url.searchParams.has('month'))return json(await radar(env,await getReport(env,url.searchParams.get('month')!,{device:deviceFilter(url.searchParams.get('device'))})));const plan=parseQuestion('Son 28 günde hangi ürünler yükseldi?',[]);return json(await radar(env,await getReport(env,plan.context.month,{current:plan.period,previous:plan.previous})));}
-  if(request.method==='GET'&&path==='/api/performance')return json(await performance(env,url.searchParams.get('month')||lastCompleteMonth(),deviceFilter(url.searchParams.get('device'))));
+  if(request.method==='GET'&&path==='/api/radar'){if(url.searchParams.has('month')||url.searchParams.has('rangeMonths')){const selected=reportSelection(url.searchParams);return json(await radar(env,await getReport(env,selected.month,selected.options)));}const plan=parseQuestion('Son 28 günde hangi ürünler yükseldi?',[]);return json(await radar(env,await getReport(env,plan.context.month,{current:plan.period,previous:plan.previous})));}
+  if(request.method==='GET'&&path==='/api/performance')return json(await performance(env,url.searchParams.get('month')||lastCompleteMonth(),deviceFilter(url.searchParams.get('device')),new Date(),rangeCount(url.searchParams.get('rangeMonths'))));
   if(request.method==='GET'&&path==='/api/performance/queries')return json(await performanceQueries(env,url.searchParams));
-  if(request.method==='GET'&&path==='/api/report')return json(await getReport(env,url.searchParams.get('month')||lastCompleteMonth(),{device:deviceFilter(url.searchParams.get('device'))}));
+  if(request.method==='GET'&&path==='/api/report'){const selected=reportSelection(url.searchParams);return json(await getReport(env,selected.month,selected.options));}
   if(request.method==='POST'&&path==='/api/questions'){
-    const body=await request.json() as {question?:unknown;month?:unknown;previous_question_id?:unknown};
+    const body=await request.json() as {question?:unknown;month?:unknown;previous_question_id?:unknown;rangeMonths?:unknown;device?:unknown};
     if(typeof body.question!=='string'||body.question.length>1000)return json({error:'Soru en fazla 1000 karakter olmalı.'},400);
     if(body.previous_question_id!==undefined&&typeof body.previous_question_id!=='string')return json({error:'Takip sorusu bağlamı geçersiz.'},400);
     const plan=await prepareQuestion(env,body.question,typeof body.month==='string'?body.month:undefined,body.previous_question_id as string|undefined);
+    const selected=reportSelection(new URLSearchParams({month:typeof body.month==='string'?body.month:plan.context.month,rangeMonths:body.rangeMonths===undefined?'1':typeof body.rangeMonths==='string'?body.rangeMonths:'invalid',device:body.device===undefined?'ALL':typeof body.device==='string'?body.device:'invalid'}));
+    if(!plan.context.device)plan.context.device=selected.options.device;
+    if(selected.months>1&&!plan.period&&plan.context.month===selected.month){plan.period=selected.period;plan.previous=selected.previous;}
     const filtered=!!plan.context.device||!!plan.period;
     const report=filtered?await analyze(env,plan.context.month,new Date(),{current:plan.period,previous:plan.previous,device:plan.context.device}):await getReport(env,plan.context.month);
     if(filtered){if((await validateAnalysis(env,report)).length)throw new Error('ANALYSIS_VALIDATION_FAILED');await saveAnalysis(env,report);}
@@ -110,8 +115,8 @@ async function route(request:Request,env:Env):Promise<Response>{
   }
   if(request.method==='GET'&&path==='/api/outcomes')return json((await env.DB.prepare('SELECT * FROM outcome_windows ORDER BY applied_change_id,days LIMIT 100').all()).results);
   if(request.method==='GET'&&path==='/api/export'){
-    const report=await getReport(env,url.searchParams.get('month')||lastCompleteMonth(),{device:deviceFilter(url.searchParams.get('device'))});
-    return new Response(JSON.stringify(report,null,2),{headers:{'Content-Type':'application/json','Content-Disposition':`attachment; filename="mavi-seo-${report.month}.json"`,'Cache-Control':'no-store'}});
+    const selected=reportSelection(url.searchParams),report=await getReport(env,selected.month,selected.options);
+    return new Response(JSON.stringify(report,null,2),{headers:{'Content-Type':'application/json','Content-Disposition':`attachment; filename="mavi-seo-${report.month.replace(/[^0-9-]/g,'_')}.json"`,'Cache-Control':'no-store'}});
   }
   return json({error:'Bu işlem bulunamadı.'},404);
 }
@@ -150,7 +155,8 @@ export default {
       return securityHeaders(await route(request,env));
     }catch(error){
       const code=error instanceof ProviderError?error.code:error instanceof Error?error.message:'UNKNOWN';
-      const invalid=['INVALID_MONTH','INVALID_DEVICE','INVALID_QUERY_SORT','INVALID_QUERY_PAGE','INVALID_QUERY_FILTER','INVALID_QUESTION','INVALID_QUESTION_CONTEXT','INVALID_APPLIED_CHANGE','INVALID_CHANGE_DAY','INVALID_CHANGE_ID','CHANGE_NOT_FOUND'].includes(code)||error instanceof SyntaxError;
+      if(code==='AUDIT_ROW_LIMIT')return securityHeaders(json({error:'Seçili dönem ayrıntılı denetim sınırını aşıyor; daha kısa bir dönem seçin. Kaynak veriler korundu.',code},422));
+      const invalid=['INVALID_MONTH','INVALID_RANGE','INVALID_DEVICE','INVALID_QUERY_SORT','INVALID_QUERY_PAGE','INVALID_QUERY_FILTER','INVALID_QUESTION','INVALID_QUESTION_CONTEXT','INVALID_APPLIED_CHANGE','INVALID_CHANGE_DAY','INVALID_CHANGE_ID','CHANGE_NOT_FOUND'].includes(code)||error instanceof SyntaxError;
       return securityHeaders(json({error:invalid?'İstek verisi geçersiz.':'İşlem tamamlanamadı. Veri kaynağı ve sistem durumunu kontrol edin.',code:invalid?'INVALID_INPUT':error instanceof ProviderError?error.code:'INTERNAL_ERROR'},invalid?400:503));
     }
   },
