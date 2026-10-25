@@ -13,7 +13,7 @@ Toplamları aynı zamandaki farklı/sınırlı analitik sorgulardan birbiriyle t
 
 | Gerçek SQL ailesi | Gözlenen okuma | Açıklama |
 |---|---:|---|
-| Bağımsız metrik doğrulama | 2.062.536 | Sayfa, cihaz, sorgu ve marka hesaplarının tekrarları |
+| Metrik toplulaştırma ve bağımsız doğrulama | 2.062.536 | Sayfa, cihaz, sorgu ve marka hesaplarının tekrarları |
 | Günlük veri kümesi doğrulama | 692.777 | Grafik/sorgu yüklenirken günlük satır ve metrik kontrolleri |
 | Sorgu performansı / ham sorgu okuması | 652.765 | En pahalı tek şekil: 51 çalışma, 595.051 okuma |
 | Sayfa performansı / ham sayfa okuması | 168.702 | Tekrarlanan rapor girdileri |
@@ -48,7 +48,7 @@ Toplamları aynı zamandaki farklı/sınırlı analitik sorgulardan birbiriyle t
 - Python: kaynak/521 CSV, migration bütünlüğü, yedek/restore, hesap analitiği, kotadan önce SQL engeli, sorgu şekli gizliliği ve EXPLAIN testleri.
 - EXPLAIN provası sentetik 9.000 GSC satırı, 30 arşiv generation ve 300 aktif satır kullanır; gerçek Google analizi değildir. Aktif veri araması, mevcut CSV/canonical indeksleri ve rapor indeksinin sıralama planı doğrulanır.
 - PR #21'in `public/` ve `tests/browser/` dosyaları birebir korundu. 34 gerçek Chromium masaüstü/mobil testi geçti; yerel testler gerçek üretim GSC kabulü olarak gösterilmez.
-- Son yerel sonuç: **334 Workers/D1 + 82 Python + 34 Chromium = 450 başarılı test**; audit 0, tip kontrolü, build ve üretim dry-run geçti. Tam commit/uzak CI TODO.md ve PR açıklamasındadır. Başarısız ilk denemelerde ortaya çıkan paralel rezervasyon kapasitesi, saatlik izin süresi ve test fixture eşleştirmeleri düzeltildi; yalnız son başarılı koşu kabul edilir.
+- Son yerel sonuç: **334 Workers/D1 + 82 Python + 34 Chromium = 450 başarılı test**; audit 0, tip kontrolü, build ve üretim dry-run geçti. Uygulama commit'i **7ec4f8e**, uzak CI **[40209576264 SUCCESS](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40209576264)**; ham logda aynı 450 test doğrulandı. Belge kontrol noktası ve son CI PR açıklamasındadır. Başarısız ilk denemelerde ortaya çıkan paralel rezervasyon kapasitesi, saatlik izin süresi ve test fixture eşleştirmeleri düzeltildi; yalnız son başarılı koşu kabul edilir.
 
 ## Kalan üretim kabulü — henüz yapılmadı
 

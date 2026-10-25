@@ -1,6 +1,6 @@
 # Acil D1 okuma kotası — 25 Ekim 2026 19.00 Türkiye kontrol noktası
 
-**Sorun tamamen çözüldü sayılmaz; gerçek üretim kabulü bekliyor.** Dal `fix/d1-account-read-budget`, [PR #22](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/22). Son temel uygulama commit'i `40967a7`; bu kaydı içeren son commit `git log -1 --oneline` ile bulunur. PR #21 / `d97c34b` bu dalın atasıdır; bütün arayüz ve tarayıcı test dosyaları birebir korunur.
+**Sorun tamamen çözüldü sayılmaz; gerçek üretim kabulü bekliyor.** Dal `fix/d1-account-read-budget`, [PR #22](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/22). Son uygulama commit'i **`7ec4f8ee3fcf8b291519248a4a6bb4f02f2abd4a`**, tam HEAD CI **[40209576264 — SUCCESS](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40209576264)** (334 + 82 + 34 = 450 test); önceki temel uygulama `40967a7`; bu kaydı içeren son commit `git log -1 --oneline` ile bulunur. PR #21 / `d97c34b` bu dalın atasıdır; bütün arayüz ve tarayıcı test dosyaları birebir korunur.
 
 ## Tamamlananlar ve gerçek kanıt
 
@@ -10,7 +10,7 @@
 - [x] Hesap geneli saatlik kota gözlemi, 75 dakikalık/UTC gece yarısıyla sınırlı izin, atomik yerel okuma/yazma rezervasyonu, gerçek D1 maliyet kaydı, eksik metadata/hata durumunda rezervasyonu koruma hazır. Üretimde bayrak eksik/false olsa da version binding korumayı zorunlu tutar. Worker'a Cloudflare API token'ı eklenmez.
 - [x] Olay başına bir sağlayıcı sayfası; güncel/geçmiş dengesi, cursor/generation/retry ve 60.000 yazma koruması sürer. Eski dakika olayları DB/Google'a dokunmaz. Tarama yalnız son tamamlanmış GSC kümesini keşifte kullanır.
 - [x] `0005` kontrol/indeks/önbellek, `0006` gerçek `cron` / `manual` / `legacy` ayrımı migration'ları; yerel veri bütünlüğü ve restore testleri. Üretimde uygulanmadı.
-- [x] Yerel son kabul: **334 Workers/D1 + 82 Python + 34 Chromium = 450 başarılı test**; npm audit 0, tip/build/üretim dry-run/kaynak ve secret taraması başarılı. Son başarısız/atlanmış test yok. İlk geliştirme denemelerindeki kapasite/freshness/fixture hataları düzeltildi. Uzak son CI ayrıca PR'da izlenir.
+- [x] Yerel son kabul: **334 Workers/D1 + 82 Python + 34 Chromium = 450 başarılı test**; npm audit 0, tip/build/üretim dry-run/kaynak ve secret taraması başarılı. Son başarısız/atlanmış test yok. İlk geliştirme denemelerindeki kapasite/freshness/fixture hataları düzeltildi. Uzak kod CI **40209576264 SUCCESS**; ham CI logunda aynı 450 test doğrulandı. Bu belge kontrol noktası commit'i ve son CI PR'da izlenir.
 - [x] 521 CSV / 9.075 satır / 29 ürün kaynak doğrulaması geçti; CSV'ler ve kaynak talimatları değiştirilmedi. Üretim /api/health 18.56 Türkiye: hâlâ **2f502c68-76ae-48a7-b87a-5b7e45bf62e4**, commit etiketi null. Bu yeni düzeltmenin canlı olduğu anlamına gelmez.
 
 ## Kalanlar — bağımlılık sırasıyla
