@@ -727,6 +727,7 @@ function renderProducts() {
     text.append(
       Object.assign(node("button", p.name, "cell-name product-open"), {
         type: "button",
+        title: p.name,
         onclick: () => openProduct(p),
       }),
       node(

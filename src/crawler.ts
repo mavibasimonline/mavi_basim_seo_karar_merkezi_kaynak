@@ -1,3 +1,4 @@
+import {D1BudgetError} from './d1-read-budget';
 import robotsParser from 'robots-parser';
 import { XMLParser } from 'fast-xml-parser';
 import { Env, Fetch, hash, nowISO } from './types';
@@ -130,11 +131,12 @@ export async function seedCrawl(env: Env): Promise<void> {
   if(env.CRAWL_ENABLED!=='true')return;
   const stamp=nowISO();
   const products=await env.DB.prepare('SELECT id,canonical_url FROM products').all<{id:string;canonical_url:string|null}>();
-  const gsc=await env.DB.prepare('SELECT DISTINCT page FROM gsc_daily_by_page ORDER BY date DESC LIMIT 20').all<{page:string}>();
+  const latest=await env.DB.prepare("SELECT dataset_id,day FROM dataset_coverage WHERE provider='gsc' AND scope='page' AND complete=1 ORDER BY day DESC LIMIT 1").first<{dataset_id:string;day:string}>();
+  const gsc=latest?await env.DB.prepare('SELECT DISTINCT page FROM gsc_daily_by_page WHERE dataset_id=? AND date=? ORDER BY page LIMIT 20').bind(latest.dataset_id,latest.day).all<{page:string}>():{results:[]};
   const unknown=products.results.filter(p=>!p.canonical_url).map(p=>'https://mavibasim.com/'+p.id);
   // These are lookup keys only. Seed only URLs actually returned by GSC;
   // skip the historical scan entirely once every product is mapped.
-  const observedProducts=unknown.length?await env.DB.prepare(`SELECT DISTINCT page FROM gsc_daily_by_page WHERE rtrim(page,'/') IN (${unknown.map(()=>'?').join(',')}) ORDER BY page LIMIT 29`).bind(...unknown).all<{page:string}>():{results:[]};
+  const observedProducts=unknown.length&&latest?await env.DB.prepare(`SELECT DISTINCT page FROM gsc_daily_by_page WHERE dataset_id=? AND date=? AND rtrim(page,'/') IN (${unknown.map(()=>'?').join(',')}) ORDER BY page LIMIT 29`).bind(latest.dataset_id,latest.day,...unknown).all<{page:string}>():{results:[]};
   const seeds=[{url:'https://mavibasim.com/sitemap.xml',kind:'sitemap'}, {url:'https://mavibasim.com/',kind:'page'}, ...observedProducts.results.map(p=>({url:p.page,kind:'page'})),...products.results.filter(p=>p.canonical_url).map(p=>({url:p.canonical_url!,kind:'page'})),...gsc.results.map(p=>({url:p.page,kind:'page'}))];
   const unique=[...new Map(seeds.flatMap(s=>{const url=siteURL(s.url);return url?[[url,{url,kind:s.kind}]] as const:[];})).values()];
   // One D1 statement, even when all products have been observed by Google.
@@ -186,6 +188,7 @@ export async function crawlOne(env: Env, fetcher: Fetch=fetch): Promise<void> {
     statements.push(env.DB.prepare('UPDATE crawl_queue SET next_crawl_at=?,attempts=0,last_error=NULL,lease_until=NULL,lease_token=NULL WHERE url=? AND lease_token=?').bind(new Date(Date.now()+86400_000).toISOString(),queued.url,lease));
     await env.DB.batch(statements);
   }catch(error){
+    if(error instanceof D1BudgetError)throw error;
     const failure=error instanceof ProviderError?error:new ProviderError('CRAWL_NETWORK_OR_PARSE_ERROR',true);
     const attempts=queued.attempts+Number(failure.code!=='CRAWL_DELAY');
     const wait=failure.code==='ROBOTS_DISALLOWED'?86400:Math.max(failure.retryAfterSeconds,Math.min(86400,60*2**Math.min(attempts,10)));

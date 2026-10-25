@@ -1,3 +1,69 @@
+# Hesap sahibi ayarı ve kota sonrası yayın — 25 Ekim 2026
+
+- [x] Hesap sahibi bu konuşmada Worker'ın otomatik Git dağıtımını **kapattığını bildirdi**. Bu kullanıcı beyanıdır; Build tetikleyici API erişimi hâlâ 403 olduğundan ayarın API ile doğrulandığı söylenmez. Yeniden token/OAuth/onay istenmez.
+- [x] Son uygulama/operasyon commit'i **`a1118355a2efe163ac54861574b95e022a7f79e5`**; yerel **334 Workers/D1 + 99 Python + 34 Chromium = 467 test** başarılı. Son belge commit'i `git log -1 --oneline` ile bulunur; uzak son CI PR #22'de izlenir. İlk yeni tarih sınırı testindeki sıralama hatası düzeltildi ve bütün kontroller tekrar geçti.
+- [x] Mevcut kontrollü production workflow'una **yalnız 26 Ekim 2026** için denemeler eklendi: Türkiye **03.17, 03.47, 04.17, 04.47, 05.17, 05.47**. GitHub zamanlaması gecikebilir. Daha sonraki yıllarda bu olay yayını yapılmaz. Her deneme önce tam main commit'inin başarılı push CI'sini ve gerçek %100 Worker UUID'sini D1'e dokunmadan doğrular. Kota/rollback/migration/commit/guard kapıları aynen zorunludur. Aynı commit zaten yayımlandıysa tekrar yayınlamaz; bu durum üretim kabulü tamamlandı anlamına gelmez.
+- [x] Saatlik kota gözlemcisi, UTC yenilenmesi ve gerçek Worker'daki **`read_guard_revision=d1-account-reads-v1`** doğrulanmadan D1'e erişmez. Henüz uygulanmamış migration tablolarını okumaz; açıkça bekleme kaydı üretir. Yayımdan sonra gerçek doğal Cron ve okuma maliyeti kabulü ayrıca çalışır.
+- [ ] PR #22'nin son tam HEAD CI'sini doğrula, PR'ı main'e al ve main CI'yi doğrula. Kullanıcı beyanıyla Git otomatik yayın engeli giderildiğinden kod birleştirme şimdi yapılabilir; **Worker yayını/migration/yoğun D1 işlemi hâlâ kota yenilenmesine kadar yasaktır**. Main'de iş akışlarının etkin kaydını ve eski Worker sürümünün değişmediğini kontrol et.
+- [ ] Kota sonrası kontrollü yayın ve gerçek GSC/Cron/okuma tüketimi kabulü **henüz gerçekleşmedi**. Kod, takvim veya test sonucu gerçek üretim başarısı sayılmaz. Ücretli plan, CSV değişikliği, veri silme veya yeniden Google yetkilendirmesi yoktur.
+
+Kullanıcıdan şu anda başka işlem gerekmiyor. Bu bir GitHub Actions zamanlamasıdır; Codex oturumunun kendiliğinden yeniden başlayacağı garanti edilmez. Sonraki somut adım aşağıdaki genel talimatların üstünde yer alan bu kayda göre main CI ve zamanlanan yayın sonucunu kontrol etmektir.
+
+---
+
+# Acil D1 okuma kotası — 25 Ekim 2026 19.00 Türkiye kontrol noktası
+
+**Sorun tamamen çözüldü sayılmaz; gerçek üretim kabulü bekliyor.** Dal `fix/d1-account-read-budget`, [PR #22](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/22). Son uygulama commit'i **`7ec4f8ee3fcf8b291519248a4a6bb4f02f2abd4a`**, tam HEAD CI **[40209576264 — SUCCESS](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40209576264)** (334 + 82 + 34 = 450 test); önceki temel uygulama `40967a7`; bu kaydı içeren son commit `git log -1 --oneline` ile bulunur. PR #21 / `d97c34b` bu dalın atasıdır; bütün arayüz ve tarayıcı test dosyaları birebir korunur.
+
+## Tamamlananlar ve gerçek kanıt
+
+- [x] Gerçek Cloudflare GraphQL sorgu analitiği alındı; D1 uygulama SQL'i çalıştırılmadı. 18.18 Türkiye: **5.065.792 okuma / 57.757 yazma**. Sorgu maliyetleri, tekrarlanan hesaplamalar ve indeks planları [D1_READ_QUOTA_INCIDENT.md](D1_READ_QUOTA_INCIDENT.md) içinde.
+- [x] Üretim Cron'u API ile `* * * * *` → **`*/15 * * * *`** değiştirildi ve geri okunarak doğrulandı: Actions **40206287323**. D1, OAuth ve Worker kodu değişmedi.
+- [x] Kök neden: bütçe/scheduler heartbeat'leri rapor önbelleğini geçersiz kılıyor; performans ve bağımsız doğrulamalar aynı kanıtı tekrar okuyordu. Kaynak revizyonuyla önbellek, eşzamanlı rapor paylaşımı, aktif kapsamdan sorgu, gerekli indeksler ve sınırlandırılmış toplulaştırma kodlandı.
+- [x] Hesap geneli saatlik kota gözlemi, 75 dakikalık/UTC gece yarısıyla sınırlı izin, atomik yerel okuma/yazma rezervasyonu, gerçek D1 maliyet kaydı, eksik metadata/hata durumunda rezervasyonu koruma hazır. Üretimde bayrak eksik/false olsa da version binding korumayı zorunlu tutar. Worker'a Cloudflare API token'ı eklenmez.
+- [x] Olay başına bir sağlayıcı sayfası; güncel/geçmiş dengesi, cursor/generation/retry ve 60.000 yazma koruması sürer. Eski dakika olayları DB/Google'a dokunmaz. Tarama yalnız son tamamlanmış GSC kümesini keşifte kullanır.
+- [x] `0005` kontrol/indeks/önbellek, `0006` gerçek `cron` / `manual` / `legacy` ayrımı migration'ları; yerel veri bütünlüğü ve restore testleri. Üretimde uygulanmadı.
+- [x] Yerel son kabul: **334 Workers/D1 + 82 Python + 34 Chromium = 450 başarılı test**; npm audit 0, tip/build/üretim dry-run/kaynak ve secret taraması başarılı. Son başarısız/atlanmış test yok. İlk geliştirme denemelerindeki kapasite/freshness/fixture hataları düzeltildi. Uzak kod CI **40209576264 SUCCESS**; ham CI logunda aynı 450 test doğrulandı. Bu belge kontrol noktası commit'i ve son CI PR'da izlenir.
+- [x] 521 CSV / 9.075 satır / 29 ürün kaynak doğrulaması geçti; CSV'ler ve kaynak talimatları değiştirilmedi. Üretim /api/health 18.56 Türkiye: hâlâ **2f502c68-76ae-48a7-b87a-5b7e45bf62e4**, commit etiketi null. Bu yeni düzeltmenin canlı olduğu anlamına gelmez.
+
+## Kalanlar — bağımlılık sırasıyla
+
+1. **Hesap sahibi ayarı:** Cloudflare Worker `mavi-basim-seo-prod` → Settings → Builds içindeki otomatik Git yayını güvenlik kapısını atlayabiliyor. API denetimi **403** döndü (40208570579); bu ayarı erişimle kapattığımız iddia edilemez. Hesap sahibi otomatik Git dağıtımını kapatmalı veya bu ayar için mevcut otomasyonun dar yetkisini sağlamalı. Token/şifre sohbete istenmez; GSC OAuth'u yeniden kurmayın. Bu çözülmeden main birleştirilmez, PR #21 tek başına yayımlanmaz.
+2. **26 Ekim 2026 03.00 Türkiye / 00.00 UTC sonrasında** gerçek günlük kotayı doğrula. Zaman gelmeden yoğun D1 sorgusu, migration veya yeniden aktarım yok. Boş/gecikmiş analitiği sıfır kullanım sayma.
+3. PR #22'nin tam son HEAD CI'sini doğrula; PR #21'i içeren bu dalı main'e al, main CI'yi doğrula. Mevcut gerçek 100% Worker UUID'sini oku. Kontrollü production workflow, eski binding/secret'ları koruyarak migration + quota checkpoint + guard bayrakları + commit smoke yapar. Doğrulanamayan yayında Cron tutulur, eski Worker'a dönülür; kuyruk/veriler silinmez.
+4. Doğal Cron'dan gerçek, boş olmayan GSC aktarımını ve `d1_query_costs`/defteri doğrula. Yeni salt okunur `scripts/d1_read_acceptance.py` gerçek indeks planı, hesap kotası, yerel maliyet ve **cron kaynağıyla** çalışmış aktarım olmadan geçmez. Pilot/test verisi kabul sayılmaz. Saatlik quota workflow main'e/yayına alınmadan etkin olduğu söylenmez.
+5. Bir sonraki gerçek hesap gözleminde okuma/yazma değişimini kontrol et. Temmuz–Eylül tam kapsam/aylık rapor kabulü hâlâ bekler; bu kota düzeltmesi eksik Google günlerini tamamlamaz. 20.000 girdi satırını aşan geniş analizler kota için daha kısa kapsam gerektirir; bu sınır eksik GSC verisi veya SEO başarısızlığı diye gösterilmez.
+
+Kota sıfırlama, defter silme, ücretli plan, yeni Google OAuth, kaynak aktarımı veya canlı mavibasim.com değişikliği yapılmadı. Sonraki oturumun kendiliğinden başlaması garanti edilmez. Aşağıdaki kayıtlar önceki aşamaların tarihçesidir.
+
+---
+
+# Ay çubuğu / ürün tablosu kontrol noktası — 25 Ekim 2026
+
+- [x] Yıl/ay/dönem dengeli aralıklı; aylar 4–6 px boşluk, açık gri kenarlık, okunabilir 46/52 px eşit düğmeler. Seçili yazı #FFFFFF, opacity=1; hover/focus/active testleri geçti. Sadece ay alanı kayar; sabit cihaz/durum/MB kesilmez. Masaüstü 60 px, 640 px ve altı telefonda kontrollerin tamamını görünür tutan 104 px iki kompakt satır.
+- [x] Ürün satırları 60 px, başlık 40 px; hücreler ortalı, küçük avatar/URL aralığı; masaüstünde arama/sıralama/gelişmiş filtre aynı alanda. Filtre-tablosu arası en fazla 10 px. Arama/sıralama/karar ve metrik sütun testleri başarılı.
+- [x] **382 test:** 299 Workers/D1 + 49 Python + 34 Chromium; tip/build/production dry-run/release denetimi ve audit 0. İlk yeni tarayıcı koşusunda bir masaüstü senaryosu, yükleme sırasında ay düğmelerinin yeniden oluşturulması nedeniyle koptu; aynı yılda düğüm korunup seçim yerinde güncellenerek düzeltildi. Tam 34 test ve ek 8 sınır testi yeniden geçti.
+- [ ] **Yeni düzeltme yayımlanmadı / main'e birleştirilmedi.** Mevcut güvenlik kapısı aşılmadı. Gerçek salt okunur tanılama **40199411351**, **25 Ekim 16:50 Türkiye**: hesap günlük D1 okuma **5.039.419**, yazma **57.754**; yayın güvenlik eşiği 4.000.000. Analytics gecikmeli olabilir. 29 ürün/521 CSV/9.075 satır ve dakikalı Cron yerinde; OAuth, senkron bütçesi ve mevcut üretim ayarları değişmedi.
+- **Son commit/dal:** bu kaydı içeren `fix/month-states-and-table-density` git kaydı. Uygulama temeli main **9dbcafa**, önceki yayın kontrol noktası **52eb12f** bu dala dahildir. Uzak CI bu dalın PR'ında izlenir. Kaynak/code ve ekran kanıtı [MONTH_TABLE_DENSITY_REPORT.md](MONTH_TABLE_DENSITY_REPORT.md).
+- **Bir sonraki somut adım:** **26 Ekim 2026 03:00 Türkiye / 00:00 UTC sonrasında** güncel kota ve gerçek Worker UUID'sini oku. Kapı uygunken başarılı PR CI ile main'e birleştir; main CI ve mevcut kontrollü production workflow'u ile yayınla, tam commit/Worker/binding/kaynak/hash ve canlı UI kabulünü tamamla. Main'e bağlı Git otomatik yayını bugünkü kapıyı aşmak için kullanılmadı. Kendiliğinden yeniden çalışma garantisi yok.
+- **Yetki:** yeni kullanıcı anahtarı/token/onay veya ücretli plan gerekmiyor; günlük bütçenin yenilenmesi ve gerçek doğrulama gerekiyor. Mevcut kaynaklar, GSC/OAuth/D1/Cron/bütçe ve canlı mavibasim.com korunur. Önceki tarihli kontrol noktaları aşağıdadır.
+
+---
+
+# Yayın kontrol noktası — 25 Ekim 2026, 15:51 Türkiye
+
+- [x] Uygulama kodu PR **#19** ile main'e birleşti: **9dbcafa5d634b1b80d2a78f1fa08b2fc6df687a4** (kaynak **cc1e87c**). PR CI **40194303362**, main CI **40194492122** başarılı; **374 test** geçti. Başarısız uygulama testi yok.
+- [x] Cloudflare'ın mevcut Git otomatik yayını yeni arayüzü aldı. Canlı 12 dosyanın SHA-256 değeri main ile aynı. Masaüstü/mobil canlı giriş, WCAG/JS/taşma, kompakt çubuk ve özel API 401 kontrolleri başarılı. Özel üretim yönetici oturumu kullanılmadı.
+- [ ] **Kontrollü tam yayın kabulü bekliyor:** production koşusu **40194725690** yayımlama öncesi durdu; Worker/D1/Cron/secret değiştirmedi. Gerçek tanılama **40194908709** günlük D1 okumayı **4.075.790** ölçtü; yayın güvenlik sınırı **4.000.000**, Free sert sınır **5.000.000**. Sınır gevşetilmedi. Canlı otomatik Git sürümü **2f502c68-76ae-48a7-b87a-5b7e45bf62e4** ve commit etiketi null; tam commit kabulü false. Başarısız olan uygulama testleri değil, yayın ön koşuludur.
+- [x] Gerçek kaynaklar/binding'ler korunuyor: **29 ürün / 521 CSV / 9.075 satır**, mevcut D1/OAuth, dakikalı Cron, otomasyon/tarama etkin, Ads kapalı, senkron bütçesi 60.000. Canlı siteye yazma ve ücretli hizmet yok.
+- **Son commit:** bu kontrol noktasını içeren `docs/compact-release-checkpoint` git kaydı; uygulamanın son main commit'i yukarıdadır. Bu belge dalı kota kapısı engelinden sonra main'in Git otomatik yayını yeniden tetiklenmemesi için birleştirilmez.
+- **Bir sonraki somut adım:** **26 Ekim 2026 03:00 Türkiye / 00:00 UTC sonrasında** gerçek güncel kota ve Worker UUID'sini oku; güvenli kapı geçerse mevcut production workflow'u gerçek UUID ile çalıştır. Tam HTTP commit/sürüm, korunan D1/secret/Cron/kaynaklar ve canlı dosya hash kabulünü tamamla. Kendiliğinden yeniden başlama garantisi yok.
+- **Gerekli yetki:** bu kalan yayın için yeni kullanıcı yetkisi/token/ücretli plan gerekmez; günlük okuma bütçesinin yenilenmesi ve gerçek doğrulama gerekir. Eski eksik geçmiş GSC/aylık rapor/şifreli yedek görevleri ayrı olarak devam eder.
+
+Ayrıntılar: [COMPACT_DASHBOARD_REPORT.md](COMPACT_DASHBOARD_REPORT.md). Aşağıdaki kayıtlar önceki adımların tarihçesidir.
+
+---
+
 # Veri odaklı kompakt panel — 25 Ekim 2026
 
 - [x] Büyük tekrar başlıkları ve intro blokları kaldırıldı. İşlevsel başlıklar ve erişilebilir H1 korunur. Yedi sekmede asıl çalışma alanı 220 px üstünde, KPI 100 px üstünde başlar.

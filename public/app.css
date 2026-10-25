@@ -2668,14 +2668,14 @@ dialog::backdrop {
     font-size: 10px;
   }
 }
-/* Compact data workspace: one toolbar, one set of controls, no hero blocks. */
+/* Keep fixed controls visible; only the months scroll when space narrows. */
 .topbar {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   height: 60px;
   min-height: 60px;
-  padding: 8px 12px;
+  padding: 6px 12px;
   gap: 6px;
 }
 .topbar #sidebarToggle {
@@ -2689,27 +2689,28 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   flex: 1 1 auto;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  scroll-padding: 4px;
 }
-.scope-controls,
+.scope-controls {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
 .topbar-actions {
   display: flex;
   flex: 0 0 auto;
   flex-wrap: nowrap;
   align-items: center;
   gap: 5px;
-}
-.topbar-actions {
   margin-left: auto;
 }
 .year-control {
   position: relative;
-  width: 60px;
-  flex: 0 0 60px;
+  width: 64px;
+  flex: 0 0 64px;
 }
 .year-control select {
   appearance: none;
@@ -2734,45 +2735,62 @@ dialog::backdrop {
 }
 .month-strip {
   display: flex;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   align-items: center;
-  gap: 2px;
-  padding: 2px;
+  min-width: 0;
+  max-width: 685px;
+  gap: 5px;
+  padding: 3px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-padding: 3px;
+}
+.month-strip::-webkit-scrollbar {
+  display: none;
 }
 .month-strip button {
-  flex: 0 0 44px;
-  width: 44px;
-  min-width: 44px;
+  flex: 0 0 52px;
+  width: 52px;
+  min-width: 52px;
   min-height: 36px;
-  padding: 7px 1px;
+  padding: 7px 3px;
   font: inherit;
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: #40516d;
+  opacity: 1;
   white-space: nowrap;
-  border: 1px solid #edf1f7;
+  border: 1px solid #d9e0ea;
   border-radius: 7px;
   background: #f8fafc;
 }
 .month-strip button:hover:not(:disabled) {
+  color: #40516d;
   background: #edf2ff;
 }
-.month-strip [aria-pressed="true"] {
-  color: #fff;
+.month-strip button:disabled {
+  color: #758196;
+  background: #f1f4f8;
+  border-color: #e0e5ed;
+  opacity: 1;
+}
+/* Explicit button specificity outranks the normal hover/not-disabled rule. */
+.month-strip button[aria-pressed="true"],
+.month-strip button[aria-pressed="true"]:hover,
+.month-strip button[aria-pressed="true"]:focus,
+.month-strip button[aria-pressed="true"]:focus-visible,
+.month-strip button[aria-pressed="true"]:active {
+  color: #ffffff;
+  opacity: 1;
   background: #275ce7;
   border-color: #275ce7;
   font-weight: 700;
 }
-.month-strip [aria-pressed="true"]:hover {
+.month-strip button[aria-pressed="true"]:hover {
   background: #214cb9;
 }
-.month-strip button:disabled {
-  color: #768298;
-  opacity: 0.55;
-}
 .range-menu {
-  flex: 0 0 72px;
-  border-left: 1px solid var(--border);
-  padding-left: 5px;
+  flex: 0 0 76px;
+  width: 76px;
 }
 .range-menu summary {
   display: flex;
@@ -2991,6 +3009,51 @@ dialog::backdrop {
 #helpDialog .data-status {
   margin: 0 0 16px;
 }
+@media (min-width: 981px) and (max-width: 1350px) {
+  .topbar {
+    padding-inline: 8px;
+  }
+  .topbar #sidebarToggle {
+    flex-basis: 28px;
+    width: 28px;
+    min-width: 28px;
+  }
+  .toolbar-track,
+  .scope-controls {
+    gap: 6px;
+  }
+  .year-control {
+    width: 60px;
+    flex-basis: 60px;
+  }
+  .month-strip {
+    gap: 4px;
+  }
+  .month-strip button {
+    width: 46px;
+    min-width: 46px;
+    flex-basis: 46px;
+    font-size: 11px;
+    padding-inline: 1px;
+  }
+  .range-menu {
+    width: 70px;
+    flex-basis: 70px;
+  }
+  .topbar-actions {
+    gap: 4px;
+  }
+  .topbar .device-selector select {
+    width: 90px;
+  }
+  .topbar .freshness {
+    width: 78px;
+  }
+  .topbar #help {
+    width: 24px;
+    min-width: 24px;
+  }
+}
 @media (max-width: 980px) {
   .topbar {
     padding-inline: 8px;
@@ -3001,6 +3064,202 @@ dialog::backdrop {
   .leaders-panel .panel-heading {
     gap: 10px;
     align-items: flex-start;
+  }
+}
+@media (max-width: 640px) {
+  .topbar {
+    display: grid;
+    grid-template-columns: 30px 64px minmax(0, 1fr) 76px;
+    grid-template-rows: 44px 44px;
+    gap: 4px 5px;
+    height: 104px;
+    min-height: 104px;
+  }
+  .toolbar-track,
+  .scope-controls {
+    display: contents;
+  }
+  .topbar #sidebarToggle {
+    grid-row: 1;
+    grid-column: 1;
+  }
+  .year-control {
+    grid-row: 1;
+    grid-column: 2;
+  }
+  .topbar-actions {
+    grid-row: 1;
+    grid-column: 3/5;
+    justify-content: flex-end;
+    gap: 4px;
+    margin: 0;
+    min-width: 0;
+  }
+  .topbar #help {
+    display: none;
+  }
+  .month-strip {
+    grid-row: 2;
+    grid-column: 1/4;
+    max-width: none;
+    width: 100%;
+  }
+  .range-menu {
+    grid-row: 2;
+    grid-column: 4;
+  }
+}
+@media (max-width: 350px) {
+  .topbar {
+    grid-template-columns: 30px 58px minmax(0, 1fr) 76px;
+  }
+  .year-control {
+    width: 58px;
+  }
+  .topbar .device-selector select {
+    width: 90px;
+  }
+  .topbar .freshness {
+    width: 72px;
+  }
+  .topbar .avatar {
+    width: 24px;
+    flex-basis: 24px;
+  }
+}
+/* Product density is scoped: query/evidence tables keep their own layout. */
+.product-controls {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 16px 8px;
+}
+.product-controls .table-toolbar {
+  flex: 1 1 240px;
+  padding: 0;
+  min-width: 200px;
+}
+.product-controls .search-field {
+  max-width: none;
+}
+.product-controls .search-field input {
+  min-height: 36px;
+  height: 36px;
+}
+.product-controls .search-field > .icon {
+  top: 10px;
+}
+.product-controls .quick-sort {
+  padding: 0;
+  gap: 6px;
+}
+.product-controls .quick-sort button {
+  min-height: 36px;
+  padding: 6px 9px;
+  font-size: 11px;
+}
+.product-controls .advanced-filters {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 0;
+  margin-left: auto;
+}
+.product-controls .advanced-filters summary {
+  min-height: 36px;
+  padding: 6px 9px;
+  border: 1px solid #d9e0ea;
+  border-radius: 7px;
+  background: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.product-controls .advanced-filters[open] > .inline-controls {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 5;
+  width: 240px;
+  max-width: calc(100vw - 40px);
+  margin: 0;
+  padding: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid #d9e0ea;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px #14243e1a;
+}
+.product-controls .advanced-filters select {
+  width: 100%;
+  max-width: none;
+}
+#products table {
+  min-width: 960px;
+}
+#products th {
+  padding: 7px 12px;
+}
+#products th:first-child,
+#products td:first-child {
+  padding-left: 16px;
+}
+#products th:last-child,
+#products td:last-child {
+  padding-right: 16px;
+}
+#products tbody tr,
+#products td {
+  height: 60px;
+}
+#products td {
+  padding: 8px 12px;
+  line-height: 1.35;
+  vertical-align: middle;
+}
+#products .row-product {
+  gap: 8px;
+}
+#products .product-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  font-size: 10px;
+}
+#products .cell-name {
+  min-height: 24px;
+  line-height: 24px;
+  font-size: 12px;
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#products .cell-subtitle {
+  margin-top: 1px;
+  line-height: 13px;
+  font-size: 10px;
+  color: #65748b;
+}
+#products .row-action {
+  min-height: 28px;
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .product-controls {
+    padding-inline: 12px;
+  }
+  .product-controls .table-toolbar {
+    flex-basis: 100%;
+  }
+  .product-controls .quick-sort {
+    flex: 1 1 auto;
+  }
+  .product-controls .quick-sort button {
+    padding-inline: 7px;
+    font-size: 10.5px;
   }
 }
 .leaders-panel {

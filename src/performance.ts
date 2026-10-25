@@ -1,3 +1,4 @@
+import {boundedDataScope} from './d1-read-budget';
 import { selectedPeriods, rangeCount, periodSelection } from "./periods";
 import { Env, dateDaysAgo } from "./types";
 import {
@@ -39,6 +40,7 @@ async function daily(
   device: string | null,
   time: Date,
 ): Promise<Daily[]> {
+  await boundedDataScope(env,start,end,scope);
   return (
     await env.DB.prepare(
       `SELECT c.day,c.dataset_id,c.row_count,c.fetched_at,count(d.dataset_id) actual_rows,
@@ -51,7 +53,7 @@ async function daily(
     sum(CASE WHEN ? IS NULL OR d.device=? THEN d.clicks END) clicks,
     sum(CASE WHEN ? IS NULL OR d.device=? THEN d.impressions END) impressions,
     sum(CASE WHEN ? IS NULL OR d.device=? THEN d.position*d.impressions END) weighted_position
-    FROM dataset_coverage c LEFT JOIN ${tables[scope]} d ON d.dataset_id=c.dataset_id AND d.date=c.day
+    FROM dataset_coverage c INDEXED BY coverage_active LEFT JOIN ${tables[scope]} d ON d.dataset_id=c.dataset_id AND d.date=c.day
     WHERE c.provider='gsc' AND c.scope=? AND c.complete=1 AND c.day BETWEEN ? AND ? AND c.day<=?
     GROUP BY c.day,c.dataset_id,c.row_count,c.fetched_at ORDER BY c.day`,
     )
@@ -126,7 +128,7 @@ async function productMetrics(
  CASE WHEN d.date>=? THEN 'current' ELSE 'previous' END period,
  count(*) selected_rows,count(DISTINCT d.date) observed_days,sum(d.clicks) clicks,sum(d.impressions) impressions,
  sum(d.position*d.impressions) weighted_position,max(c.fetched_at) fetched_at
- FROM gsc_daily_by_page d JOIN dataset_coverage c ON c.provider='gsc' AND c.scope='page' AND c.complete=1 AND c.dataset_id=d.dataset_id AND c.day=d.date
+ FROM dataset_coverage c INDEXED BY coverage_active CROSS JOIN gsc_daily_by_page d ON c.provider='gsc' AND c.scope='page' AND c.complete=1 AND c.dataset_id=d.dataset_id AND c.day=d.date
  LEFT JOIN products p ON p.canonical_url=d.page
  LEFT JOIN pages pg ON pg.url=d.page
  LEFT JOIN page_aliases a ON a.alias_url=d.page
@@ -333,7 +335,7 @@ export async function performanceQueries(
       `SELECT d.query,d.page,d.device,d.is_brand,p.id product_id,p.name product_name,
     sum(d.clicks) clicks,sum(d.impressions) impressions,CASE WHEN sum(d.impressions)>0 THEN sum(d.clicks)/sum(d.impressions) END ctr,
     CASE WHEN sum(d.impressions)>0 THEN sum(d.position*d.impressions)/sum(d.impressions) END position,max(c.fetched_at) fetched_at
-    FROM gsc_daily_by_query_device d JOIN dataset_coverage c ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider='gsc' AND c.scope='query' AND c.complete=1
+    FROM dataset_coverage c INDEXED BY coverage_active CROSS JOIN gsc_daily_by_query_device d ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider='gsc' AND c.scope='query' AND c.complete=1
     LEFT JOIN products p ON p.canonical_url=d.page AND p.url_verified_at IS NOT NULL
     WHERE d.dataset_id IN (SELECT value FROM json_each(?)) AND (? IS NULL OR d.device=?)
     AND lower(replace(replace(d.query,'İ','i'),'I','ı')) LIKE ? ESCAPE '\\'

@@ -13,11 +13,21 @@ import {dataIntegrity} from './data-integrity';
 import {reserveSyncPage,settleSyncPage,syncBudget} from './sync-budget';
 import {performance,performanceQueries,deviceFilter} from './performance';
 import {calendarMonth,periodSelection,rangeCount} from './periods';
+import {cachedRead} from './read-cache';
+import {withReadBudget,readBudgetStatus,D1BudgetError,originalDatabase} from './d1-read-budget';
 
 const RUNTIME_REVISION='gsc-catchup-v1';
-function deploymentInfo(env:Env){const metadata=env.CF_VERSION_METADATA;return {runtime_revision:RUNTIME_REVISION,version_id:metadata?.id&&/^[a-f0-9-]{36}$/i.test(metadata.id)?metadata.id:null,commit:metadata?.tag&&/^[a-f0-9]{40}$/.test(metadata.tag)?metadata.tag:null};}
+function deploymentInfo(env:Env){const metadata=env.CF_VERSION_METADATA;return {runtime_revision:RUNTIME_REVISION,read_guard_revision:'d1-account-reads-v1',version_id:metadata?.id&&/^[a-f0-9-]{36}$/i.test(metadata.id)?metadata.id:null,commit:metadata?.tag&&/^[a-f0-9]{40}$/.test(metadata.tag)?metadata.tag:null};}
 
+const reportFlights=new WeakMap<D1Database,Map<string,Promise<AnalysisReport>>>();
 export async function getReport(env:Env,month:string,options:AnalysisOptions={}):Promise<AnalysisReport>{
+  const db=originalDatabase(env.DB),key=JSON.stringify([month,options]);
+  let flights=reportFlights.get(db);if(!flights){flights=new Map();reportFlights.set(db,flights);}
+  const existing=flights.get(key);if(existing)return existing;
+  const task=buildReport(env,month,options);flights.set(key,task);
+  try{return await task;}finally{if(flights.get(key)===task)flights.delete(key);}
+}
+async function buildReport(env:Env,month:string,options:AnalysisOptions={}):Promise<AnalysisReport>{
   monthPeriod(month);
   if(month<'2020-01'||month>calendarMonth())throw new Error('INVALID_MONTH');
   const period=options.current||monthPeriod(month);
@@ -29,7 +39,7 @@ export async function getReport(env:Env,month:string,options:AnalysisOptions={})
     AND json_extract(result_json,'$.sources.google_connected')=EXISTS(SELECT 1 FROM oauth_credentials WHERE provider='google')
     AND created_at>=COALESCE((SELECT MAX(stamp) FROM (
       SELECT MAX(fetched_at) AS stamp FROM dataset_coverage UNION ALL SELECT MAX(updated_at) FROM oauth_credentials
-      UNION ALL SELECT MAX(checked_at) FROM health_checks UNION ALL SELECT MAX(url_verified_at) FROM products
+      UNION ALL SELECT MAX(checked_at) FROM health_checks WHERE provider IN ('gsc','ga4') UNION ALL SELECT MAX(url_verified_at) FROM products
       UNION ALL SELECT MAX(imported_at) FROM keyword_sources)), '')
     ORDER BY created_at DESC LIMIT 1`).bind(period.start,period.end,options.current?`${options.current.start}/${options.current.end}`:month,ENGINE_VERSION,options.device||null).first<{result_json:string;created_at:string;health_checked_at:string|null;health_status:string|null;coverage_fetched_at:string|null}>();
   if(cached){const result=JSON.parse(cached.result_json) as AnalysisReport;const recent=(stamp:string|null,limit:number)=>!!stamp&&Date.now()-Date.parse(stamp)>=0&&Date.now()-Date.parse(stamp)<limit;
@@ -44,12 +54,16 @@ function reportSelection(params:URLSearchParams){const selected=periodSelection(
 async function route(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url),path=url.pathname;
   if(request.method==='GET'&&path==='/api/health')return json({ok:true,service:'Mavi Basım SEO Karar Merkezi',deployment:deploymentInfo(env)});
-  if(request.method==='POST'&&path==='/api/session')return login(request,env);
-  if(request.method==='GET'&&path==='/api/oauth/google/callback')return oauthCallback(request,env);
+  if(request.method==='POST'&&path==='/api/session')return withReadBudget(env,path,safe=>login(request,safe));
+  if(request.method==='GET'&&path==='/api/oauth/google/callback')return withReadBudget(env,path,safe=>oauthCallback(request,safe));
   if(!path.startsWith('/api/'))return env.ASSETS.fetch(request);
   if(!await authenticated(request,env))return json({error:'Giriş yapmanız gerekiyor.'},401);
   if(!['GET','HEAD'].includes(request.method)&&!safeOrigin(request))return json({error:'Geçersiz istek kaynağı.'},403);
   if(request.method==='DELETE'&&path==='/api/session')return new Response(null,{status:204,headers:{'Set-Cookie':'mavi_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'}});
+  return withReadBudget(env,path,safe=>dataRoute(request,safe));
+}
+async function dataRoute(request:Request,env:Env):Promise<Response>{
+  const url=new URL(request.url),path=url.pathname;
   if(request.method==='POST'&&path==='/api/oauth/google/start')return oauthStart(env);
   if(request.method==='GET'&&path==='/api/gsc/verify')return json(await verifyGscAccess(env));
   if(request.method==='POST'&&path==='/api/gsc/pilot')return json(await pilotGscDay(env));
@@ -65,16 +79,16 @@ async function route(request:Request,env:Env):Promise<Response>{
       priorityProgress(env),
       env.DB.prepare("SELECT j.day,j.scope,r.started_at,r.finished_at,r.status,r.rows_received FROM sync_runs r JOIN sync_jobs j ON j.id=r.job_id WHERE j.provider='gsc' ORDER BY r.started_at DESC LIMIT 8").all(),
     ]);
-    return json({sync_budget:await syncBudget(env),deployment:deploymentInfo(env),catchup_enabled:env.CATCHUP_ENABLED==='true',priority_progress:priority,recent_sync_runs:lastRuns.results,google_connected:!!google,ga4_configured:!!env.GA4_PROPERTY_ID,ads_configured:env.ENABLE_GOOGLE_ADS==='true'&&!!env.GOOGLE_ADS_DEVELOPER_TOKEN,crawl_enabled:env.CRAWL_ENABLED==='true',automation_enabled:env.AUTOMATION_ENABLED==='true',health:health.results,jobs:jobs.results,crawls:crawls.results,coverage:coverage.results,job_diagnostics:jobDiagnostics.results,recent_failures:recentFailures.results,
+    return json({read_budget:await readBudgetStatus(env),sync_budget:await syncBudget(env),deployment:deploymentInfo(env),catchup_enabled:env.CATCHUP_ENABLED==='true',priority_progress:priority,recent_sync_runs:lastRuns.results,google_connected:!!google,ga4_configured:!!env.GA4_PROPERTY_ID,ads_configured:env.ENABLE_GOOGLE_ADS==='true'&&!!env.GOOGLE_ADS_DEVELOPER_TOKEN,crawl_enabled:env.CRAWL_ENABLED==='true',automation_enabled:env.AUTOMATION_ENABLED==='true',health:health.results,jobs:jobs.results,crawls:crawls.results,coverage:coverage.results,job_diagnostics:jobDiagnostics.results,recent_failures:recentFailures.results,
       note:'Yapılandırma veya OAuth kaydı başarılı API erişimi anlamına gelmez; günlük sağlık sonuçlarını kontrol edin.'});
   }
-  if(request.method==='GET'&&path==='/api/data-integrity'){const selected=reportSelection(url.searchParams);return json(await dataIntegrity(env,selected.month,new Date(),selected.options));}
+  if(request.method==='GET'&&path==='/api/data-integrity'){const selected=reportSelection(url.searchParams);return json(await dataIntegrity(env,selected.month,new Date(),selected.options,await getReport(env,selected.month,selected.options)));}
   if(request.method==='GET'&&path==='/api/audit-history')return json({rows:(await env.DB.prepare("SELECT id,kind,created_at,result_json FROM insight_runs WHERE kind IN ('data-integrity','sync-audit') AND id>? ORDER BY id LIMIT 50").bind(url.searchParams.get('after')||'').all()).results});
   if(request.method==='GET'&&path==='/api/change-calendar')return json({rows:await changeCalendar(env,url.searchParams.get('day')||new Date().toISOString().slice(0,10),url.searchParams.get('after')||''),timezone:'UTC',note:'Takvim tespit tarihidir; kesin yayın tarihi değildir.'});
   if(request.method==='GET'&&path==='/api/change-impact')return json(await changeImpact(env,url.searchParams.get('id')||''));
   if(request.method==='GET'&&path==='/api/radar'){if(url.searchParams.has('month')||url.searchParams.has('rangeMonths')){const selected=reportSelection(url.searchParams);return json(await radar(env,await getReport(env,selected.month,selected.options)));}const plan=parseQuestion('Son 28 günde hangi ürünler yükseldi?',[]);return json(await radar(env,await getReport(env,plan.context.month,{current:plan.period,previous:plan.previous})));}
-  if(request.method==='GET'&&path==='/api/performance')return json(await performance(env,url.searchParams.get('month')||lastCompleteMonth(),deviceFilter(url.searchParams.get('device')),new Date(),rangeCount(url.searchParams.get('rangeMonths'))));
-  if(request.method==='GET'&&path==='/api/performance/queries')return json(await performanceQueries(env,url.searchParams));
+  if(request.method==='GET'&&path==='/api/performance')return json(await cachedRead(env,path+'?'+url.searchParams.toString(),()=>performance(env,url.searchParams.get('month')||lastCompleteMonth(),deviceFilter(url.searchParams.get('device')),new Date(),rangeCount(url.searchParams.get('rangeMonths')))));
+  if(request.method==='GET'&&path==='/api/performance/queries')return json(await cachedRead(env,path+'?'+url.searchParams.toString(),()=>performanceQueries(env,url.searchParams)));
   if(request.method==='GET'&&path==='/api/report'){const selected=reportSelection(url.searchParams);return json(await getReport(env,selected.month,selected.options));}
   if(request.method==='POST'&&path==='/api/questions'){
     const body=await request.json() as {question?:unknown;month?:unknown;previous_question_id?:unknown;rangeMonths?:unknown;device?:unknown};
@@ -123,24 +137,33 @@ async function route(request:Request,env:Env):Promise<Response>{
 export interface TickResult {phase:'disabled'|'idle'|'planned'|'crawl'|'outcome'|'processed'|'budget';pages:number}
 export async function tick(env:Env,fetcher:typeof fetch=fetch,time=new Date(),source:'manual'|'cron'='manual'):Promise<TickResult>{
   if(env.AUTOMATION_ENABLED!=='true')return {phase:'disabled',pages:0};
-  if(source==='cron'&&time.getUTCMinutes()%15!==0){
-    if(env.CATCHUP_ENABLED!=='true'||(await priorityProgress(env,time)).complete)return {phase:'idle',pages:0};
-  }
+  if(source==='cron'&&time.getUTCMinutes()%15!==0)return {phase:'idle',pages:0};
+  return withReadBudget(env,'cron',async safe=>{
+    const result=await tickWork(safe,fetcher,time,source);
+    if(source==='cron')await safe.DB.prepare("INSERT INTO health_checks VALUES('scheduler',?,?,?,?) ON CONFLICT(provider,day) DO UPDATE SET checked_at=excluded.checked_at,status=excluded.status,code=excluded.code")
+      .bind(time.toISOString().slice(0,10),time.toISOString(),result.phase==='budget'?'partial':'ok',result.phase==='planned'?'PLANNED':result.pages?'PAGES_'+result.pages:result.phase==='budget'?'DAILY_WRITE_BUDGET':'IDLE_NO_READY_JOB').run();
+    return result;
+  },time);
+}
+async function tickWork(env:Env,fetcher:typeof fetch,time:Date,source:'manual'|'cron'):Promise<TickResult>{
   if(await enqueueDaily(env,time)){await enqueueAds(env);return {phase:'planned',pages:0};}
   if(env.CRAWL_ENABLED==='true'&&time.getUTCMinutes()===45){await seedCrawl(env);await crawlOne(env,fetcher);return {phase:'crawl',pages:0};}
   if(time.getUTCMinutes()===30&&time.getUTCHours()%4===0&&await measureOneOutcome(env,time))return {phase:'outcome',pages:0};
   let processed=0,budgetPaused=false;
-  for(let i=0;i<3;i++){
+  const pageLimit=env.SYNC_MAX_PAGES_PER_TICK===undefined?3:Math.max(1,Math.min(3,Number(env.SYNC_MAX_PAGES_PER_TICK)||1));
+  for(let i=0;i<pageLimit;i++){
     const budgeted=env.CATCHUP_ENABLED==='true';
     if(budgeted&&!await reserveSyncPage(env,time)){budgetPaused=true;break;}
-    const job=await claimJob(env,time,i%2===0?'history':'recent');
+    // With a single page per event, keep fresh days moving while backfilling.
+    const priority=pageLimit===1?(Math.floor(time.getTime()/900_000)%3===1?'recent':'history'):(i%2===0?'history':'recent');
+    const job=await claimJob(env,time,priority);
     if(!job){if(budgeted)await settleSyncPage(env,time,0);break;}
-    const written=await processJob(env,job,fetcher);processed++;
+    const written=await processJob(env,job,fetcher,source);processed++;
     if(budgeted)await settleSyncPage(env,time,written);
   }
   if(processed)return {phase:'processed',pages:processed};
   if(budgetPaused)return {phase:'budget',pages:0};
-  await seedCrawl(env);await crawlOne(env,fetcher);await measureOneOutcome(env,time);
+  await crawlOne(env,fetcher);
   return {phase:'idle',pages:0};
 }
 export default {
@@ -154,6 +177,7 @@ export default {
       }
       return securityHeaders(await route(request,env));
     }catch(error){
+      if(error instanceof D1BudgetError)return securityHeaders(json({error:'Ücretsiz D1 okuma bütçesi veya güncel kota doğrulaması bekleniyor. Kayıtlar korunuyor; aktarım uygun bütçeyle devam edecek.',code:error.code},429));
       const code=error instanceof ProviderError?error.code:error instanceof Error?error.message:'UNKNOWN';
       if(code==='AUDIT_ROW_LIMIT')return securityHeaders(json({error:'Seçili dönem ayrıntılı denetim sınırını aşıyor; daha kısa bir dönem seçin. Kaynak veriler korundu.',code},422));
       const invalid=['INVALID_MONTH','INVALID_RANGE','INVALID_DEVICE','INVALID_QUERY_SORT','INVALID_QUERY_PAGE','INVALID_QUERY_FILTER','INVALID_QUESTION','INVALID_QUESTION_CONTEXT','INVALID_APPLIED_CHANGE','INVALID_CHANGE_DAY','INVALID_CHANGE_ID','CHANGE_NOT_FOUND'].includes(code)||error instanceof SyntaxError;
@@ -164,14 +188,11 @@ export default {
     try{
       const time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
       const result=await tick(env,fetch,time,'cron');
-      if((result.phase==='idle'||result.phase==='budget')&&time.getUTCMinutes()%15!==0)return;
-      const stamp=nowISO();
-      await env.DB.prepare("INSERT INTO health_checks VALUES('scheduler',?,?,?,?) ON CONFLICT(provider,day) DO UPDATE SET checked_at=excluded.checked_at,status=excluded.status,code=excluded.code")
-        .bind(stamp.slice(0,10),stamp,result.phase==='budget'?'partial':'ok',result.phase==='planned'?'PLANNED':result.pages?'PAGES_'+result.pages:result.phase==='budget'?'DAILY_WRITE_BUDGET':'IDLE_NO_READY_JOB').run();
-    }catch{
-      const stamp=nowISO();
-      await env.DB.prepare("INSERT INTO health_checks VALUES('scheduler',?,?,?,?) ON CONFLICT(provider,day) DO UPDATE SET checked_at=excluded.checked_at,status=excluded.status,code=excluded.code")
-        .bind(stamp.slice(0,10),stamp,'failed','SCHEDULER_FAILED').run().catch(()=>{throw new Error('SCHEDULER_PERSISTENCE_UNAVAILABLE');});
+      if(time.getUTCMinutes()%15!==0)return;
+    }catch(error){
+      // A blocked/expired quota lease must not cause an unbudgeted error write.
+      if(error instanceof D1BudgetError)return;
+      throw new Error('SCHEDULER_FAILED_NO_UNBUDGETED_RETRY');
     }
   })());},
 };

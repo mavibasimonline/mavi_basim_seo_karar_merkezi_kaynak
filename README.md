@@ -6,6 +6,8 @@ Fırsat radarı: [kabul ve sınırlar](SEO_OPPORTUNITY_RADAR_REPORT.md).
 
 # Mavi Basım SEO Karar Merkezi
 
+**25 Ekim D1 kota olayı:** Üretim Cron'u 15 dakikaya indirildi. Tekrarlanan rapor okumalarını azaltan önbellek/indeks düzeltmeleri, hesap geneli okuma koruması ve gerçek kabul araçları [PR #22](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/22) içinde hazır; **450 test / kod CI 40209576264 başarılı**. PR #21 arayüzü korunur. **Yeni kod henüz canlı değil; üretim kabulü bekliyor.** Kota 26 Ekim 03.00 Türkiye'de yenilenir. Hesap sahibi otomatik Git yayınını kapattığını bildirdi. Kontrollü yayın için yalnız 26 Ekim 03.17–05.47 Türkiye aralığında altı sınırlı deneme hazırlandı; her deneme başarılı main CI, kota, gerçek sürüm ve migration kapılarına bağlıdır. Saatlik gözlemci, gerçek okuma koruması yayımlanmadan D1'e erişmez. Güncel 467 testlik devam kaydı TODO.md başındadır. [Kanıt, sınırlar ve devam adımları](D1_READ_QUOTA_INCIDENT.md), güncel [TODO.md](TODO.md). Aşağıdaki önceki tarihli yayın kayıtları tarihçedir.
+
 Üretime geçiş: [hesap/dağıtım/OAuth yönergesi](docs/PRODUCTION.md), [ilk gerçek veri kabulü](docs/PRODUCTION_ACCEPTANCE.md), [main ve güvenlik denetimi](docs/RELEASE_REVIEW.md). Çalışan uygulama korunur; üretim kaynakları bu oturumda oluşturulmadı.
 
 Türkçe soru-cevap ve takip bağlamı: [kabul raporu](QUESTION_ANSWER_TEST_REPORT.md). Son 28/30 kesinleşmiş gün, cihaz, koruma, öncelik ve mevcut değişiklik sonuçları desteklenir; ücretli model kullanılmaz.
@@ -19,6 +21,10 @@ Türkçe tek ekran paneli, Cloudflare Worker API'si, D1/SQLite veri modeli, gün
 **Panel yayını (25 Ekim 2026, Türkiye):** [Canlı uygulama](https://mavi-basim-seo-prod.mavibasimonline.workers.dev) yenilendi; PR #13 ve main CI başarılı, kontrollü yayın **40135545161** ve canlı masaüstü/mobil giriş kabulü geçti. Mevcut otomatik aktarım ve kaynaklar korunur; aşağıdaki tarihli geçmiş veri sınırları sürer.
 
 Gerçek üretim devamı (25 Ekim 01:16 Türkiye): [29 ürünün gerçek tarama kabulü, eksik aylık GSC kapsamı ve sonraki otomatik kontrol](PRODUCTION_CONTINUITY_REPORT.md). Tam aylık rapor kabulü henüz geçmedi.
+
+**25 Ekim 2026 kompakt arayüz yayını:** PR #19/main CI başarılı, 374 test geçti. Mevcut Git otomatik yayınının canlı 12 arayüz dosyası main ile eşleşir. Kontrollü tam yayın kabulü günlük D1 okuma güvenlik eşiği nedeniyle bekler; tamamlandı sayılmaz. Gerçek kota/sürüm kanıtı ve sonraki adım [kontrol noktası raporunda](COMPACT_DASHBOARD_REPORT.md) ve TODO.md içindedir.
+
+**Hazır düzeltme — ay durumları ve tablo yoğunluğu:** `fix/month-states-and-table-density` dalında aylar 4–6 px aralıklı, seçili yazı hover/focus/active durumlarında açıkça beyaz; ürün satırları 60 px, filtreler kompakt. 382 test ve tarayıcı görüntüleri [kabul raporunda](MONTH_TABLE_DENSITY_REPORT.md). Yeni düzeltme henüz yayımlanmadı: 25 Ekim 16:50 Türkiye tanılamasında D1 okuma 5.039.419; yayın kapısı 4.000.000 nedeniyle kapalı. Mevcut üretim korunur.
 
 ## Dönem seçimi ve kullanım
 

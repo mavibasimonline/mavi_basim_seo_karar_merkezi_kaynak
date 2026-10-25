@@ -68,8 +68,23 @@ export function setupPeriod(viewNames, onChange) {
     } catch {}
   }
   function draw() {
-    const focusedMonth = document.activeElement?.dataset?.month;
     $("pickerYear").value = String(year);
+    if ($("monthGrid").dataset.year === String(year)) {
+      $("monthGrid")
+        .querySelectorAll("button")
+        .forEach((b) => {
+          b.setAttribute(
+            "aria-pressed",
+            String(
+              $("rangeMonths").value === "1" &&
+                $("month").value === b.dataset.month,
+            ),
+          );
+        });
+      return;
+    }
+    const focusedMonth = document.activeElement?.dataset?.month;
+    $("monthGrid").dataset.year = String(year);
     $("monthGrid").replaceChildren(
       ...Array.from({ length: 12 }, (_, i) => {
         const value = year + "-" + String(i + 1).padStart(2, "0"),
@@ -118,7 +133,7 @@ export function setupPeriod(viewNames, onChange) {
         '[data-month=\"' + $("month").value + '\"]',
       );
       if (b) {
-        const track = $("toolbarTrack"),
+        const track = $("monthGrid"),
           r = track.getBoundingClientRect(),
           v = b.getBoundingClientRect();
         if (r.width && (v.left < r.left || v.right > r.right))
@@ -174,18 +189,6 @@ export function setupPeriod(viewNames, onChange) {
     );
   }
   $("rangeMenu").addEventListener("toggle", positionRangeMenu);
-  $("toolbarTrack").addEventListener(
-    "scroll",
-    () => {
-      if (!$("rangeMenu").open) return;
-      const anchor = $("rangeToggle").getBoundingClientRect(),
-        track = $("toolbarTrack").getBoundingClientRect();
-      if (anchor.right <= track.left || anchor.left >= track.right)
-        $("rangeMenu").open = false;
-      else positionRangeMenu();
-    },
-    { passive: true },
-  );
   addEventListener("resize", positionRangeMenu);
   $("rangeMenu").addEventListener("keydown", (e) => {
     if (e.key === "Escape") {

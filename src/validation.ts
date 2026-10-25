@@ -6,9 +6,9 @@ async function aggregate(env:Env,report:AnalysisReport,scope:'page'|'query',dime
  const table=scope==='page'?'gsc_daily_by_page':'gsc_daily_by_query_device',extra=dimension?`,d.${dimension}`:'';
  const rows=await env.DB.prepare(`SELECT COALESCE(p.id,pg.product_id,pc.id) product_id,CASE WHEN d.date>=? THEN 'current' ELSE 'previous' END period${extra},
  SUM(d.clicks) clicks,SUM(d.impressions) impressions,SUM(d.clicks)*1.0/NULLIF(SUM(d.impressions),0) ctr,SUM(d.position*d.impressions)*1.0/NULLIF(SUM(d.impressions),0) position
- FROM ${table} d JOIN dataset_coverage c ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider='gsc' AND c.scope=? AND c.complete=1
+ FROM dataset_coverage c INDEXED BY coverage_active CROSS JOIN ${table} d ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider='gsc' AND c.scope=? AND c.complete=1
  LEFT JOIN products p ON p.canonical_url=d.page LEFT JOIN pages pg ON pg.url=d.page LEFT JOIN page_aliases a ON a.alias_url=d.page LEFT JOIN products pc ON pc.canonical_url=a.canonical_url
- WHERE ((d.date BETWEEN ? AND ?) OR (d.date BETWEEN ? AND ?)) AND (? IS NULL OR d.device=?)
+ WHERE ((c.day BETWEEN ? AND ?) OR (c.day BETWEEN ? AND ?)) AND (? IS NULL OR d.device=?)
  GROUP BY COALESCE(p.id,pg.product_id,pc.id),period${extra} LIMIT 50001`).bind(report.period.start,scope,report.previous_period.start,report.previous_period.end,report.period.start,report.period.end,report.filters?.device||null,report.filters?.device||null).all<SumRow>();
  if(rows.results.length>50000)throw new Error('VALIDATION_ROW_LIMIT');return rows.results;
 }
@@ -26,7 +26,8 @@ export function metricErrors(actual:Metrics|null|undefined,expected:Metrics|null
 }
 export async function validateAnalysis(env:Env,report:AnalysisReport):Promise<string[]> {
  const errors:string[]=[];
- const [rows,devices,queries,brands]=await Promise.all([aggregate(env,report,'page'),aggregate(env,report,'page','device'),aggregate(env,report,'query','query'),aggregate(env,report,'query','is_brand')]);
+ const [rows,devices]=await Promise.all([aggregate(env,report,'page'),aggregate(env,report,'page','device')]);
+ const [queries,brands]=await Promise.all([aggregate(env,report,'query','query'),aggregate(env,report,'query','is_brand')]);
  const key=(id:string|null,period:string,value:unknown)=>JSON.stringify([id,period,value]);
  const deviceMap=new Map(devices.map(r=>[key(r.product_id,r.period,r.device),r]));
  const queryMap=new Map(queries.map(r=>[key(r.product_id,r.period,r.query),r]));

@@ -1,3 +1,4 @@
+import {D1BudgetError} from './d1-read-budget';
 import { Env, Fetch, dateDaysAgo, nowISO } from './types';
 import { ProviderError } from './google';
 import { fetchGsc, fetchGa4, fetchKeywordPlanner, GscRow, Ga4Row } from './providers';
@@ -121,9 +122,9 @@ async function storePage(env: Env, job: Job, rows: GscRow[] | Ga4Row[], next: nu
   statements.push(env.DB.prepare("UPDATE sync_runs SET status='done',finished_at=?,rows_received=? WHERE id=?").bind(stamp,rows.length,run));
   return writtenRows(await env.DB.batch(statements));
 }
-export async function processJob(env: Env, job: Job, fetcher: Fetch = fetch): Promise<number> {
+export async function processJob(env: Env, job: Job, fetcher: Fetch = fetch, source:'manual'|'cron'='manual'): Promise<number> {
   const run = crypto.randomUUID();
-  const started=await env.DB.prepare("INSERT INTO sync_runs(id,job_id,started_at,status) VALUES(?,?,?,'running')").bind(run,job.id,nowISO()).run();
+  const started=await env.DB.prepare("INSERT INTO sync_runs(id,job_id,started_at,status,trigger_source) VALUES(?,?,?,'running',?)").bind(run,job.id,nowISO(),source).run();
   const initial=writtenRows([started]);
   try {
     if (job.provider === 'gsc') {
@@ -144,6 +145,7 @@ export async function processJob(env: Env, job: Job, fetcher: Fetch = fetch): Pr
       ]));
     } else throw new ProviderError('UNKNOWN_PROVIDER');
   } catch (error) {
+    if(error instanceof D1BudgetError)throw error;
     const failure = error instanceof ProviderError ? error : new ProviderError('INTERNAL_SYNC_ERROR',true);
     const attempts = job.attempts + 1;
     const retry = failure.retryable && attempts < 6;

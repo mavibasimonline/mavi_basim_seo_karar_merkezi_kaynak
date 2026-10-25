@@ -6,14 +6,44 @@ on:
         description: Tanılamada doğrulanan mevcut Worker version UUID
         required: true
         type: string
+  schedule:
+    - cron: '17,47 0-2 26 10 *' # One-time recovery window; script rejects any date except 2026-10-26.
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: mavi-production-deployment
   cancel-in-progress: false
 jobs:
-  deploy:
+  prepare:
     if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      needed: ${{ steps.ready.outputs.needed }}
+      previous_version: ${{ steps.ready.outputs.previous_version }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GITHUB_TOKEN: ${{ github.token }}
+      EXPECTED_PREVIOUS_VERSION: ${{ inputs.previous_version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: D1 okumadan yenilenme tarihi, tam main CI ve gerçek sürümü kontrol et
+        id: ready
+        run: python3 scripts/release_readiness.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: release-readiness-${{ github.run_id }}
+          path: .local/release-readiness.json
+          retention-days: 3
+          if-no-files-found: ignore
+  deploy:
+    needs: prepare
+    if: github.ref_name == 'main' && needs.prepare.outputs.needed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
@@ -36,7 +66,7 @@ jobs:
       - name: Canlı sürümü ve korunan ayarları doğrula
         id: guard
         env:
-          EXPECTED_PREVIOUS_VERSION: ${{ inputs.previous_version }}
+          EXPECTED_PREVIOUS_VERSION: ${{ needs.prepare.outputs.previous_version }}
         run: python3 scripts/production_guard.py preflight
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -45,16 +75,22 @@ jobs:
           retention-days: 7
       - name: Kaynak ve bağımsız Worker hedefini doğrula
         run: python3 scripts/release_checks.py --base HEAD
+      - name: Kota yenilenmeden migration veya yeni aktarım başlatma
+        run: |
+          python3 -c "from datetime import datetime,timezone; from pathlib import Path; import sys; sys.path.insert(0,'scripts'); from d1_quota_checkpoint import NOT_BEFORE; assert datetime.now(timezone.utc)>=NOT_BEFORE, 'WAIT_FOR_UTC_QUOTA_RESET'"
+          node scripts/run.mjs wrangler d1 migrations apply DB --remote --config deploy/wrangler.production.jsonc
+          python3 scripts/d1_quota_checkpoint.py
       - name: Aynı Worker'a, mevcut secret ve D1 binding'lerini koruyarak yayımla
         id: publish
-        run: node scripts/run.mjs wrangler deploy --config deploy/wrangler.production.jsonc --keep-vars --tag "$GITHUB_SHA" --message "GSC queue $GITHUB_SHA"
+        run: node scripts/run.mjs wrangler deploy --config deploy/wrangler.production.jsonc --keep-vars --var D1_READ_GUARD_ENABLED:true --var SYNC_MAX_PAGES_PER_TICK:1 --tag "$GITHUB_SHA" --message "GSC queue $GITHUB_SHA"
       - name: Gerçek HTTP yanıtında tam commit'i doğrula
         id: smoke
         run: python3 scripts/production_guard.py smoke
-      - name: Yeni yayın doğrulanmazsa önceki Cron ve Worker sürümüne dön
+      - name: Yeni yayın doğrulanmazsa Cron’u tut ve önceki Worker sürümüne dön
         if: failure() && steps.publish.outcome == 'success' && steps.smoke.outcome != 'success'
         env:
           PREVIOUS_VERSION: ${{ steps.guard.outputs.previous_version }}
         run: |
-          python3 scripts/production_guard.py restore-cron
+          python3 scripts/production_guard.py pause-cron
           node scripts/run.mjs wrangler rollback "$PREVIOUS_VERSION" --config deploy/wrangler.production.jsonc --message "Automatic rollback after failed release verification" --yes
+          python3 scripts/production_guard.py pause-cron

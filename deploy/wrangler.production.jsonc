@@ -29,11 +29,13 @@
     "CATCHUP_ENABLED": "true",
     "SYNC_DAILY_WRITE_LIMIT": "60000",
     "SYNC_INITIAL_BUDGET_DAY": "2026-10-24",
-    "SYNC_INITIAL_WRITE_LIMIT": "10000"
+    "SYNC_INITIAL_WRITE_LIMIT": "10000",
+    "D1_READ_GUARD_ENABLED": "true",
+    "SYNC_MAX_PAGES_PER_TICK": "1"
   },
   "triggers": {
     "crons": [
-      "* * * * *"
+      "*/15 * * * *"
     ]
   },
   "observability": {

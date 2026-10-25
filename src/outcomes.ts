@@ -1,3 +1,4 @@
+import {boundedDataScope} from './d1-read-budget';
 import { Env, nowISO } from './types';
 
 export async function recordAppliedChange(env:Env,input:{recommendation_id:string;applied_at:string;evidence:string;old:unknown;new:unknown}):Promise<string>{
@@ -26,6 +27,7 @@ export async function measureOneOutcome(env:Env,time=new Date()):Promise<boolean
   for(const period of [ranges.before,ranges.after]){
     for(let day=Date.parse(period.start);day<=Date.parse(period.end);day+=86400_000)if(!coverage.results.some(c=>c.day===new Date(day).toISOString().slice(0,10))){await defer('Önce/sonra döneminin Google günlük kapsamı eksik.');return true;}
   }
+  await boundedDataScope(env,ranges.before.start,ranges.after.end,'page');
   const result:Record<string,unknown>={ranges,application_day_excluded:true,limitation:'Önce/sonra farkı nedensellik kanıtı değildir. Diğer sayfalar yalnızca gözlemsel kontrol grubudur; mevsimsellik kesin olarak elenemez.'};
   for(const [label,range] of Object.entries(ranges)){
     result[label]=(await env.DB.prepare(`SELECT CASE WHEN d.page=? THEN 'target' ELSE 'other_pages' END AS cohort,

@@ -47,6 +47,8 @@ def config_errors(config, ready=False, bootstrap=False):
     enabled = variables.get('AUTOMATION_ENABLED') == 'true'
     if cron not in ([], ['*/15 * * * *'], ['* * * * *']) or variables.get('CRAWL_ENABLED') not in ('false', 'true') or variables.get('AUTOMATION_ENABLED') not in ('false', 'true'):
         errors.append('UNREVIEWED_AUTOMATION_SETTINGS')
+    if enabled and (variables.get('D1_READ_GUARD_ENABLED')!='true' or variables.get('SYNC_MAX_PAGES_PER_TICK')!='1' or cron!=['*/15 * * * *']):
+        errors.append('ACCOUNT_D1_READ_GUARD_REQUIRED')
     if cron==['* * * * *'] and variables.get('CATCHUP_ENABLED')!='true':
         errors.append('CATCHUP_OPT_IN_REQUIRED')
     if variables.get('CATCHUP_ENABLED')=='true':

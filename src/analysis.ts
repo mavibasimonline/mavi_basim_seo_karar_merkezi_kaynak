@@ -1,5 +1,6 @@
 import { Env, nowISO } from './types';
 import { insertRows } from './sync';
+import {boundedDataScope} from './d1-read-budget';
 import { siteURL } from './urls';
 
 export const ENGINE_VERSION = '1.2.2';
@@ -62,7 +63,7 @@ function coverageComplete(coverage:Coverage[],period:Period,scope='page',provide
   return dates(period).every(date=>coverage.some(c=>c.provider===provider&&c.day===date&&c.scope===scope&&c.complete===1));
 }
 async function activeGsc(db:D1Database,table:string,start:string,end:string,scope:string):Promise<DataRow[]> {
-  return (await db.prepare(`SELECT d.* FROM ${table} d JOIN dataset_coverage c ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider='gsc' AND c.scope=? AND c.complete=1 WHERE d.date BETWEEN ? AND ? ORDER BY d.date,d.page LIMIT 50001`).bind(scope,start,end).all<DataRow>()).results;
+  return (await db.prepare(`SELECT d.* FROM dataset_coverage c INDEXED BY coverage_active CROSS JOIN ${table} d WHERE c.provider='gsc' AND c.scope=? AND c.complete=1 AND c.day BETWEEN ? AND ? AND d.dataset_id=c.dataset_id AND d.date=c.day ORDER BY d.date,d.page LIMIT 50001`).bind(scope,start,end).all<DataRow>()).results;
 }
 export interface AnalysisOptions {current?:Period;previous?:Period;device?:string|null}
 export async function analyze(env:Env,month=lastCompleteMonth(),time=new Date(),options:AnalysisOptions={}):Promise<AnalysisReport> {
@@ -70,6 +71,8 @@ export async function analyze(env:Env,month=lastCompleteMonth(),time=new Date(),
   const rolling=!!options.current;
   const oldest=options.current?previous.start:monthPeriod(month,-12).start;
   const stamp=time.toISOString();
+  await boundedDataScope(env,oldest,current.end,'page');
+  await boundedDataScope(env,previous.start,current.end,'query');
   const [productResult,coverageResult,rawPageRows,rawQueryRows,counts,credential,googleHealth]=await Promise.all([
     env.DB.prepare('SELECT p.*,g.name AS group_name FROM products p JOIN product_groups g ON g.id=p.group_id ORDER BY g.name,p.name').all<{id:string;name:string;canonical_url:string|null;url_verified_at:string|null;group_name:string}>(),
     env.DB.prepare('SELECT * FROM dataset_coverage WHERE day BETWEEN ? AND ?').bind(oldest,current.end).all<Coverage>(),
