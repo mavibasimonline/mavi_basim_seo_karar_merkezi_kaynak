@@ -6,7 +6,7 @@ on:
         description: Salt okunur tanılama veya mevcut şifreli yedek
         type: choice
         default: backup
-        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl]
+        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl, quota-inspect, quota-contain]
   schedule:
     - cron: '17 2 * * *'
     - cron: '7 0 * * *' # 03:07 Turkey: read-only rollover evidence, may be delayed by GitHub
@@ -124,3 +124,24 @@ jobs:
           path: .local/crawl-pilot-summary.json
           retention-days: 3
           if-no-files-found: warn
+
+  quota-incident:
+    if: github.event_name == 'workflow_dispatch' && (inputs.operation == 'quota-inspect' || inputs.operation == 'quota-contain')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      QUOTA_OPERATION: ${{ inputs.operation }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: D1 okumadan hesap analitiği ve güvenli Cron sınırı
+        run: python3 scripts/d1_quota_control.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: d1-quota-incident-${{ github.run_id }}
+          path: .local/d1-quota-incident.json
+          retention-days: 3
+          if-no-files-found: error
