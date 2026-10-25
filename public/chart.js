@@ -36,8 +36,8 @@ export function drawChart(root, tableRoot, data, metric = "clicks") {
   if (!observed.length) {
     root.append(
       empty(
-        "Doğrulanmış GSC verisi bekleniyor",
-        "Bu dönem ve cihaz için ölçüm yok. Eksik günler örnek değerlerle veya sıfırla doldurulmaz.",
+        "Bu dönem için ölçüm yok",
+        "Ölçümler geldikçe grafik burada görünür. Eksik günler boş bırakılır.",
       ),
     );
     tableRoot.append(

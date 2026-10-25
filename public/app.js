@@ -19,9 +19,15 @@ import {
   sortHeader,
   metricCell,
 } from "./ui.js";
-import { evidenceView, performanceView, answerView, historyEventView } from "./evidence.js";
+import {
+  evidenceView,
+  performanceView,
+  answerView,
+  historyEventView,
+} from "./evidence.js";
 import { drawChart, metricNames } from "./chart.js";
 import { setupModules } from "./modules.js";
+import { setupPeriod, currentMonth } from "./period.js";
 const views = {
   overview: [
     "Genel Bakış",
@@ -65,7 +71,7 @@ const state = {
   performance: null,
   view: "overview",
   metric: "clicks",
-  productSort: { key: "name", direction: "asc" },
+  productSort: { key: "clicks", direction: "desc" },
   querySort: { key: "impressions", direction: "desc" },
   queryPage: 1,
   queryHasNext: false,
@@ -78,30 +84,35 @@ const state = {
 let controller,
   queryController,
   sessionEpoch = 0;
-const last = new Date();
-last.setUTCDate(1);
-last.setUTCMonth(last.getUTCMonth() - 1);
-const now = new Date();
-for (let i = 0; i < 24; i++) {
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-  const label = new Intl.DateTimeFormat("tr-TR", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(d);
-  $("month").append(
-    new Option(
-      label[0].toLocaleUpperCase("tr-TR") + label.slice(1),
-      d.toISOString().slice(0, 7),
-    ),
-  );
+const periodControl = setupPeriod(Object.keys(views), scopeChanged);
+state.view = periodControl.view;
+function syncCalendar() {
+  const month = $("month").value,
+    today = new Date().toISOString().slice(0, 10);
+  if (!$("changeDay").value.startsWith(month))
+    $("changeDay").value = today.startsWith(month) ? today : month + "-01";
+  $("changeDay").min = month + "-01";
+  const d = new Date(month + "-01T12:00:00Z");
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  d.setUTCDate(0);
+  $("changeDay").max = d.toISOString().slice(0, 10);
 }
-$("month").value = last.toISOString().slice(0, 7);
+function scopeChanged() {
+  periodControl.remember(state.view);
+  syncCalendar();
+  state.previousQuestionId = null;
+  state.questionMonth = null;
+  $("answer").hidden = true;
+  load();
+}
 function notify(text = "") {
   $("message").textContent = text;
   $("message").hidden = !text;
 }
 function showLogin() {
+  document.body.classList.remove("is-loading");
+  $("loadStatus").textContent = "";
+  if ($("monthPicker").matches(":popover-open")) $("monthPicker").hidePopover();
   sessionEpoch++;
   controller?.abort();
   queryController?.abort();
@@ -113,6 +124,7 @@ function showLogin() {
   state.previousQuestionId = null;
   state.questionMonth = null;
   state.loaded = {};
+  modules.invalidate();
   $("app").hidden = true;
   document.querySelector(".skip-link").href = "#loginScreen";
   $("loginScreen").hidden = false;
@@ -185,6 +197,12 @@ function params() {
 }
 async function load(initial = false) {
   const revision = ++state.request;
+  queryController?.abort();
+  state.queryRequest++;
+  modules.invalidate();
+  periodControl.sync();
+  syncCalendar();
+  $("loadStatus").textContent = "Yükleniyor…";
   controller?.abort();
   controller = new AbortController();
   const signal = controller.signal;
@@ -221,6 +239,13 @@ async function load(initial = false) {
     );
   } catch (error) {
     if (revision !== state.request || error.name === "AbortError") return;
+    if (state.performance) {
+      $("month").value = state.performance.period.label;
+      $("device").value = state.performance.device || "ALL";
+      periodControl.sync();
+      periodControl.remember(state.view);
+      syncCalendar();
+    }
     if (error.status !== 401)
       notify(
         error.message +
@@ -236,6 +261,7 @@ async function load(initial = false) {
   } finally {
     if (revision === state.request) {
       $("refresh").disabled = false;
+      $("loadStatus").textContent = "";
       document.body.classList.remove("is-loading");
       $("mainContent").removeAttribute("aria-busy");
     }
@@ -243,6 +269,7 @@ async function load(initial = false) {
 }
 function unavailableReport(data, error) {
   return {
+    unavailable: true,
     period: data.period,
     previous_period: data.previous_period,
     created_at: data.measured_at,
@@ -301,58 +328,78 @@ function render() {
     " · " +
     deviceName(report.filters?.device) +
     ". Kısmi ölçüm, tamamlanmış aylık karşılaştırma değildir.";
+  $("export").hidden = !!report.unavailable || !state.performance.current;
+  const partial =
+    $("month").value === currentMonth() ||
+    report.missing.length > 0 ||
+    !state.performance.coverage.measurement_complete;
+  $("exportLabel").textContent = partial
+    ? "Kısmi raporu indir"
+    : "Raporu indir";
+  $("export").title = partial
+    ? "Eksik günler ve kanıt sınırları raporda açıkça belirtilir."
+    : "Seçili dönemin raporunu indir.";
   $("export").href = "/api/export?" + params().toString();
 }
 function renderNotice() {
   const data = state.performance,
-    report = state.report,
     status = state.status,
-    coverage = data.coverage;
-  const fresh = status.google_connected && data.fresh;
-  const label = !status.google_connected
-    ? "Google bağlantısı bekleniyor"
-    : status.sync_budget?.paused
-      ? "Günlük bütçe koruması etkin"
-      : fresh
-        ? "Veriler güncel"
-        : "Veri güncelliği kontrol edilmeli";
+    report = state.report;
+  const health = (status.health || []).find((h) => h.provider === "gsc");
+  const technical =
+    !!report.unavailable ||
+    (status.google_connected && health?.status === "failed");
+  const complete =
+    $("month").value !== currentMonth() &&
+    data.coverage.complete &&
+    data.coverage.measurement_complete &&
+    data.fresh &&
+    status.google_connected &&
+    !report.missing.length;
+  const label = technical
+    ? "Veri kontrolü gerekli"
+    : !status.google_connected
+      ? "Bağlantı gerekli"
+      : complete
+        ? "Veriler tamamlandı"
+        : data.current
+          ? "Kısmi veri"
+          : "Veriler toplanıyor";
   $("freshness").className =
-    "freshness " + (fresh && !status.sync_budget?.paused ? "good" : "wait");
+    "freshness " + (technical ? "error" : complete ? "good" : "wait");
   $("freshness").replaceChildren(
     node("span", null, "status-dot"),
     node("span", label),
   );
-  const title = !status.google_connected
-    ? data.current
-      ? "Google bağlantısı kapalı; doğrulanmış arşiv ölçümleri gösteriliyor."
-      : "Google bağlantısı yok; gerçek arama verisi bekleniyor."
-    : !coverage.complete
-      ? `Bu dönem kısmen doğrulandı · ${coverage.verified_days}/${coverage.expected_days} gün.`
-      : report.missing.length
-        ? "Ölçümler mevcut; SEO kararı için ek kanıt bekleniyor."
-        : "Veriler doğrulandı. Başarılı çalışmaları koruyun.";
-  const description = !status.google_connected
-    ? data.current
-      ? "Arşiv ölçümleri son doğrulama tarihine aittir; güncel Google erişimi veya yeni veri alındığı anlamına gelmez."
-      : "Bağlantı kurulana kadar KPI ve grafikler veri yok olarak gösterilir. Keyword Planner arşivi ayrı bir kaynaktır."
-    : !coverage.complete
-      ? "Yalnız doğrulanmış günlerin ölçümleri gösterilir. Eksik günler boş bırakılır; tam aylık değişim hesaplanmaz."
-      : report.missing.length
-        ? "Cihaz, sorgu veya önceki dönem kapsamındaki eksikler kanıt ayrıntılarında görünür."
-        : "GSC ölçümleri gözlemseldir; tek başına kesin neden göstermez.";
-  const body = node("div");
-  body.append(node("strong", title), node("p", description));
-  if (report.missing.length)
-    body.append(detail("Eksik kanıtları gör", list(report.missing)));
-  $("status").className =
-    "data-notice" +
-    (!report.missing.length && coverage.measurement_complete && data.fresh
-      ? " good"
-      : "");
-  $("status").replaceChildren(
-    icon(report.missing.length ? "info" : "shield"),
-    body,
+  $("status").className = "data-status" + (technical ? " technical-error" : "");
+  const explanation = node("div");
+  explanation.append(
+    node(
+      "p",
+      !status.google_connected
+        ? "Google bağlantısı yok. Kayıtlı ölçümler varsa son doğrulama tarihleriyle gösterilir."
+        : "Yalnız doğrulanmış GSC ölçümleri gösterilir. Eksik günler sıfır değildir; tamamlanmamış aylar tam ayla karşılaştırılmaz.",
+    ),
   );
+  if (report.missing.length) explanation.append(list(report.missing));
+  if (status.sync_budget?.paused)
+    explanation.append(
+      node(
+        "p",
+        "Günlük güvenlik bütçesi nedeniyle aktarım sıradaki bütçe dönemini bekliyor. Kullanıcı müdahalesi gerekmez.",
+      ),
+    );
+  explanation.append(
+    node("p", "Son doğrulanmış veri: " + time(data.last_fetched_at)),
+  );
+  $("dataExplanation").replaceChildren(explanation);
+  $("dataDetails").querySelector("summary").textContent = technical
+    ? "Sorunu incele"
+    : complete
+      ? "Veri ayrıntıları"
+      : "Neden eksik?";
+  $("google").hidden = !!status.google_connected;
+  $("pilot").hidden = !!status.google_connected && !!status.automation_enabled;
 }
 function renderKpis() {
   const data = state.performance;
@@ -383,7 +430,12 @@ function renderKpis() {
         label + ": " + (current == null ? "Veri yok" : value.textContent),
       );
       const caption = node("div", null, "kpi-caption");
-      if (data.comparison_available && current != null && previous > 0) {
+      if (
+        $("month").value !== currentMonth() &&
+        data.comparison_available &&
+        current != null &&
+        previous > 0
+      ) {
         const change = (current - previous) / previous;
         const better = key === "position" ? change <= 0 : change >= 0;
         caption.append(
@@ -399,7 +451,7 @@ function renderKpis() {
           node(
             "span",
             current == null
-              ? "Doğrulanmış ölçüm yok"
+              ? ""
               : `${data.coverage.observed_days ?? data.coverage.verified_days} günlük ölçüm · ${data.coverage.measurement_complete ? "tam kapsam" : "kısmi kapsam"}`,
           ),
         );
@@ -416,69 +468,31 @@ function renderChart() {
   $("chartPeriod").textContent =
     period(data.period) + " · " + deviceName(data.device);
   $("chartCoverage").textContent =
-    `${data.coverage.verified_days}/${data.coverage.expected_days} gün doğrulandı` +
-    (state.metric === "position"
-      ? " · Düşük konum daha iyidir."
-      : " · Eksik günler boş bırakılır.");
+    state.metric === "position"
+      ? "Düşük konum daha iyidir."
+      : "Eksik günler boş bırakılır.";
   drawChart($("performanceChart"), $("chartTable"), data, state.metric);
 }
 function renderCoverage() {
   const data = state.performance,
     status = state.status;
-  const actual = data.coverage.verified_days,
-    expected = data.coverage.expected_days,
-    ratio = expected ? actual / expected : 0;
-  const ring = svg("svg", { viewBox: "0 0 126 126", "aria-hidden": "true" });
-  ring.append(svg("circle", { cx: 63, cy: 63, r: 48, class: "track" }));
-  if (actual > 0)
-    ring.append(
-      svg("circle", {
-        cx: 63,
-        cy: 63,
-        r: 48,
-        class: "fill",
-        "stroke-dasharray": `${ratio * 301.593} 301.593`,
-      }),
-    );
-  const label = node("div", null, "ring-label");
-  label.append(
-    node("strong", actual + "/" + expected),
-    node("span", "gün doğrulandı"),
-  );
-  $("coverageRing").replaceChildren(ring, label);
-  $("coverageRing").setAttribute("role", "img");
-  $("coverageRing").setAttribute(
-    "aria-label",
-    `${expected} günden ${actual} gün doğrulandı`,
-  );
   $("coverageText").textContent =
-    ratio === 1
-      ? "Seçili dönemin günlük sayfa kapsamı tamam. Sorgu ve önceki dönem ayrıca denetlenir."
-      : "Güvenilir aylık karşılaştırma için eksik günlerin aktarılması bekleniyor.";
-  const done = (status.jobs || [])
-    .filter((j) => j.provider === "gsc" && j.status === "done")
-    .reduce((n, j) => n + j.jobs, 0);
-  const rows = [
-    ["Son veri alımı", time(data.last_fetched_at)],
-    [
-      "Google bağlantısı",
-      status.google_connected
-        ? data.fresh
-          ? "Doğrulandı"
-          : "Kayıtlı · sağlık kontrolü"
-        : "Bağlı değil",
-    ],
-    [
-      "GSC aktarımı",
-      done ? number(done) + " iş tamamlandı" : "Veri bekleniyor",
-    ],
-  ];
-  if (status.sync_budget?.paused)
-    rows.push(["Günlük bütçe", "Güvenli bekleme"]);
+    `${data.coverage.verified_days}/${data.coverage.expected_days} gün doğrulandı` +
+    (data.current ? " · Gözlenen günlerin ölçümü" : " · Henüz ölçüm yok");
   $("connectionSummary").replaceChildren(
-    ...rows.map(([key, value]) => {
+    ...[
+      [
+        "Google bağlantısı",
+        status.google_connected ? "Kayıtlı" : "Bağlı değil",
+      ],
+      ["Son veri alımı", time(data.last_fetched_at)],
+      [
+        "Günlük aktarım",
+        status.sync_budget?.paused ? "Güvenli bekleme" : "Otomatik süreç",
+      ],
+    ].map(([label, value]) => {
       const r = node("div", null, "connection-row");
-      r.append(node("span", key), node("strong", value));
+      r.append(node("span", label), node("strong", value));
       return r;
     }),
   );
@@ -495,14 +509,10 @@ function renderPriorities() {
           e.append(node("strong", p.name), node("p", p.reason));
           return e;
         })
-      : [
-          node(
-            "p",
-            "Şu an kanıtla desteklenen öncelikli bir SEO değişikliği yok. Eksik veride mevcut çalışmayı koruyun.",
-          ),
-        ]),
+      : [node("p", "Şu an kanıtla desteklenen öncelikli bir değişiklik yok.")]),
   );
   const protectedProducts = products.filter((p) => p.decision === "Koru");
+  $("protectPanel").hidden = !protectedProducts.length;
   $("protect").textContent = protectedProducts.length
     ? protectedProducts.map((p) => p.name).join(", ") +
       ". Başlık, URL veya içerik değişikliğinden önce başarılı sorguları inceleyin."
@@ -556,6 +566,15 @@ function renderSources() {
   ];
   $("health").textContent = lines.filter(Boolean).join("\n");
 }
+function productChange(p) {
+  return $("month").value !== currentMonth() &&
+    state.performance?.comparison_available &&
+    !p.missing?.length &&
+    p.current &&
+    p.previous
+    ? p.current.clicks - p.previous.clicks
+    : null;
+}
 function renderProducts() {
   if (!state.report) return;
   const search = $("productSearch").value.toLocaleLowerCase("tr-TR"),
@@ -576,13 +595,21 @@ function renderProducts() {
           ? a.name
           : sort.key === "decision"
             ? a.decision
-            : a.current?.[sort.key],
+            : sort.key === "change"
+              ? productChange(a) == null
+                ? null
+                : Math.abs(productChange(a))
+              : a.current?.[sort.key],
       bv =
         sort.key === "name"
           ? b.name
           : sort.key === "decision"
             ? b.decision
-            : b.current?.[sort.key];
+            : sort.key === "change"
+              ? productChange(b) == null
+                ? null
+                : Math.abs(productChange(b))
+              : b.current?.[sort.key];
     if (av == null) return bv == null ? 0 : 1;
     if (bv == null) return -1;
     const v = typeof av === "string" ? av.localeCompare(bv, "tr") : av - bv;
@@ -597,6 +624,7 @@ function renderProducts() {
       { key: "impressions", label: "Gösterim", numeric: true },
       { key: "ctr", label: "CTR", numeric: true },
       { key: "position", label: "Ort. konum", numeric: true },
+      { key: "change", label: "Tıklama farkı", numeric: true },
       { key: "decision", label: "SEO kararı" },
       { label: "Kanıtlar" },
     ],
@@ -632,7 +660,10 @@ function renderProducts() {
       ),
       text = node("div");
     text.append(
-      node("span", p.name, "cell-name"),
+      Object.assign(node("button", p.name, "cell-name product-open"), {
+        type: "button",
+        onclick: () => openProduct(p),
+      }),
       node(
         "span",
         p.url ? new URL(p.url).pathname : "URL doğrulaması bekleniyor",
@@ -654,15 +685,19 @@ function renderProducts() {
       metricCell(p.current?.impressions),
       metricCell(p.current?.ctr, "percent"),
       metricCell(p.current?.position),
+      metricCell(productChange(p)),
       decisionCell,
       action,
     );
+    row.addEventListener("click", (e) => {
+      if (!e.target.closest("button,a")) openProduct(p);
+    });
     body.append(row);
   }
   if (!products.length) {
     const row = node("tr"),
       td = node("td", null, "empty-cell");
-    td.colSpan = 7;
+    td.colSpan = 8;
     td.append(
       icon("search"),
       node("strong", "Eşleşen ürün bulunamadı"),
@@ -673,6 +708,13 @@ function renderProducts() {
   }
   table.append(body);
   $("products").replaceChildren(table);
+  document.querySelectorAll("[data-product-sort]").forEach((b) => {
+    b.setAttribute("aria-pressed", String(b.dataset.productSort === sort.key));
+    if (b.dataset.productSort === "change")
+      b.disabled =
+        $("month").value === currentMonth() ||
+        !state.performance.comparison_available;
+  });
   $("productCount").textContent = number(state.report.products.length);
   $("productTableFoot").textContent =
     `${products.length} / ${state.report.products.length} ürün gösteriliyor. — : gözlenen ölçüm yok. Kararlar mevcut analiz motorundan gelir.`;
@@ -897,13 +939,17 @@ function setView(view, focus = true) {
   $("breadcrumb").textContent = views[view][0];
   $("viewTitle").textContent = views[view][1];
   $("viewDescription").textContent = views[view][2];
-  $("periodControl").hidden = ["radar", "changes"].includes(view);
-  $("deviceControl").hidden = !["overview", "products", "queries"].includes(
-    view,
-  );
+  $("periodControl").hidden = false;
+  periodControl.remember(view);
+  $("deviceControl").hidden = ![
+    "overview",
+    "products",
+    "queries",
+    "radar",
+  ].includes(view);
   $("scopeLabel").textContent =
     view === "radar"
-      ? "Son 28 kesinleşmiş gün · GSC"
+      ? "Seçili ay ve cihaz · GSC"
       : view === "changes"
         ? "Tespit takvimi · UTC"
         : view === "health"
@@ -1051,8 +1097,25 @@ $("logout").addEventListener("click", async () => {
   }
 });
 $("refresh").addEventListener("click", () => load());
-$("month").addEventListener("change", () => load());
-$("device").addEventListener("change", () => load());
+document.querySelectorAll("[data-product-sort]").forEach((b) =>
+  b.addEventListener("click", () => {
+    state.productSort = { key: b.dataset.productSort, direction: "desc" };
+    renderProducts();
+  }),
+);
+let queryTimer;
+$("querySearch").addEventListener("input", () => {
+  clearTimeout(queryTimer);
+  queryTimer = setTimeout(() => {
+    state.queryPage = 1;
+    loadQueries();
+  }, 350);
+});
+for (const id of ["queryBrand", "queryProduct"])
+  $(id).addEventListener("change", () => {
+    state.queryPage = 1;
+    loadQueries();
+  });
 for (const id of ["productSearch", "decisionFilter", "groupFilter"])
   $(id).addEventListener(
     id === "productSearch" ? "input" : "change",
@@ -1060,6 +1123,7 @@ for (const id of ["productSearch", "decisionFilter", "groupFilter"])
   );
 $("queryFilters").addEventListener("submit", (e) => {
   e.preventDefault();
+  clearTimeout(queryTimer);
   state.queryPage = 1;
   loadQueries();
 });
@@ -1114,7 +1178,8 @@ $("pilot").addEventListener("click", async () => {
 });
 $("question").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const b = e.currentTarget.querySelector("button");
+  const b = e.currentTarget.querySelector("button"),
+    questionScope = $("month").value;
   b.disabled = true;
   notify();
   try {
@@ -1128,6 +1193,7 @@ $("question").addEventListener("submit", async (e) => {
           : {}),
       }),
     });
+    if (questionScope !== $("month").value) return;
     state.previousQuestionId = answer.question_id;
     state.questionMonth = $("month").value;
     const sections = answer.sections;

@@ -58,3 +58,12 @@ it('invalidates a cached Google connection immediately when its authorization re
   await connected();const first=await worker.fetch(request('/api/report'),env);expect((await first.json() as any).sources.google_connected).toBe(true);
   await env.DB.prepare('DELETE FROM oauth_credentials').run();const second=await worker.fetch(request('/api/report'),env);expect((await second.json() as any).sources.google_connected).toBe(false);
 });
+it('radar respects an explicitly selected month and device while preserving its legacy route',async()=>{
+  const cfg={...env,ADMIN_TOKEN:'TEST-ADMIN'};
+  const r=await worker.fetch(new Request('https://app.example/api/radar?month=2026-09&device=MOBILE',{headers:{Authorization:'Bearer TEST-ADMIN'}}),cfg);
+  expect(r.status).toBe(200);const body=await r.json() as any;
+  expect(body.period).toMatchObject({start:'2026-09-01',end:'2026-09-30'});
+  const saved=await env.DB.prepare('SELECT filters_json FROM analysis_runs ORDER BY created_at DESC LIMIT 1').first<any>();
+  expect(JSON.parse(saved.filters_json).device).toBe('MOBILE');
+  for(const query of ['month=bad','month=2026-09&device=UNKNOWN'])expect((await worker.fetch(new Request('https://app.example/api/radar?'+query,{headers:{Authorization:'Bearer TEST-ADMIN'}}),cfg)).status).toBe(400);
+});

@@ -1,3 +1,16 @@
+# Kullanım kolaylığı — 25 Ekim 2026
+
+- [x] Sabit üst çubukta tek tık/dokunuş ay seçici; ilk ziyaret mevcut ay, gelecek ay engeli, önceki/sonraki okları. Ay/cihaz değişimi otomatik yükler; yalnız ay/cihaz/sekme tercihi saklanır.
+- [x] Sade genel bakış, kısa veri durumu, “Neden eksik?” ayrıntıları; hızlı ürün sıralama/arama, satırdan kanıt, otomatik marka filtresi, açılır gelişmiş filtreler. Eksik metrikler tire; kısmi rapor etiketli; ölçüm yoksa indirme gizli. Mevcut ay tam aylık karşılaştırma yapmaz.
+- [x] Kaynak/GSC otomasyonu değiştirilmedi. Radar mevcut API'ye isteğe bağlı ay/cihaz parametreleriyle bağlı. Başarısız kapsam yüklemesinde eski verinin doğru dönemine dönülür.
+- [x] 287 Workers/D1 + 49 Python + 16 masaüstü/mobil Chromium = **352 başarılı test**; WCAG, tip/build, audit 0, kaynak koruma ve üretim dry-run başarılı. Son commit bu kaydı içeren git log kaydıdır; dal feat/dashboard-usage-improvements.
+- [x] Gerçek tanılama **40170613608**, 09:51 Türkiye: 03:00 sonrası gerçek GSC devamı artık **doğrulandı**; kapsam **76/184**, ürün tarama kanıtı **29/29**. Önceki geceye ait “03:00 henüz gelmedi” kayıtları aşağıda tarihçedir. Tam aylık kabul hâlâ bloke.
+- [x] Yayın ön kontrolünün harcanmış GSC yazmalarını ikinci kez rezerve eden hesabı düzeltildi; günlük bütçe/sayaç, 90.000/4.000.000 yayın güvenlik kapıları ve production ayarları korunur. Eksik/geçersiz sayaçta güvenli kapanma test edildi.
+
+Sonraki somut veri adımı: kalan Temmuz–Eylül kapsamını gerçek tanılamadan izlemek, tam ve taze veri oluştuğunda dolu aylık raporu bağımsız hesapla doğrulamak. Şifreli uzak yedek ve özel yönetici oturumu için önceki kabul sınırları sürer. UX CI/yayın kanıtları bu değişikliğin PR ve production workflow kaydındadır. Ayrıntılar [UX_ACCEPTANCE_REPORT.md](UX_ACCEPTANCE_REPORT.md). Canlı site, OAuth, Cron ve 521 kaynak CSV korunur.
+
+---
+
 # Gerçek üretim devamı — 25 Ekim 2026, 01:16 Türkiye
 
 - [x] Gerçek D1 tanılaması **40137124437**: GSC 36 done / 324 pending, Temmuz–Eylül **12/184**. Günlük 8.552/10.000 güvenlik bütçesi bekletiyor; Google hata kaydı yok. 03:00 henüz gerçekleşmedi.

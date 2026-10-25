@@ -50,7 +50,7 @@ test("real APIs preserve secure login, sources, evidence, questions and empty da
   await expect(page.locator("#status")).toContainText("Google bağlantısı yok");
   await expect(page.locator(".kpi-value")).toHaveText(["—", "—", "—", "—"]);
   await expect(page.locator("#performanceChart")).toContainText(
-    "Doğrulanmış GSC verisi bekleniyor",
+    "Bu dönem için ölçüm yok",
   );
   expect(await page.locator(".chart-point").count()).toBe(0);
   await navigate(page, "Ürün Performansı");
@@ -123,6 +123,7 @@ test("real APIs preserve secure login, sources, evidence, questions and empty da
     device: "DESKTOP",
   });
   await expect(page.locator("#answer")).toContainText("Masaüstü");
+  await expect(page.locator("#export")).toBeHidden();
   const exported = await page.request.get(
     (await page.locator("#export").getAttribute("href")) || "",
   );
@@ -160,11 +161,19 @@ test("real APIs preserve secure login, sources, evidence, questions and empty da
 test("browser-only fixtures verify real chart rendering, gaps, measured zeros and query controls", async ({
   page,
 }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "mavi-dashboard-preferences",
+      JSON.stringify({ month: "2026-09", device: "ALL", view: "overview" }),
+    ),
+  );
   const requests = await chartFixtures(page);
   await login(page);
   await expect(page.locator(".kpi-value").first()).toHaveText("40");
   await expect(page.locator("#status")).toContainText("3/30");
   await expect(page.locator(".delta")).toHaveCount(0);
+  await expect(page.locator("#export")).toBeVisible();
+  await expect(page.locator("#export")).toContainText("Kısmi raporu indir");
   await expect(page.locator(".chart-point")).toHaveCount(3);
   await expect(page.locator('.chart-point[data-value="0"]')).toHaveCount(1);
   await expect(page.locator('[data-segment="verified"]')).toHaveCount(1);
@@ -285,7 +294,7 @@ test("failed analysis or network never manufactures values and keeps the interfa
     }),
   );
   await login(page);
-  await page.getByText("Eksik kanıtları gör", { exact: true }).click();
+  await page.getByText("Sorunu incele", { exact: true }).click();
   await expect(page.locator("#status")).toContainText(
     "Aylık SEO analizi alınamadı",
   );

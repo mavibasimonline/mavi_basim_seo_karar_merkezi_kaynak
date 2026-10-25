@@ -11,7 +11,7 @@ VERSION='12345678-1234-1234-1234-123456789abc'
 class Fake:
  account='a'*32
  def __init__(self,config):self.config=config;self.changed=False;self.db_mismatch=False;self.calls=[]
- def query(self,*args):return {'ok':True,'rows':[{'products':29,'csv_files':521,'csv_rows':9075}]}
+ def query(self,database,sql):return {'ok':True,'rows':[{'products':29,'csv_files':521,'csv_rows':9075}]} if sql==guard.QUERIES['source_counts'] else {'ok':True,'rows':[]}
  def daily_usage(self):return {'ok':True,'hours':1,'rows_written':1000,'rows_read':1000}
  def request(self,method,path,body=None):
   self.calls.append((method,path,body))
@@ -55,3 +55,25 @@ class ProductionGuardTests(unittest.TestCase):
   class Opener:
    def open(self,req,timeout):return io.BytesIO(json.dumps({'deployment':{'version_id':VERSION,'commit':commit,'runtime_revision':'gsc-catchup-v1'}}).encode())
   verified=guard.postflight(self.client,self.config,saved,commit,Opener());self.assertTrue(verified['existing_bindings_preserved'])
+
+ def test_spent_sync_writes_are_not_reserved_twice_and_limits_do_not_change(self):
+  from datetime import datetime,timezone
+  day=datetime.now(timezone.utc).date().isoformat();self.config['vars']['SYNC_INITIAL_BUDGET_DAY']='2000-01-01'
+  original=json.dumps(self.config);query=self.client.query
+  self.client.query=lambda db,sql: {'ok':True,'rows':[{'day':day,'code':'58000.0'}]} if sql==guard.QUERIES['sync_budget_history'] else query(db,sql)
+  self.client.daily_usage=lambda:{'ok':True,'hours':1,'rows_written':54317,'rows_read':1000}
+  usage=guard.preflight(self.client,self.config,VERSION)['daily_d1_usage']
+  self.assertEqual(usage['sync_remaining_allowance'],2000);self.assertEqual(usage['projected_writes'],60000);self.assertEqual(json.dumps(self.config),original)
+  self.assertTrue(all(c[0]=='GET' for c in self.client.calls))
+ def test_missing_current_day_counter_keeps_the_full_allowance_reserved(self):
+  self.config['vars']['SYNC_INITIAL_BUDGET_DAY']='2000-01-01';self.client.daily_usage=lambda:{'ok':True,'hours':1,'rows_written':54317,'rows_read':1000}
+  with self.assertRaisesRegex(ValueError,'BUDGET_UNAVAILABLE'):guard.preflight(self.client,self.config,VERSION)
+ def test_invalid_budget_counter_fails_closed(self):
+  from datetime import datetime,timezone
+  day=datetime.now(timezone.utc).date().isoformat();query=self.client.query
+  for code in ('invalid','NaN','Infinity','-1'):
+   self.client.query=lambda db,sql: {'ok':True,'rows':[{'day':day,'code':code}]} if sql==guard.QUERIES['sync_budget_history'] else query(db,sql)
+   with self.assertRaisesRegex(ValueError,'SYNC_BUDGET_READ_REQUIRED'):guard.preflight(self.client,self.config,VERSION)
+ def test_unreadable_budget_counter_does_not_allow_a_release(self):
+  query=self.client.query;self.client.query=lambda db,sql: {'ok':False} if sql==guard.QUERIES['sync_budget_history'] else query(db,sql)
+  with self.assertRaisesRegex(ValueError,'SYNC_BUDGET_READ_REQUIRED'):guard.preflight(self.client,self.config,VERSION)
