@@ -1,3 +1,15 @@
+# Veri odaklı kompakt panel — 25 Ekim 2026
+
+- [x] Büyük tekrar başlıkları ve intro blokları kaldırıldı. İşlevsel başlıklar ve erişilebilir H1 korunur. Yedi sekmede asıl çalışma alanı 220 px üstünde, KPI 100 px üstünde başlar.
+- [x] 60 px tek araç çubuğu: menü/yıl/12 eşit ve yakın ay/dönem/cihaz/durum/bilgi/MB. 1280/1440/1920 px'de bütün ay ve kontroller görünür; dar pencerede/mobilde tek satır yatay kayar. Tüm kontrollerin erişilebilirliği doğrulanır.
+- [x] Yenile/indirme etkin bölümün sağ üstünde; kapsam/kaynak açıklamaları durum/bilgi ayrıntısında. Gerçek hatalar görünür alert/bildirim olarak kalır. Çıkışta özel ayrıntılar temizlenir. Sahte metrik/liderlik yoktur.
+- [x] **374 test: 299 Workers/D1 + 49 Python + 26 Chromium.** Tip/build, production dry-run, release kontrolü, npm audit 0. İlk iki mobil menü testi otomatik kaydırma/kapanma hatasını yakaladı; düzeltme sonrası tekrar ve tam koşu başarılıdır.
+- Son commit bu kaydı içeren git kaydıdır; dal `fix/compact-data-first-dashboard`. Uzak CI, kontrollü yayın ve canlı SHA/Worker sürümü bu düzeltmenin PR açıklaması ve production workflow'unda izlenir. Ayrıntı ve masaüstü/mobil görüntüler: [COMPACT_DASHBOARD_REPORT.md](COMPACT_DASHBOARD_REPORT.md).
+
+Bu arayüz işi için yeni hesap yetkisi gerekmedi. GSC OAuth/D1/Cron/bütçe/tarama/deploy ayarı, 29 ürün ve 521 CSV korunur. Kalan üretim veri görevi değişmedi: eksik tarihleri bütçeli otomasyondan izlemek, tam/taze veriyle gerçek aylık raporu kabul etmek; özel yönetici oturumu ve uzak şifreli yedek kabul sınırları sürer. Kendiliğinden oturum başlama garantisi yoktur. Önceki kayıtlar aşağıda tarihçe olarak korunur.
+
+---
+
 # Üst tarih çubuğu düzen düzeltmesi — 25 Ekim 2026
 
 - [x] En üstte tek satır: kompakt yıl, 12 sürekli açık ay, hemen sağında tıklanınca 3/6/12 Ay açılan Dönem menüsü. Seçili ay dolu mavi; eski tarih kutusu ve sağ-sol okları yok. Mobilde ayların kendi yatay kaydırması var.

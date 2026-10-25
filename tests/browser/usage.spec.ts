@@ -25,51 +25,243 @@ async function view(page: Page, name: string) {
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-25T09:00:00+03:00"));
 });
-test("all twelve months and the adjacent period menu occupy the very first row; desktop screenshot proves no clipped month", async ({ page }) => {
+test("compact single toolbar preserves equal-width months and all controls; desktop screenshot proves no clipping", async ({
+  page,
+}) => {
   await login(page);
   await page.evaluate(() => document.fonts.ready);
   await expect(page.locator("#monthGrid button")).toHaveText([
-    "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+    "Ocak",
+    "Şubat",
+    "Mart",
+    "Nisan",
+    "Mayıs",
+    "Haziran",
+    "Temmuz",
+    "Ağustos",
+    "Eylül",
+    "Ekim",
+    "Kasım",
+    "Aralık",
   ]);
-  await expect(page.locator("#monthToggle, #monthPicker, #previousMonth, #nextMonth, #previousYear, #nextYear")).toHaveCount(0);
+  await expect(
+    page.locator(
+      "#monthToggle, #monthPicker, #previousMonth, #nextMonth, #previousYear, #nextYear",
+    ),
+  ).toHaveCount(0);
   const desktop = test.info().project.name === "desktop";
   for (const width of desktop ? [1024, 1280, 1440, 1920] : [360, 393, 768]) {
     await page.setViewportSize({ width, height: 1000 });
     await expect(async () => {
       const layout = await page.evaluate(() => {
-        const rect = (id: string) => document.getElementById(id)!.getBoundingClientRect();
-        const strip = rect("monthGrid"), year = rect("pickerYear"), menu = rect("rangeToggle"), title = rect("breadcrumb");
-        const months = Array.from(document.querySelectorAll("#monthGrid button")).map(b => b.getBoundingClientRect());
+        const rect = (id: string) =>
+          document.getElementById(id)!.getBoundingClientRect();
+        const strip = rect("monthGrid"),
+          year = rect("pickerYear"),
+          menu = rect("rangeToggle"),
+          bar = rect("toolbarTrack"),
+          toolbar = document.querySelector(".topbar")!.getBoundingClientRect();
+        const controls = [
+          "sidebarToggle",
+          "pickerYear",
+          "rangeToggle",
+          "device",
+          "freshness",
+          "help",
+        ].map(rect);
+        const months = Array.from(
+          document.querySelectorAll("#monthGrid button"),
+        ).map((b) => b.getBoundingClientRect());
         return {
-          noDocumentOverflow: document.documentElement.scrollWidth <= innerWidth,
-          firstRow: strip.bottom <= title.top && year.right <= strip.left && menu.left >= strip.right,
-          sameRow: months.every(r => Math.abs((r.y + r.height / 2) - (menu.y + menu.height / 2)) < 2),
-          allMonthsInStrip: months.every(r => r.left >= strip.left && r.right <= strip.right),
-          blueSelectedMonth: getComputedStyle(document.querySelector('#monthGrid [aria-pressed="true"]')!).backgroundColor === "rgb(39, 92, 231)",
+          noDocumentOverflow:
+            document.documentElement.scrollWidth <= innerWidth,
+          firstRow:
+            year.right <= strip.left &&
+            menu.left >= strip.right &&
+            toolbar.height <= 64 &&
+            controls.every(
+              (r) =>
+                Math.abs(
+                  r.y + r.height / 2 - (toolbar.y + toolbar.height / 2),
+                ) < 3,
+            ),
+          sameRow: months.every(
+            (r) =>
+              Math.abs(r.y + r.height / 2 - (menu.y + menu.height / 2)) < 2,
+          ),
+          allMonthsInStrip: months.every(
+            (r) => r.left >= bar.left && r.right <= bar.right,
+          ),
+          equalWidths: months.every(
+            (r) => Math.abs(r.width - months[0].width) < 0.5,
+          ),
+          tightSpacing: months.every(
+            (r, i) => !i || r.left - months[i - 1].right <= 2,
+          ),
+          allControlsVisible:
+            controls.every((r) => r.left >= 0 && r.right <= innerWidth) &&
+            document.getElementById("toolbarTrack")!.scrollWidth <=
+              document.getElementById("toolbarTrack")!.clientWidth,
+          blueSelectedMonth:
+            getComputedStyle(
+              document.querySelector('#monthGrid [aria-pressed="true"]')!,
+            ).backgroundColor === "rgb(39, 92, 231)",
         };
       });
       expect(layout.noDocumentOverflow).toBe(true);
       expect(layout.firstRow).toBe(true);
       expect(layout.sameRow).toBe(true);
       expect(layout.blueSelectedMonth).toBe(true);
-      if (desktop) expect(layout.allMonthsInStrip).toBe(true);
+      expect(layout.equalWidths).toBe(true);
+      expect(layout.tightSpacing).toBe(true);
+      if (desktop && width >= 1280) {
+        expect(layout.allMonthsInStrip).toBe(true);
+        expect(layout.allControlsVisible).toBe(true);
+      }
     }).toPass();
     if (width === 1440 || width === 393) {
-      await page.screenshot({path: ".local/open-month-bar-" + test.info().project.name + ".png", fullPage: true, animations: "disabled"});
+      await page.screenshot({
+        path: ".local/compact-dashboard-" + test.info().project.name + ".png",
+        fullPage: true,
+        animations: "disabled",
+      });
       await page.locator("#rangeToggle").click();
-      await expect(page.getByRole("group", { name: "Dönem seçenekleri" }).getByRole("button")).toHaveText(["3 Ay", "6 Ay", "12 Ay"]);
-      const accessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
-      expect(accessibility.violations.map(v => ({ id: v.id, targets: v.nodes.map(n => n.target) }))).toEqual([]);
-      await page.screenshot({path: ".local/open-month-menu-" + test.info().project.name + ".png", fullPage: true, animations: "disabled"});
+      await expect(
+        page
+          .getByRole("group", { name: "Dönem seçenekleri" })
+          .getByRole("button"),
+      ).toHaveText(["3 Ay", "6 Ay", "12 Ay"]);
+      const accessibility = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+        .analyze();
+      expect(
+        accessibility.violations.map((v) => ({
+          id: v.id,
+          targets: v.nodes.map((n) => n.target),
+        })),
+      ).toEqual([]);
+      await page.screenshot({
+        path: ".local/compact-menu-" + test.info().project.name + ".png",
+        fullPage: true,
+        animations: "disabled",
+      });
       await page.keyboard.press("Escape");
     }
   }
 });
-test("compact year selector prevents future dates; period dropdown closes outside and supports keyboard selection", async ({ page }) => {
+test("all seven workspaces start with data, filters or the question field; actions follow the workspace and details stay accessible", async ({
+  page,
+}) => {
+  await login(page);
+  await expect(
+    page.locator(
+      ".page-heading,.section-intro,.question-intro,#viewDescription",
+    ),
+  ).toHaveCount(0);
+  await expect(page.locator("#viewTitle")).toHaveClass("sr-only");
+  const positions: Record<string, number> = {};
+  for (const [name, id, target] of [
+    ["Genel Bakış", "overview", "#kpis"],
+    ["Ürün Performansı", "products", "#productSearch"],
+    ["Arama Sorguları", "queries", "#querySearch"],
+    ["SEO Fırsat Radarı", "radar", "#radarResults"],
+    ["Değişiklik Takvimi", "changes", "#changeDay"],
+    ["Veri Sağlığı", "health", "#dataAuditResults"],
+    ["SEO Soru-Cevap", "questions", "#questionText"],
+  ]) {
+    await view(page, name);
+    await expect(page.locator(target)).toBeVisible();
+    await expect(page.locator("#view-" + id + " #reportActions")).toHaveCount(
+      1,
+    );
+    await expect(page.locator("#refresh")).toBeVisible();
+    const box = (await page.locator(target).boundingBox())!;
+    positions[id] = box.y;
+    expect(box.y).toBeLessThan(220);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: ".local/compact-" + id + "-" + test.info().project.name + ".png",
+      fullPage: true,
+      animations: "disabled",
+    });
+  }
+  expect(positions.overview).toBeLessThan(100);
+  // Every control remains reachable in the single horizontally scrolling bar.
+  for (const selector of [
+    "#pickerYear",
+    "#rangeToggle",
+    "#device",
+    "#freshness",
+    ".topbar .avatar",
+  ]) {
+    await page.locator(selector).scrollIntoViewIfNeeded();
+    const box = (await page.locator(selector).boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  }
+  await page
+    .locator(".topbar")
+    .screenshot({
+      path:
+        ".local/compact-toolbar-status-" + test.info().project.name + ".png",
+      animations: "disabled",
+    });
+  await page.locator("#freshness").click();
+  await expect(page.locator("#helpDialog")).toBeVisible();
+  await expect(page.locator("#coverageText")).toContainText("gün doğrulandı");
+  await expect(page.locator("#dataExplanation")).toContainText(
+    "Google bağlantısı yok",
+  );
+  await expect(page.locator("#helpDialog")).toContainText(
+    "Google aktarımını başlatmaz",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#helpDialog")).not.toBeVisible();
+});
+test("real error indicators remain visible outside collapsed details and private detail state clears on logout", async ({
+  page,
+}) => {
+  await page.route("**/api/report?*", (r) =>
+    r.fulfill({
+      status: 503,
+      json: { error: "TEST ONLY analiz bağlantısı kesildi" },
+    }),
+  );
+  await login(page);
+  await expect(page.locator("#dataError")).toBeVisible();
+  await expect(page.locator("#dataError")).toContainText(
+    "Aylık SEO analizi alınamadı",
+  );
+  await expect(page.locator("#freshness")).toHaveClass(/error/);
+  await expect(page.locator("#helpDialog")).not.toBeVisible();
+  await page.locator("#freshness").click();
+  await expect(page.locator("#dataExplanation")).toContainText(
+    "TEST ONLY analiz bağlantısı kesildi",
+  );
+  await page.keyboard.press("Escape");
+  if (
+    (await page.locator("#sidebarToggle").getAttribute("aria-label")) ===
+    "Menüyü aç"
+  )
+    await page.locator("#sidebarToggle").click();
+  await page.locator("#logout").click();
+  await expect(page.locator("#loginScreen")).toBeVisible();
+  await expect(page.locator("#helpDialog")).not.toHaveAttribute("open");
+  await expect(page.locator("#dataExplanation")).toBeEmpty();
+  await expect(page.locator("#dataError")).toBeEmpty();
+});
+test("compact year selector prevents future dates; period dropdown closes outside and supports keyboard selection", async ({
+  page,
+}) => {
   await login(page);
   await expect(page.locator("#rangeMenu")).not.toHaveAttribute("open");
-  await expect(page.getByRole("button", { name: "3 Ay", exact: true })).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "3 Ay", exact: true }),
+  ).toBeHidden();
   await page.getByLabel("Rapor yılı", { exact: true }).selectOption("2025");
   await expect(page.locator("#chartPeriod")).toContainText("01 Eki 2025");
   await expect(page.locator('[data-month="2025-12"]')).toBeEnabled();
@@ -78,18 +270,28 @@ test("compact year selector prevents future dates; period dropdown closes outsid
   await page.getByLabel("Rapor yılı", { exact: true }).selectOption("2026");
   await expect(page.locator("#chartPeriod")).toContainText("01 Eki 2026");
   await expect(page.locator('[data-month="2026-12"]')).toBeDisabled();
-  await expect(page.locator("#pickerYear option")).toHaveText(["2026", "2025", "2024"]);
+  await expect(page.locator("#pickerYear option")).toHaveText([
+    "2026",
+    "2025",
+    "2024",
+  ]);
   await page.locator("#rangeToggle").click();
-  await expect(page.getByRole("button", { name: "6 Ay", exact: true })).toBeVisible();
-  await page.locator("#viewTitle").click();
+  await expect(
+    page.getByRole("button", { name: "6 Ay", exact: true }),
+  ).toBeVisible();
+  await page.locator("#kpis").click();
   await expect(page.locator("#rangeMenu")).not.toHaveAttribute("open");
   await page.locator("#rangeToggle").focus();
   await page.keyboard.press("ArrowUp");
-  await expect(page.getByRole("button", { name: "12 Ay", exact: true })).toBeFocused();
+  await expect(
+    page.getByRole("button", { name: "12 Ay", exact: true }),
+  ).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.locator("#rangeToggle")).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("button", { name: "3 Ay", exact: true })).toBeFocused();
+  await expect(
+    page.getByRole("button", { name: "3 Ay", exact: true }),
+  ).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   await expect(page.locator("#chartPeriod")).toContainText("01 May 2026");
@@ -221,7 +423,15 @@ test("no storage or missing data never invents zeroes or leaders; open filters r
   const a = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
     .analyze();
-  expect(a.violations.map((v) => ({ id: v.id, nodes: v.nodes.map(n => ({ target: n.target, summary: n.failureSummary })) }))).toEqual([]);
+  expect(
+    a.violations.map((v) => ({
+      id: v.id,
+      nodes: v.nodes.map((n) => ({
+        target: n.target,
+        summary: n.failureSummary,
+      })),
+    })),
+  ).toEqual([]);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

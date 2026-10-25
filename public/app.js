@@ -29,41 +29,13 @@ import { drawChart, metricNames } from "./chart.js";
 import { setupModules } from "./modules.js";
 import { setupPeriod, currentMonth, scopeParams } from "./period.js";
 const views = {
-  overview: [
-    "Genel Bakış",
-    "SEO’ya genel bakış",
-    "Arama performansınızı izleyin. Bir sonraki adımınızı kanıtla belirleyin.",
-  ],
-  products: [
-    "Ürün Performansı",
-    "Ürün performansı",
-    "Her ürünün arama görünürlüğü, SEO kararı ve kaynak kanıtı bir arada.",
-  ],
-  queries: [
-    "Arama Sorguları",
-    "Sorgudan içgörüye",
-    "Hangi aramaların ürünlerinize görünürlük ve tıklama getirdiğini inceleyin.",
-  ],
-  radar: [
-    "SEO Fırsat Radarı",
-    "Bir sonraki fırsatınızı bulun",
-    "Veri yeterliliğini ve başarılı kelimeleri koruyan fırsat değerlendirmeleri.",
-  ],
-  changes: [
-    "Değişiklik Takvimi",
-    "SEO değişikliklerini izleyin",
-    "Nelerin değiştiğini, ne zaman tespit edildiğini ve ölçülebilen etkileri görün.",
-  ],
-  health: [
-    "Veri Sağlığı",
-    "Kararlarınızın temeli: güvenilir veri",
-    "Bağlantıları, kaynakları ve ölçümlerin doğruluğunu tek yerden inceleyin.",
-  ],
-  questions: [
-    "SEO Soru-Cevap",
-    "Verinize sorun. Kanıtıyla yanıt alın.",
-    "Kısa Türkçe sorular, kaynakları ve sınırları açık yanıtlar.",
-  ],
+  overview: "Genel Bakış",
+  products: "Ürün Performansı",
+  queries: "Arama Sorguları",
+  radar: "SEO Fırsat Radarı",
+  changes: "Değişiklik Takvimi",
+  health: "Veri Sağlığı",
+  questions: "SEO Soru-Cevap",
 };
 const state = {
   report: null,
@@ -155,9 +127,15 @@ function showLogin() {
     "chartTable",
     "summary",
     "changeResults",
+    "dataExplanation",
+    "coverageText",
+    "connectionSummary",
+    "dataError",
   ])
     $(id).replaceChildren();
   if ($("productDialog").open) $("productDialog").close();
+  if ($("helpDialog").open) $("helpDialog").close();
+  $("dataError").hidden = true;
   closeMobile();
 }
 async function api(path, options = {}) {
@@ -264,6 +242,11 @@ async function load(initial = false) {
       $("freshness").replaceChildren(
         node("span", null, "status-dot"),
         node("span", "Yenileme başarısız"),
+      );
+      $("freshness").title = "Yenileme başarısız; son başarılı veri korunuyor.";
+      $("freshness").setAttribute(
+        "aria-label",
+        $("freshness").title + " Veri ayrıntılarını aç",
       );
     }
   } finally {
@@ -380,6 +363,19 @@ function renderNotice() {
     node("span", null, "status-dot"),
     node("span", label),
   );
+  $("freshness").title =
+    label + " · " + period(data.period) + " · " + deviceName(data.device);
+  $("freshness").setAttribute(
+    "aria-label",
+    $("freshness").title + ". Veri ayrıntılarını aç",
+  );
+  $("dataError").hidden = !technical;
+  $("dataError").textContent = technical
+    ? report.unavailable
+      ? report.missing[0]
+      : "Google veri kontrolü başarısız. " +
+        (health?.code || "Ayrıntılar veri durumu düğmesinde.")
+    : "";
   $("status").className = "data-status" + (technical ? " technical-error" : "");
   const explanation = node("div");
   explanation.append(
@@ -511,6 +507,7 @@ function renderPriorities() {
   const priorities = products
     .filter((p) => ["İncele", "İyileştir"].includes(p.decision))
     .slice(0, 3);
+  $("attentionPanel").hidden = !priorities.length;
   $("priorities").replaceChildren(
     ...(priorities.length
       ? priorities.map((p) => {
@@ -580,11 +577,11 @@ function renderLeaders() {
     table.append(tbody);
     $("leadersTable").replaceChildren(table);
   }
-  $("leadersNote").textContent =
-    `${period(data.period)} · ${deviceName(data.device)} · Gözlenen günlerin tıklamalarına göre sıralanır. ` +
-    (!data.coverage.measurement_complete
-      ? "Kısmi sıralama; ürünlerin ölçüm günleri farklı olabilir."
-      : "Eksik sorgu veya düşük örneklem, başarı kanıtı değildir.");
+  $("leadersNote").textContent = !entries.length
+    ? ""
+    : !data.coverage.measurement_complete
+      ? "Kısmi sıralama · Gözlenen tıklamalara göre; ölçüm günleri farklı olabilir."
+      : "Tıklamaya göre sıralanır · Başarı veya neden kanıtı değildir.";
 }
 function renderSources() {
   const report = state.report,
@@ -1006,15 +1003,17 @@ async function loadQueries() {
 }
 function setView(view, focus = true) {
   if (!views[view]) view = "overview";
+  if (state.view !== view && $("helpDialog").open) $("helpDialog").close();
   state.view = view;
   for (const key of Object.keys(views)) $("view-" + key).hidden = key !== view;
   document.querySelectorAll("[data-view]").forEach((a) => {
     if (a.dataset.view === view) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
-  $("breadcrumb").textContent = views[view][0];
-  $("viewTitle").textContent = views[view][1];
-  $("viewDescription").textContent = views[view][2];
+  $("viewTitle").textContent = views[view];
+  $("view-" + view)
+    .querySelector("[data-actions-slot]")
+    .append($("reportActions"));
   $("periodControl").hidden = false;
   periodControl.remember(view);
   $("deviceControl").hidden = false;
@@ -1221,6 +1220,10 @@ document.querySelectorAll("[data-metric]").forEach((b) =>
 );
 $("closeDialog").addEventListener("click", () => $("productDialog").close());
 $("help").addEventListener("click", () => $("helpDialog").showModal());
+$("freshness").addEventListener("click", () => {
+  $("dataDetails").open = true;
+  $("helpDialog").showModal();
+});
 $("closeHelp").addEventListener("click", () => $("helpDialog").close());
 $("google").addEventListener("click", async () => {
   try {

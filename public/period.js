@@ -118,11 +118,11 @@ export function setupPeriod(viewNames, onChange) {
         '[data-month=\"' + $("month").value + '\"]',
       );
       if (b) {
-        const r = $("monthGrid").getBoundingClientRect(),
+        const track = $("toolbarTrack"),
+          r = track.getBoundingClientRect(),
           v = b.getBoundingClientRect();
         if (r.width && (v.left < r.left || v.right > r.right))
-          $("monthGrid").scrollLeft +=
-            v.left - r.left - r.width / 2 + v.width / 2;
+          track.scrollLeft += v.left - r.left - r.width / 2 + v.width / 2;
       }
     });
     document
@@ -156,17 +156,37 @@ export function setupPeriod(viewNames, onChange) {
     if (!available.length) return sync();
     choose(available.includes(target) ? target : available[0], "1");
   };
-  document
-    .querySelectorAll("[data-range]")
-    .forEach((b) => {
-      b.onclick = () => {
-        choose(currentMonth(), b.dataset.range);
-        $("rangeToggle").focus({ preventScroll: true });
-      };
-    });
+  document.querySelectorAll("[data-range]").forEach((b) => {
+    b.onclick = () => {
+      choose(currentMonth(), b.dataset.range);
+      $("rangeToggle").focus({ preventScroll: true });
+    };
+  });
   document.addEventListener("click", (e) => {
     if (!$("rangeMenu").contains(e.target)) $("rangeMenu").open = false;
   });
+  function positionRangeMenu() {
+    const anchor = $("rangeToggle").getBoundingClientRect();
+    $("rangeMenu").style.setProperty("--menu-top", anchor.bottom + 6 + "px");
+    $("rangeMenu").style.setProperty(
+      "--menu-left",
+      Math.max(8, Math.min(innerWidth - 138, anchor.right - 130)) + "px",
+    );
+  }
+  $("rangeMenu").addEventListener("toggle", positionRangeMenu);
+  $("toolbarTrack").addEventListener(
+    "scroll",
+    () => {
+      if (!$("rangeMenu").open) return;
+      const anchor = $("rangeToggle").getBoundingClientRect(),
+        track = $("toolbarTrack").getBoundingClientRect();
+      if (anchor.right <= track.left || anchor.left >= track.right)
+        $("rangeMenu").open = false;
+      else positionRangeMenu();
+    },
+    { passive: true },
+  );
+  addEventListener("resize", positionRangeMenu);
   $("rangeMenu").addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -185,8 +205,11 @@ export function setupPeriod(viewNames, onChange) {
           : e.key === "End"
             ? buttons.length - 1
             : i < 0
-              ? e.key === "ArrowDown" ? 0 : buttons.length - 1
-              : (i + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+              ? e.key === "ArrowDown"
+                ? 0
+                : buttons.length - 1
+              : (i + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) %
+                buttons.length;
     buttons[next].focus();
   });
   $("monthGrid").addEventListener("keydown", (e) => {
