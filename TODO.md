@@ -1,3 +1,16 @@
+# Hesap sahibi ayarı ve kota sonrası yayın — 25 Ekim 2026
+
+- [x] Hesap sahibi bu konuşmada Worker'ın otomatik Git dağıtımını **kapattığını bildirdi**. Bu kullanıcı beyanıdır; Build tetikleyici API erişimi hâlâ 403 olduğundan ayarın API ile doğrulandığı söylenmez. Yeniden token/OAuth/onay istenmez.
+- [x] Son uygulama/operasyon commit'i **`a1118355a2efe163ac54861574b95e022a7f79e5`**; yerel **334 Workers/D1 + 99 Python + 34 Chromium = 467 test** başarılı. Son belge commit'i `git log -1 --oneline` ile bulunur; uzak son CI PR #22'de izlenir. İlk yeni tarih sınırı testindeki sıralama hatası düzeltildi ve bütün kontroller tekrar geçti.
+- [x] Mevcut kontrollü production workflow'una **yalnız 26 Ekim 2026** için denemeler eklendi: Türkiye **03.17, 03.47, 04.17, 04.47, 05.17, 05.47**. GitHub zamanlaması gecikebilir. Daha sonraki yıllarda bu olay yayını yapılmaz. Her deneme önce tam main commit'inin başarılı push CI'sini ve gerçek %100 Worker UUID'sini D1'e dokunmadan doğrular. Kota/rollback/migration/commit/guard kapıları aynen zorunludur. Aynı commit zaten yayımlandıysa tekrar yayınlamaz; bu durum üretim kabulü tamamlandı anlamına gelmez.
+- [x] Saatlik kota gözlemcisi, UTC yenilenmesi ve gerçek Worker'daki **`read_guard_revision=d1-account-reads-v1`** doğrulanmadan D1'e erişmez. Henüz uygulanmamış migration tablolarını okumaz; açıkça bekleme kaydı üretir. Yayımdan sonra gerçek doğal Cron ve okuma maliyeti kabulü ayrıca çalışır.
+- [ ] PR #22'nin son tam HEAD CI'sini doğrula, PR'ı main'e al ve main CI'yi doğrula. Kullanıcı beyanıyla Git otomatik yayın engeli giderildiğinden kod birleştirme şimdi yapılabilir; **Worker yayını/migration/yoğun D1 işlemi hâlâ kota yenilenmesine kadar yasaktır**. Main'de iş akışlarının etkin kaydını ve eski Worker sürümünün değişmediğini kontrol et.
+- [ ] Kota sonrası kontrollü yayın ve gerçek GSC/Cron/okuma tüketimi kabulü **henüz gerçekleşmedi**. Kod, takvim veya test sonucu gerçek üretim başarısı sayılmaz. Ücretli plan, CSV değişikliği, veri silme veya yeniden Google yetkilendirmesi yoktur.
+
+Kullanıcıdan şu anda başka işlem gerekmiyor. Bu bir GitHub Actions zamanlamasıdır; Codex oturumunun kendiliğinden yeniden başlayacağı garanti edilmez. Sonraki somut adım aşağıdaki genel talimatların üstünde yer alan bu kayda göre main CI ve zamanlanan yayın sonucunu kontrol etmektir.
+
+---
+
 # Acil D1 okuma kotası — 25 Ekim 2026 19.00 Türkiye kontrol noktası
 
 **Sorun tamamen çözüldü sayılmaz; gerçek üretim kabulü bekliyor.** Dal `fix/d1-account-read-budget`, [PR #22](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/22). Son uygulama commit'i **`7ec4f8ee3fcf8b291519248a4a6bb4f02f2abd4a`**, tam HEAD CI **[40209576264 — SUCCESS](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40209576264)** (334 + 82 + 34 = 450 test); önceki temel uygulama `40967a7`; bu kaydı içeren son commit `git log -1 --oneline` ile bulunur. PR #21 / `d97c34b` bu dalın atasıdır; bütün arayüz ve tarayıcı test dosyaları birebir korunur.

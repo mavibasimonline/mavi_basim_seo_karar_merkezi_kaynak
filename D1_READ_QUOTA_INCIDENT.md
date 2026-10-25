@@ -59,3 +59,11 @@ Toplamları aynı zamandaki farklı/sınırlı analitik sorgulardan birbiriyle t
 5. En az bir sonraki hesap gözleminde gerçek okuma/yazma değişimini ve yerel maliyetleri karşılaştır. Aylık Temmuz–Eylül eksikliği ayrıca sürer; bu düzeltme aylık rapor kabulünü tamamlamaz.
 
 Bu oturumun kota yenilendiğinde kendiliğinden devam edeceği garanti edilmez. Yeni kontrol/yayın iş akışları main'e alınmadan üretimde zamanlandığı söylenemez.
+
+## Hesap sahibi yanıtından sonraki devam kaydı
+
+25 Ekim'deki kullanıcı mesajı otomatik Git dağıtımının kapatıldığını bildirir. Bu ayar API 403 nedeniyle bağımsız olarak doğrulanmadı; kullanıcı beyanı kayıtlıdır. Kaynak **a111835**, yerel 334 Workers/D1 + 99 Python + 34 Chromium = **467 test** geçti. PR #21 arayüzü birebir korunur.
+
+Mevcut kontrollü production workflow'u 26 Ekim **03.17/03.47/04.17/04.47/05.17/05.47 Türkiye** için sınırlı deneme yapacak şekilde hazırlanmıştır. Tam ve başarılı main push CI'si, gerçek %100 Worker sürümü, UTC yenilenmesi ve hesap kotası olmadan migration/yayın başlamaz. Başarıyla yayımlanan aynı commit tekrar yayımlanmaz; yayının varlığı, gerçek Cron kabulüyle karıştırılmaz. Yeni halka açık health alanı yalnız yazılım koruma sürümünü bildirir; Google bağlantısı/veri kabulü iddiası değildir.
+
+Saatlik gözlemciler yenilenme/gerçek guard marker'ı yokken `database_queries=0` ve bekleme nedeni üretir. Böylece iş akışları önce main'e alınabilir; eski Worker ve mevcut D1, kota yenilenene kadar korunur. Main CI, canlı sürümün değişmediği ve iş akışı kaydı daha sonra PR/TODO içinde doğrulanır. Gerçek kota sonrası sonuç henüz yoktur. GitHub zamanlaması gecikebilir; Codex oturumu için yeniden başlama garantisi verilmez.
