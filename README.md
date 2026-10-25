@@ -22,7 +22,7 @@ Gerçek üretim devamı (25 Ekim 01:16 Türkiye): [29 ürünün gerçek tarama k
 
 ## Dönem seçimi ve kullanım
 
-Üst çubuktaki takvim simgesine bir kez tıklayarak ayı seçin; oklarla aylar arasında geçin. İlk ziyaret mevcut ayı açar, sonraki ziyaretlerde ay/cihaz/sekme tercihi hatırlanır. Mevcut ay kısmi olarak gösterilir; gelecek ay seçilmez. Ay veya cihaz değişince ilgili tablolar ve radar otomatik yüklenir. “Ekranı yenile” Google aktarımını başlatmaz. Eksik ölçümler tire, ayrıntılar “Neden eksik?” altında gösterilir. [UX kabulü ve sınırlar](UX_ACCEPTANCE_REPORT.md).
+Üstte 12 ay açık butonlarla gösterilir; ay adına tek tıklamak raporu yükler. Ayrı 3 Ay / 6 Ay / 12 Ay seçenekleri mevcut ay dâhil son takvim aylarını özetler; tam tarih aralığı görünür. İlk ziyarette mevcut ay/Tüm cihazlar, sonraki ziyarette son tercih açılır. Ay/dönem/cihaz/sekme korunur; gelecek ay seçilmez. **İlk 10 Lider Ürün**, yalnız gözlenen gerçek ürün ölçümlerini tıklamaya göre sıralar ve isimden kanıt penceresini açar. Kısmi sıralama ve eksik günler açıkça belirtilir; veri yoksa sıfır veya sahte lider gösterilmez. “Ekranı yenile” yalnız kayıtlı veriyi okur. [366 test ve gerçek D1 kabulü](FILTER_BAR_REPORT.md).
 
 ## Yenilenen Türkçe panel
 
