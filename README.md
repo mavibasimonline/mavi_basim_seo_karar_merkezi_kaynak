@@ -20,6 +20,10 @@ Türkçe tek ekran paneli, Cloudflare Worker API'si, D1/SQLite veri modeli, gün
 
 Gerçek üretim devamı (25 Ekim 01:16 Türkiye): [29 ürünün gerçek tarama kabulü, eksik aylık GSC kapsamı ve sonraki otomatik kontrol](PRODUCTION_CONTINUITY_REPORT.md). Tam aylık rapor kabulü henüz geçmedi.
 
+## Dönem seçimi ve kullanım
+
+Üst çubuktaki takvim simgesine bir kez tıklayarak ayı seçin; oklarla aylar arasında geçin. İlk ziyaret mevcut ayı açar, sonraki ziyaretlerde ay/cihaz/sekme tercihi hatırlanır. Mevcut ay kısmi olarak gösterilir; gelecek ay seçilmez. Ay veya cihaz değişince ilgili tablolar ve radar otomatik yüklenir. “Ekranı yenile” Google aktarımını başlatmaz. Eksik ölçümler tire, ayrıntılar “Neden eksik?” altında gösterilir. [UX kabulü ve sınırlar](UX_ACCEPTANCE_REPORT.md).
+
 ## Yenilenen Türkçe panel
 
 Daraltılabilir menüden Genel Bakış, Ürün Performansı, Arama Sorguları, Fırsat Radarı, Değişiklik Takvimi, Veri Sağlığı ve SEO Soru-Cevap açılır. Üstteki dönem/cihaz seçimi KPI, günlük grafik, ürün raporu ve sorgu tablosuna uygulanır. Soru-cevap kendi doğal dil tarih/cihaz bağlamını korur. Ürün satırları kanıt ayrıntısını açar; sorgular sunucuda filtrelenir, sıralanır ve sayfalanır.

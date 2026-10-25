@@ -1,5 +1,6 @@
 """Read deployment/settings and save rollback identity. No secret values are serialized."""
 import json
+import math
 import os
 import re
 import urllib.request
@@ -40,7 +41,18 @@ def preflight(client,config,expected):
  if config['vars'].get('CATCHUP_ENABLED')=='true':
   day=datetime.now(timezone.utc).date().isoformat();budget=int(config['vars']['SYNC_INITIAL_WRITE_LIMIT'] if day==config['vars']['SYNC_INITIAL_BUDGET_DAY'] else config['vars']['SYNC_DAILY_WRITE_LIMIT'])
   if not usage['ok'] or usage.get('hours',0)==0:raise ValueError('D1_QUOTA_READ_REQUIRED')
-  if usage['rows_written']+budget>90_000 or usage['rows_read']>4_000_000:raise ValueError('D1_DAILY_BUDGET_UNAVAILABLE')
+  # Analytics already includes spent sync writes. Reserving the entire daily
+  # allowance a second time blocks harmless releases after normal collection.
+  counter=client.query(config['d1_databases'][0]['database_id'],QUERIES['sync_budget_history'])
+  if not counter.get('ok'):raise ValueError('D1_SYNC_BUDGET_READ_REQUIRED')
+  today=[r for r in counter['rows'] if r.get('day')==day]
+  try:spent=float(today[0]['code']) if len(today)==1 else 0 if not today else float('nan')
+  except (ValueError,TypeError,KeyError):raise ValueError('D1_SYNC_BUDGET_READ_REQUIRED')
+  if not math.isfinite(spent) or spent<0:raise ValueError('D1_SYNC_BUDGET_READ_REQUIRED')
+  remaining=max(0,budget-spent)
+  projected=max(usage['rows_written'],spent)+remaining
+  if projected>90_000 or usage['rows_read']>4_000_000:raise ValueError('D1_DAILY_BUDGET_UNAVAILABLE')
+  usage={**usage,'sync_daily_limit':budget,'sync_reserved_writes':spent,'sync_remaining_allowance':remaining,'projected_writes':projected}
  return {'worker':'mavi-basim-seo-prod','previous_version':expected,'previous_crons':crons,'binding_names':sorted(names),'source_counts':source['rows'][0],'schema_changes':False,'secret_changes':False,'daily_d1_usage':usage}
 
 def restore_cron(client,saved):

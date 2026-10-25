@@ -60,6 +60,29 @@
       </div>
       <p class="login-footer">Mavi Basım · Veriden kanıta, kanıttan karara.</p>
     </main>
+    <div
+      id="monthPicker"
+      class="month-picker"
+      popover
+      role="dialog"
+      aria-label="Rapor ayını seç"
+    >
+      <div class="picker-heading">
+        <button id="previousYear" class="icon-button" aria-label="Önceki yıl">
+          ←</button
+        ><strong id="pickerYear"></strong
+        ><button id="nextYear" class="icon-button" aria-label="Sonraki yıl">
+          →
+        </button>
+      </div>
+      <div
+        id="monthGrid"
+        class="month-grid"
+        role="group"
+        aria-label="Aylar"
+      ></div>
+      <p>Ayı seçtiğinizde rapor güncellenir.</p>
+    </div>
     <div id="app" class="app-shell" hidden>
       <aside
         id="sidebar"
@@ -166,8 +189,52 @@
             ><span class="breadcrumb-divider">/</span
             ><strong id="breadcrumb">Genel Bakış</strong>
           </div>
+          <div class="scope-controls">
+            <div id="periodControl" class="month-control">
+              <button
+                id="previousMonth"
+                class="icon-button"
+                aria-label="Önceki ay"
+              >
+                ←
+              </button>
+              <button
+                id="monthToggle"
+                class="month-toggle"
+                popovertarget="monthPicker"
+                aria-haspopup="dialog"
+                aria-controls="monthPicker"
+                aria-expanded="false"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="/icons.svg#calendar" /></svg
+                ><span id="monthLabel"></span><span aria-hidden="true">⌄</span>
+              </button>
+              <button
+                id="nextMonth"
+                class="icon-button"
+                aria-label="Sonraki ay"
+              >
+                →
+              </button>
+              <select
+                id="month"
+                hidden
+                aria-label="Rapor dönemi değeri"
+              ></select>
+            </div>
+            <div id="deviceControl" class="device-selector">
+              <label class="sr-only" for="device">Cihaz</label
+              ><select id="device" aria-label="Cihaz">
+                <option value="ALL">Tüm cihazlar</option>
+                <option value="MOBILE">Mobil</option>
+                <option value="DESKTOP">Masaüstü</option>
+                <option value="TABLET">Tablet</option>
+              </select>
+            </div>
+          </div>
           <div class="topbar-actions">
-            <span id="freshness" class="freshness"
+            <span id="freshness" class="freshness" role="status"
               ><span class="status-dot"></span> Veri durumu kontrol
               ediliyor</span
             ><button
@@ -197,46 +264,58 @@
                   belirleyin.
                 </p>
               </div>
-              <div class="page-actions">
+              <div class="page-actions" aria-label="Rapor işlemleri">
                 <a id="export" class="button secondary" href="/api/export"
                   ><svg class="icon" aria-hidden="true">
                     <use href="/icons.svg#down" /></svg
-                  ><span>Raporu indir</span></a
-                ><button id="refresh" class="button primary">
+                  ><span id="exportLabel">Raporu indir</span></a
+                ><button
+                  id="refresh"
+                  class="button primary"
+                  title="Yalnızca ekrandaki kayıtları yeniden yükler; Google aktarımını başlatmaz."
+                >
                   <svg class="icon" aria-hidden="true">
                     <use href="/icons.svg#refresh" />
                   </svg>
-                  Verileri yenile
+                  Ekranı yenile
                 </button>
               </div>
             </div>
-            <div class="filterbar">
-              <div id="periodControl" class="period-selector">
-                <svg class="icon" aria-hidden="true">
-                  <use href="/icons.svg#calendar" /></svg
-                ><label for="month">Rapor dönemi</label
-                ><select id="month" aria-label="Rapor dönemi"></select>
-              </div>
-              <div id="deviceControl" class="device-selector">
-                <label for="device">Cihaz</label
-                ><select id="device" aria-label="Cihaz">
-                  <option value="ALL">Tüm cihazlar</option>
-                  <option value="MOBILE">Mobil</option>
-                  <option value="DESKTOP">Masaüstü</option>
-                  <option value="TABLET">Tablet</option>
-                </select>
-              </div>
-              <span id="scopeLabel" class="filter-scope"
-                >Google Search Console · Web araması</span
-              >
+            <p class="refresh-hint">
+              Ekranı yenile: kayıtlı verileri yeniden yükler; Google aktarımını
+              başlatmaz.
+            </p>
+            <div class="period-context">
+              <span id="periodHint"></span
+              ><span id="scopeLabel">Google Search Console · Web araması</span
+              ><span id="loadStatus" role="status" aria-live="polite"></span>
             </div>
-            <div id="status" class="data-notice" role="status"></div>
+            <div id="status" class="data-status">
+              <span id="coverageText"></span>
+              <details id="dataDetails">
+                <summary>Neden eksik?</summary>
+                <div id="dataExplanation"></div>
+                <div id="connectionSummary" class="connection-summary"></div>
+                <button class="text-button" data-go="health">
+                  Veri sağlığını incele
+                </button>
+              </details>
+            </div>
             <section id="view-overview" class="view" aria-label="Genel bakış">
               <div
                 id="kpis"
                 class="kpi-grid"
                 aria-label="Arama performansı göstergeleri"
               ></div>
+              <section class="panel attention-strip">
+                <div>
+                  <h2>Dikkat gerektiren değişimler</h2>
+                  <div id="priorities"></div>
+                </div>
+                <button class="text-button" data-go="radar">
+                  Fırsat radarını aç →
+                </button>
+              </section>
               <div class="analytics-grid">
                 <section class="panel performance-panel">
                   <div class="panel-heading">
@@ -288,51 +367,9 @@
                     ></div>
                   </details>
                 </section>
-                <aside class="panel coverage-panel">
-                  <div class="panel-heading">
-                    <h2>Veri kapsamı</h2>
-                    <svg class="icon" aria-hidden="true">
-                      <use href="/icons.svg#shield" />
-                    </svg>
-                  </div>
-                  <div id="coverageRing" class="coverage-ring"></div>
-                  <p id="coverageText" class="coverage-text"></p>
-                  <div id="connectionSummary" class="connection-summary"></div>
-                  <button class="text-button" data-go="health">
-                    Veri sağlığını incele
-                    <svg class="icon" aria-hidden="true">
-                      <use href="/icons.svg#arrow" />
-                    </svg>
-                  </button>
-                </aside>
-              </div>
-              <div class="section-heading">
-                <div>
-                  <h2>Öncelikleriniz</h2>
-                  <p>
-                    Verinin desteklediği fırsatlar ve korunması gereken
-                    çalışmalar.
-                  </p>
-                </div>
-                <button class="text-button" data-go="radar">
-                  Fırsat radarını aç
-                  <svg class="icon" aria-hidden="true">
-                    <use href="/icons.svg#arrow" />
-                  </svg>
-                </button>
               </div>
               <div class="priorities-grid">
-                <section class="panel">
-                  <div class="mini-heading">
-                    <span class="icon-tile amber"
-                      ><svg class="icon" aria-hidden="true">
-                        <use href="/icons.svg#radar" /></svg
-                    ></span>
-                    <h3>Önce neye bakalım?</h3>
-                  </div>
-                  <div id="priorities"></div>
-                </section>
-                <section class="panel protect-panel">
+                <section id="protectPanel" class="panel protect-panel">
                   <div class="mini-heading">
                     <span class="icon-tile green"
                       ><svg class="icon" aria-hidden="true">
@@ -349,25 +386,6 @@
                   </button>
                 </section>
               </div>
-              <section class="question-callout">
-                <span class="callout-icon"
-                  ><svg class="icon" aria-hidden="true">
-                    <use href="/icons.svg#chat" /></svg
-                ></span>
-                <div>
-                  <h3>Verilerinize bir soru sorun.</h3>
-                  <p>
-                    “Broşür mobilde neden düştü?” Yanıtı, kaynaklarıyla birlikte
-                    inceleyin.
-                  </p>
-                </div>
-                <button class="button secondary" data-go="questions">
-                  SEO Soru-Cevap
-                  <svg class="icon" aria-hidden="true">
-                    <use href="/icons.svg#arrow" />
-                  </svg>
-                </button>
-              </section>
             </section>
             <section
               id="view-products"
@@ -396,18 +414,42 @@
                       aria-label="Ürün veya URL ara"
                     />
                   </div>
-                  <label class="sr-only" for="decisionFilter">SEO kararı</label
-                  ><select id="decisionFilter">
-                    <option value="">Tüm kararlar</option>
-                    <option>Koru</option>
-                    <option>İncele</option>
-                    <option>İyileştir</option>
-                    <option>Veri bekle</option></select
-                  ><label class="sr-only" for="groupFilter">Ürün grubu</label
-                  ><select id="groupFilter">
-                    <option value="">Tüm ürün grupları</option>
-                  </select>
                 </div>
+                <div
+                  id="productQuickSort"
+                  class="quick-sort"
+                  role="group"
+                  aria-label="Ürünleri hızlı sırala"
+                >
+                  <button data-product-sort="clicks" aria-pressed="true">
+                    En çok tıklanan</button
+                  ><button data-product-sort="impressions" aria-pressed="false">
+                    En çok gösterilen</button
+                  ><button
+                    data-product-sort="change"
+                    aria-pressed="false"
+                    title="Tam ayların mutlak tıklama farkına göre sıralar."
+                  >
+                    En fazla değişen
+                  </button>
+                </div>
+                <details class="advanced-filters">
+                  <summary>Gelişmiş filtreler</summary>
+                  <div class="inline-controls">
+                    <label class="sr-only" for="decisionFilter"
+                      >SEO kararı</label
+                    ><select id="decisionFilter">
+                      <option value="">Tüm kararlar</option>
+                      <option>Koru</option>
+                      <option>İncele</option>
+                      <option>İyileştir</option>
+                      <option>Veri bekle</option></select
+                    ><label class="sr-only" for="groupFilter">Ürün grubu</label
+                    ><select id="groupFilter">
+                      <option value="">Tüm ürün grupları</option>
+                    </select>
+                  </div>
+                </details>
                 <div
                   id="products"
                   class="table-scroll"
@@ -446,10 +488,7 @@
                       aria-label="Arama sorgusu ara"
                     />
                   </div>
-                  <label class="sr-only" for="queryProduct">Sorgu ürünü</label
-                  ><select id="queryProduct">
-                    <option value="">Tüm ürünler</option></select
-                  ><label class="sr-only" for="queryBrand">Marka ayrımı</label
+                  <label class="sr-only" for="queryBrand">Marka ayrımı</label
                   ><select id="queryBrand">
                     <option value="all">Tüm sorgular</option>
                     <option value="non_brand">Markasız</option>
@@ -458,6 +497,13 @@
                     Filtrele
                   </button>
                 </form>
+                <details class="advanced-filters">
+                  <summary>Gelişmiş seçenekler</summary>
+                  <label for="queryProduct">Ürün</label
+                  ><select id="queryProduct">
+                    <option value="">Tüm ürünler</option>
+                  </select>
+                </details>
                 <div
                   id="queryTable"
                   class="table-scroll"
@@ -494,8 +540,8 @@
                   <use href="/icons.svg#radar" />
                 </svg>
                 <p>
-                  Son 28 kesinleşmiş gün incelenir. Bir fırsatın nedeni, riski
-                  ve kaynakları birlikte değerlendirilir.
+                  Üst çubuktaki ay ve cihaz seçimi incelenir. Bir fırsatın
+                  nedeni, riski ve kaynakları birlikte değerlendirilir.
                 </p>
               </div>
               <div id="radarResults" class="module-results">

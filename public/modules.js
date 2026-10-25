@@ -1,10 +1,17 @@
 import { $, node, number, percent, detail, list, sourceName } from "./ui.js";
 export function setupModules(api, notify) {
   let auditRequest = 0,
-    calendarRequest = 0;
+    calendarRequest = 0,
+    radarRequest = 0;
   async function loadRadar() {
+    const request = ++radarRequest,
+      scope = new URLSearchParams({
+        month: $("month").value,
+        device: $("device").value,
+      }).toString();
     try {
-      const r = await api("/api/radar");
+      const r = await api("/api/radar?" + scope);
+      if (request !== radarRequest) return;
       const root = $("radarResults");
       root.replaceChildren(
         node(
@@ -57,13 +64,14 @@ export function setupModules(api, notify) {
       }
       root.append(list(r.limitations));
     } catch (e) {
-      $("radarResults").textContent = e.message;
+      if (request === radarRequest) $("radarResults").textContent = e.message;
     }
   }
   $("changeDay").value = new Date().toISOString().slice(0, 10);
   $("showChanges").addEventListener("click", async () => {
     const request = ++calendarRequest,
       day = $("changeDay").value;
+    if (!$("changeDay").reportValidity()) return;
     try {
       const r = await api(
         "/api/change-calendar?day=" + encodeURIComponent($("changeDay").value),
@@ -184,6 +192,7 @@ export function setupModules(api, notify) {
         list(r.limitations),
       );
       const history = await api("/api/audit-history");
+      if (request !== auditRequest || month !== $("month").value) return;
       root.append(
         detail(
           "Denetim Geçmişi",
@@ -202,6 +211,11 @@ export function setupModules(api, notify) {
 
   $("runDataAudit").addEventListener("click", loadDataAudit);
   return {
+    invalidate: () => {
+      auditRequest++;
+      calendarRequest++;
+      radarRequest++;
+    },
     radar: loadRadar,
     health: loadDataAudit,
     changes: () => {
