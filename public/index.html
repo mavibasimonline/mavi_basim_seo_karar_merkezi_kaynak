@@ -168,20 +168,8 @@
           </div>
           <div class="scope-controls">
             <div id="periodControl" class="year-control">
-              <button
-                id="previousYear"
-                class="icon-button"
-                aria-label="Önceki yıl"
-              >
-                ←</button
-              ><strong id="pickerYear"></strong
-              ><button
-                id="nextYear"
-                class="icon-button"
-                aria-label="Sonraki yıl"
-              >
-                →
-              </button>
+              <label class="sr-only" for="pickerYear">Rapor yılı</label>
+              <select id="pickerYear"></select>
             </div>
             <div
               id="monthGrid"
@@ -189,12 +177,23 @@
               role="group"
               aria-label="Ay seçimi"
             ></div>
-            <div class="range-modes" role="group" aria-label="Çok aylık özet">
-              <span class="sr-only">Son dönem</span
-              ><button data-range="3" aria-pressed="false">3 Ay</button
-              ><button data-range="6" aria-pressed="false">6 Ay</button
-              ><button data-range="12" aria-pressed="false">12 Ay</button>
-            </div>
+            <details id="rangeMenu" class="range-menu">
+              <summary id="rangeToggle" aria-label="Dönem seçimi">
+                <span id="rangeLabel">Dönem</span>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </summary>
+              <div
+                class="range-options"
+                role="group"
+                aria-label="Dönem seçenekleri"
+              >
+                <button data-range="3" aria-pressed="false">3 Ay</button>
+                <button data-range="6" aria-pressed="false">6 Ay</button>
+                <button data-range="12" aria-pressed="false">12 Ay</button>
+              </div>
+            </details>
             <select id="month" hidden aria-label="Rapor dönemi değeri"></select
             ><select id="rangeMonths" hidden aria-label="Dönem modu">
               <option value="1">Tekil ay</option>
@@ -202,6 +201,8 @@
               <option value="6">6 Ay</option>
               <option value="12">12 Ay</option>
             </select>
+          </div>
+          <div class="topbar-actions">
             <div id="deviceControl" class="device-selector">
               <label class="sr-only" for="device">Cihaz</label
               ><select id="device" aria-label="Cihaz">
@@ -211,8 +212,6 @@
                 <option value="TABLET">Tablet</option>
               </select>
             </div>
-          </div>
-          <div class="topbar-actions">
             <span id="freshness" class="freshness" role="status"
               ><span class="status-dot"></span> Veri durumu kontrol
               ediliyor</span

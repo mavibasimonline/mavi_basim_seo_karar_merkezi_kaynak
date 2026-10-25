@@ -1,3 +1,15 @@
+# Üst tarih çubuğu düzen düzeltmesi — 25 Ekim 2026
+
+- [x] En üstte tek satır: kompakt yıl, 12 sürekli açık ay, hemen sağında tıklanınca 3/6/12 Ay açılan Dönem menüsü. Seçili ay dolu mavi; eski tarih kutusu ve sağ-sol okları yok. Mobilde ayların kendi yatay kaydırması var.
+- [x] Mevcut ay/Tüm cihazlar ilk açılışı, otomatik yükleme, dönem/cihaz/sekme tercihleri ve İlk 10 Lider Ürün korunur. Eksik veri/liderlik üretilmez. Yıl/dönem menüsü klavye, odak, dışarı tıklama ve Escape kontrolleri tamamlandı.
+- [x] **370 test:** 299 Workers/D1 + 49 Python + 22 masaüstü/mobil Chromium; tip/build, üretim dry-run, audit 0. İlk erişilebilirlik koşusundaki geçici kontrast hatası, yüklemede soluklaştırma kaldırılarak giderildi; yeniden koşu başarılı.
+- [x] 1024/1280/1440/1920 px'de 12 ay kırpılmadan aynı satırda; 360/393/768 px'de belge taşması yok. Masaüstü açık/kapalı menü ekran görüntüleri `docs/screenshots/` ve [kabul raporunda](FILTER_BAR_REPORT.md).
+- Son commit bu belgeyi içeren git kaydıdır; dal `fix/open-month-bar-with-period-menu`. Uzak CI ve kontrollü yayın kanıtı bu düzeltmenin PR açıklaması/production workflow kaydında izlenir. OAuth, D1, Cron, günlük bütçe, tarama, deploy yapılandırması ve 521 CSV değişmez.
+
+Kalan gerçek veri görevi değişmedi: eksik geçmiş ayları mevcut bütçeli otomasyondan izlemek; tam ve taze veriyle aylık rapor kabulünü yapmak. Önceki özel yönetici oturumu/şifreli yedek kabul sınırları sürer; bu düzen düzeltmesi için yeni yetki gerekmedi. Aşağıdaki kayıtlar önceki aşamaların tarihçesidir.
+
+---
+
 # Açık ay çubuğu ve liderler — 25 Ekim 2026
 
 - [x] 12 açık ay, seçili ay/yıl, gelecek ay engeli; ayrı 3/6/12 ay modu ve cihaz filtresi. Mevcut ay dâhil N takvim ayı kullanılır; aralık açık gösterilir. Tercihler ay/dönem/cihaz/sekme olarak hatırlanır; başka kullanıcı verisi saklanmaz.
