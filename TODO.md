@@ -1,3 +1,15 @@
+# Üretim bekleme kontrolü — 25 Ekim 2026, main hazır
+
+- [x] **PR #22 main'e birleşti:** `dcd4b493a7a2b4b361ee623384a7e10a6f887fff`. PR CI **40211912177**, main CI **40212255314 SUCCESS**; gerçek loglarda **334 Workers/D1 + 99 Python + 34 Chromium = 467 test**, audit 0 doğrulandı. PR #21/#20 de içerilen commit'leriyle birleşmiş durumdadır; arayüz/CSV kaynakları korundu. Son uygulama commit'i `a111835`; bu belge kontrol noktasının son commit'i `git log -1 --oneline` ile izlenir.
+- [x] Hesap sahibi otomatik Cloudflare Git dağıtımını kapattığını bildirdi; tekrar kullanıcı işlemi/token gerekmiyor. API 403 nedeniyle ayarın kendisi bağımsız okunamadı. **Main birleşmesi sonrasında gerçek Worker hâlâ `2f502c68-76ae-48a7-b87a-5b7e45bf62e4`, commit null:** yeni sürüm yayımlanmadı, erken migration veya aktarım yapılmadı.
+- [x] GitHub üzerinde production workflow **395288949**, saatlik quota workflow **396168026**, ikisi de **active** olarak doğrulandı. Main'de kayıtlı ilk kontrollü yayın denemesi **26 Ekim 2026 03.17 Türkiye**; en fazla altı deneme 05.47'ye kadar yarım saat arayla. Zamanlama gecikebilir. Her deneme tam main push CI, gerçek Worker UUID, UTC yenilenmesi, hesap kotası ve korunan D1/OAuth/binding kapılarına bağlıdır. Aynı commit tekrar yayımlanmaz; yayın varlığı gerçek kabul sayılmaz.
+- [x] Main'deki gerçek bekleme provası **[40212297189](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40212297189)** başarılı: artifact `updated=false`, `reason=WAIT_FOR_2026_10_26_UTC_RESET`, **`database_queries=0`**. Gerçek veri kabul adımı çalıştırılmadı; bu koşu kota yenilendi/Google verisi geldi anlamına gelmez.
+- [ ] **Kalan tek üretim aşaması:** Kota yenilendikten sonraki production workflow'un tam commit/sürüm/binding/migration kabulünü ve ardından saatlik quota workflow'un gerçek `cron` kaynaklı, boş olmayan GSC aktarımı/okuma maliyeti kabulünü kontrol et. Gecikmiş/boş analitik veya başarısız CI durumunda yayımlama başlamaz. Bir sonraki gerçek hesap gözleminde tüketim tekrar doğrulanmalı; eksik Temmuz–Eylül verileri ayrıca bekler.
+
+Kullanıcıdan şu anda ek işlem gerekmiyor. Yeni kod main'dedir; Worker'ın yeni sürümü ve gerçek üretim kabulü **henüz gerçekleşmedi**. Codex'in kendiliğinden yeniden başlama garantisi yoktur; kurulan GitHub Actions görevleri bağımsızdır. Ücretli hizmet, kaynak silme, OAuth değişimi veya mavibasim.com içerik değişikliği yapılmadı. Aşağıdaki kayıtlar tarihçedir.
+
+---
+
 # Hesap sahibi ayarı ve kota sonrası yayın — 25 Ekim 2026
 
 - [x] Hesap sahibi bu konuşmada Worker'ın otomatik Git dağıtımını **kapattığını bildirdi**. Bu kullanıcı beyanıdır; Build tetikleyici API erişimi hâlâ 403 olduğundan ayarın API ile doğrulandığı söylenmez. Yeniden token/OAuth/onay istenmez.

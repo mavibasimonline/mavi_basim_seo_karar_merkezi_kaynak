@@ -67,3 +67,11 @@ Bu oturumun kota yenilendiğinde kendiliğinden devam edeceği garanti edilmez. 
 Mevcut kontrollü production workflow'u 26 Ekim **03.17/03.47/04.17/04.47/05.17/05.47 Türkiye** için sınırlı deneme yapacak şekilde hazırlanmıştır. Tam ve başarılı main push CI'si, gerçek %100 Worker sürümü, UTC yenilenmesi ve hesap kotası olmadan migration/yayın başlamaz. Başarıyla yayımlanan aynı commit tekrar yayımlanmaz; yayının varlığı, gerçek Cron kabulüyle karıştırılmaz. Yeni halka açık health alanı yalnız yazılım koruma sürümünü bildirir; Google bağlantısı/veri kabulü iddiası değildir.
 
 Saatlik gözlemciler yenilenme/gerçek guard marker'ı yokken `database_queries=0` ve bekleme nedeni üretir. Böylece iş akışları önce main'e alınabilir; eski Worker ve mevcut D1, kota yenilenene kadar korunur. Main CI, canlı sürümün değişmediği ve iş akışı kaydı daha sonra PR/TODO içinde doğrulanır. Gerçek kota sonrası sonuç henüz yoktur. GitHub zamanlaması gecikebilir; Codex oturumu için yeniden başlama garantisi verilmez.
+
+## Main ve bekleme kabulü — doğrulandı
+
+PR #22 **dcd4b493** ile main'e birleşti. PR CI **40211912177** ve main CI **40212255314 SUCCESS**, gerçek loglarda **467 test / audit 0**. Source **a111835**; sonraki belge commit'leri Git geçmişinde bulunur. PR #21 arayüzü dahil edilmiştir. Cloudflare otomatik Git yayınının kapatıldığı kullanıcı beyanı kaydedildi; API ile doğrulandığı iddia edilmez. Main birleşmesi sonrasındaki gerçek salt okunur health hâlâ önceki Worker **2f502c68-76ae-48a7-b87a-5b7e45bf62e4 / commit null** döndürür; yeni yayın yapılmadı.
+
+Production workflow **395288949** ve quota workflow **396168026** GitHub'da active durumdadır. Main'deki ilk deneme **26 Ekim 2026 03.17 Türkiye**, son deneme **05.47**; GitHub başlatmayı geciktirebilir. Yeni görevlerle yapılan gerçek bekleme provası **40212297189**, `updated=false / WAIT_FOR_2026_10_26_UTC_RESET / database_queries=0` kaydetti. Bu, kontrollü bekleme davranışının kabulüdür; gerçek GSC veya kota sonrası üretim kabulü değildir.
+
+Kullanıcıdan ek işlem gerekmiyor. Kalan doğrulama: zamanlanan yayının gerçek commit/migration/binding kabulü, doğal Cron'da gerçek boş olmayan GSC aktarımı ve sonraki hesap gözleminde okuma/yazma maliyeti. Bu sonuçlar henüz yoktur; TODO.md'de açık bırakılır. Yeni oturum garantisi verilmez.
