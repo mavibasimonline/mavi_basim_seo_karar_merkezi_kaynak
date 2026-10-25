@@ -32,6 +32,7 @@ def preflight(client,config,expected):
  if (binding.get('id') or binding.get('database_id'))!=config['d1_databases'][0]['database_id']:raise ValueError('D1_BINDING_DRIFT')
  usage=client.daily_usage()
  if not usage.get('ok') or usage.get('hours',0)==0:raise ValueError('D1_QUOTA_READ_REQUIRED')
+ if any(isinstance(usage.get(key),bool) or not isinstance(usage.get(key),(int,float)) or not math.isfinite(usage[key]) or usage[key]<0 or int(usage[key])!=usage[key] for key in ('rows_read','rows_written')):raise ValueError('D1_QUOTA_READ_REQUIRED')
  if usage['rows_read']>3_500_000 or usage['rows_written']>85_000:raise ValueError('D1_DAILY_BUDGET_UNAVAILABLE')
  source=client.query(config['d1_databases'][0]['database_id'],QUERIES['source_counts'])
  if not source['ok'] or source['rows']!=[{'products':29,'csv_files':521,'csv_rows':9075}]:raise ValueError('SOURCE_ARCHIVE_COUNTS_CHANGED')
@@ -64,6 +65,15 @@ def restore_cron(client,saved):
  result=client.request('PUT',f'/accounts/{client.account}/workers/scripts/mavi-basim-seo-prod/schedules',[{'cron':c} for c in saved['previous_crons']])
  if not result['ok']:raise ValueError('CRON_ROLLBACK_FAILED')
 
+def pause_cron(client):
+ path=f'/accounts/{client.account}/workers/scripts/mavi-basim-seo-prod/schedules'
+ changed=client.request('PUT',path,[])
+ if not changed.get('ok'):raise ValueError('SAFE_CRON_HOLD_FAILED')
+ verified=client.request('GET',path)
+ if not verified.get('ok'):raise ValueError('SAFE_CRON_HOLD_FAILED')
+ rows=verified['result'].get('schedules',[]) if isinstance(verified['result'],dict) else verified['result']
+ if rows:raise ValueError('SAFE_CRON_HOLD_FAILED')
+
 def smoke(commit,opener=None):
  if not re.fullmatch(r'[a-f0-9]{40}',commit):raise ValueError('INVALID_COMMIT')
  request=urllib.request.Request(APP+'/api/health?release='+commit,headers={'User-Agent':'MaviBasimReleaseCheck/1.0','Accept':'application/json'})
@@ -91,6 +101,7 @@ if __name__=='__main__':
    result=preflight(client,json.loads(CONFIG.read_text()),os.environ.get('EXPECTED_PREVIOUS_VERSION'));path.write_text(json.dumps(result,indent=2));print(json.dumps(result))
    if os.environ.get('GITHUB_OUTPUT'):
     with open(os.environ['GITHUB_OUTPUT'],'a') as out:out.write('previous_version='+result['previous_version']+'\n')
+  elif mode=='pause-cron':pause_cron(client);print('Failed-release cron held; queue and Google/source records preserved')
   elif mode=='restore-cron':restore_cron(client,json.loads(path.read_text()));print('Previous cron restored; no database or secret modified')
   elif mode=='smoke':print(json.dumps(postflight(client,json.loads(CONFIG.read_text()),json.loads(path.read_text()),os.environ.get('GITHUB_SHA',''))))
   else:raise ValueError('INVALID_OPERATION')

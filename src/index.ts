@@ -139,13 +139,13 @@ export async function tick(env:Env,fetcher:typeof fetch=fetch,time=new Date(),so
   if(env.AUTOMATION_ENABLED!=='true')return {phase:'disabled',pages:0};
   if(source==='cron'&&time.getUTCMinutes()%15!==0)return {phase:'idle',pages:0};
   return withReadBudget(env,'cron',async safe=>{
-    const result=await tickWork(safe,fetcher,time);
+    const result=await tickWork(safe,fetcher,time,source);
     if(source==='cron')await safe.DB.prepare("INSERT INTO health_checks VALUES('scheduler',?,?,?,?) ON CONFLICT(provider,day) DO UPDATE SET checked_at=excluded.checked_at,status=excluded.status,code=excluded.code")
       .bind(time.toISOString().slice(0,10),time.toISOString(),result.phase==='budget'?'partial':'ok',result.phase==='planned'?'PLANNED':result.pages?'PAGES_'+result.pages:result.phase==='budget'?'DAILY_WRITE_BUDGET':'IDLE_NO_READY_JOB').run();
     return result;
   },time);
 }
-async function tickWork(env:Env,fetcher:typeof fetch,time:Date):Promise<TickResult>{
+async function tickWork(env:Env,fetcher:typeof fetch,time:Date,source:'manual'|'cron'):Promise<TickResult>{
   if(await enqueueDaily(env,time)){await enqueueAds(env);return {phase:'planned',pages:0};}
   if(env.CRAWL_ENABLED==='true'&&time.getUTCMinutes()===45){await seedCrawl(env);await crawlOne(env,fetcher);return {phase:'crawl',pages:0};}
   if(time.getUTCMinutes()===30&&time.getUTCHours()%4===0&&await measureOneOutcome(env,time))return {phase:'outcome',pages:0};
@@ -158,7 +158,7 @@ async function tickWork(env:Env,fetcher:typeof fetch,time:Date):Promise<TickResu
     const priority=pageLimit===1?(Math.floor(time.getTime()/900_000)%3===1?'recent':'history'):(i%2===0?'history':'recent');
     const job=await claimJob(env,time,priority);
     if(!job){if(budgeted)await settleSyncPage(env,time,0);break;}
-    const written=await processJob(env,job,fetcher);processed++;
+    const written=await processJob(env,job,fetcher,source);processed++;
     if(budgeted)await settleSyncPage(env,time,written);
   }
   if(processed)return {phase:'processed',pages:processed};

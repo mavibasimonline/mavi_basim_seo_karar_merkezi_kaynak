@@ -56,10 +56,11 @@ jobs:
       - name: Gerçek HTTP yanıtında tam commit'i doğrula
         id: smoke
         run: python3 scripts/production_guard.py smoke
-      - name: Yeni yayın doğrulanmazsa önceki Cron ve Worker sürümüne dön
+      - name: Yeni yayın doğrulanmazsa Cron’u tut ve önceki Worker sürümüne dön
         if: failure() && steps.publish.outcome == 'success' && steps.smoke.outcome != 'success'
         env:
           PREVIOUS_VERSION: ${{ steps.guard.outputs.previous_version }}
         run: |
-          python3 scripts/production_guard.py restore-cron
+          python3 scripts/production_guard.py pause-cron
           node scripts/run.mjs wrangler rollback "$PREVIOUS_VERSION" --config deploy/wrangler.production.jsonc --message "Automatic rollback after failed release verification" --yes
+          python3 scripts/production_guard.py pause-cron

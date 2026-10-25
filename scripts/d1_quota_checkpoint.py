@@ -22,7 +22,7 @@ def observation(client,now=None):
   if len(response['accounts'])!=1:raise ValueError()
   rows=response['accounts'][0]['d1AnalyticsAdaptiveGroups']
   if not rows or len(rows)>=10000:raise ValueError()
-  if any(not isinstance(r['sum'][field],(int,float)) or not 0<=r['sum'][field]<float('inf') for r in rows for field in ('rowsRead','rowsWritten')):raise ValueError()
+  if any((isinstance(r['sum'][field],bool) or not isinstance(r['sum'][field],(int,float))) or not 0<=r['sum'][field]<float('inf') for r in rows for field in ('rowsRead','rowsWritten')):raise ValueError()
   reads=sum(r['sum']['rowsRead'] for r in rows);writes=sum(r['sum']['rowsWritten'] for r in rows)
   latest=max(datetime.fromisoformat(r['dimensions']['datetimeHour'].replace('Z','+00:00')) for r in rows)
   if latest.tzinfo is None or latest<start or latest>now or (now-latest).total_seconds()>7200:raise ValueError()

@@ -4,6 +4,7 @@ import {Env,hash} from './types';
 // intentionally overcounting rather than assuming those writes/reads are visible.
 export const ACCOUNT_READ_STOP=3_500_000,ACCOUNT_WRITE_STOP=85_000;
 export const LOCAL_READ_STOP=2_000_000,LOCAL_WRITE_STOP=65_000;
+export function guardRequired(env:Env){return env.D1_READ_GUARD_ENABLED==='true'||!!env.CF_VERSION_METADATA;}
 export class D1BudgetError extends Error {constructor(public code='D1_READ_BUDGET_WAIT'){super(code);}}
 interface State {day:string;observed_at:string;data_through:string;valid_until:string;account_reads:number;account_writes:number;mode:'open'|'slow'|'blocked';reason:string}
 const databaseRoots=new WeakMap<D1Database,D1Database>();
@@ -11,8 +12,8 @@ export function originalDatabase(db:D1Database){return databaseRoots.get(db)||db
 interface Cost {reads:number;writes:number;count:number;max:number}
 export function queryAllowance(sql:string){
   if(/^\s*(WITH incoming|INSERT (?:OR (?:REPLACE|IGNORE) )?INTO (?:gsc_daily_|ga4_daily_))/i.test(sql))return 5_000;
-  if(/gsc_daily_|ga4_daily_/.test(sql))return 250_000;
-  if(/keyword_metric_observations/.test(sql))return 50_000;
+  if(/gsc_daily_|ga4_daily_/i.test(sql))return 250_000;
+  if(/keyword_metric_observations/i.test(sql))return 50_000;
   return 10_000;
 }
 function usableState(state:State|null,time:Date):state is State{
@@ -22,14 +23,14 @@ function usableState(state:State|null,time:Date):state is State{
     &&Number.isSafeInteger(state.account_reads)&&state.account_reads>=0&&Number.isSafeInteger(state.account_writes)&&state.account_writes>=0;
 }
 export async function readBudgetStatus(env:Env,time=new Date()){
-  if(env.D1_READ_GUARD_ENABLED!=='true')return {enabled:false,mode:'local',reason:'Yerel ortam; üretim hesabı kotası doğrulanmadı.'};
+  if(!guardRequired(env))return {enabled:false,mode:'local',reason:'Yerel ortam; üretim hesabı kotası doğrulanmadı.'};
   const state=await env.DB.prepare('SELECT * FROM d1_quota_state WHERE day=?').bind(time.toISOString().slice(0,10)).first<State>();
   const fresh=usableState(state,time);
   return {enabled:true,mode:fresh?state.mode:'blocked',reason:fresh?state.reason:'Güncel hesap kotası doğrulaması bekleniyor.',observed_at:state?.observed_at||null,data_through:state?.data_through||null,account_reads:state?.account_reads??null,account_writes:state?.account_writes??null};
 }
 
 export async function withReadBudget<T>(env:Env,kind:string,work:(safe:Env)=>Promise<T>,time=new Date()):Promise<T>{
-  if(env.D1_READ_GUARD_ENABLED!=='true')return work(env);
+  if(!guardRequired(env))return work(env);
   const startedAt=Date.now(),stamp=time.toISOString(),day=stamp.slice(0,10);
   const state=await env.DB.prepare('SELECT * FROM d1_quota_state WHERE day=?').bind(day).first<State>();
   if(!usableState(state,time)||state.mode==='blocked')throw new D1BudgetError();
@@ -118,7 +119,7 @@ export async function withReadBudget<T>(env:Env,kind:string,work:(safe:Env)=>Pro
 }
 
 export async function boundedDataScope(env:Env,start:string,end:string,scope:'page'|'query'|'organic',provider='gsc'){
-  if(env.D1_READ_GUARD_ENABLED!=='true')return;
+  if(!guardRequired(env))return;
   const row=await env.DB.prepare('SELECT COALESCE(sum(row_count),0) rows FROM dataset_coverage WHERE provider=? AND scope=? AND complete=1 AND day BETWEEN ? AND ?').bind(provider,scope,start,end).first<{rows:number}>();
   // Aggregates and GROUP BY can scan far more than their output LIMIT. Bound
   // input evidence before running them. Narrower periods stay available.

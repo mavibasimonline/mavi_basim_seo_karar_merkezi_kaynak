@@ -51,7 +51,7 @@ class QuotaTests(unittest.TestCase):
   for latest in (TIME+timedelta(hours=1),TIME-timedelta(days=1)):
    with patch.object(checkpoint,'graphql',return_value=self.response(latest=latest)):self.assertFalse(checkpoint.observation(Fake(),TIME)['ok'])
  def test_invalid_counters_fail_closed(self):
-  for value in (-1,float('inf'),float('nan'),'0',0.5):
+  for value in (-1,float('inf'),float('nan'),'0',0.5,True):
    with patch.object(checkpoint,'graphql',return_value=self.response(reads=value)):self.assertFalse(checkpoint.observation(Fake(),TIME)['ok'])
  def test_day_end_lease_cannot_cross_utc_reset(self):
   time=TIME.replace(hour=23,minute=50)
@@ -66,3 +66,8 @@ class QuotaTests(unittest.TestCase):
    def query(self,*args):raise AssertionError('NO_APPLICATION_SCAN')
   config={'name':'mavi-basim-seo-prod','d1_databases':[{'binding':'DB','database_name':'mavi-basim-seo','database_id':incident.DATABASE}]}
   r=diagnostics.collect(Client(),config);self.assertTrue(all(v['code']=='D1_READ_QUOTA_HOLD' for v in r['queries'].values()))
+
+ def test_build_control_denials_are_identified_without_exposing_commands_or_tokens(self):
+  class Denied(Fake):
+   def request(self,*args):return {'ok':False,'code':'CF_HTTP_403'}
+  self.assertEqual(incident.build_status(Denied())['step'],'workers-list')

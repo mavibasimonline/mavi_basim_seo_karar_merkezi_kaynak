@@ -6,14 +6,16 @@ class QueryPlanTests(unittest.TestCase):
  def setUp(self):
   self.db=sqlite3.connect(':memory:')
   for p in sorted((ROOT/'migrations').glob('*.sql')):
-   if p.name!='0005_d1_read_guard.sql':self.db.executescript(p.read_text())
+   if p.name<'0005':self.db.executescript(p.read_text())
   self.db.execute("INSERT INTO product_groups VALUES('test','TEST fixtures')")
   self.db.executemany('INSERT INTO products(id,group_id,name,source_folder,canonical_url) VALUES(?,?,?,?,?)',[(f'p{i}','test',f'TEST product {i}',f'test/{i}',f'https://mavibasim.com/p{i}') for i in range(29)])
   for day in range(1,31):
    date=f'2026-09-{day:02d}'
    self.db.executemany('INSERT INTO gsc_daily_by_page VALUES(?,?,?,?,?,?,?,?,?)',[(f'test-generation-{generation}-{day}',date,f'https://mavibasim.com/p{row}','tur','MOBILE',1,10,0.1,3) for generation in range(30) for row in range(10)])
    self.db.execute('INSERT INTO dataset_coverage VALUES(?,?,?,?,?,?,?,?,?)',('gsc',date,'page',f'test-generation-29-{day}',1,0,10,'2026-10-25','SYNTHETIC migration/query-plan test'))
- def migrated(self):self.db.executescript((ROOT/'migrations/0005_d1_read_guard.sql').read_text())
+ def migrated(self):
+  for p in sorted((ROOT/'migrations').glob('*.sql')):
+   if p.name>='0005':self.db.executescript(p.read_text())
  def plan(self,sql):return ' | '.join(r[3] for r in self.db.execute('EXPLAIN QUERY PLAN '+sql))
  def steps(self,sql):
   steps=[0];self.db.set_progress_handler(lambda:steps.__setitem__(0,steps[0]+100) or 0,100)
@@ -34,3 +36,7 @@ class QueryPlanTests(unittest.TestCase):
  def test_costs_and_reservations_have_point_lookup_primary_keys(self):
   self.migrated()
   for table,where in [('d1_quota_state',"day='2026-10-26'"),('d1_quota_ledger',"day='2026-10-26'"),('d1_query_costs',"day='2026-10-26' AND fingerprint='test'")]:self.assertIn('SEARCH ',self.plan(f'SELECT * FROM {table} WHERE {where}'))
+ def test_legacy_runs_remain_legacy_and_are_never_relabelled_as_cron(self):
+  self.db.execute("INSERT INTO sync_jobs(id,provider,day,scope,generation,next_attempt_at,created_at,updated_at) VALUES('test-job','gsc','2026-09-01','page','test','2026-10-25','2026-10-25','2026-10-25')")
+  self.db.execute("INSERT INTO sync_runs VALUES('test-run','test-job','2026-10-25','2026-10-25','done',10)")
+  before=self.db.execute('SELECT * FROM sync_runs').fetchone();self.migrated();after=self.db.execute('SELECT * FROM sync_runs').fetchone();self.assertEqual(after[:-1],before);self.assertEqual(after[-1],'legacy')

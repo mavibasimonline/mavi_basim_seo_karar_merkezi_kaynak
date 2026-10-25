@@ -95,3 +95,15 @@ class ProductionGuardTests(unittest.TestCase):
    def now(cls,tz=None):return datetime(2026,10,25,23,59,tzinfo=timezone.utc)
   with patch.object(guard,'datetime',Clock):
    with self.assertRaisesRegex(ValueError,'QUOTA_RESET_REQUIRED'):guard.preflight(self.client,self.config,VERSION)
+
+ def test_invalid_analytics_numbers_never_allow_source_scan(self):
+  for value in (float('nan'),float('inf'),-1,True,'100'):
+   self.client.daily_usage=lambda:{'ok':True,'hours':1,'rows_read':value,'rows_written':0}
+   self.client.query=lambda *args:self.fail('NO_D1_QUERY_WITH_INVALID_ANALYTICS')
+   with self.assertRaisesRegex(ValueError,'QUOTA_READ_REQUIRED'):guard.preflight(self.client,self.config,VERSION)
+
+ def test_failed_release_holds_cron_without_deleting_jobs_or_auth(self):
+  calls=[]
+  def request(method,path,body=None):
+   calls.append((method,path,body));return {'ok':True,'result':{'schedules':[]}}
+  self.client.request=request;guard.pause_cron(self.client);self.assertEqual(calls[0][2],[]);self.assertTrue(all(c[1].endswith('/schedules') for c in calls))

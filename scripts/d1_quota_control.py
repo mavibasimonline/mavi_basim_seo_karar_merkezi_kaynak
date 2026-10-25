@@ -86,13 +86,13 @@ def contain(client):
 
 def build_status(client):
  scripts=client.request('GET',f'/accounts/{client.account}/workers/scripts')
- if not scripts['ok']:return scripts
+ if not scripts['ok']:return {**scripts,'step':'workers-list'}
  worker=next((s for s in scripts['result'] if s.get('id')==WORKER),None)
  if not worker or not re.fullmatch(r'[a-f0-9]{32}',worker.get('tag','')):return {'ok':False,'code':'WORKER_TAG_UNAVAILABLE'}
  result=client.request('GET',f"/accounts/{client.account}/builds/workers/{worker['tag']}/triggers")
- if not result['ok']:return result
+ if not result['ok']:return {**result,'step':'build-triggers'}
  rows=result['result'] if isinstance(result['result'],list) else result['result'].get('triggers',[])
- return {'ok':True,'triggers':[{'trigger_uuid':r.get('trigger_uuid'),'branch_includes':r.get('branch_includes'),'branch_excludes':r.get('branch_excludes'),'deploy_command':shape(r.get('deploy_command',''))} for r in rows]}
+ return {'ok':True,'triggers':[{'trigger_uuid':r.get('trigger_uuid'),'branch_includes':r.get('branch_includes'),'branch_excludes':r.get('branch_excludes'),'deploys_worker':'wrangler deploy' in r.get('deploy_command','')} for r in rows]}
 
 
 if __name__=='__main__':
