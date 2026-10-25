@@ -1,12 +1,12 @@
 # Açık ay çubuğu ve İlk 10 Lider Ürün — 25 Ekim 2026
 
-Başlangıç main: `83c5907`. Dal: `feat/month-strip-and-product-leaders`. Çalışan mevcut arayüz ve servisler korunur. Kaynak commit'i `cd8de35`; bu belgeyi içeren commit git log ile izlenir. Son CI/yayın kimlikleri değişikliğin PR açıklamasında ve kontrollü production workflow'undadır.
+Son düzen düzeltmesinin başlangıcı: `e4d6872`, dal `fix/open-month-bar-with-period-menu`. Önceki ortak dönem/veri çalışması `cd8de35` korunur. Bu düzeltme yalnız frontend, tarayıcı testleri ve belgelerdedir; backend, üretim yapılandırması, kaynaklar ve veritabanı değişmez. Son commit `git log -1 --oneline`, CI/yayın kimlikleri bu düzeltmenin PR açıklaması ve kontrollü production workflow'unda izlenir.
 
 ## Çalışan kullanım
 
-12 ay açık butonlardır; seçili ay belirgindir, gelecek aylar kapalıdır. Yıl okları korunur. Dar ekranda ay şeridi kendi içinde kayar; cihaz filtresi ayların üstünü kapatmaz. İlk ziyarette İstanbul takvimindeki mevcut ay ve Tüm cihazlar seçilir. Son ay/dönem/cihaz/sekme tercihi güvenli yerel ayarlarda hatırlanır. Token veya Google ölçümleri tarayıcı depolamasına yazılmaz.
+Sayfanın **en üst yatay satırı** solda kompakt yıl seçimi, ortada Ocak–Aralık **12 sürekli açık ay**, hemen sağında **Dönem açılır menüsü** şeklindedir. Seçili ay dolu mavidir; gelecek tarihler kapalıdır. Eski ay kutusu ve tüm sağ-sol yıl/ay okları yoktur. Alt kısımda ikinci tarih filtresi oluşturulmaz. Dar ekranda ay şeridi kendi içinde kayar; yıl/dönem görünür kalır, cihaz filtresi ikinci başlık satırındadır ve ayları örtmez. İlk ziyarette İstanbul takvimindeki mevcut ay ve Tüm cihazlar seçilir. Son ay/dönem/cihaz/sekme tercihi güvenli yerel ayarlarda hatırlanır. Token veya Google ölçümleri tarayıcı depolamasına yazılmaz.
 
-3 Ay / 6 Ay / 12 Ay ayrı bir gruptadır. Anlamı **mevcut ay dâhil son N takvim ayı**: 25 Ekim 2026'da 3 Ay, 1 Ağustos–31 Ekim; 6 Ay, 1 Mayıs–31 Ekim; 12 Ay, 1 Kasım 2025–31 Ekim 2026. Tam tarih aralığı/mod görünür. Ay butonuna basmak tekil aya döner. Ek rapor butonu gerekmez. Dönem ve cihaz KPI/grafik/ürün/sorgu/radar/export üzerinde aynı kapsamı kullanır. Veri sağlığı seçili dönemi denetler; takvimdeki gün seçili aralıkta kalır. Soru-cevap bu dönemi/cihazı varsayılan alır, sorudaki açık tarih/cihaz önceliğini korur.
+3 Ay / 6 Ay / 12 Ay, 12 ayın hemen sağındaki Dönem düğmesine basınca açılır. Seçim ek rapor onayı olmadan yüklenir ve menü kapanır. Dışarı tıklama, Escape ve klavye yukarı/aşağı/Home/End desteklenir. Anlamı **mevcut ay dâhil son N takvim ayı**: 25 Ekim 2026'da 3 Ay, 1 Ağustos–31 Ekim; 6 Ay, 1 Mayıs–31 Ekim; 12 Ay, 1 Kasım 2025–31 Ekim 2026. Tam tarih aralığı/mod görünür. Ay butonuna basmak tekil aya döner. Ek rapor butonu gerekmez. Dönem ve cihaz KPI/grafik/ürün/sorgu/radar/export üzerinde aynı kapsamı kullanır. Veri sağlığı seçili dönemi denetler; takvimdeki gün seçili aralıkta kalır. Soru-cevap bu dönemi/cihazı varsayılan alır, sorudaki açık tarih/cihaz önceliğini korur.
 
 **İlk 10 Lider Ürün** genel bakışta ayrı karttır. Yalnız doğrulanmış URL'si ve gözlenen gerçek sayfa metriği olan ürünler tıklama azalan, eşitlikte gösterim ve isimle sıralanır; en fazla 10 satır gösterilir. İsim, tıklama, gösterim, CTR, ortalama konum ve gözlenen gün sayısı bulunur. İsim mevcut kanıt penceresini açar. Veri yoksa liste doldurulmaz; kısmi sıralamada ürünlerin eşit günlerle ölçülmediği belirtilir. Sıralama SEO başarı nedeni veya değişiklik önerisi değildir. Mini trend eklenmedi; kanıtsız eğilim üretilmez.
 
@@ -20,13 +20,13 @@ Başlangıç main: `83c5907`. Dal: `feat/month-strip-and-product-leaders`. Çal�
 
 ## Kabul kanıtları
 
-**366 otomatik test başarılı:** 299 Workers/D1 + 49 Python + 18 Chromium masaüstü/mobil. Kaynak 521 CSV / 9.075 satır/hash testleri, tip/build, üretim dry-run, release kontrolü ve npm audit 0 başarılı. Son başarısız test yok. İlk ürün karışması testi düzeltmeden önce başarısızdı; düzeltmeyle tekrar geçti.
+**370 otomatik test başarılı:** 299 Workers/D1 + 49 Python + 22 Chromium masaüstü/mobil. Kaynak 521 CSV / 9.075 satır/hash testleri, tip/build, üretim dry-run, release kontrolü ve npm audit 0 başarılı. Son başarısız veya atlanan test yok. İlk çalışmada bir masaüstü erişilebilirlik testi, ay değişimi sırasında soluklaştırmanın kontrastı düşürmesini yakaladı. Soluklaştırma kaldırıldı; yükleme bilgisi/aria-busy korundu, tüm tarayıcı testleri yeniden geçti. Önceki ürün gruplama hatası ve düzeltme testleri de korunur.
 
 | Kabul | Sonuç |
 |---|---|
 | İlk mevcut ay / Tüm cihazlar | Gerçek yerel API tarayıcı testi geçti |
-| 12 açık ay, seçili durum, gelecek ay engeli | Masaüstü/mobil, tık ve dokunma geçti |
-| 3/6/12 ay, doğru takvim günleri ve cihaz | Gerçek API, artık yıl, yıl sınırı ve önceki N ay testleri geçti |
+| 12 açık ay, mavi seçim, üstte tek satır ve sağında dönem menüsü | 1024/1280/1440/1920 px masaüstünde bütün ayların görünür sınırları ölçüldü; kırpılma yok. 360/393/768 px mobilde yatay kaydırma ve taşma kontrolü geçti |
+| Açılır 3/6/12 ay, yıl, takvim günleri ve cihaz | Gerçek yerel API, tarih/yıl sınırı, kapanma/fokus/klavye testleri; açık menüde WCAG kontrolleri geçti |
 | Otomatik güncelleme, sekme ve reload | Tercihler ve hatalı istekten doğru kapsama dönüş geçti |
 | İlk 10 başlığı, sıralama, en fazla 10 ve modal | Tarayıcıda yalnız fixture sıralama testi geçti; veri yokken gerçek API boş durum testi geçti |
 | Eksik veri / sıfır / yanlış CTR / ürün ayrımı | Bağımsız hesap ve bozuk veri testleri geçti |
@@ -43,3 +43,13 @@ Fixture'lar yalnız Playwright HTTP yanıtlarındadır; üretime/D1'e örnek ver
 - Mevcut salt okunur operatör: src/crawl-pilot.ts; üç dönem ve ürün hesabı kabulü, herkese açık endpoint yok.
 - Testler: tests/periods.test.ts (yeni), performance.test.ts, api.test.ts, data-integrity.test.ts, crawl-pilot.test.ts ve browser/usage.spec.ts.
 - Belgeler: README.md, TODO.md ve bu rapor.
+
+## Düzenin ekran görüntüsüyle doğrulanması
+
+Aşağıdaki görüntüler **1440 px Chromium'da mevcut uygulama ve gerçek yerel API** ile çekildi. Yerel Google hesabı bağlı değildir; metrikler `—`, liderler boş gösterilir. Bunlar üretim GSC performans kanıtı veya sahte trafik değildir. Sayfa koordinat kontrolü, menünün Aralık'ın sağında ve bütün ayların tek satırda/kırpılmadan görünür olduğunu ayrıca doğrular.
+
+![12 açık ay, kompakt yıl, hemen sağında Dönem](docs/screenshots/open-month-bar-desktop.png)
+
+![Dönem menüsü açıldığında 3 Ay, 6 Ay, 12 Ay](docs/screenshots/open-month-menu-desktop.png)
+
+Bu düzen düzeltmesinin uygulama dosyaları yalnız `public/index.html`, `public/app.css`, `public/period.js`; testleri `tests/browser/usage.spec.ts`. Mevcut İlk 10 Lider Ürün tablosu ve doğrulanmış çok aylık GSC hesapları yeniden yazılmadı. Önceki gerçek D1 kabulü yukarıda tarihli olarak kalır; bu arayüz düzeltmesi eksik tarih aralığını tamamlanmış saymaz. Canlı kabulü: tam commit/Worker sürümü, dağıtılan dosyaların hash eşleşmesi, masaüstü/mobil giriş sayfası ve oturumsuz özel API'lerin 401 dönmesi. Özel üretim yönetici oturumu atlanmaz.

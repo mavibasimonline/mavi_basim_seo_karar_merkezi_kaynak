@@ -2535,73 +2535,7 @@ dialog::backdrop {
   background: #fff;
   max-height: 180px;
 }
-/* Scope controls and progressive disclosure share the existing visual system. */
-.scope-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-.month-control {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #fff;
-  padding: 2px;
-}
-.month-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 9px 6px;
-  min-width: 155px;
-  min-height: 40px;
-  cursor: pointer;
-}
-.month-control .icon-button {
-  width: 32px;
-  min-width: 32px;
-  height: 40px;
-}
-.month-toggle .icon {
-  width: 18px;
-  height: 18px;
-  color: var(--blue);
-}
-.month-picker {
-  position: fixed;
-  inset: auto;
-  margin: 0;
-  width: 300px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: white;
-  color: #14243e;
-  box-shadow: 0 12px 50px #14243e26;
-  z-index: 100;
-}
-.picker-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-.month-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-.month-grid button,
+/* Product controls and progressive disclosure share the visual system. */
 .quick-sort button {
   font: inherit;
   font-size: 12px;
@@ -2611,28 +2545,12 @@ dialog::backdrop {
   color: #40516d;
   padding: 10px 7px;
   min-height: 40px;
-  cursor: pointer;
 }
-.month-grid [aria-pressed="true"],
 .quick-sort [aria-pressed="true"] {
   background: #edf2ff;
   border-color: #afc4ff;
   color: #214cb9;
   font-weight: 700;
-}
-.month-grid button:disabled {
-  color: #7d8796;
-  background: #f5f7fb;
-  cursor: default;
-}
-.month-picker p {
-  font-size: 11px;
-  color: #60718b;
-  margin: 14px 0 0;
-}
-.month-picker button:focus-visible {
-  outline: 3px solid #275ce7;
-  outline-offset: 2px;
 }
 .period-context {
   display: flex;
@@ -2769,10 +2687,6 @@ dialog::backdrop {
 .product {
   cursor: pointer;
 }
-.is-loading .view {
-  opacity: 0.6;
-  transition: opacity 0.1s;
-}
 .button[hidden] {
   display: none !important;
 }
@@ -2781,71 +2695,15 @@ dialog::backdrop {
   .topbar .breadcrumb-divider {
     display: none;
   }
-  .topbar {
-    padding: 0 28px;
-    gap: 12px;
-  }
-  .topbar-actions {
-    gap: 12px;
-  }
-  .scope-controls .device-selector label {
-    display: none;
-  }
 }
 @media (max-width: 1200px) {
   .breadcrumb-workspace,
-  .breadcrumb-divider {
-    display: none;
-  }
+  .breadcrumb-divider,
   .topbar .avatar {
     display: none;
   }
-  .scope-controls {
-    gap: 8px;
-  }
-  .topbar-actions {
-    gap: 8px;
-  }
 }
 @media (max-width: 980px) {
-  .topbar {
-    height: auto;
-    min-height: 116px;
-    padding: 10px 20px;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 6px;
-  }
-  .topbar .breadcrumb {
-    grid-column: 1;
-  }
-  .scope-controls {
-    grid-row: 2;
-    grid-column: 1/-1;
-    justify-content: space-between;
-  }
-  .topbar-actions {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  .topbar-actions #freshness {
-    display: inline-flex;
-    font-size: 11px;
-  }
-  .topbar .breadcrumb strong {
-    max-width: 150px;
-  }
-  .device-selector select {
-    max-width: 145px;
-  }
-  .month-toggle {
-    min-width: 130px;
-    font-size: 12px;
-  }
-  .month-control .icon-button {
-    width: 28px;
-    min-width: 28px;
-  }
   .refresh-hint {
     margin-top: 10px;
   }
@@ -2854,31 +2712,6 @@ dialog::backdrop {
   }
 }
 @media (max-width: 480px) {
-  .topbar {
-    padding: 8px 16px;
-  }
-  .topbar .breadcrumb {
-    gap: 6px;
-  }
-  .topbar-actions #help {
-    display: none;
-  }
-  .month-toggle {
-    min-width: 117px;
-    gap: 6px;
-  }
-  .scope-controls {
-    gap: 5px;
-  }
-  .device-selector select {
-    width: 128px;
-    padding: 8px 20px 8px 8px;
-    font-size: 11px;
-  }
-  .month-control .icon-button {
-    width: 26px;
-    min-width: 26px;
-  }
   .quick-sort {
     padding: 0 14px 12px;
     gap: 6px;
@@ -2969,48 +2802,60 @@ dialog::backdrop {
     font-size: 10px;
   }
 }
-/* Always-open months and clearly separated rolling calendar summaries. */
+/* One top filter row: year, twelve open months, then the period menu. */
 .topbar {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   height: auto;
-  min-height: 120px;
+  min-height: 112px;
   padding: 10px 24px;
   gap: 8px 14px;
 }
-.topbar .breadcrumb {
-  grid-row: 1;
-  grid-column: 1/3;
-}
-.topbar-actions {
-  grid-row: 1;
-  grid-column: 3;
-  justify-self: end;
-}
 .scope-controls {
-  display: contents;
-}
-.year-control {
-  grid-row: 2;
-  grid-column: 1;
+  grid-row: 1;
+  grid-column: 1/-1;
   display: flex;
   align-items: center;
-  gap: 3px;
-  justify-self: start;
+  gap: 10px;
+  min-width: 0;
 }
-.year-control .icon-button {
-  width: 28px;
-  min-width: 28px;
-  height: 38px;
+.topbar .breadcrumb {
+  grid-row: 2;
+  grid-column: 1;
 }
-.year-control strong {
-  font-size: 12px;
-}
-.month-strip {
+.topbar-actions {
   grid-row: 2;
   grid-column: 2;
+  justify-self: end;
+  gap: 12px;
+}
+.year-control {
+  position: relative;
+  flex: 0 0 76px;
+}
+.year-control select {
+  appearance: none;
+  width: 100%;
+  padding: 8px 20px 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.year-control::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  top: 16px;
+  width: 6px;
+  height: 6px;
+  border-right: 1px solid #40516d;
+  border-bottom: 1px solid #40516d;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.month-strip {
   display: flex;
-  gap: 3px;
+  flex: 1 1 auto;
+  gap: 2px;
   overflow-x: auto;
   min-width: 0;
   scrollbar-width: thin;
@@ -3019,9 +2864,9 @@ dialog::backdrop {
 }
 .month-strip button {
   flex: 1 0 auto;
-  min-width: 48px;
-  min-height: 40px;
-  padding: 8px 7px;
+  min-width: 44px;
+  min-height: 42px;
+  padding: 8px 6px;
   font: inherit;
   font-size: 12px;
   color: #40516d;
@@ -3034,64 +2879,179 @@ dialog::backdrop {
   background: #edf2ff;
 }
 .month-strip [aria-pressed="true"] {
-  color: #214cb9;
-  background: #eaf0ff;
-  border-color: #b9cbfb;
+  color: #fff;
+  background: #275ce7;
+  border-color: #275ce7;
   font-weight: 700;
+}
+.month-strip [aria-pressed="true"]:hover {
+  background: #214cb9;
 }
 .month-strip button:disabled {
   color: #768298;
   opacity: 0.55;
   cursor: default;
 }
-.range-modes {
-  grid-row: 2;
-  grid-column: 3;
-  display: flex;
+.range-menu {
+  position: relative;
+  flex: 0 0 102px;
   border-left: 1px solid var(--border);
-  padding-left: 12px;
-  gap: 4px;
+  padding-left: 10px;
 }
-.range-modes button {
-  font: inherit;
+.range-menu summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 10px;
   font-size: 12px;
-  white-space: nowrap;
-  min-height: 40px;
-  padding: 8px 9px;
-  border: 1px solid var(--border);
+  font-weight: 700;
+  list-style: none;
+  border: 1px solid #d6deea;
   border-radius: 8px;
   background: #fff;
   color: #40516d;
-  cursor: pointer;
 }
-.range-modes [aria-pressed="true"] {
-  background: #275ce7;
-  color: #fff;
-  border-color: #275ce7;
+.range-menu summary::-webkit-details-marker {
+  display: none;
+}
+.range-menu summary:hover {
+  background: #f5f7fb;
+}
+.range-menu summary.is-selected {
+  color: #214cb9;
+  background: #eaf0ff;
+  border-color: #b9cbfb;
+}
+.range-menu summary .icon {
+  width: 15px;
+  height: 15px;
+}
+.range-menu[open] summary .icon {
+  transform: rotate(180deg);
+}
+.range-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 130px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 24px #14243e1a;
+  z-index: 2;
+}
+.range-options button {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  text-align: left;
+  font-size: 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #fff;
+  color: #40516d;
+}
+.range-options button:hover {
+  background: #edf2ff;
+}
+.range-options [aria-pressed="true"] {
+  color: #214cb9;
+  background: #eaf0ff;
   font-weight: 700;
 }
-.scope-controls .device-selector {
-  grid-row: 1;
-  grid-column: 2;
-  justify-self: end;
-  margin-right: 14px;
-  z-index: 1;
+.topbar .device-selector label {
+  display: none;
 }
-.topbar .breadcrumb {
-  pointer-events: none;
-}
-.topbar .breadcrumb button,
-.topbar .breadcrumb a {
-  pointer-events: auto;
+.topbar .device-selector select {
+  max-width: 145px;
+  min-height: 34px;
+  padding-block: 5px;
+  font-size: 11px;
 }
 .month-strip button:focus-visible,
-.range-modes button:focus-visible {
+.range-menu summary:focus-visible,
+.range-options button:focus-visible {
   outline: 3px solid #275ce7;
   outline-offset: 1px;
 }
 #selectionMode {
   color: #40516d;
   font-size: 12px;
+}
+@media (min-width: 981px) and (max-width: 1200px) {
+  .topbar {
+    padding-inline: 16px;
+  }
+  .scope-controls {
+    gap: 6px;
+  }
+  .year-control {
+    flex-basis: 70px;
+  }
+  .range-menu {
+    flex-basis: 94px;
+    padding-left: 6px;
+  }
+  .month-strip button {
+    min-width: 38px;
+    font-size: 11px;
+    padding-inline: 3px;
+  }
+}
+@media (max-width: 980px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 112px;
+    padding: 8px 16px;
+    gap: 6px 8px;
+  }
+  .scope-controls {
+    gap: 6px;
+  }
+  .year-control {
+    flex-basis: 68px;
+  }
+  .range-menu {
+    flex-basis: 94px;
+    padding-left: 6px;
+  }
+  .month-strip button {
+    flex: 0 0 auto;
+  }
+  .topbar .breadcrumb {
+    grid-row: 2;
+    grid-column: 1;
+    gap: 6px;
+  }
+  .topbar .breadcrumb strong {
+    max-width: 100px;
+    font-size: 11px;
+  }
+  .topbar-actions {
+    grid-row: 2;
+    grid-column: 2;
+    gap: 8px;
+  }
+  .topbar-actions #freshness {
+    max-width: 100px;
+    font-size: 10px;
+  }
+  .topbar-actions #help,
+  .topbar-actions .avatar {
+    display: none;
+  }
+  .topbar .device-selector select {
+    width: 115px;
+    padding-inline: 6px 18px;
+    font-size: 10px;
+  }
+  .leaders-panel .panel-heading {
+    gap: 12px;
+    align-items: flex-start;
+  }
 }
 .leaders-panel {
   margin: 20px 0;
@@ -3107,66 +3067,6 @@ dialog::backdrop {
 }
 .leaders-panel th:not(:first-child) {
   text-align: right;
-}
-@media (min-width: 1440px) {
-  .month-strip button {
-    min-width: 51px;
-  }
-}
-@media (max-width: 980px) {
-  .topbar {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    padding: 10px 16px;
-    min-height: 166px;
-    gap: 6px 10px;
-  }
-  .topbar .breadcrumb {
-    grid-row: 1;
-    grid-column: 1;
-  }
-  .topbar-actions {
-    grid-row: 1;
-    grid-column: 2;
-  }
-  .year-control {
-    grid-row: 2;
-    grid-column: 1;
-  }
-  .range-modes {
-    grid-row: 2;
-    grid-column: 2;
-    justify-self: end;
-    border-left: 0;
-    padding-left: 0;
-  }
-  .month-strip {
-    grid-row: 3;
-    grid-column: 1/3;
-    padding-right: 140px;
-    min-height: 46px;
-  }
-  .scope-controls .device-selector {
-    grid-row: 3;
-    grid-column: 2;
-    justify-self: end;
-    margin: 0;
-    align-self: center;
-    background: #fff;
-    padding-left: 8px;
-  }
-  .month-strip button {
-    flex: 0 0 auto;
-  }
-  .topbar .breadcrumb strong {
-    max-width: 160px;
-  }
-  .range-modes button {
-    padding: 8px 9px;
-  }
-  .leaders-panel .panel-heading {
-    gap: 12px;
-    align-items: flex-start;
-  }
 }
 .leaders-panel .panel-heading .text-button {
   white-space: nowrap;
@@ -3218,47 +3118,5 @@ dialog::backdrop {
   }
   .leaders-panel .panel-heading .text-button {
     font-size: 11px;
-  }
-}
-@media (max-width: 980px) {
-  .topbar {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-  .topbar .breadcrumb {
-    grid-row: 1;
-    grid-column: 1;
-  }
-  .topbar-actions {
-    grid-row: 1;
-    grid-column: 3;
-  }
-  .year-control {
-    grid-row: 1;
-    grid-column: 2;
-  }
-  .range-modes {
-    grid-row: 2;
-    grid-column: 1/3;
-    justify-self: start;
-  }
-  .scope-controls .device-selector {
-    grid-row: 2;
-    grid-column: 3;
-    padding-left: 0;
-  }
-  .month-strip {
-    grid-row: 3;
-    grid-column: 1/4;
-    padding-right: 3px;
-  }
-  .topbar .breadcrumb strong {
-    max-width: 105px;
-  }
-  .topbar-actions #freshness {
-    max-width: 125px;
-  }
-  .year-control .icon-button {
-    width: 23px;
-    min-width: 23px;
   }
 }

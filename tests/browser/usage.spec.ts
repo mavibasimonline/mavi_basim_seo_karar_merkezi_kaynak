@@ -25,6 +25,78 @@ async function view(page: Page, name: string) {
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-25T09:00:00+03:00"));
 });
+test("all twelve months and the adjacent period menu occupy the very first row; desktop screenshot proves no clipped month", async ({ page }) => {
+  await login(page);
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page.locator("#monthGrid button")).toHaveText([
+    "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+  ]);
+  await expect(page.locator("#monthToggle, #monthPicker, #previousMonth, #nextMonth, #previousYear, #nextYear")).toHaveCount(0);
+  const desktop = test.info().project.name === "desktop";
+  for (const width of desktop ? [1024, 1280, 1440, 1920] : [360, 393, 768]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect(async () => {
+      const layout = await page.evaluate(() => {
+        const rect = (id: string) => document.getElementById(id)!.getBoundingClientRect();
+        const strip = rect("monthGrid"), year = rect("pickerYear"), menu = rect("rangeToggle"), title = rect("breadcrumb");
+        const months = Array.from(document.querySelectorAll("#monthGrid button")).map(b => b.getBoundingClientRect());
+        return {
+          noDocumentOverflow: document.documentElement.scrollWidth <= innerWidth,
+          firstRow: strip.bottom <= title.top && year.right <= strip.left && menu.left >= strip.right,
+          sameRow: months.every(r => Math.abs((r.y + r.height / 2) - (menu.y + menu.height / 2)) < 2),
+          allMonthsInStrip: months.every(r => r.left >= strip.left && r.right <= strip.right),
+          blueSelectedMonth: getComputedStyle(document.querySelector('#monthGrid [aria-pressed="true"]')!).backgroundColor === "rgb(39, 92, 231)",
+        };
+      });
+      expect(layout.noDocumentOverflow).toBe(true);
+      expect(layout.firstRow).toBe(true);
+      expect(layout.sameRow).toBe(true);
+      expect(layout.blueSelectedMonth).toBe(true);
+      if (desktop) expect(layout.allMonthsInStrip).toBe(true);
+    }).toPass();
+    if (width === 1440 || width === 393) {
+      await page.screenshot({path: ".local/open-month-bar-" + test.info().project.name + ".png", fullPage: true, animations: "disabled"});
+      await page.locator("#rangeToggle").click();
+      await expect(page.getByRole("group", { name: "Dönem seçenekleri" }).getByRole("button")).toHaveText(["3 Ay", "6 Ay", "12 Ay"]);
+      const accessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+      expect(accessibility.violations.map(v => ({ id: v.id, targets: v.nodes.map(n => n.target) }))).toEqual([]);
+      await page.screenshot({path: ".local/open-month-menu-" + test.info().project.name + ".png", fullPage: true, animations: "disabled"});
+      await page.keyboard.press("Escape");
+    }
+  }
+});
+test("compact year selector prevents future dates; period dropdown closes outside and supports keyboard selection", async ({ page }) => {
+  await login(page);
+  await expect(page.locator("#rangeMenu")).not.toHaveAttribute("open");
+  await expect(page.getByRole("button", { name: "3 Ay", exact: true })).toBeHidden();
+  await page.getByLabel("Rapor yılı", { exact: true }).selectOption("2025");
+  await expect(page.locator("#chartPeriod")).toContainText("01 Eki 2025");
+  await expect(page.locator('[data-month="2025-12"]')).toBeEnabled();
+  await page.getByRole("button", { name: "Aralık 2025", exact: true }).click();
+  await expect(page.locator("#chartPeriod")).toContainText("31 Ara 2025");
+  await page.getByLabel("Rapor yılı", { exact: true }).selectOption("2026");
+  await expect(page.locator("#chartPeriod")).toContainText("01 Eki 2026");
+  await expect(page.locator('[data-month="2026-12"]')).toBeDisabled();
+  await expect(page.locator("#pickerYear option")).toHaveText(["2026", "2025", "2024"]);
+  await page.locator("#rangeToggle").click();
+  await expect(page.getByRole("button", { name: "6 Ay", exact: true })).toBeVisible();
+  await page.locator("#viewTitle").click();
+  await expect(page.locator("#rangeMenu")).not.toHaveAttribute("open");
+  await page.locator("#rangeToggle").focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(page.getByRole("button", { name: "12 Ay", exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#rangeToggle")).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("button", { name: "3 Ay", exact: true })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#chartPeriod")).toContainText("01 May 2026");
+  await expect(page.locator("#rangeLabel")).toHaveText("6 Ay");
+  await expect(page.locator("#rangeMenu")).not.toHaveAttribute("open");
+  await expect(page.locator("#rangeToggle")).toBeFocused();
+});
 test("twelve open months select with one click or tap, reject future months and preserve single-month preferences", async ({
   page,
 }) => {
@@ -71,7 +143,11 @@ test("3, 6, 12 month modes and device load matching real APIs and survive tabs a
     ["6", "01 May 2026"],
     ["12", "01 Kas 2025"],
   ]) {
+    await page.locator("#rangeToggle").click();
+    await expect(page.locator("#rangeMenu")).toHaveAttribute("open");
     await page.getByRole("button", { name: n + " Ay", exact: true }).click();
+    await expect(page.locator("#rangeMenu")).not.toHaveAttribute("open");
+    await expect(page.locator("#rangeLabel")).toHaveText(n + " Ay");
     await expect(page.locator("#rangeMonths")).toHaveValue(n);
     await expect(page.locator("#chartPeriod")).toContainText(start);
     await expect(page.locator('#monthGrid [aria-pressed="true"]')).toHaveCount(
@@ -86,6 +162,8 @@ test("3, 6, 12 month modes and device load matching real APIs and survive tabs a
   await expect(page.locator("#radarResults")).toContainText("2025-11-01");
   await page.reload();
   await expect(page.locator("#view-radar")).toBeVisible();
+  await expect(page.locator("#rangeLabel")).toHaveText("12 Ay");
+  await page.locator("#rangeToggle").click();
   await expect(page.locator('[data-range="12"]')).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -143,7 +221,7 @@ test("no storage or missing data never invents zeroes or leaders; open filters r
   const a = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
     .analyze();
-  expect(a.violations.map((v) => v.id)).toEqual([]);
+  expect(a.violations.map((v) => ({ id: v.id, nodes: v.nodes.map(n => ({ target: n.target, summary: n.failureSummary })) }))).toEqual([]);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -171,11 +249,13 @@ test("invalid preferences and failed multi-month requests restore the last prove
   await page.route("**/api/performance?*", (r) =>
     r.fulfill({ status: 503, json: { error: "TEST ONLY unavailable" } }),
   );
+  await page.locator("#rangeToggle").click();
   await page.getByRole("button", { name: "3 Ay", exact: true }).click();
   await expect(page.locator("#message")).toContainText(
     "önceki başarılı yükleme korunuyor",
   );
   await expect(page.locator("#rangeMonths")).toHaveValue("1");
+  await expect(page.locator("#rangeLabel")).toHaveText("Dönem");
   await expect(page.locator('[data-month="2026-10"]')).toHaveAttribute(
     "aria-pressed",
     "true",

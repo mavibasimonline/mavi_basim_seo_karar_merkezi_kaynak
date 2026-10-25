@@ -52,6 +52,8 @@ export function setupPeriod(viewNames, onChange) {
       : today;
   $("device").value = devices.includes(pref.device) ? pref.device : "ALL";
   let year = Number($("month").value.slice(0, 4));
+  const years = [...new Set(allowed().map((v) => v.slice(0, 4)))];
+  $("pickerYear").replaceChildren(...years.map((v) => new Option(v, v)));
   function remember(view) {
     try {
       localStorage.setItem(
@@ -66,10 +68,8 @@ export function setupPeriod(viewNames, onChange) {
     } catch {}
   }
   function draw() {
-    $("pickerYear").textContent = year;
-    const years = allowed().map((v) => Number(v.slice(0, 4)));
-    $("previousYear").disabled = year <= Math.min(...years);
-    $("nextYear").disabled = year >= Math.max(...years);
+    const focusedMonth = document.activeElement?.dataset?.month;
+    $("pickerYear").value = String(year);
     $("monthGrid").replaceChildren(
       ...Array.from({ length: 12 }, (_, i) => {
         const value = year + "-" + String(i + 1).padStart(2, "0"),
@@ -86,6 +86,10 @@ export function setupPeriod(viewNames, onChange) {
         return b;
       }),
     );
+    if (focusedMonth)
+      $("monthGrid")
+        .querySelector('[data-month="' + focusedMonth + '"]')
+        ?.focus({ preventScroll: true });
   }
   function sync() {
     year = Number($("month").value.slice(0, 4));
@@ -129,6 +133,8 @@ export function setupPeriod(viewNames, onChange) {
           String(b.dataset.range === $("rangeMonths").value),
         ),
       );
+    $("rangeLabel").textContent = n === 1 ? "Dönem" : n + " Ay";
+    $("rangeToggle").classList.toggle("is-selected", n !== 1);
   }
   function choose(value, count) {
     if (!allowed().includes(value)) return;
@@ -136,6 +142,7 @@ export function setupPeriod(viewNames, onChange) {
       value !== $("month").value || count !== $("rangeMonths").value;
     $("month").value = value;
     $("rangeMonths").value = count;
+    $("rangeMenu").open = false;
     sync();
     if (count === "1")
       $("monthGrid")
@@ -143,19 +150,45 @@ export function setupPeriod(viewNames, onChange) {
         ?.focus({ preventScroll: true });
     if (changed) onChange();
   }
-  $("previousYear").onclick = () => {
-    year--;
-    draw();
-  };
-  $("nextYear").onclick = () => {
-    year++;
-    draw();
+  $("pickerYear").onchange = () => {
+    const target = $("pickerYear").value + $("month").value.slice(4),
+      available = allowed().filter((v) => v.startsWith($("pickerYear").value));
+    if (!available.length) return sync();
+    choose(available.includes(target) ? target : available[0], "1");
   };
   document
     .querySelectorAll("[data-range]")
-    .forEach(
-      (b) => (b.onclick = () => choose(currentMonth(), b.dataset.range)),
-    );
+    .forEach((b) => {
+      b.onclick = () => {
+        choose(currentMonth(), b.dataset.range);
+        $("rangeToggle").focus({ preventScroll: true });
+      };
+    });
+  document.addEventListener("click", (e) => {
+    if (!$("rangeMenu").contains(e.target)) $("rangeMenu").open = false;
+  });
+  $("rangeMenu").addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      $("rangeMenu").open = false;
+      $("rangeToggle").focus({ preventScroll: true });
+      return;
+    }
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+    e.preventDefault();
+    $("rangeMenu").open = true;
+    const buttons = [...$("rangeMenu").querySelectorAll("button")],
+      i = buttons.indexOf(e.target),
+      next =
+        e.key === "Home"
+          ? 0
+          : e.key === "End"
+            ? buttons.length - 1
+            : i < 0
+              ? e.key === "ArrowDown" ? 0 : buttons.length - 1
+              : (i + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+    buttons[next].focus();
+  });
   $("monthGrid").addEventListener("keydown", (e) => {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
     const buttons = [
