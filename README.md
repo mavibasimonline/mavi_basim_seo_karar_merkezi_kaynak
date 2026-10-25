@@ -22,7 +22,11 @@ Gerçek üretim devamı (25 Ekim 01:16 Türkiye): [29 ürünün gerçek tarama k
 
 ## Dönem seçimi ve kullanım
 
-Sayfanın en üst satırında solda kompakt yıl seçimi, ortada 12 açık ay butonu, hemen sağında Dönem menüsü bulunur. Seçili ay mavidir; eski ay kutusu ve sağ-sol okları kaldırılmıştır. Ay adına tek tıklamak raporu yükler. Ayların hemen sağındaki **Dönem** açılır menüsünün 3 Ay / 6 Ay / 12 Ay seçenekleri mevcut ay dâhil son takvim aylarını özetler; tam tarih aralığı görünür. İlk ziyarette mevcut ay/Tüm cihazlar, sonraki ziyarette son tercih açılır. Ay/dönem/cihaz/sekme korunur; gelecek ay seçilmez. **İlk 10 Lider Ürün**, yalnız gözlenen gerçek ürün ölçümlerini tıklamaya göre sıralar ve isimden kanıt penceresini açar. Kısmi sıralama ve eksik günler açıkça belirtilir; veri yoksa sıfır veya sahte lider gösterilmez. “Ekranı yenile” yalnız kayıtlı veriyi okur. [370 test, masaüstü ekran görüntüleri ve gerçek D1 kabulü](FILTER_BAR_REPORT.md).
+60 px tek satır üst araç çubuğunda menü, kompakt yıl seçimi, eşit genişlikte 12 açık ay, Dönem menüsü, cihaz, veri durumu ve MB bulunur. Seçili ay mavidir; gelecek ay seçilmez. Masaüstünde ayların tamamı görünür, dar pencere/mobilde çubuk yatay kayar. Ay adına tek tıklamak raporu yükler. **3 Ay / 6 Ay / 12 Ay** mevcut ay dâhil son takvim aylarını özetler. İlk ziyarette mevcut ay/Tüm cihazlar, sonrasında son ay/dönem/cihaz/sekme tercihi korunur.
+
+Büyük tekrarlanan başlıklar kaldırıldı; sekmeler doğrudan veri, filtre veya soru alanıyla açılır. Yenile/indirme düğmeleri etkin çalışma alanının sağ üstündedir. “Ekranı yenile” yalnız kayıtlı veriyi okur. Dönemin ayrıntısı, veri kapsamı ve güncelleme tarihi üstteki durum/bilgi düğmesinden açılır; gerçek hatalar içerikte görünür kalır. **İlk 10 Lider Ürün**, doğrulanmış gerçek ürün ölçümlerini tıklamaya göre sıralar. Kısmi kapsam belirtilir; ölçüm yoksa sahte sıralama/sıfır gösterilmez.
+
+[374 test ve masaüstü/mobil ekran kabulü](COMPACT_DASHBOARD_REPORT.md). [Önceki gerçek çok aylık D1 hesap kabulü](FILTER_BAR_REPORT.md).
 
 ## Yenilenen Türkçe panel
 

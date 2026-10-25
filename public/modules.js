@@ -11,12 +11,7 @@ export function setupModules(api, notify) {
       const r = await api("/api/radar?" + scope);
       if (request !== radarRequest) return;
       const root = $("radarResults");
-      root.replaceChildren(
-        node(
-          "p",
-          `GSC · ${r.period.start} – ${r.period.end}; önceki ${r.comparison_period.start} – ${r.comparison_period.end}. Ölçüm: ${r.measured_at}`,
-        ),
-      );
+      root.replaceChildren();
       for (const [title, items] of [
         ["En yüksek öncelikli 5 SEO fırsatı", r.opportunities],
         ["Dikkat gerektiren 5 ürün", r.attention],
@@ -60,7 +55,16 @@ export function setupModules(api, notify) {
         }
         root.append(section);
       }
-      root.append(list(r.limitations));
+      root.append(
+        detail(
+          "Analiz kapsamı ve sınırlar",
+          node(
+            "p",
+            `GSC · ${r.period.start} – ${r.period.end}; önceki ${r.comparison_period.start} – ${r.comparison_period.end}. Ölçüm: ${r.measured_at}`,
+          ),
+          list(r.limitations),
+        ),
+      );
     } catch (e) {
       if (request === radarRequest) $("radarResults").textContent = e.message;
     }
@@ -76,7 +80,7 @@ export function setupModules(api, notify) {
       );
       const root = $("changeResults");
       if (request !== calendarRequest || day !== $("changeDay").value) return;
-      root.replaceChildren(node("p", r.note));
+      root.replaceChildren();
       if (!r.rows.length)
         root.append(
           node("p", "Bu tarihte doğrulanmış değişiklik tespiti yok."),
@@ -134,6 +138,7 @@ export function setupModules(api, notify) {
         });
         root.append(card);
       }
+      root.append(detail("Tespit ve yayın tarihi", node("p", r.note)));
     } catch (e) {
       if (request === calendarRequest)
         $("changeResults").textContent = e.message;
@@ -150,10 +155,6 @@ export function setupModules(api, notify) {
         return;
       root.replaceChildren(
         node("h3", "Kaynak Kontrolleri"),
-        node(
-          "p",
-          `Denetim: ${r.measured_at}; ${r.period.start} – ${r.period.end}.`,
-        ),
         list(
           r.source_states.map(
             (s) =>
@@ -186,7 +187,14 @@ export function setupModules(api, notify) {
               `${p.name} · ${p.url || "URL eşlemesi yok"}: ${p.state}. ${p.missing.join(" ")} ${p.query_difference_explanation || ""}`,
           ),
         ),
-        list(r.limitations),
+        detail(
+          "Denetim kapsamı ve sınırlar",
+          node(
+            "p",
+            `Denetim: ${r.measured_at}; ${r.period.start} – ${r.period.end}.`,
+          ),
+          list(r.limitations),
+        ),
       );
       const history = await api("/api/audit-history");
       if (request !== auditRequest || month !== scopeParams().toString())

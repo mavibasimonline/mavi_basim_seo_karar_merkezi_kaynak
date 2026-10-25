@@ -540,26 +540,6 @@ small {
   padding: 30px 34px 0;
   outline: none;
 }
-.page-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 24px;
-  margin-bottom: 27px;
-}
-.page-heading h1 {
-  margin-bottom: 8px;
-}
-.page-heading > div > p:last-child {
-  font-size: 12.5px;
-  color: var(--muted);
-  margin: 0;
-}
-.page-actions {
-  display: flex;
-  gap: 9px;
-  align-items: center;
-}
 .filterbar {
   display: flex;
   align-items: center;
@@ -1393,27 +1373,6 @@ td.numeric {
   display: none;
 }
 /* Existing evidence, radar, calendar and audit modules */
-.section-intro {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  border: 1px solid #dfe8f7;
-  background: #eef4ff;
-  color: #5d6e86;
-  padding: 15px 20px;
-  border-radius: 9px;
-  margin-bottom: 22px;
-  font-size: 12px;
-}
-.section-intro .icon {
-  color: #5d6e86;
-  width: 19px;
-  height: 19px;
-  flex-shrink: 0;
-}
-.section-intro p {
-  margin: 0;
-}
 .module-results {
   min-width: 0;
   color: #61728a;
@@ -1512,31 +1471,6 @@ pre {
 }
 .question-workspace {
   max-width: 850px;
-  margin: auto;
-}
-.question-intro {
-  text-align: center;
-  padding: 32px 16px 22px;
-}
-.question-intro > .icon-tile {
-  width: 54px;
-  height: 54px;
-  border-radius: 14px;
-  margin: 0 auto 20px;
-}
-.question-intro > .icon-tile .icon {
-  width: 27px;
-  height: 27px;
-}
-.question-intro h2 {
-  font-size: 24px;
-  letter-spacing: -0.6px;
-  margin-bottom: 12px;
-}
-.question-intro p {
-  color: #5d6e86;
-  font-size: 13px;
-  max-width: 540px;
   margin: auto;
 }
 .suggested-questions {
@@ -1960,16 +1894,6 @@ dialog::backdrop {
     grid-template-columns: minmax(0, 1fr) 245px;
     gap: 16px;
   }
-  .page-heading {
-    align-items: flex-start;
-  }
-  .page-heading h1 {
-    font-size: 26px;
-  }
-  .page-actions .button {
-    font-size: 11px;
-    padding-inline: 10px;
-  }
   .kpi-grid {
     gap: 12px;
   }
@@ -2085,25 +2009,6 @@ dialog::backdrop {
   }
   .breadcrumb strong {
     font-size: 11px;
-  }
-  .page-heading {
-    display: block;
-    margin-bottom: 20px;
-  }
-  .page-heading h1 {
-    font-size: 25px;
-  }
-  .page-heading > div > p:last-child {
-    font-size: 12px;
-  }
-  .page-actions {
-    margin-top: 18px;
-    gap: 8px;
-  }
-  .page-actions .button {
-    font-size: 12px;
-    min-height: 40px;
-    padding: 9px 12px;
   }
   .filterbar {
     gap: 10px;
@@ -2330,10 +2235,6 @@ dialog::backdrop {
   #view-changes .panel-heading {
     flex-wrap: wrap;
   }
-  .section-intro {
-    font-size: 11px;
-    padding: 14px 15px;
-  }
   .archive-stats {
     gap: 8px;
   }
@@ -2380,15 +2281,6 @@ dialog::backdrop {
   }
   .connection-details .button {
     font-size: 11px;
-  }
-  .question-intro {
-    padding-top: 22px;
-  }
-  .question-intro h2 {
-    font-size: 22px;
-  }
-  .question-intro p {
-    font-size: 12px;
   }
   .question-form {
     padding: 19px;
@@ -2613,11 +2505,6 @@ dialog::backdrop {
   background: #fffbf3;
   padding: 12px;
 }
-.refresh-hint {
-  font-size: 11px;
-  color: #60718b;
-  margin: 12px 0 18px;
-}
 .analytics-grid {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -2627,9 +2514,6 @@ dialog::backdrop {
 .chart-empty {
   min-height: 220px;
   padding: 20px;
-}
-.page-heading {
-  margin-bottom: 18px;
 }
 .kpi-card {
   padding: 20px;
@@ -2704,9 +2588,6 @@ dialog::backdrop {
   }
 }
 @media (max-width: 980px) {
-  .refresh-hint {
-    margin-top: 10px;
-  }
   .data-status {
     gap: 8px 14px;
   }
@@ -2730,12 +2611,6 @@ dialog::backdrop {
   }
   .period-context {
     font-size: 11px;
-  }
-  .page-heading {
-    gap: 14px;
-  }
-  .page-actions {
-    justify-content: flex-start;
   }
   .data-status {
     margin-bottom: 16px;
@@ -2775,12 +2650,6 @@ dialog::backdrop {
   height: 260px;
   min-height: 220px;
 }
-.refresh-hint {
-  margin: -7px 0 14px;
-}
-.page-actions {
-  min-height: 42px;
-}
 @media (max-width: 720px) {
   .attention-strip {
     padding: 14px;
@@ -2794,59 +2663,70 @@ dialog::backdrop {
   .topbar .breadcrumb strong {
     max-width: 145px;
   }
-  .refresh-hint {
-    font-size: 10px;
-  }
   .topbar-actions #freshness {
     max-width: 160px;
     font-size: 10px;
   }
 }
-/* One top filter row: year, twelve open months, then the period menu. */
+/* Compact data workspace: one toolbar, one set of controls, no hero blocks. */
 .topbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  height: auto;
-  min-height: 112px;
-  padding: 10px 24px;
-  gap: 8px 14px;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  height: 60px;
+  min-height: 60px;
+  padding: 8px 12px;
+  gap: 6px;
 }
-.scope-controls {
-  grid-row: 1;
-  grid-column: 1/-1;
+.topbar #sidebarToggle {
+  flex: 0 0 30px;
+  width: 30px;
+  min-width: 30px;
+  height: 36px;
+  min-height: 36px;
+}
+.toolbar-track {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex: 1 1 auto;
+  gap: 6px;
   min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scroll-padding: 4px;
 }
-.topbar .breadcrumb {
-  grid-row: 2;
-  grid-column: 1;
+.scope-controls,
+.topbar-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 5px;
 }
 .topbar-actions {
-  grid-row: 2;
-  grid-column: 2;
-  justify-self: end;
-  gap: 12px;
+  margin-left: auto;
 }
 .year-control {
   position: relative;
-  flex: 0 0 76px;
+  width: 60px;
+  flex: 0 0 60px;
 }
 .year-control select {
   appearance: none;
   width: 100%;
-  padding: 8px 20px 8px 10px;
-  font-size: 12px;
+  min-height: 36px;
+  height: 36px;
+  padding: 6px 16px 6px 7px;
+  font-size: 11px;
   font-weight: 700;
 }
 .year-control::after {
   content: "";
   position: absolute;
-  right: 10px;
-  top: 16px;
-  width: 6px;
-  height: 6px;
+  right: 7px;
+  top: 13px;
+  width: 5px;
+  height: 5px;
   border-right: 1px solid #40516d;
   border-bottom: 1px solid #40516d;
   transform: rotate(45deg);
@@ -2854,26 +2734,24 @@ dialog::backdrop {
 }
 .month-strip {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  align-items: center;
   gap: 2px;
-  overflow-x: auto;
-  min-width: 0;
-  scrollbar-width: thin;
-  padding: 3px;
-  scroll-padding: 3px;
+  padding: 2px;
 }
 .month-strip button {
-  flex: 1 0 auto;
+  flex: 0 0 44px;
+  width: 44px;
   min-width: 44px;
-  min-height: 42px;
-  padding: 8px 6px;
+  min-height: 36px;
+  padding: 7px 1px;
   font: inherit;
-  font-size: 12px;
+  font-size: 10.5px;
   color: #40516d;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  cursor: pointer;
+  white-space: nowrap;
+  border: 1px solid #edf1f7;
+  border-radius: 7px;
+  background: #f8fafc;
 }
 .month-strip button:hover:not(:disabled) {
   background: #edf2ff;
@@ -2890,26 +2768,24 @@ dialog::backdrop {
 .month-strip button:disabled {
   color: #768298;
   opacity: 0.55;
-  cursor: default;
 }
 .range-menu {
-  position: relative;
-  flex: 0 0 102px;
+  flex: 0 0 72px;
   border-left: 1px solid var(--border);
-  padding-left: 10px;
+  padding-left: 5px;
 }
 .range-menu summary {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  min-height: 42px;
-  padding: 8px 10px;
-  font-size: 12px;
+  justify-content: space-between;
+  gap: 4px;
+  min-height: 36px;
+  padding: 6px;
+  font-size: 11px;
   font-weight: 700;
   list-style: none;
   border: 1px solid #d6deea;
-  border-radius: 8px;
+  border-radius: 7px;
   background: #fff;
   color: #40516d;
 }
@@ -2925,16 +2801,16 @@ dialog::backdrop {
   border-color: #b9cbfb;
 }
 .range-menu summary .icon {
-  width: 15px;
-  height: 15px;
+  width: 12px;
+  height: 12px;
 }
 .range-menu[open] summary .icon {
   transform: rotate(180deg);
 }
 .range-options {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
+  position: fixed;
+  top: var(--menu-top, 54px);
+  left: var(--menu-left, 8px);
   width: 130px;
   padding: 5px;
   border: 1px solid var(--border);
@@ -2954,22 +2830,57 @@ dialog::backdrop {
   background: #fff;
   color: #40516d;
 }
-.range-options button:hover {
-  background: #edf2ff;
+.range-options button:hover,
+.range-options [aria-pressed="true"] {
+  background: #eaf0ff;
+  color: #214cb9;
 }
 .range-options [aria-pressed="true"] {
-  color: #214cb9;
-  background: #eaf0ff;
   font-weight: 700;
 }
 .topbar .device-selector label {
   display: none;
 }
 .topbar .device-selector select {
-  max-width: 145px;
-  min-height: 34px;
-  padding-block: 5px;
-  font-size: 11px;
+  width: 100px;
+  min-height: 36px;
+  height: 36px;
+  padding: 6px 15px 6px 6px;
+  font-size: 10px;
+}
+.topbar .freshness {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 90px;
+  max-width: none;
+  min-height: 36px;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 10px;
+}
+.topbar .freshness > span:not(.status-dot) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar #help {
+  display: inline-flex;
+  width: 26px;
+  min-width: 26px;
+  height: 36px;
+  min-height: 36px;
+}
+.topbar .avatar {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  font-size: 10px;
 }
 .month-strip button:focus-visible,
 .range-menu summary:focus-visible,
@@ -2977,79 +2888,118 @@ dialog::backdrop {
   outline: 3px solid #275ce7;
   outline-offset: 1px;
 }
-#selectionMode {
-  color: #40516d;
+#mainContent {
+  padding: 14px 16px 0;
+}
+.kpi-grid {
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.kpi-card {
+  padding: 12px 16px;
+}
+.kpi-value {
+  margin: 8px 0 4px;
+  font-size: 28px;
+}
+.kpi-caption:empty {
+  display: none;
+}
+.panel-heading {
+  align-items: center;
+  padding: 12px 16px;
+  gap: 10px;
+}
+.panel-heading h2 {
+  font-size: 14px;
+}
+.analytics-grid {
+  margin-bottom: 14px;
+  gap: 14px;
+}
+.report-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.report-actions .button,
+.report-actions .icon-button {
+  min-height: 34px;
+  height: 34px;
+  font-size: 11px;
+  padding: 6px 9px;
+}
+.report-actions .icon-button {
+  width: 34px;
+  min-width: 34px;
+  border: 1px solid var(--border);
+}
+.section-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+.data-error {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-left: 3px solid #bd4444;
+  border-radius: 6px;
+  background: #fff3f3;
+  color: #883333;
   font-size: 12px;
 }
-@media (min-width: 981px) and (max-width: 1200px) {
-  .topbar {
-    padding-inline: 16px;
-  }
-  .scope-controls {
-    gap: 6px;
-  }
-  .year-control {
-    flex-basis: 70px;
-  }
-  .range-menu {
-    flex-basis: 94px;
-    padding-left: 6px;
-  }
-  .month-strip button {
-    min-width: 38px;
-    font-size: 11px;
-    padding-inline: 3px;
-  }
+.data-error[hidden] {
+  display: none;
+}
+.table-toolbar {
+  padding: 0 16px 10px;
+}
+.table-notes {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.table-notes .source-note {
+  margin: 0;
+}
+.question-workspace {
+  max-width: none;
+  margin: 0;
+}
+.question-form {
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+.question-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.question-tools label {
+  font-weight: 700;
+}
+.suggested-questions {
+  justify-content: flex-start;
+  margin: 12px 0;
+}
+#helpDialog .period-context {
+  margin: 0 0 12px;
+}
+#helpDialog .data-status {
+  margin: 0 0 16px;
 }
 @media (max-width: 980px) {
   .topbar {
-    grid-template-columns: minmax(0, 1fr) auto;
-    min-height: 112px;
-    padding: 8px 16px;
-    gap: 6px 8px;
+    padding-inline: 8px;
   }
-  .scope-controls {
-    gap: 6px;
-  }
-  .year-control {
-    flex-basis: 68px;
-  }
-  .range-menu {
-    flex-basis: 94px;
-    padding-left: 6px;
-  }
-  .month-strip button {
-    flex: 0 0 auto;
-  }
-  .topbar .breadcrumb {
-    grid-row: 2;
-    grid-column: 1;
-    gap: 6px;
-  }
-  .topbar .breadcrumb strong {
-    max-width: 100px;
-    font-size: 11px;
-  }
-  .topbar-actions {
-    grid-row: 2;
-    grid-column: 2;
-    gap: 8px;
-  }
-  .topbar-actions #freshness {
-    max-width: 100px;
-    font-size: 10px;
-  }
-  .topbar-actions #help,
-  .topbar-actions .avatar {
-    display: none;
-  }
-  .topbar .device-selector select {
-    width: 115px;
-    padding-inline: 6px 18px;
-    font-size: 10px;
+  #mainContent {
+    padding: 12px 12px 0;
   }
   .leaders-panel .panel-heading {
-    gap: 12px;
+    gap: 10px;
     align-items: flex-start;
   }
 }

@@ -294,11 +294,13 @@ test("failed analysis or network never manufactures values and keeps the interfa
     }),
   );
   await login(page);
-  await page.getByText("Sorunu incele", { exact: true }).click();
+  await expect(page.locator("#dataError")).toBeVisible();
+  await page.locator("#freshness").click();
   await expect(page.locator("#status")).toContainText(
     "Aylık SEO analizi alınamadı",
   );
   await expect(page.locator("#status")).toContainText("Google bağlantısı yok");
+  await page.locator("#closeHelp").click();
   await navigate(page, "Ürün Performansı");
   await expect(page.locator(".product")).toHaveCount(29);
   await expect(page.locator(".badge").first()).toHaveText("Veri bekle");
