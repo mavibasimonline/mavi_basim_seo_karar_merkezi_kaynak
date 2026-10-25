@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from cloudflare_diagnostics import Cloudflare
@@ -43,6 +44,15 @@ def family(sql):
  return 'other'
 
 
+def shape(sql):
+ # Bound values are absent in D1 insights. Remove all remaining SQL literals and
+ # comments as well; never serialize raw query text, credentials or Google rows.
+ sql=re.sub(r"/\*.*?\*/|--[^\n]*",' ',sql,flags=re.S)
+ sql=re.sub(r"'(?:''|[^'])*'",'?',sql)
+ sql=re.sub(r'"(?:""|[^"])*"','?',sql)
+ return ' '.join(sql.split())[:6000]
+
+
 def inspect(client):
  now=datetime.now(timezone.utc);start=now.replace(hour=0,minute=0,second=0,microsecond=0).isoformat()
  query='''query D1ReadIncident($accountTag: string, $filter: ZoneWorkersRequestsFilter_InputObject) {
@@ -51,7 +61,7 @@ def inspect(client):
  data=graphql(client,query,{'accountTag':client.account,'filter':{'AND':[{'datetimeHour_geq':start,'datetimeHour_leq':now.isoformat(),'databaseId':DATABASE}]}})
  result={'observed_at':now.isoformat(),'analytics_only':True,'application_sql_executed':False,'daily_usage':client.daily_usage(),'query_insights':{'ok':data['ok']}}
  if data['ok']:
-  result['query_insights']['queries']=[{'fingerprint':hashlib.sha256(r.get('dimensions',{}).get('query','').encode()).hexdigest()[:16],'family':family(r.get('dimensions',{}).get('query','')),'executions':r.get('count'),'rows_read':r.get('sum',{}).get('rowsRead'),'rows_written':r.get('sum',{}).get('rowsWritten'),'average_rows_read':r.get('avg',{}).get('rowsRead')} for a in data['accounts'] for r in a.get('d1QueriesAdaptiveGroups',[])]
+  result['query_insights']['queries']=[{'fingerprint':hashlib.sha256(r.get('dimensions',{}).get('query','').encode()).hexdigest()[:16],'family':family(r.get('dimensions',{}).get('query','')),'shape':shape(r.get('dimensions',{}).get('query','')),'executions':r.get('count'),'rows_read':r.get('sum',{}).get('rowsRead'),'rows_written':r.get('sum',{}).get('rowsWritten'),'average_rows_read':r.get('avg',{}).get('rowsRead')} for a in data['accounts'] for r in a.get('d1QueriesAdaptiveGroups',[])]
  else:result['query_insights']['code']=data['code']
  return result
 
