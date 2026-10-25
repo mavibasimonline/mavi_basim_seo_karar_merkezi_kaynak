@@ -2,6 +2,18 @@
 
 Başlangıç main `2717153`; dal `fix/compact-data-first-dashboard`. Mevcut lacivert menü, açık zemin, grafikler, tablolar ve gerçek API'ler korunur. Yeni SEO modülü veya veri hesaplama kuralı yoktur. Son commit `git log -1 --oneline`; uzak CI, yayın ve canlı sürüm kanıtları bu değişikliğin PR açıklaması ve kontrollü production workflow'unda izlenir.
 
+## Gerçek yayın sonucu — 25 Ekim 2026, 15:51 Türkiye
+
+- Uygulama kodu `cc1e87c`, PR **#19**, main **9dbcafa5d634b1b80d2a78f1fa08b2fc6df687a4**. PR CI **40194303362** ve main CI **40194492122** başarılı; 299 + 49 + 26 = **374 test** geçti.
+- Mevcut Cloudflare Git otomatik yayını **15:45 Türkiye** tarihinde Worker **2f502c68-76ae-48a7-b87a-5b7e45bf62e4** sürümüne %100 trafik vermiştir. Gerçek canlı **12 statik dosyanın tamamının SHA-256 değeri main ile eşleşir**. Masaüstü/mobil canlı giriş kabulü, font/JS/taşma/axe, kompakt çubuk/başlıksız DOM ve oturumsuz performans/sorgu API'lerinin 401 koruması başarılıdır. Yerel yetkili tarayıcı düzeni ekran görüntüleri yukarıdadır; özel canlı yönetici oturumu kullanılmamıştır.
+- **Kontrollü tam yayın kabulü tamamlanmadı.** Production workflow **40194725690**, yayımlama adımından önce güvenlik ön kontrolünde durdu. Bu koşu Worker/D1/Cron/secret değiştirmedi. Canlı Git otomatik sürümünde tam commit etiketi `null`; bu yüzden tam commit/sürüm kabulü de false kalır. Arayüz dosyalarının canlıda olması ile kontrollü yayının kabulü ayrı sonuçlardır.
+- Salt okunur gerçek tanılama **40194908709**, **15:50 Türkiye**: D1 günlük okuma **4.075.790**, yazma **57.055**. Yayın güvenlik eşiği **4.000.000 okuma** aşıldı; Cloudflare Free sert sınırı **5.000.000 okumadır**. Tam ücretsiz kota bitmiş veya ücret başlamış denmez. Eşik düşürülmedi/gevşetilmedi, sayaç sıfırlanmadı; yeni ücretli kaynak açılmadı.
+- Aynı tanılama mevcut OAuth binding'leri, D1, **dakikalı Cron**, otomasyon/tarama bayrakları, günlük **60.000** senkron bütçesi ve **29 ürün / 521 CSV / 9.075 satırı** doğrular. Yeni Google senkronu/site taraması başlatılmaz.
+
+**Bir sonraki somut adım:** **26 Ekim 2026 03:00 Türkiye / 00:00 UTC sonrasında**, gerçek güncel D1 kullanımını ve mevcut Worker UUID'sini tekrar oku. Güvenli ön kontrol geçiyorsa mevcut main ve başarılı CI için production workflow'u o gerçek UUID ile çalıştır; tam commit etiketi, HTTP sürümü, binding/kaynak koruması ve canlı dosya eşleşmesini yeniden doğrula. Kota yenilenmeden veya kontrol geçmeden yeniden yayını zorlamayın. Kendiliğinden yeniden çalıştırma garantisi verilmez; kullanıcının yeni token/ücretli plan/onay işlemi gerekmiyor.
+
+Bu yayın durum belgesi ayrı `docs/compact-release-checkpoint` dalında saklanır. Mevcut main'e bağlı Git otomatik yayını, kota güvenlik kapısı engelinden sonra tekrar tetiklenmemesi için bu belge dalı henüz main'e birleştirilmez. Bu, uygulama kodunun main'e kaydedilmediği anlamına gelmez; kod PR #19 ile zaten main'dedir.
+
 ## Çalışan düzen
 
 - Büyük sayfa başlığı/açıklaması, tekrar eden SEO KARAR MERKEZİ metni, sekme karşılama/intro blokları ve sürekli yenile açıklaması HTML'den kaldırıldı. Erişilebilirlik için tek bir `sr-only` H1, seçili sekmenin gerçek adını taşır; main bu başlıkla etiketlidir. İşlevsel tablo/grafik/bölüm başlıkları korunur.

@@ -20,6 +20,8 @@ Türkçe tek ekran paneli, Cloudflare Worker API'si, D1/SQLite veri modeli, gün
 
 Gerçek üretim devamı (25 Ekim 01:16 Türkiye): [29 ürünün gerçek tarama kabulü, eksik aylık GSC kapsamı ve sonraki otomatik kontrol](PRODUCTION_CONTINUITY_REPORT.md). Tam aylık rapor kabulü henüz geçmedi.
 
+**25 Ekim 2026 kompakt arayüz yayını:** PR #19/main CI başarılı, 374 test geçti. Mevcut Git otomatik yayınının canlı 12 arayüz dosyası main ile eşleşir. Kontrollü tam yayın kabulü günlük D1 okuma güvenlik eşiği nedeniyle bekler; tamamlandı sayılmaz. Gerçek kota/sürüm kanıtı ve sonraki adım [kontrol noktası raporunda](COMPACT_DASHBOARD_REPORT.md) ve TODO.md içindedir.
+
 ## Dönem seçimi ve kullanım
 
 60 px tek satır üst araç çubuğunda menü, kompakt yıl seçimi, eşit genişlikte 12 açık ay, Dönem menüsü, cihaz, veri durumu ve MB bulunur. Seçili ay mavidir; gelecek ay seçilmez. Masaüstünde ayların tamamı görünür, dar pencere/mobilde çubuk yatay kayar. Ay adına tek tıklamak raporu yükler. **3 Ay / 6 Ay / 12 Ay** mevcut ay dâhil son takvim aylarını özetler. İlk ziyarette mevcut ay/Tüm cihazlar, sonrasında son ay/dönem/cihaz/sekme tercihi korunur.

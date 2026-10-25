@@ -1,3 +1,17 @@
+# Yayın kontrol noktası — 25 Ekim 2026, 15:51 Türkiye
+
+- [x] Uygulama kodu PR **#19** ile main'e birleşti: **9dbcafa5d634b1b80d2a78f1fa08b2fc6df687a4** (kaynak **cc1e87c**). PR CI **40194303362**, main CI **40194492122** başarılı; **374 test** geçti. Başarısız uygulama testi yok.
+- [x] Cloudflare'ın mevcut Git otomatik yayını yeni arayüzü aldı. Canlı 12 dosyanın SHA-256 değeri main ile aynı. Masaüstü/mobil canlı giriş, WCAG/JS/taşma, kompakt çubuk ve özel API 401 kontrolleri başarılı. Özel üretim yönetici oturumu kullanılmadı.
+- [ ] **Kontrollü tam yayın kabulü bekliyor:** production koşusu **40194725690** yayımlama öncesi durdu; Worker/D1/Cron/secret değiştirmedi. Gerçek tanılama **40194908709** günlük D1 okumayı **4.075.790** ölçtü; yayın güvenlik sınırı **4.000.000**, Free sert sınır **5.000.000**. Sınır gevşetilmedi. Canlı otomatik Git sürümü **2f502c68-76ae-48a7-b87a-5b7e45bf62e4** ve commit etiketi null; tam commit kabulü false. Başarısız olan uygulama testleri değil, yayın ön koşuludur.
+- [x] Gerçek kaynaklar/binding'ler korunuyor: **29 ürün / 521 CSV / 9.075 satır**, mevcut D1/OAuth, dakikalı Cron, otomasyon/tarama etkin, Ads kapalı, senkron bütçesi 60.000. Canlı siteye yazma ve ücretli hizmet yok.
+- **Son commit:** bu kontrol noktasını içeren `docs/compact-release-checkpoint` git kaydı; uygulamanın son main commit'i yukarıdadır. Bu belge dalı kota kapısı engelinden sonra main'in Git otomatik yayını yeniden tetiklenmemesi için birleştirilmez.
+- **Bir sonraki somut adım:** **26 Ekim 2026 03:00 Türkiye / 00:00 UTC sonrasında** gerçek güncel kota ve Worker UUID'sini oku; güvenli kapı geçerse mevcut production workflow'u gerçek UUID ile çalıştır. Tam HTTP commit/sürüm, korunan D1/secret/Cron/kaynaklar ve canlı dosya hash kabulünü tamamla. Kendiliğinden yeniden başlama garantisi yok.
+- **Gerekli yetki:** bu kalan yayın için yeni kullanıcı yetkisi/token/ücretli plan gerekmez; günlük okuma bütçesinin yenilenmesi ve gerçek doğrulama gerekir. Eski eksik geçmiş GSC/aylık rapor/şifreli yedek görevleri ayrı olarak devam eder.
+
+Ayrıntılar: [COMPACT_DASHBOARD_REPORT.md](COMPACT_DASHBOARD_REPORT.md). Aşağıdaki kayıtlar önceki adımların tarihçesidir.
+
+---
+
 # Veri odaklı kompakt panel — 25 Ekim 2026
 
 - [x] Büyük tekrar başlıkları ve intro blokları kaldırıldı. İşlevsel başlıklar ve erişilebilir H1 korunur. Yedi sekmede asıl çalışma alanı 220 px üstünde, KPI 100 px üstünde başlar.
