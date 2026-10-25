@@ -1,16 +1,16 @@
 import { $, node } from "./ui.js";
-const KEY = "mavi-dashboard-preferences";
-const devices = ["ALL", "MOBILE", "DESKTOP", "TABLET"];
+const KEY = "mavi-dashboard-preferences",
+  devices = ["ALL", "MOBILE", "DESKTOP", "TABLET"];
 export const currentMonth = () => {
-  const parts = new Intl.DateTimeFormat("en-CA", {
+  const p = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Istanbul",
     year: "numeric",
     month: "2-digit",
   }).formatToParts(new Date());
   return (
-    parts.find((p) => p.type === "year").value +
+    p.find((x) => x.type === "year").value +
     "-" +
-    parts.find((p) => p.type === "month").value
+    p.find((x) => x.type === "month").value
   );
 };
 export const monthLabel = (value) =>
@@ -21,21 +21,35 @@ export const monthLabel = (value) =>
   })
     .format(new Date(value + "-01T12:00:00Z"))
     .replace(/^./, (s) => s.toLocaleUpperCase("tr-TR"));
+export const scopeParams = () =>
+  new URLSearchParams({
+    month: $("month").value,
+    device: $("device").value,
+    rangeMonths: $("rangeMonths").value,
+  });
 export function setupPeriod(viewNames, onChange) {
   const today = currentMonth(),
     start = new Date(today + "-01T12:00:00Z");
   for (let i = 0; i < 24; i++) {
     const d = new Date(start);
     d.setUTCMonth(d.getUTCMonth() - i);
-    const value = d.toISOString().slice(0, 7);
-    $("month").append(new Option(monthLabel(value), value));
+    const v = d.toISOString().slice(0, 7);
+    $("month").append(new Option(monthLabel(v), v));
   }
   const allowed = () => [...$("month").options].map((o) => o.value);
   let pref = {};
   try {
     pref = JSON.parse(localStorage.getItem(KEY) || "{}") || {};
   } catch {}
-  $("month").value = allowed().includes(pref.month) ? pref.month : today;
+  $("rangeMonths").value = ["1", "3", "6", "12"].includes(
+    String(pref.rangeMonths),
+  )
+    ? String(pref.rangeMonths)
+    : "1";
+  $("month").value =
+    $("rangeMonths").value === "1" && allowed().includes(pref.month)
+      ? pref.month
+      : today;
   $("device").value = devices.includes(pref.device) ? pref.device : "ALL";
   let year = Number($("month").value.slice(0, 4));
   function remember(view) {
@@ -44,38 +58,15 @@ export function setupPeriod(viewNames, onChange) {
         KEY,
         JSON.stringify({
           month: $("month").value,
+          rangeMonths: $("rangeMonths").value,
           device: $("device").value,
           view: viewNames.includes(view) ? view : "overview",
         }),
       );
     } catch {}
   }
-  function sync() {
-    $("monthLabel").textContent = monthLabel($("month").value);
-    $("monthToggle").setAttribute(
-      "aria-label",
-      "Rapor dönemi: " + monthLabel($("month").value),
-    );
-    $("periodHint").textContent =
-      $("month").value === currentMonth()
-        ? "Bu ay — kısmi veriler"
-        : "Seçili ayın doğrulanmış ölçümleri";
-    const values = allowed(),
-      i = values.indexOf($("month").value);
-    $("nextMonth").disabled = i <= 0;
-    $("previousMonth").disabled = i === values.length - 1;
-  }
-  function choose(value) {
-    if (!allowed().includes(value)) return;
-    const changed = $("month").value !== value;
-    $("month").value = value;
-    sync();
-    $("monthPicker").hidePopover();
-    $("monthToggle").focus();
-    if (changed) onChange();
-  }
   function draw() {
-    $("pickerYear").textContent = String(year);
+    $("pickerYear").textContent = year;
     const years = allowed().map((v) => Number(v.slice(0, 4)));
     $("previousYear").disabled = year <= Math.min(...years);
     $("nextYear").disabled = year >= Math.max(...years);
@@ -84,44 +75,74 @@ export function setupPeriod(viewNames, onChange) {
         const value = year + "-" + String(i + 1).padStart(2, "0"),
           b = node("button", monthLabel(value).split(" ")[0]);
         b.type = "button";
-        b.disabled = !allowed().includes(value);
         b.dataset.month = value;
+        b.disabled = !allowed().includes(value);
         b.setAttribute("aria-label", monthLabel(value));
-        b.setAttribute("aria-pressed", String(value === $("month").value));
-        b.addEventListener("click", () => choose(value));
+        b.setAttribute(
+          "aria-pressed",
+          String($("rangeMonths").value === "1" && $("month").value === value),
+        );
+        b.onclick = () => choose(value, "1");
         return b;
       }),
     );
   }
-  $("monthPicker").addEventListener("toggle", (e) => {
-    const open = e.newState === "open";
-    $("monthToggle").setAttribute("aria-expanded", String(open));
-    if (open) {
-      year = Number($("month").value.slice(0, 4));
-      draw();
-      const r = $("monthToggle").getBoundingClientRect();
-      $("monthPicker").style.top = r.bottom + 8 + "px";
-      $("monthPicker").style.left =
-        Math.max(12, Math.min(r.left, innerWidth - 300 - 12)) + "px";
-      $("monthGrid").querySelector('[aria-pressed="true"]')?.focus();
-    }
-  });
-  $("monthPicker").addEventListener("keydown", (e) => {
-    const b = e.target.closest("[data-month]");
-    if (
-      b &&
-      ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)
-    ) {
-      e.preventDefault();
-      const all = [...$("monthGrid").querySelectorAll("button")],
-        i = all.indexOf(b),
-        delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -3, ArrowDown: 3 }[
-          e.key
-        ],
-        target = all[i + delta];
-      if (target && !target.disabled) target.focus();
-    }
-  });
+  function sync() {
+    year = Number($("month").value.slice(0, 4));
+    draw();
+    const n = Number($("rangeMonths").value),
+      end = $("month").value,
+      d = new Date(end + "-01T12:00:00Z");
+    d.setUTCMonth(d.getUTCMonth() - n + 1);
+    $("selectionMode").textContent =
+      n === 1
+        ? "Tekil ay · " + monthLabel(end)
+        : "Son " +
+          n +
+          " ay · " +
+          monthLabel(d.toISOString().slice(0, 7)) +
+          " – " +
+          monthLabel(end);
+    $("periodHint").textContent =
+      n === 1
+        ? end === currentMonth()
+          ? "Bu ay — kısmi veriler"
+          : "Tekil ay modu"
+        : n + " ay modu · Mevcut ay dâhil; eksik günler boş bırakılır";
+    requestAnimationFrame(() => {
+      const b = $("monthGrid").querySelector(
+        '[data-month=\"' + $("month").value + '\"]',
+      );
+      if (b) {
+        const r = $("monthGrid").getBoundingClientRect(),
+          v = b.getBoundingClientRect();
+        if (r.width && (v.left < r.left || v.right > r.right))
+          $("monthGrid").scrollLeft +=
+            v.left - r.left - r.width / 2 + v.width / 2;
+      }
+    });
+    document
+      .querySelectorAll("[data-range]")
+      .forEach((b) =>
+        b.setAttribute(
+          "aria-pressed",
+          String(b.dataset.range === $("rangeMonths").value),
+        ),
+      );
+  }
+  function choose(value, count) {
+    if (!allowed().includes(value)) return;
+    const changed =
+      value !== $("month").value || count !== $("rangeMonths").value;
+    $("month").value = value;
+    $("rangeMonths").value = count;
+    sync();
+    if (count === "1")
+      $("monthGrid")
+        .querySelector('[data-month=\"' + value + '\"]')
+        ?.focus({ preventScroll: true });
+    if (changed) onChange();
+  }
   $("previousYear").onclick = () => {
     year--;
     draw();
@@ -130,22 +151,39 @@ export function setupPeriod(viewNames, onChange) {
     year++;
     draw();
   };
-  $("previousMonth").onclick = () =>
-    choose(allowed()[allowed().indexOf($("month").value) + 1]);
-  $("nextMonth").onclick = () =>
-    choose(allowed()[allowed().indexOf($("month").value) - 1]);
-  // Backing select also supports automation and assistive integrations; the visible picker is a single button.
-  $("month").addEventListener("change", () => {
+  document
+    .querySelectorAll("[data-range]")
+    .forEach(
+      (b) => (b.onclick = () => choose(currentMonth(), b.dataset.range)),
+    );
+  $("monthGrid").addEventListener("keydown", (e) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+    const buttons = [
+        ...$("monthGrid").querySelectorAll("button:not(:disabled)"),
+      ],
+      i = buttons.indexOf(e.target);
+    if (i < 0) return;
+    e.preventDefault();
+    const next =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? buttons.length - 1
+          : i + (e.key === "ArrowRight" ? 1 : -1);
+    buttons[next]?.focus();
+  });
+  $("month").onchange = () => {
     if (!allowed().includes($("month").value))
       $("month").value = currentMonth();
+    $("rangeMonths").value = "1";
     sync();
     onChange();
-  });
-  $("device").addEventListener("change", onChange);
+  };
+  $("device").onchange = onChange;
   sync();
   return {
-    sync,
     remember,
+    sync,
     view: viewNames.includes(pref.view) ? pref.view : "overview",
   };
 }

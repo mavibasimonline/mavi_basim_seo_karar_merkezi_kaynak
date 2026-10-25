@@ -396,3 +396,126 @@ it("exposes authenticated real-data endpoints, validates filters and keeps expor
     );
   }
 });
+it("aggregates multi-month raw measures with weighted position and preserves missing days", async () => {
+  await seed("2026-08-01", [{ clicks: 10, impressions: 100, position: 2 }]);
+  await seed("2026-09-01", [{ clicks: 0, impressions: 900, position: 20 }]);
+  await seed("2026-10-01", [{ clicks: 20, impressions: 100, position: 5 }]);
+  const r = await performance(env, "2026-10", null, TIME, 3);
+  expect(r.period).toMatchObject({
+    start: "2026-08-01",
+    end: "2026-10-31",
+    days: 92,
+  });
+  expect(r.current).toEqual({
+    clicks: 30,
+    impressions: 1100,
+    ctr: 30 / 1100,
+    position: 17,
+  });
+  expect(r.series).toHaveLength(92);
+  expect(r.series.filter((x) => x.metrics)).toHaveLength(3);
+  expect(r.comparison_available).toBe(false);
+  expect(r.products.find((p) => p.id === "brosur")).toMatchObject({
+    current: r.current,
+    observed_days: 3,
+    previous: null,
+  });
+  const mobile = await performance(env, "2026-10", "DESKTOP", TIME, 3);
+  expect(mobile.current).toBeNull();
+});
+it("excludes corrupt days from product ranking inputs, including corruption on another device", async () => {
+  await seed("2026-09-01", [
+    { clicks: 20, impressions: 100, position: 5 },
+    { clicks: 10, impressions: 100, position: 10, device: "DESKTOP", ctr: 0.9 },
+  ]);
+  const r = await performance(env, "2026-10", "MOBILE", TIME, 3);
+  expect(r.products).toEqual([]);
+  expect(r.current).toBeNull();
+});
+it("keeps separate products and calculates product CTR from totals, not averages", async () => {
+  await seed("2026-08-01", [
+    { clicks: 10, impressions: 100, position: 2 },
+    {
+      clicks: 4,
+      impressions: 50,
+      position: 4,
+      page: "https://mavibasim.com/el-ilani",
+    },
+  ]);
+  await seed("2026-09-01", [{ clicks: 0, impressions: 900, position: 20 }]);
+  const r = await performance(env, "2026-10", null, TIME, 3);
+  expect(r.products.find((p) => p.id === "brosur")!.current).toEqual({
+    clicks: 10,
+    impressions: 1000,
+    ctr: 0.01,
+    position: 18.2,
+  });
+  expect(r.products.find((p) => p.id === "el-ilani")!.current!.clicks).toBe(4);
+  const response = await worker.fetch(
+    request("/api/report?month=2026-10&rangeMonths=3"),
+    env,
+  );
+  expect(response.status).toBe(200);
+  const report = (await response.json()) as any;
+  expect(
+    report.products.find((p: any) => p.id === "brosur").current.clicks,
+  ).toBe(10);
+  expect(
+    report.products.find((p: any) => p.id === "el-ilani").current.clicks,
+  ).toBe(4);
+});
+it("queries more than 100 daily datasets with a bounded JSON binding, not hundreds of SQL parameters", async () => {
+  const days = dates({
+    start: "2026-01-01",
+    end: "2026-04-20",
+    days: 110,
+    label: "fixture",
+  });
+  for (const day of days)
+    await seed(day, [{ clicks: 1, impressions: 100, position: 5 }], "query");
+  const r = await performanceQueries(
+    env,
+    params({ month: "2026-10", rangeMonths: "12" }),
+    TIME,
+  );
+  expect(r.verified_days).toBe(110);
+  expect(r.rows[0].clicks).toBe(110);
+  expect(r.rows[0].ctr).toBe(0.01);
+});
+it("does not lose the previous window when comparing 12 calendar months", async () => {
+  await seed("2024-11-01", [{ clicks: 7, impressions: 100, position: 3 }]);
+  await seed("2025-11-01", [{ clicks: 8, impressions: 200, position: 6 }]);
+  const r = await performance(env, "2026-10", null, TIME, 12);
+  expect(r.previous!.clicks).toBe(7);
+  expect(r.current!.clicks).toBe(8);
+});
+it("protects multi-month HTTP APIs, validates range parameters and exports explicit matching periods", async () => {
+  await seed("2026-08-01", [{ clicks: 10, impressions: 100, position: 2 }]);
+  for (const path of [
+    "/api/performance",
+    "/api/performance/queries",
+    "/api/report",
+    "/api/radar",
+    "/api/data-integrity",
+    "/api/export",
+  ]) {
+    const invalid = await worker.fetch(
+      request(path + "?month=2026-10&rangeMonths=24"),
+      env,
+    );
+    expect(invalid.status).toBe(400);
+  }
+  for (const path of ["/api/report", "/api/radar", "/api/export","/api/data-integrity","/api/performance","/api/performance/queries"]) {
+    const r = await worker.fetch(
+      request(path + "?month=2026-10&rangeMonths=3&device=MOBILE"),
+      env,
+    );
+    expect(r.status).toBe(200);
+    const data = (await r.json()) as any;
+    expect(data.period).toMatchObject({
+      start: "2026-08-01",
+      end: "2026-10-31",
+      days: 92,
+    });
+  }
+});

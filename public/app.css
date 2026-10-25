@@ -2969,3 +2969,296 @@ dialog::backdrop {
     font-size: 10px;
   }
 }
+/* Always-open months and clearly separated rolling calendar summaries. */
+.topbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  height: auto;
+  min-height: 120px;
+  padding: 10px 24px;
+  gap: 8px 14px;
+}
+.topbar .breadcrumb {
+  grid-row: 1;
+  grid-column: 1/3;
+}
+.topbar-actions {
+  grid-row: 1;
+  grid-column: 3;
+  justify-self: end;
+}
+.scope-controls {
+  display: contents;
+}
+.year-control {
+  grid-row: 2;
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  justify-self: start;
+}
+.year-control .icon-button {
+  width: 28px;
+  min-width: 28px;
+  height: 38px;
+}
+.year-control strong {
+  font-size: 12px;
+}
+.month-strip {
+  grid-row: 2;
+  grid-column: 2;
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  min-width: 0;
+  scrollbar-width: thin;
+  padding: 3px;
+  scroll-padding: 3px;
+}
+.month-strip button {
+  flex: 1 0 auto;
+  min-width: 48px;
+  min-height: 40px;
+  padding: 8px 7px;
+  font: inherit;
+  font-size: 12px;
+  color: #40516d;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+.month-strip button:hover:not(:disabled) {
+  background: #edf2ff;
+}
+.month-strip [aria-pressed="true"] {
+  color: #214cb9;
+  background: #eaf0ff;
+  border-color: #b9cbfb;
+  font-weight: 700;
+}
+.month-strip button:disabled {
+  color: #768298;
+  opacity: 0.55;
+  cursor: default;
+}
+.range-modes {
+  grid-row: 2;
+  grid-column: 3;
+  display: flex;
+  border-left: 1px solid var(--border);
+  padding-left: 12px;
+  gap: 4px;
+}
+.range-modes button {
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  min-height: 40px;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: #40516d;
+  cursor: pointer;
+}
+.range-modes [aria-pressed="true"] {
+  background: #275ce7;
+  color: #fff;
+  border-color: #275ce7;
+  font-weight: 700;
+}
+.scope-controls .device-selector {
+  grid-row: 1;
+  grid-column: 2;
+  justify-self: end;
+  margin-right: 14px;
+  z-index: 1;
+}
+.topbar .breadcrumb {
+  pointer-events: none;
+}
+.topbar .breadcrumb button,
+.topbar .breadcrumb a {
+  pointer-events: auto;
+}
+.month-strip button:focus-visible,
+.range-modes button:focus-visible {
+  outline: 3px solid #275ce7;
+  outline-offset: 1px;
+}
+#selectionMode {
+  color: #40516d;
+  font-size: 12px;
+}
+.leaders-panel {
+  margin: 20px 0;
+}
+.leaders-panel table {
+  min-width: 620px;
+}
+.leaders-panel .table-scroll {
+  max-height: 500px;
+}
+.leaders-panel .panel-heading p {
+  max-width: 850px;
+}
+.leaders-panel th:not(:first-child) {
+  text-align: right;
+}
+@media (min-width: 1440px) {
+  .month-strip button {
+    min-width: 51px;
+  }
+}
+@media (max-width: 980px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding: 10px 16px;
+    min-height: 166px;
+    gap: 6px 10px;
+  }
+  .topbar .breadcrumb {
+    grid-row: 1;
+    grid-column: 1;
+  }
+  .topbar-actions {
+    grid-row: 1;
+    grid-column: 2;
+  }
+  .year-control {
+    grid-row: 2;
+    grid-column: 1;
+  }
+  .range-modes {
+    grid-row: 2;
+    grid-column: 2;
+    justify-self: end;
+    border-left: 0;
+    padding-left: 0;
+  }
+  .month-strip {
+    grid-row: 3;
+    grid-column: 1/3;
+    padding-right: 140px;
+    min-height: 46px;
+  }
+  .scope-controls .device-selector {
+    grid-row: 3;
+    grid-column: 2;
+    justify-self: end;
+    margin: 0;
+    align-self: center;
+    background: #fff;
+    padding-left: 8px;
+  }
+  .month-strip button {
+    flex: 0 0 auto;
+  }
+  .topbar .breadcrumb strong {
+    max-width: 160px;
+  }
+  .range-modes button {
+    padding: 8px 9px;
+  }
+  .leaders-panel .panel-heading {
+    gap: 12px;
+    align-items: flex-start;
+  }
+}
+.leaders-panel .panel-heading .text-button {
+  white-space: nowrap;
+}
+.leaders-panel table {
+  min-width: 500px;
+}
+.leaders-panel .empty-message {
+  white-space: normal;
+  line-height: 1.7;
+}
+.leaders-panel .cell-subtitle {
+  display: block;
+}
+@media (min-width: 1280px) {
+  .analytics-grid {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .analytics-grid > .leaders-panel {
+    margin: 0;
+    min-width: 0;
+  }
+  .leaders-panel table {
+    min-width: 0;
+  }
+  .leaders-panel th,
+  .leaders-panel td {
+    padding: 10px 8px;
+    font-size: 11px;
+  }
+  .leaders-panel .panel-heading {
+    padding: 20px 16px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .leaders-panel .panel-heading p {
+    font-size: 10px;
+  }
+  .leaders-panel .table-scroll {
+    max-height: 560px;
+  }
+  .leaders-panel .product-open {
+    max-width: 140px;
+    text-align: left;
+  }
+  .leaders-panel .cell-subtitle {
+    font-size: 10px;
+  }
+  .leaders-panel .panel-heading .text-button {
+    font-size: 11px;
+  }
+}
+@media (max-width: 980px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  .topbar .breadcrumb {
+    grid-row: 1;
+    grid-column: 1;
+  }
+  .topbar-actions {
+    grid-row: 1;
+    grid-column: 3;
+  }
+  .year-control {
+    grid-row: 1;
+    grid-column: 2;
+  }
+  .range-modes {
+    grid-row: 2;
+    grid-column: 1/3;
+    justify-self: start;
+  }
+  .scope-controls .device-selector {
+    grid-row: 2;
+    grid-column: 3;
+    padding-left: 0;
+  }
+  .month-strip {
+    grid-row: 3;
+    grid-column: 1/4;
+    padding-right: 3px;
+  }
+  .topbar .breadcrumb strong {
+    max-width: 105px;
+  }
+  .topbar-actions #freshness {
+    max-width: 125px;
+  }
+  .year-control .icon-button {
+    width: 23px;
+    min-width: 23px;
+  }
+}

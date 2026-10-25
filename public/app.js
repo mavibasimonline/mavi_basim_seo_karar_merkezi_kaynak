@@ -27,7 +27,7 @@ import {
 } from "./evidence.js";
 import { drawChart, metricNames } from "./chart.js";
 import { setupModules } from "./modules.js";
-import { setupPeriod, currentMonth } from "./period.js";
+import { setupPeriod, currentMonth, scopeParams } from "./period.js";
 const views = {
   overview: [
     "Genel Bakış",
@@ -88,14 +88,22 @@ const periodControl = setupPeriod(Object.keys(views), scopeChanged);
 state.view = periodControl.view;
 function syncCalendar() {
   const month = $("month").value,
-    today = new Date().toISOString().slice(0, 10);
-  if (!$("changeDay").value.startsWith(month))
-    $("changeDay").value = today.startsWith(month) ? today : month + "-01";
-  $("changeDay").min = month + "-01";
-  const d = new Date(month + "-01T12:00:00Z");
-  d.setUTCMonth(d.getUTCMonth() + 1);
-  d.setUTCDate(0);
-  $("changeDay").max = d.toISOString().slice(0, 10);
+    today = new Date().toISOString().slice(0, 10),
+    first = new Date(month + "-01T12:00:00Z"),
+    last = new Date(first);
+  first.setUTCMonth(first.getUTCMonth() - Number($("rangeMonths").value) + 1);
+  last.setUTCMonth(last.getUTCMonth() + 1);
+  last.setUTCDate(0);
+  const min = first.toISOString().slice(0, 10),
+    max = last.toISOString().slice(0, 10);
+  if (
+    !$("changeDay").value ||
+    $("changeDay").value < min ||
+    $("changeDay").value > max
+  )
+    $("changeDay").value = today >= min && today <= max ? today : min;
+  $("changeDay").min = min;
+  $("changeDay").max = max;
 }
 function scopeChanged() {
   periodControl.remember(state.view);
@@ -112,7 +120,7 @@ function notify(text = "") {
 function showLogin() {
   document.body.classList.remove("is-loading");
   $("loadStatus").textContent = "";
-  if ($("monthPicker").matches(":popover-open")) $("monthPicker").hidePopover();
+
   sessionEpoch++;
   controller?.abort();
   queryController?.abort();
@@ -135,6 +143,7 @@ function showLogin() {
   $("answer").hidden = true;
   for (const id of [
     "products",
+    "leadersTable",
     "queryTable",
     "answer",
     "productDetail",
@@ -190,10 +199,7 @@ async function api(path, options = {}) {
 
 const modules = setupModules(api, notify);
 function params() {
-  return new URLSearchParams({
-    month: $("month").value,
-    device: $("device").value,
-  });
+  return scopeParams();
 }
 async function load(initial = false) {
   const revision = ++state.request;
@@ -230,6 +236,7 @@ async function load(initial = false) {
     state.queryPage = 1;
     $("loginScreen").hidden = true;
     $("app").hidden = false;
+    periodControl.sync();
     document.querySelector(".skip-link").href = "#mainContent";
     notify();
     render();
@@ -241,6 +248,7 @@ async function load(initial = false) {
     if (revision !== state.request || error.name === "AbortError") return;
     if (state.performance) {
       $("month").value = state.performance.period.label;
+      $("rangeMonths").value = String(state.performance.range_months || 1);
       $("device").value = state.performance.device || "ALL";
       periodControl.sync();
       periodControl.remember(state.view);
@@ -323,6 +331,7 @@ function render() {
     ? product
     : "";
   renderProducts();
+  renderLeaders();
   $("productPeriod").textContent =
     period(report.period) +
     " · " +
@@ -361,7 +370,7 @@ function renderNotice() {
     : !status.google_connected
       ? "Bağlantı gerekli"
       : complete
-        ? "Veriler tamamlandı"
+        ? "Tamamlandı"
         : data.current
           ? "Kısmi veri"
           : "Veriler toplanıyor";
@@ -517,6 +526,65 @@ function renderPriorities() {
     ? protectedProducts.map((p) => p.name).join(", ") +
       ". Başlık, URL veya içerik değişikliğinden önce başarılı sorguları inceleyin."
     : "Başarılı kelimeleri doğrulamak için yeterli Google kanıtı bekleniyor. Veri tamamlanmadan başlık ve URL değişikliği yapmayın.";
+}
+function renderLeaders() {
+  const data = state.performance,
+    table = node("table"),
+    thead = node("thead"),
+    head = node("tr");
+  for (const title of ["Ürün", "Tıklama", "Gösterim", "CTR", "Ort. konum"]) {
+    const th = node("th", title);
+    th.scope = "col";
+    head.append(th);
+  }
+  thead.append(head);
+  table.append(thead);
+  const entries = (data.products || [])
+    .map((r) => ({
+      metrics: r,
+      product: state.report.products.find((p) => p.id === r.id),
+    }))
+    .filter((r) => r.metrics.current && r.product?.url_verified)
+    .sort(
+      (a, b) =>
+        b.metrics.current.clicks - a.metrics.current.clicks ||
+        b.metrics.current.impressions - a.metrics.current.impressions ||
+        a.product.name.localeCompare(b.product.name, "tr"),
+    )
+    .slice(0, 10);
+  const tbody = node("tbody");
+  for (const { product: p, metrics: r } of entries) {
+    const row = node("tr"),
+      name = node("td"),
+      button = node("button", p.name, "product-open");
+    button.type = "button";
+    button.addEventListener("click", () => openProduct(p, r));
+    name.append(
+      button,
+      node("span", r.observed_days + " ölçüm günü", "cell-subtitle"),
+    );
+    row.append(
+      name,
+      metricCell(r.current.clicks),
+      metricCell(r.current.impressions),
+      metricCell(r.current.ctr, "percent"),
+      metricCell(r.current.position),
+    );
+    tbody.append(row);
+  }
+  if (!entries.length) {
+    $("leadersTable").replaceChildren(
+      node("p", "Bu dönem için doğrulanmış ürün ölçümü yok.", "empty-message"),
+    );
+  } else {
+    table.append(tbody);
+    $("leadersTable").replaceChildren(table);
+  }
+  $("leadersNote").textContent =
+    `${period(data.period)} · ${deviceName(data.device)} · Gözlenen günlerin tıklamalarına göre sıralanır. ` +
+    (!data.coverage.measurement_complete
+      ? "Kısmi sıralama; ürünlerin ölçüm günleri farklı olabilir."
+      : "Eksik sorgu veya düşük örneklem, başarı kanıtı değildir.");
 }
 function renderSources() {
   const report = state.report,
@@ -719,7 +787,7 @@ function renderProducts() {
   $("productTableFoot").textContent =
     `${products.length} / ${state.report.products.length} ürün gösteriliyor. — : gözlenen ölçüm yok. Kararlar mevcut analiz motorundan gelir.`;
 }
-function openProduct(p) {
+function openProduct(p, summary = null) {
   const root = $("productDetail");
   $("dialogTitle").textContent = p.name;
   root.replaceChildren(
@@ -739,17 +807,25 @@ function openProduct(p) {
     e.append(
       node(
         "strong",
-        p.current?.[key] == null
+        (summary ? summary.current : p.current)?.[key] == null
           ? "—"
           : key === "ctr"
-            ? percent(p.current[key])
-            : number(p.current[key]),
+            ? percent((summary ? summary.current : p.current)[key])
+            : number((summary ? summary.current : p.current)[key]),
       ),
       node("span", label),
     );
     metrics.append(e);
   }
-  root.append(metrics, evidenceView(p, state.report), performanceView(p));
+  root.append(metrics);
+  if (summary)
+    root.append(
+      node(
+        "p",
+        `Google Search Console · ${period(state.performance.period)} · ${deviceName(state.performance.device)} · ${summary.observed_days} gözlenen gün · son veri ${time(summary.last_fetched_at)}. CTR ve konum gösterimlerle ağırlıklı hesaplandı; liderlik nedensellik veya tam kapsam kanıtı değildir.`,
+      ),
+    );
+  root.append(evidenceView(p, state.report), performanceView(p));
   if (p.url) {
     const history = detail("SEO değişiklik geçmişi");
     history.addEventListener("toggle", async () => {
@@ -941,15 +1017,10 @@ function setView(view, focus = true) {
   $("viewDescription").textContent = views[view][2];
   $("periodControl").hidden = false;
   periodControl.remember(view);
-  $("deviceControl").hidden = ![
-    "overview",
-    "products",
-    "queries",
-    "radar",
-  ].includes(view);
+  $("deviceControl").hidden = false;
   $("scopeLabel").textContent =
     view === "radar"
-      ? "Seçili ay ve cihaz · GSC"
+      ? "Seçili dönem ve cihaz · GSC"
       : view === "changes"
         ? "Tespit takvimi · UTC"
         : view === "health"
@@ -1179,7 +1250,7 @@ $("pilot").addEventListener("click", async () => {
 $("question").addEventListener("submit", async (e) => {
   e.preventDefault();
   const b = e.currentTarget.querySelector("button"),
-    questionScope = $("month").value;
+    questionScope = params().toString();
   b.disabled = true;
   notify();
   try {
@@ -1188,14 +1259,17 @@ $("question").addEventListener("submit", async (e) => {
       body: JSON.stringify({
         question: $("questionText").value,
         month: $("month").value,
-        ...(state.questionMonth === $("month").value && state.previousQuestionId
+        rangeMonths: $("rangeMonths").value,
+        device: $("device").value,
+        ...(state.questionMonth === params().toString() &&
+        state.previousQuestionId
           ? { previous_question_id: state.previousQuestionId }
           : {}),
       }),
     });
-    if (questionScope !== $("month").value) return;
+    if (questionScope !== params().toString()) return;
     state.previousQuestionId = answer.question_id;
-    state.questionMonth = $("month").value;
+    state.questionMonth = params().toString();
     const sections = answer.sections;
     $("answer").replaceChildren(
       node("h2", "Kanıta dayalı yanıt"),

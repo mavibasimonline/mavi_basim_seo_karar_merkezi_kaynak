@@ -60,29 +60,6 @@
       </div>
       <p class="login-footer">Mavi Basım · Veriden kanıta, kanıttan karara.</p>
     </main>
-    <div
-      id="monthPicker"
-      class="month-picker"
-      popover
-      role="dialog"
-      aria-label="Rapor ayını seç"
-    >
-      <div class="picker-heading">
-        <button id="previousYear" class="icon-button" aria-label="Önceki yıl">
-          ←</button
-        ><strong id="pickerYear"></strong
-        ><button id="nextYear" class="icon-button" aria-label="Sonraki yıl">
-          →
-        </button>
-      </div>
-      <div
-        id="monthGrid"
-        class="month-grid"
-        role="group"
-        aria-label="Aylar"
-      ></div>
-      <p>Ayı seçtiğinizde rapor güncellenir.</p>
-    </div>
     <div id="app" class="app-shell" hidden>
       <aside
         id="sidebar"
@@ -190,39 +167,41 @@
             ><strong id="breadcrumb">Genel Bakış</strong>
           </div>
           <div class="scope-controls">
-            <div id="periodControl" class="month-control">
+            <div id="periodControl" class="year-control">
               <button
-                id="previousMonth"
+                id="previousYear"
                 class="icon-button"
-                aria-label="Önceki ay"
+                aria-label="Önceki yıl"
               >
-                ←
-              </button>
-              <button
-                id="monthToggle"
-                class="month-toggle"
-                popovertarget="monthPicker"
-                aria-haspopup="dialog"
-                aria-controls="monthPicker"
-                aria-expanded="false"
-              >
-                <svg class="icon" aria-hidden="true">
-                  <use href="/icons.svg#calendar" /></svg
-                ><span id="monthLabel"></span><span aria-hidden="true">⌄</span>
-              </button>
-              <button
-                id="nextMonth"
+                ←</button
+              ><strong id="pickerYear"></strong
+              ><button
+                id="nextYear"
                 class="icon-button"
-                aria-label="Sonraki ay"
+                aria-label="Sonraki yıl"
               >
                 →
               </button>
-              <select
-                id="month"
-                hidden
-                aria-label="Rapor dönemi değeri"
-              ></select>
             </div>
+            <div
+              id="monthGrid"
+              class="month-strip"
+              role="group"
+              aria-label="Ay seçimi"
+            ></div>
+            <div class="range-modes" role="group" aria-label="Çok aylık özet">
+              <span class="sr-only">Son dönem</span
+              ><button data-range="3" aria-pressed="false">3 Ay</button
+              ><button data-range="6" aria-pressed="false">6 Ay</button
+              ><button data-range="12" aria-pressed="false">12 Ay</button>
+            </div>
+            <select id="month" hidden aria-label="Rapor dönemi değeri"></select
+            ><select id="rangeMonths" hidden aria-label="Dönem modu">
+              <option value="1">Tekil ay</option>
+              <option value="3">3 Ay</option>
+              <option value="6">6 Ay</option>
+              <option value="12">12 Ay</option>
+            </select>
             <div id="deviceControl" class="device-selector">
               <label class="sr-only" for="device">Cihaz</label
               ><select id="device" aria-label="Cihaz">
@@ -286,7 +265,7 @@
               başlatmaz.
             </p>
             <div class="period-context">
-              <span id="periodHint"></span
+              <strong id="selectionMode"></strong><span id="periodHint"></span
               ><span id="scopeLabel">Google Search Console · Web araması</span
               ><span id="loadStatus" role="status" aria-live="polite"></span>
             </div>
@@ -366,6 +345,29 @@
                       aria-label="Günlük ölçüm tablosu"
                     ></div>
                   </details>
+                </section>
+                <section
+                  class="panel leaders-panel"
+                  aria-labelledby="leadersTitle"
+                >
+                  <div class="panel-heading">
+                    <div>
+                      <h2 id="leadersTitle">İlk 10 Lider Ürün</h2>
+                      <p id="leadersNote">
+                        Doğrulanmış ürün ölçümleri gösterilir.
+                      </p>
+                    </div>
+                    <button class="text-button" data-go="products">
+                      Tüm ürünleri gör →
+                    </button>
+                  </div>
+                  <div
+                    id="leadersTable"
+                    class="table-scroll"
+                    role="region"
+                    tabindex="0"
+                    aria-label="İlk 10 Lider Ürün tablosu"
+                  ></div>
                 </section>
               </div>
               <div class="priorities-grid">
