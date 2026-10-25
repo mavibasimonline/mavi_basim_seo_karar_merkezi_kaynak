@@ -393,53 +393,59 @@
                     </p>
                   </div>
                 </div>
-                <div class="table-toolbar">
-                  <div class="search-field">
-                    <svg class="icon" aria-hidden="true">
-                      <use href="/icons.svg#search" /></svg
-                    ><input
-                      id="productSearch"
-                      type="search"
-                      placeholder="Ürün veya URL ara…"
-                      aria-label="Ürün veya URL ara"
-                    />
+                <div class="product-controls">
+                  <div class="table-toolbar">
+                    <div class="search-field">
+                      <svg class="icon" aria-hidden="true">
+                        <use href="/icons.svg#search" /></svg
+                      ><input
+                        id="productSearch"
+                        type="search"
+                        placeholder="Ürün veya URL ara…"
+                        aria-label="Ürün veya URL ara"
+                      />
+                    </div>
                   </div>
-                </div>
-                <div
-                  id="productQuickSort"
-                  class="quick-sort"
-                  role="group"
-                  aria-label="Ürünleri hızlı sırala"
-                >
-                  <button data-product-sort="clicks" aria-pressed="true">
-                    En çok tıklanan</button
-                  ><button data-product-sort="impressions" aria-pressed="false">
-                    En çok gösterilen</button
-                  ><button
-                    data-product-sort="change"
-                    aria-pressed="false"
-                    title="Tam ayların mutlak tıklama farkına göre sıralar."
+                  <div
+                    id="productQuickSort"
+                    class="quick-sort"
+                    role="group"
+                    aria-label="Ürünleri hızlı sırala"
                   >
-                    En fazla değişen
-                  </button>
-                </div>
-                <details class="advanced-filters">
-                  <summary>Gelişmiş filtreler</summary>
-                  <div class="inline-controls">
-                    <label class="sr-only" for="decisionFilter"
-                      >SEO kararı</label
-                    ><select id="decisionFilter">
-                      <option value="">Tüm kararlar</option>
-                      <option>Koru</option>
-                      <option>İncele</option>
-                      <option>İyileştir</option>
-                      <option>Veri bekle</option></select
-                    ><label class="sr-only" for="groupFilter">Ürün grubu</label
-                    ><select id="groupFilter">
-                      <option value="">Tüm ürün grupları</option>
-                    </select>
+                    <button data-product-sort="clicks" aria-pressed="true">
+                      En çok tıklanan</button
+                    ><button
+                      data-product-sort="impressions"
+                      aria-pressed="false"
+                    >
+                      En çok gösterilen</button
+                    ><button
+                      data-product-sort="change"
+                      aria-pressed="false"
+                      title="Tam ayların mutlak tıklama farkına göre sıralar."
+                    >
+                      En fazla değişen
+                    </button>
                   </div>
-                </details>
+                  <details class="advanced-filters">
+                    <summary>Gelişmiş filtreler</summary>
+                    <div class="inline-controls">
+                      <label class="sr-only" for="decisionFilter"
+                        >SEO kararı</label
+                      ><select id="decisionFilter">
+                        <option value="">Tüm kararlar</option>
+                        <option>Koru</option>
+                        <option>İncele</option>
+                        <option>İyileştir</option>
+                        <option>Veri bekle</option></select
+                      ><label class="sr-only" for="groupFilter"
+                        >Ürün grubu</label
+                      ><select id="groupFilter">
+                        <option value="">Tüm ürün grupları</option>
+                      </select>
+                    </div>
+                  </details>
+                </div>
                 <div
                   id="products"
                   class="table-scroll"

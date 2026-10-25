@@ -22,6 +22,8 @@ Gerçek üretim devamı (25 Ekim 01:16 Türkiye): [29 ürünün gerçek tarama k
 
 **25 Ekim 2026 kompakt arayüz yayını:** PR #19/main CI başarılı, 374 test geçti. Mevcut Git otomatik yayınının canlı 12 arayüz dosyası main ile eşleşir. Kontrollü tam yayın kabulü günlük D1 okuma güvenlik eşiği nedeniyle bekler; tamamlandı sayılmaz. Gerçek kota/sürüm kanıtı ve sonraki adım [kontrol noktası raporunda](COMPACT_DASHBOARD_REPORT.md) ve TODO.md içindedir.
 
+**Hazır düzeltme — ay durumları ve tablo yoğunluğu:** `fix/month-states-and-table-density` dalında aylar 4–6 px aralıklı, seçili yazı hover/focus/active durumlarında açıkça beyaz; ürün satırları 60 px, filtreler kompakt. 382 test ve tarayıcı görüntüleri [kabul raporunda](MONTH_TABLE_DENSITY_REPORT.md). Yeni düzeltme henüz yayımlanmadı: 25 Ekim 16:50 Türkiye tanılamasında D1 okuma 5.039.419; yayın kapısı 4.000.000 nedeniyle kapalı. Mevcut üretim korunur.
+
 ## Dönem seçimi ve kullanım
 
 60 px tek satır üst araç çubuğunda menü, kompakt yıl seçimi, eşit genişlikte 12 açık ay, Dönem menüsü, cihaz, veri durumu ve MB bulunur. Seçili ay mavidir; gelecek ay seçilmez. Masaüstünde ayların tamamı görünür, dar pencere/mobilde çubuk yatay kayar. Ay adına tek tıklamak raporu yükler. **3 Ay / 6 Ay / 12 Ay** mevcut ay dâhil son takvim aylarını özetler. İlk ziyarette mevcut ay/Tüm cihazlar, sonrasında son ay/dönem/cihaz/sekme tercihi korunur.

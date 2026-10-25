@@ -1,3 +1,15 @@
+# Ay çubuğu / ürün tablosu kontrol noktası — 25 Ekim 2026
+
+- [x] Yıl/ay/dönem dengeli aralıklı; aylar 4–6 px boşluk, açık gri kenarlık, okunabilir 46/52 px eşit düğmeler. Seçili yazı #FFFFFF, opacity=1; hover/focus/active testleri geçti. Sadece ay alanı kayar; sabit cihaz/durum/MB kesilmez. Masaüstü 60 px, 640 px ve altı telefonda kontrollerin tamamını görünür tutan 104 px iki kompakt satır.
+- [x] Ürün satırları 60 px, başlık 40 px; hücreler ortalı, küçük avatar/URL aralığı; masaüstünde arama/sıralama/gelişmiş filtre aynı alanda. Filtre-tablosu arası en fazla 10 px. Arama/sıralama/karar ve metrik sütun testleri başarılı.
+- [x] **382 test:** 299 Workers/D1 + 49 Python + 34 Chromium; tip/build/production dry-run/release denetimi ve audit 0. İlk yeni tarayıcı koşusunda bir masaüstü senaryosu, yükleme sırasında ay düğmelerinin yeniden oluşturulması nedeniyle koptu; aynı yılda düğüm korunup seçim yerinde güncellenerek düzeltildi. Tam 34 test ve ek 8 sınır testi yeniden geçti.
+- [ ] **Yeni düzeltme yayımlanmadı / main'e birleştirilmedi.** Mevcut güvenlik kapısı aşılmadı. Gerçek salt okunur tanılama **40199411351**, **25 Ekim 16:50 Türkiye**: hesap günlük D1 okuma **5.039.419**, yazma **57.754**; yayın güvenlik eşiği 4.000.000. Analytics gecikmeli olabilir. 29 ürün/521 CSV/9.075 satır ve dakikalı Cron yerinde; OAuth, senkron bütçesi ve mevcut üretim ayarları değişmedi.
+- **Son commit/dal:** bu kaydı içeren `fix/month-states-and-table-density` git kaydı. Uygulama temeli main **9dbcafa**, önceki yayın kontrol noktası **52eb12f** bu dala dahildir. Uzak CI bu dalın PR'ında izlenir. Kaynak/code ve ekran kanıtı [MONTH_TABLE_DENSITY_REPORT.md](MONTH_TABLE_DENSITY_REPORT.md).
+- **Bir sonraki somut adım:** **26 Ekim 2026 03:00 Türkiye / 00:00 UTC sonrasında** güncel kota ve gerçek Worker UUID'sini oku. Kapı uygunken başarılı PR CI ile main'e birleştir; main CI ve mevcut kontrollü production workflow'u ile yayınla, tam commit/Worker/binding/kaynak/hash ve canlı UI kabulünü tamamla. Main'e bağlı Git otomatik yayını bugünkü kapıyı aşmak için kullanılmadı. Kendiliğinden yeniden çalışma garantisi yok.
+- **Yetki:** yeni kullanıcı anahtarı/token/onay veya ücretli plan gerekmiyor; günlük bütçenin yenilenmesi ve gerçek doğrulama gerekiyor. Mevcut kaynaklar, GSC/OAuth/D1/Cron/bütçe ve canlı mavibasim.com korunur. Önceki tarihli kontrol noktaları aşağıdadır.
+
+---
+
 # Yayın kontrol noktası — 25 Ekim 2026, 15:51 Türkiye
 
 - [x] Uygulama kodu PR **#19** ile main'e birleşti: **9dbcafa5d634b1b80d2a78f1fa08b2fc6df687a4** (kaynak **cc1e87c**). PR CI **40194303362**, main CI **40194492122** başarılı; **374 test** geçti. Başarısız uygulama testi yok.

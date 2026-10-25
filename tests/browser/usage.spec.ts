@@ -25,7 +25,7 @@ async function view(page: Page, name: string) {
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-25T09:00:00+03:00"));
 });
-test("compact single toolbar preserves equal-width months and all controls; desktop screenshot proves no clipping", async ({
+test("responsive month toolbar preserves equal-width months and visible fixed controls; desktop screenshot proves no clipping", async ({
   page,
 }) => {
   await login(page);
@@ -59,7 +59,7 @@ test("compact single toolbar preserves equal-width months and all controls; desk
         const strip = rect("monthGrid"),
           year = rect("pickerYear"),
           menu = rect("rangeToggle"),
-          bar = rect("toolbarTrack"),
+          bar = rect("monthGrid"),
           toolbar = document.querySelector(".topbar")!.getBoundingClientRect();
         const controls = [
           "sidebarToggle",
@@ -76,15 +76,19 @@ test("compact single toolbar preserves equal-width months and all controls; desk
           noDocumentOverflow:
             document.documentElement.scrollWidth <= innerWidth,
           firstRow:
-            year.right <= strip.left &&
+            (innerWidth <= 640 || year.right <= strip.left) &&
             menu.left >= strip.right &&
-            toolbar.height <= 64 &&
-            controls.every(
-              (r) =>
-                Math.abs(
-                  r.y + r.height / 2 - (toolbar.y + toolbar.height / 2),
-                ) < 3,
-            ),
+            toolbar.height <= (innerWidth <= 640 ? 108 : 64) &&
+            controls
+              .filter((_, i) => innerWidth > 640 || (i !== 2 && i !== 5))
+              .every(
+                (r) =>
+                  Math.abs(
+                    r.y +
+                      r.height / 2 -
+                      (controls[0].y + controls[0].height / 2),
+                  ) < 3,
+              ),
           sameRow: months.every(
             (r) =>
               Math.abs(r.y + r.height / 2 - (menu.y + menu.height / 2)) < 2,
@@ -96,7 +100,10 @@ test("compact single toolbar preserves equal-width months and all controls; desk
             (r) => Math.abs(r.width - months[0].width) < 0.5,
           ),
           tightSpacing: months.every(
-            (r, i) => !i || r.left - months[i - 1].right <= 2,
+            (r, i) =>
+              !i ||
+              (r.left - months[i - 1].right >= 4 &&
+                r.left - months[i - 1].right <= 6),
           ),
           allControlsVisible:
             controls.every((r) => r.left >= 0 && r.right <= innerWidth) &&
@@ -189,8 +196,10 @@ test("all seven workspaces start with data, filters or the question field; actio
       animations: "disabled",
     });
   }
-  expect(positions.overview).toBeLessThan(100);
-  // Every control remains reachable in the single horizontally scrolling bar.
+  expect(positions.overview).toBeLessThan(
+    page.viewportSize()!.width <= 640 ? 140 : 100,
+  );
+  // Fixed controls remain visible while only the month area scrolls.
   for (const selector of [
     "#pickerYear",
     "#rangeToggle",
@@ -203,13 +212,10 @@ test("all seven workspaces start with data, filters or the question field; actio
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   }
-  await page
-    .locator(".topbar")
-    .screenshot({
-      path:
-        ".local/compact-toolbar-status-" + test.info().project.name + ".png",
-      animations: "disabled",
-    });
+  await page.locator(".topbar").screenshot({
+    path: ".local/compact-toolbar-status-" + test.info().project.name + ".png",
+    animations: "disabled",
+  });
   await page.locator("#freshness").click();
   await expect(page.locator("#helpDialog")).toBeVisible();
   await expect(page.locator("#coverageText")).toContainText("gün doğrulandı");
