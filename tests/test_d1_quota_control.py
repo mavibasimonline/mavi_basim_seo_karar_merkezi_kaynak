@@ -71,3 +71,17 @@ class QuotaTests(unittest.TestCase):
   class Denied(Fake):
    def request(self,*args):return {'ok':False,'code':'CF_HTTP_403'}
   self.assertEqual(incident.build_status(Denied())['step'],'workers-list')
+
+ def test_hourly_monitor_waits_before_reset_without_any_request(self):
+  client=Fake()
+  with patch.object(checkpoint,'observation',side_effect=AssertionError('NO_ANALYTICS')):
+   r=checkpoint.monitored_checkpoint(client,TIME-timedelta(days=1),True,lambda:(_ for _ in ()).throw(AssertionError('NO_PROBE')))
+  self.assertEqual(r['database_queries'],0);self.assertEqual(client.calls,[])
+ def test_hourly_monitor_never_uses_missing_migration_tables_before_guard_is_live(self):
+  client=Fake()
+  with patch.object(checkpoint,'checkpoint',side_effect=AssertionError('NO_D1_CHECKPOINT')):r=checkpoint.monitored_checkpoint(client,TIME,True,lambda:None)
+  self.assertEqual(r['reason'],'LIVE_READ_GUARD_NOT_DEPLOYED');self.assertEqual(client.calls,[])
+ def test_verified_live_guard_allows_a_bounded_hourly_checkpoint(self):
+  client=Fake()
+  with patch.object(checkpoint,'graphql',return_value=self.response()):r=checkpoint.monitored_checkpoint(client,TIME,True,lambda:{'read_guard_revision':'d1-account-reads-v1'})
+  self.assertTrue(r['updated']);self.assertEqual(len(client.calls),1)

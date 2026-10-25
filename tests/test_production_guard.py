@@ -47,7 +47,7 @@ class ProductionGuardTests(unittest.TestCase):
    def open(inner,req,timeout):
     self.assertEqual(req.get_header('User-agent'),'MaviBasimReleaseCheck/1.0')
     self.assertEqual(req.get_header('Accept'),'application/json')
-    return io.BytesIO(json.dumps({'deployment':{'commit':commit,'runtime_revision':'gsc-catchup-v1'}}).encode())
+    return io.BytesIO(json.dumps({'deployment':{'commit':commit,'runtime_revision':'gsc-catchup-v1','read_guard_revision':'d1-account-reads-v1'}}).encode())
   self.assertEqual(guard.smoke(commit,Opener())['commit'],commit)
   with self.assertRaisesRegex(ValueError,'COMMIT_MISMATCH'):guard.smoke('d'*40,Opener())
  def test_free_quota_can_block_release_without_mutating_any_resource(self):
@@ -60,7 +60,7 @@ class ProductionGuardTests(unittest.TestCase):
  def test_postflight_checks_live_version_and_existing_auth_bindings(self):
   saved=guard.preflight(self.client,self.config,VERSION);commit='c'*40
   class Opener:
-   def open(self,req,timeout):return io.BytesIO(json.dumps({'deployment':{'version_id':VERSION,'commit':commit,'runtime_revision':'gsc-catchup-v1'}}).encode())
+   def open(self,req,timeout):return io.BytesIO(json.dumps({'deployment':{'version_id':VERSION,'commit':commit,'runtime_revision':'gsc-catchup-v1','read_guard_revision':'d1-account-reads-v1'}}).encode())
   verified=guard.postflight(self.client,self.config,saved,commit,Opener());self.assertTrue(verified['existing_bindings_preserved'])
 
  def test_spent_sync_writes_are_not_reserved_twice_and_limits_do_not_change(self):
@@ -107,3 +107,7 @@ class ProductionGuardTests(unittest.TestCase):
   def request(method,path,body=None):
    calls.append((method,path,body));return {'ok':True,'result':{'schedules':[]}}
   self.client.request=request;guard.pause_cron(self.client);self.assertEqual(calls[0][2],[]);self.assertTrue(all(c[1].endswith('/schedules') for c in calls))
+ def test_old_runtime_cannot_pass_smoke_with_a_new_commit_label_alone(self):
+  class Opener:
+   def open(self,req,timeout):return io.BytesIO(json.dumps({'deployment':{'commit':'c'*40,'runtime_revision':'gsc-catchup-v1'}}).encode())
+  with self.assertRaisesRegex(ValueError,'COMMIT_MISMATCH'):guard.smoke('c'*40,Opener())

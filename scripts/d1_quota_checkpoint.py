@@ -47,8 +47,24 @@ def checkpoint(client,now=None):
  return {'updated':True,'observation':state,'database_queries':1,'local_reservations_reset':False}
 
 
+def monitored_checkpoint(client,now=None,require_live_guard=False,probe=None):
+ now=now or datetime.now(timezone.utc)
+ if now<NOT_BEFORE:return {'updated':False,'reason':'WAIT_FOR_2026_10_26_UTC_RESET','database_queries':0}
+ if require_live_guard:
+  if probe is None:
+   from release_readiness import live_guard_deployment
+   probe=live_guard_deployment
+  try:ready=bool(probe())
+  except ValueError:ready=False
+  if not ready:return {'updated':False,'reason':'LIVE_READ_GUARD_NOT_DEPLOYED','database_queries':0}
+ return checkpoint(client,now)
+
+
 if __name__=='__main__':
- result=checkpoint(Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID')))
+ import sys
+ result=monitored_checkpoint(Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID')),require_live_guard='--require-live-guard' in sys.argv)
  folder=Path('.local');folder.mkdir(exist_ok=True);(folder/'d1-quota-checkpoint.json').write_text(json.dumps(result,indent=2))
  print(json.dumps(result,indent=2))
- if not result.get('updated'):raise SystemExit('D1_QUOTA_CHECKPOINT_NOT_EXTENDED')
+ if os.environ.get('GITHUB_OUTPUT'):
+  with open(os.environ['GITHUB_OUTPUT'],'a') as out:out.write('ready='+str(bool(result.get('updated'))).lower()+'\n')
+ if not result.get('updated') and result.get('reason') not in ('LIVE_READ_GUARD_NOT_DEPLOYED','WAIT_FOR_2026_10_26_UTC_RESET'):raise SystemExit('D1_QUOTA_CHECKPOINT_NOT_EXTENDED')

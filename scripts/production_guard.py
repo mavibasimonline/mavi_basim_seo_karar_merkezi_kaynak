@@ -79,7 +79,7 @@ def smoke(commit,opener=None):
  request=urllib.request.Request(APP+'/api/health?release='+commit,headers={'User-Agent':'MaviBasimReleaseCheck/1.0','Accept':'application/json'})
  with (opener or urllib.request.build_opener()).open(request,timeout=30) as r:
   payload=json.loads(r.read(20000))
- if payload.get('deployment',{}).get('commit')!=commit or payload.get('deployment',{}).get('runtime_revision')!='gsc-catchup-v1':raise ValueError('DEPLOYED_COMMIT_MISMATCH')
+ if payload.get('deployment',{}).get('commit')!=commit or payload.get('deployment',{}).get('runtime_revision')!='gsc-catchup-v1' or payload.get('deployment',{}).get('read_guard_revision')!='d1-account-reads-v1':raise ValueError('DEPLOYED_COMMIT_MISMATCH')
  return payload['deployment']
 
 def postflight(client,config,saved,commit,opener=None):

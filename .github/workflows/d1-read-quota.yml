@@ -21,8 +21,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Yalnız hesap analitiği ve tek kota kaydı; geçmiş veri sorgusu yok
-        run: python3 scripts/d1_quota_checkpoint.py
+        id: usage
+        run: python3 scripts/d1_quota_checkpoint.py --require-live-guard
       - name: Kayıtlı gerçek Cron sonucunu ve okuma maliyetini doğrula; aktarım başlatmaz
+        if: steps.usage.outputs.ready == 'true'
         run: python3 scripts/d1_read_acceptance.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
