@@ -26,8 +26,9 @@ export async function gscReviewOverview(env:Env,month?:string) {
   const observed=new Map(rows.results.filter(r=>r.observed_at).map(r=>[r.url,r]));
   // Limited sampled source snapshots; never claim an exhaustive inbound-link graph.
   const linkSources=await env.DB.prepare(`SELECT url,snapshot_json FROM seo_snapshots
-    WHERE id IN (SELECT id FROM seo_snapshots ORDER BY observed_at DESC LIMIT 200)`).all<{url:string;snapshot_json:string}>();
+    WHERE id IN (SELECT MAX(rowid) FROM seo_snapshots GROUP BY url ORDER BY MAX(rowid) DESC LIMIT 100)`).all<{url:string;snapshot_json:string}>();
   const inbound=new Map<string,string[]>();
+  const targetSet=new Set(targets);
   for(const source of linkSources.results){
     try{
       const snap=JSON.parse(source.snapshot_json) as Partial<LinkSnapshot>;
@@ -36,7 +37,7 @@ export async function gscReviewOverview(env:Env,month?:string) {
       if(!sourceUrl)continue;
       for(const raw of snap.links){
         const target=canonical(raw);
-        if(target && targets.includes(target)){
+        if(target && targetSet.has(target)){
           const list=inbound.get(target)||[];
           if(!list.includes(sourceUrl))list.push(sourceUrl);
           inbound.set(target,list);
@@ -61,13 +62,14 @@ export async function gscReviewOverview(env:Env,month?:string) {
         if(!selfCanonical)reasons.push('Tekil self-canonical doğrulanmadı.');
         if([...(snapshot.robots||[]),snapshot.x_robots||''].some(v=>/noindex/i.test(v)))reasons.push('Noindex sinyali görüldü; amaçlanan durum incelenmeli.');
       }
-      reasons.push('Bağımsız gelen bağlantı kaynakları ve iki tam dönem GSC performansı henüz bu raporda doğrulanmadı.');
-      if(c.group==='city-content')reasons.push('Şehir sayfasının özgün yararı ve gerçek hizmet kapsamı ayrıca incelenmeli.');
+      reasons.push('Gözlenen bağlantı kaynakları sınırlı bir tarama örneklemidir; eksik kaynak bağlantı olmadığı anlamına gelmez.');
       const measured=performance&&'rows' in performance?performance.rows.find(p=>p.path===c.path):undefined;
+      if(!measured || !measured.available)reasons.push('Seçilen ayın doğrulanmış iki dönem GSC performansı bu sayfa için yok.');
+      if(c.group==='city-content')reasons.push('Şehir sayfasının özgün yararı ve gerçek hizmet kapsamı ayrıca incelenmeli.');
       return {
         path:c.path,name:c.name,group:c.group,performance:measured||null,
         observed_inbound_sources:(inbound.get(base+c.path)||[]).slice(0,20),
-        inbound_source_scope:'Son 200 tarama kaydının HTML bağlantıları; tüm siteyi temsil etmez.',
+        inbound_source_scope:'En fazla 100 farklı URL için son saklanan HTML taraması; tüm siteyi temsil etmez.',
         sampled_gsc_internal_links:c.gscInternalLinks,
         status:'Veri bekle' as const,
         observed_at:item?.observed_at||null,http_status:status,self_canonical:selfCanonical,
