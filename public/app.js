@@ -1310,7 +1310,7 @@ $("loadGscReview").addEventListener("click", async () => {
   button.disabled = true;
   target.textContent = "İnceleme kayıtları yükleniyor…";
   try {
-    const report = await api("/api/gsc-review");
+    const report = await api("/api/gsc-review?month=" + encodeURIComponent($("month").value));
     if (!$("app").hidden) renderGscReview(target, report);
   } catch (error) {
     target.textContent = "İnceleme verisi alınamadı: " + (error.message || "Bilinmeyen hata");
