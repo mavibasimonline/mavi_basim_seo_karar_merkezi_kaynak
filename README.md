@@ -1,3 +1,5 @@
+**26 Ekim GSC düzeltmesi — henüz yayımlanmadı:** sahip olunan apex/www URL gözlemleri, gerçek mülk kapsamı ve blocked iş karantinası için [kod/test/kapsam raporu](GSC_URL_VARIANTS_REPORT.md). Güncel devam kaydı [TODO.md](TODO.md); aşağıdaki tarihli üretim kayıtları tarihçedir.
+
 Veri kaynakları ve bağımsız metrik denetimi: [DATA_INTEGRITY_AUDIT.md](DATA_INTEGRITY_AUDIT.md).
 
 SEO değişiklik takvimi ve 28 günlük etki karşılaştırması: [test ve sınırlar](SEO_CHANGE_IMPACT_REPORT.md).
@@ -107,7 +109,7 @@ Başlangıç eşikleri denetlenebilir muhafazakâr kurallardır; istatistiksel a
 
 1. Son kesinleşmiş günler yeniden uzlaştırılır. İlk geçmiş aktarımı her gün en fazla 90 günlük yeni görev ekleyerek 400 güne kadar ilerler; ücretsiz bütçe için istekler parçalara ayrılır.
 2. Her işte en fazla 200 Google satırı alınır. Veriler yeni veri kümesine yazılır; son sayfa ve satır sayısı doğrulanmadan aktif küme değiştirilmez. Hatalı veya eksik yeni aktarım eskisini bozmaz.
-3. İş kiralama ve token kontrolü eşzamanlı tekrarları sınırlar. 429/5xx/ağ hataları jitter, Retry-After ve üstel beklemeyle yeniden denenir. Altı başarısız denemeden sonra durur; günlük kontrol veya OAuth yeniden bağlama uygun işi tekrar açar. Hata kodu, deneme, zaman ve imleç saklanır.
+3. İş kiralama ve token kontrolü eşzamanlı tekrarları sınırlar. 429/5xx/ağ hataları jitter, Retry-After ve üstel beklemeyle yeniden denenir. Altı başarısız denemeden sonra blocked kalır; günlük planlayıcı kalıcı veri hatalarını veya tükenen tekrar bütçesini yeniden açmaz. Başarılı yeni OAuth onayı yalnız açık yetkilendirme hatalarını kurtarır. Diğer blocked işler kök neden giderildikten sonra açıkça onaylanmış, sınırlı operatör kurtarması gerektirir. Hata kodu, deneme, zaman ve imleç saklanır.
 4. Her saatin `:45` dilimi taramaya ayrılır; her dört saatte bir sonuç ölçümü için ayrı dilim vardır. Uzun Google geçmiş aktarımı bu işleri süresiz bekletmez.
 5. Panel tamamlanmış günlük kapsamı, gecikmeleri, kuyruğu ve bağlantı hatalarını gösterir. İlk geçmiş aktarımı tamamlanana kadar raporların beklemesi beklenen davranıştır.
 

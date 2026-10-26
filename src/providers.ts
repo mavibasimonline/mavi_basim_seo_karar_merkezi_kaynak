@@ -1,6 +1,6 @@
 import { Env, Fetch } from './types';
 import { googleJSON, ProviderError } from './google';
-import { isBrand, siteURL } from './urls';
+import { isBrand, siteURL, gscPageURL } from './urls';
 
 export const PAGE_SIZE = 200;
 export interface GscRow { date: string; page: string; country: string; device: string; query?: string; is_brand?: number; clicks: number; impressions: number; ctr: number; position: number }
@@ -10,18 +10,9 @@ interface GscReply { rows?: { keys: string[]; clicks: number; impressions: numbe
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 // Fixed categories only: never persist the rejected URL, query, metrics or tokens.
-export function gscRowIssue(row: GscRow, day: string): string|null {
+export function gscRowIssue(row: GscRow, day: string, property='sc-domain:mavibasim.com'): string|null {
   if(row.date!==day)return 'DATE';
-  if(!siteURL(row.page)){
-    try{
-      const url=new URL(row.page);
-      if(!url.username&&!url.password){
-        if(url.hostname==='mavibasim.com'&&url.protocol==='http:')return 'PAGE_HTTP_APEX';
-        if(url.hostname==='www.mavibasim.com'&&['http:','https:'].includes(url.protocol))return 'PAGE_WWW';
-      }
-    }catch{/* Only a fixed category leaves this validator. */}
-    return 'PAGE_ORIGIN';
-  }
+  if(!gscPageURL(row.page,property))return gscPageURL(row.page)?'PAGE_PROPERTY_SCOPE':'PAGE_ORIGIN';
   if(!/^[a-zA-Z]{3}$/.test(row.country))return 'COUNTRY';
   if(!['MOBILE','DESKTOP','TABLET'].includes(row.device))return 'DEVICE';
   if(![row.clicks,row.impressions,row.ctr,row.position].every(finite))return 'METRIC_NUMBER';
@@ -31,8 +22,8 @@ export function gscRowIssue(row: GscRow, day: string): string|null {
   if(row.query!==undefined&&(!row.query.trim()||row.query.length>2000))return 'QUERY';
   return null;
 }
-export function validateGscRow(row: GscRow, day: string): void {
-  const issue=gscRowIssue(row,day);
+export function validateGscRow(row: GscRow, day: string, property='sc-domain:mavibasim.com'): void {
+  const issue=gscRowIssue(row,day,property);
   if(issue)throw new ProviderError('INVALID_GSC_ROW_'+issue);
 }
 export async function fetchGsc(env: Env, day: string, scope: string, cursor = 0, fetcher: Fetch = fetch): Promise<Page<GscRow>> {
@@ -46,9 +37,12 @@ export async function fetchGsc(env: Env, day: string, scope: string, cursor = 0,
   const rows = (reply.rows || []).map(raw => {
     if (!Array.isArray(raw.keys) || raw.keys.length !== dimensions.length || !raw.keys.every(k => typeof k === 'string')) throw new ProviderError('INVALID_GSC_DIMENSIONS');
     const dims = Object.fromEntries(dimensions.map((key, i) => [key, raw.keys[i]]));
-    const row: GscRow = { date: dims.date, page: siteURL(dims.page) || dims.page, country: dims.country, device: dims.device.toUpperCase(), clicks: raw.clicks, impressions: raw.impressions, ctr: raw.ctr, position: raw.position };
+    const row: GscRow = { date: dims.date, page: dims.page, country: dims.country, device: dims.device.toUpperCase(), clicks: raw.clicks, impressions: raw.impressions, ctr: raw.ctr, position: raw.position };
     if (scope === 'query') { row.query = dims.query; row.is_brand = Number(isBrand(dims.query)); }
-    validateGscRow(row, day);
+    validateGscRow(row, day, env.GSC_PROPERTY);
+    // Preserve the existing apex ingestion identity for staged cursor/generation
+    // compatibility. New www/http observations keep their exact source identity.
+    row.page=siteURL(dims.page)||dims.page;
     const key = JSON.stringify([row.date,row.page,row.query,row.country,row.device]);
     if (keysSeen.has(key)) throw new ProviderError('DUPLICATE_GSC_ROW');
     keysSeen.add(key);
@@ -56,7 +50,8 @@ export async function fetchGsc(env: Env, day: string, scope: string, cursor = 0,
   });
   const partial = !!reply.metadata?.first_incomplete_date && reply.metadata.first_incomplete_date <= day;
   return { rows, next: rows.length === PAGE_SIZE ? cursor + rows.length : null, complete: !partial,
-    notes: scope === 'query' ? 'GSC sorguları anonimleştirme ve üst satır sınırı nedeniyle eksik olabilir; eksik sorgu sıfır değildir.' : 'GSC web, byPage, final; günler Search Console Pasifik saat dilimindedir.' };
+    notes: (scope === 'query' ? 'GSC sorguları anonimleştirme ve üst satır sınırı nedeniyle eksik olabilir; eksik sorgu sıfır değildir.' : 'GSC web, byPage, final; günler Search Console Pasifik saat dilimindedir.')
+      +` Mülk: ${env.GSC_PROPERTY}. www/http URL gözlemleri ayrı saklanır; canonical eşitliği veya ürün eşlemesi varsayılmaz.` };
 }
 
 interface Ga4Reply {

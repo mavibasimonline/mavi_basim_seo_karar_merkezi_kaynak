@@ -124,6 +124,8 @@ export async function oauthCallback(request: Request, env: Env, fetcher: Fetch =
   const reply = await requestJSON<TokenReply>('https://oauth2.googleapis.com/token', { method: 'POST', body: new URLSearchParams({ grant_type: 'authorization_code', code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, redirect_uri: env.GOOGLE_REDIRECT_URI }) }, fetcher);
   if (typeof reply.access_token !== 'string' || !reply.refresh_token || !Number.isFinite(reply.expires_in) || reply.expires_in! <= 0 || !requiredScopes(env).every(scope => reply.scope?.split(' ').includes(scope))) return json({ error: 'Gerekli salt okunur kapsamlar veya yenileme izni eksik.' }, 400);
   await saveTokens(env, { access_token: reply.access_token, refresh_token: reply.refresh_token, expires_at: Date.now() + reply.expires_in! * 1000, scope: reply.scope! });
-  await env.DB.prepare("UPDATE sync_jobs SET status='pending', attempts=0, next_attempt_at=?, error_code=NULL WHERE status='blocked' AND provider IN ('gsc','ga4','ads')").bind(nowISO()).run();
+  // Successful new consent can recover authorization failures. It does not
+  // validate rejected datasets or renew an exhausted provider retry budget.
+  await env.DB.prepare("UPDATE sync_jobs SET status='pending', attempts=0, next_attempt_at=?, error_code=NULL WHERE status='blocked' AND provider IN ('gsc','ga4','ads') AND error_code IN ('GOOGLE_HTTP_401','GOOGLE_HTTP_403','OAUTH_RECONNECT_REQUIRED','GOOGLE_NOT_CONNECTED','TOKEN_DECRYPTION_FAILED')").bind(nowISO()).run();
   return new Response(null, { status: 303, headers: { Location: '/', 'Set-Cookie': 'mavi_oauth=; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google; Max-Age=0', 'Cache-Control': 'no-store' } });
 }

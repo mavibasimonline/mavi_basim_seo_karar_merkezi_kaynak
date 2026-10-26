@@ -15,11 +15,14 @@ READS={
  'coverage':QUERIES['priority_months'],
  'recent':"SELECT j.day,j.scope,r.started_at,r.finished_at,r.status,r.rows_received,r.trigger_source FROM sync_runs r JOIN sync_jobs j ON j.id=r.job_id ORDER BY r.started_at DESC LIMIT 5",
 }
-# Legacy failure only. New code emits a category, so this cannot reset the same
-# failure repeatedly. Generation, cursor, attempts, data and error history stay.
-REQUEUE="""UPDATE sync_jobs SET status='pending',next_attempt_at=?,updated_at=?,error_code='GSC_ROW_DIAGNOSTIC_RETRY'
+# Only the two diagnosed legacy URL categories. The owned-URL validator no longer
+# emits either code, so a new failure cannot be reset by this incident operation.
+# Generation, cursor, attempts, data and error history stay unchanged. This SQL is
+# prepared for a separately approved release/recovery; importing it runs nothing.
+REQUEUE="""UPDATE sync_jobs SET status='pending',next_attempt_at=?,updated_at=?,error_code='GSC_OWNED_URL_RECOVERY_RETRY'
  WHERE id IN (?,?) AND provider='gsc' AND day='2026-08-18' AND scope IN ('page','query')
- AND status='blocked' AND error_code='INVALID_GSC_ROW' AND lease_token IS NULL
+ AND id='gsc:'||day||':'||scope
+ AND status='blocked' AND error_code IN ('INVALID_GSC_ROW_PAGE_WWW','INVALID_GSC_ROW_PAGE_HTTP_APEX') AND lease_token IS NULL
  AND EXISTS(SELECT 1 FROM d1_quota_state WHERE day=? AND mode='open' AND valid_until>? AND account_reads<3500000 AND account_writes<85000)
  RETURNING id,status,cursor,attempts"""
 
@@ -41,8 +44,8 @@ def run(client,operation,sha,now=None,probe=None):
  for name,sql in READS.items():out['queries'][name]=query(sql,JOB_IDS if name=='jobs' else [day] if name in ('quota','ledger') else [])
  if operation=='requeue':
   if not re.fullmatch(r'[a-f0-9]{40}',sha or ''):raise ValueError('EXACT_RELEASE_COMMIT_REQUIRED')
-  live=(probe or (lambda:get_json(APP+'/api/health?gsc-recovery=field-reasons-v1')))().get('deployment',{})
-  if live.get('commit')!=sha or live.get('read_guard_revision')!='d1-account-reads-v1' or live.get('gsc_validation_revision')!='field-reasons-v1':raise ValueError('DIAGNOSTIC_CODE_NOT_LIVE')
+  live=(probe or (lambda:get_json(APP+'/api/health?gsc-recovery=owned-url-variants-v2')))().get('deployment',{})
+  if live.get('commit')!=sha or live.get('read_guard_revision')!='d1-account-reads-v1' or live.get('gsc_validation_revision')!='owned-url-variants-v2':raise ValueError('OWNED_URL_CODE_NOT_LIVE')
   state=out['queries']['quota'];ledger=out['queries']['ledger']
   if len(state)!=1 or state[0]['mode']!='open' or datetime.fromisoformat(state[0]['valid_until'].replace('Z','+00:00'))<=now:raise ValueError('CURRENT_QUOTA_LEASE_REQUIRED')
   if len(ledger)!=1 or ledger[0]['reads']>1900000 or ledger[0]['writes']>64000:raise ValueError('LOCAL_QUOTA_HEADROOM_REQUIRED')

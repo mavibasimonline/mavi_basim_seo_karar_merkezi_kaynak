@@ -1,4 +1,5 @@
 import {boundedDataScope} from './d1-read-budget';
+import {GSC_PAGE_SQL_VALID} from './urls';
 import { selectedPeriods, rangeCount, periodSelection } from "./periods";
 import { Env, dateDaysAgo } from "./types";
 import {
@@ -46,7 +47,7 @@ async function daily(
       `SELECT c.day,c.dataset_id,c.row_count,c.fetched_at,count(d.dataset_id) actual_rows,
     COALESCE(sum(CASE WHEN d.dataset_id IS NOT NULL AND (d.clicks!=CAST(d.clicks AS INTEGER) OR d.impressions!=CAST(d.impressions AS INTEGER)
       OR d.clicks<0 OR d.impressions<d.clicks OR d.position<0 OR d.device NOT IN ('MOBILE','DESKTOP','TABLET')
-      OR length(d.country)!=3 OR d.country GLOB '*[^A-Za-z]*' OR d.page NOT LIKE 'https://mavibasim.com/%'
+      OR length(d.country)!=3 OR d.country GLOB '*[^A-Za-z]*' OR NOT ${GSC_PAGE_SQL_VALID}
       OR (d.impressions=0 AND d.ctr!=0) OR (d.impressions>0 AND abs(d.ctr-d.clicks/d.impressions)>0.000001)
       ${scope === "query" ? "OR trim(d.query)='' OR length(d.query)>2000 OR d.is_brand NOT IN (0,1)" : ""}) THEN 1 ELSE 0 END),0) bad_rows,
     sum(CASE WHEN d.dataset_id IS NOT NULL AND (? IS NULL OR d.device=?) THEN 1 ELSE 0 END) selected_rows,

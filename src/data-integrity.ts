@@ -4,6 +4,7 @@ import {analyze,saveAnalysis,AnalysisReport,dates} from './analysis';
 import {validateAnalysis} from './validation';
 import {saveInsight} from './insights';
 import manifest from './source-manifest.json';
+import {GSC_PAGE_SQL_VALID} from './urls';
 export type Reliability='Doğrulandı'|'Kısmen doğrulandı'|'Veri yetersiz'|'Senkronizasyon hatası'|'Kaynaklar arasında açıklanması gereken fark';
 export interface Issue {source:string;code:string;record:string;field:string;expected:unknown;actual:unknown}
 export interface SourceRecord {product_id:string;path:string;sha256:string;row_count:number;exported_at:string;actual_rows?:number;source_folder?:string;imported_at?:string}
@@ -49,11 +50,12 @@ export async function dataIntegrity(env:Env,month:string,time=new Date(),options
    const identity=provider==='ga4'?'d.date,d.landing_page,d.country,d.city,d.device':scope==='query'?'d.date,d.page,d.query,d.country,d.device':'d.date,d.page,d.country,d.device';
    const repeated=await env.DB.prepare(`SELECT d.dataset_id,count(*) actual FROM dataset_coverage c INDEXED BY coverage_active CROSS JOIN ${table} d ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider=? AND c.scope=? AND c.complete=1 WHERE d.date BETWEEN ? AND ? GROUP BY ${identity} HAVING count(*)>1 LIMIT 21`).bind(provider,scope,report.previous_period.start,report.period.end).all<{dataset_id:string;actual:number}>();
    for(const r of repeated.results)issues.push({source:provider,code:'DUPLICATE_ACTIVE_RECORD',record:r.dataset_id,field:scope,expected:1,actual:r.actual});
-   const predicate=provider==='ga4'?'d.sessions<0 OR d.engaged_sessions>d.sessions OR d.sessions<>CAST(d.sessions AS INTEGER) OR d.engaged_sessions<>CAST(d.engaged_sessions AS INTEGER)':"d.clicks<0 OR d.impressions<d.clicks OR d.clicks<>CAST(d.clicks AS INTEGER) OR d.impressions<>CAST(d.impressions AS INTEGER) OR (d.impressions>0 AND ABS(d.ctr-d.clicks*1.0/d.impressions)>0.000001)";
+   const predicate=provider==='ga4'?'d.sessions<0 OR d.engaged_sessions>d.sessions OR d.sessions<>CAST(d.sessions AS INTEGER) OR d.engaged_sessions<>CAST(d.engaged_sessions AS INTEGER)':`d.clicks<0 OR d.impressions<d.clicks OR d.clicks<>CAST(d.clicks AS INTEGER) OR d.impressions<>CAST(d.impressions AS INTEGER) OR (d.impressions>0 AND ABS(d.ctr-d.clicks*1.0/d.impressions)>0.000001) OR NOT ${GSC_PAGE_SQL_VALID}`;
+   const invalidUrl=provider==='gsc'?`CASE WHEN NOT ${GSC_PAGE_SQL_VALID} THEN 1 ELSE 0 END`:'0';
    const actual=provider==='ga4'?"json_object('sessions',d.sessions,'engaged_sessions',d.engaged_sessions)":"json_object('clicks',d.clicks,'impressions',d.impressions,'ctr',d.ctr)";
    const expected=provider==='ga4'?"json_object('integer_sessions',1,'engaged_sessions_max',d.sessions)":"json_object('ctr',CASE WHEN d.impressions>0 THEN d.clicks*1.0/d.impressions ELSE 0 END,'integer_clicks',1,'integer_impressions',1)";
-   const malformed=await env.DB.prepare(`SELECT d.dataset_id,d.date,${actual} actual,${expected} expected FROM dataset_coverage c INDEXED BY coverage_active CROSS JOIN ${table} d ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider=? AND c.scope=? AND c.complete=1 WHERE d.date BETWEEN ? AND ? AND (${predicate}) LIMIT 21`).bind(provider,scope,report.previous_period.start,report.period.end).all<{dataset_id:string;date:string;actual:string;expected:string}>();
-   for(const r of malformed.results)issues.push({source:provider,code:'INVALID_SOURCE_METRICS',record:r.dataset_id,field:r.date,expected:JSON.parse(r.expected),actual:JSON.parse(r.actual)});
+   const malformed=await env.DB.prepare(`SELECT d.dataset_id,d.date,${invalidUrl} invalid_url,${actual} actual,${expected} expected FROM dataset_coverage c INDEXED BY coverage_active CROSS JOIN ${table} d ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider=? AND c.scope=? AND c.complete=1 WHERE d.date BETWEEN ? AND ? AND (${predicate}) LIMIT 21`).bind(provider,scope,report.previous_period.start,report.period.end).all<{dataset_id:string;date:string;invalid_url:number;actual:string;expected:string}>();
+   for(const r of malformed.results)issues.push({source:provider,code:r.invalid_url?'INVALID_SOURCE_URL':'INVALID_SOURCE_METRICS',record:r.dataset_id,field:r.date,expected:r.invalid_url?{owned_gsc_url:true}:JSON.parse(r.expected),actual:r.invalid_url?{owned_gsc_url:false}:JSON.parse(r.actual)});
   }
   const h=health.results.find(h=>h.provider===provider);
   const latest=c.filter(c=>c.complete).map(c=>c.fetched_at).sort().at(-1)||null;

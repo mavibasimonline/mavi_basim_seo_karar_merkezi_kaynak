@@ -17,7 +17,7 @@ import {cachedRead} from './read-cache';
 import {withReadBudget,readBudgetStatus,D1BudgetError,originalDatabase} from './d1-read-budget';
 
 const RUNTIME_REVISION='gsc-catchup-v1';
-function deploymentInfo(env:Env){const metadata=env.CF_VERSION_METADATA;return {runtime_revision:RUNTIME_REVISION,read_guard_revision:'d1-account-reads-v1',gsc_validation_revision:'field-reasons-v1',version_id:metadata?.id&&/^[a-f0-9-]{36}$/i.test(metadata.id)?metadata.id:null,commit:metadata?.tag&&/^[a-f0-9]{40}$/.test(metadata.tag)?metadata.tag:null};}
+function deploymentInfo(env:Env){const metadata=env.CF_VERSION_METADATA;return {runtime_revision:RUNTIME_REVISION,read_guard_revision:'d1-account-reads-v1',gsc_validation_revision:'owned-url-variants-v2',version_id:metadata?.id&&/^[a-f0-9-]{36}$/i.test(metadata.id)?metadata.id:null,commit:metadata?.tag&&/^[a-f0-9]{40}$/.test(metadata.tag)?metadata.tag:null};}
 
 const reportFlights=new WeakMap<D1Database,Map<string,Promise<AnalysisReport>>>();
 export async function getReport(env:Env,month:string,options:AnalysisOptions={}):Promise<AnalysisReport>{
