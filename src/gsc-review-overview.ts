@@ -1,4 +1,5 @@
 import {reviewPerformance} from './gsc-review-performance';
+import {ENGINE_VERSION} from './analysis';
 import {Env} from './types';
 import {GSC_REVIEW_CANDIDATES,GSC_REVIEW_SOURCE,reviewChecks} from './gsc-review-cohorts';
 
@@ -13,7 +14,7 @@ export async function gscReviewOverview(env:Env,month?:string) {
   if(month){
     if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))throw new Error('INVALID_MONTH');
     const saved=await env.DB.prepare("SELECT result_json FROM analysis_runs WHERE month=? AND engine_version=? AND json_extract(filters_json,'$.device') IS NULL ORDER BY created_at DESC LIMIT 1")
-      .bind(month,'1.2.2').first<{result_json:string}>();
+      .bind(month,ENGINE_VERSION).first<{result_json:string}>();
     performance=reviewPerformance(saved?JSON.parse(saved.result_json):null,month);
   }
   const targets=GSC_REVIEW_CANDIDATES.map(c=>base+c.path);
