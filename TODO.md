@@ -1,3 +1,16 @@
+# 26 Ekim 2026 — GSC iki hata: yayın onayı engeli ve devam kaydı
+
+- Son kaynak commit'i `a72e7fa`; [PR #23](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/23) açık/birleştirilmemiş. Tam kaynak HEAD CI **40282140567 SUCCESS**: **348 Workers/D1 + 104 Python + 34 Chromium = 486 test**, audit/type/build/üretim dry-run/kaynak koruma başarılı. Bu belgeyi içeren son commit ve CI PR'da ayrıca izlenir.
+- Son sınırlı gerçek inceleme **40282015379**, 09.48 Türkiye: **97/184 (%52,72) tamamlandı, 87 eksik**; 09.15'teki 96'ya göre +1. Temmuz 0/62, Ağustos 37/62 (19 sayfa, 18 sorgu günü), Eylül 60/60. İşlem **574 D1 satırı okudu, 0 yazdı, Google aktarımı başlatmadı**.
+- 18 Ağustos iki iş hâlâ legacy `INVALID_GSC_ROW` ile blocked; sayfa cursor 0, sorgu cursor 200. Hangi alanın reddedildiği eski kayıtta yok. Gerçek kök neden veya çözüm iddia edilmez; doğrulama koşullarını değiştirmeyen alan tanılaması hazır.
+- Otomatik onay denetimi PR #23 main birleştirmesini reddetti: bu PR özelinde açık merge/yayın onayı olmadığını, ana dal ve olası üretim otomasyonunun değişeceğini belirtti. Reddedilen işlem başka API/araç/dolaylı dağıtımla denenmedi. **Main ve canlı Worker f96f184 / d2b8f1dc-0c49-40d0-886c-da18948868d6 olarak korundu.**
+- Gerekli tek sonraki kullanıcı yetkisi: **PR #23'ü main'e birleştirme ve mevcut güvenli workflow'la sınırlı tanılama kodunu yayımlama onayı**. Yeni token, Google OAuth veya ücretli plan gerekmez.
+- Yetki sonrası: PR'ın tam güncel CI'sini ve main CI'yı doğrula → gerçek Worker UUID/kota/binding korumalarıyla kontrollü yayın → main tam SHA ile `gsc-row-requeue` işlemini bir kez çalıştır → doğal Cron sonucunu `gsc-row-inspect` ile oku → yalnız gerçek alan kanıtına göre düzeltme/test/yayın. Yeni sınıflandırılmış hatalar aynı kurtarma işlemiyle tekrar açılamaz; cursor/generation/attempts korunur. Toplu aktarım/migration yok.
+- Mevcut Cron 15 dakikada bir; sıradaki planlı slot 26 Ekim 10.00 Türkiye, gerçek çalışma güncel kota izni ve sağlayıcı zamanlamasına bağlı. Bu slot blocked iki işi kendiliğinden çözer diye gösterilmez. Saatlik kota izni geçerliliği eski gözlemde 10.19 Türkiye'ye kadardı; sonraki izni güncel gerçek gözlemle doğrula, korumayı kaldırma.
+- Üretim kaynakları 29 ürün / 521 CSV / 9.075 satır; UI, OAuth, D1 bütçeleri ve Cron değişmedi. Uygulama tam geçmiş/aylık kabulü henüz tamamlanmadı.
+
+---
+
 # 26 Ekim 2026 — 18 Ağustos GSC doğrulama incelemesi
 
 - Gerçek 09.15 Türkiye üretim kontrolü: main `f96f184`, Worker `d2b8f1dc-0c49-40d0-886c-da18948868d6`, PR #21/#22 arayüz/kota koruması canlı; kaynaklar 29/521/9.075.
