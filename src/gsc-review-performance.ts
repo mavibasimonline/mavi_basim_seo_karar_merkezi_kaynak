@@ -1,4 +1,5 @@
 import {GSC_REVIEW_CANDIDATES} from './gsc-review-cohorts';
+import {ENGINE_VERSION} from './analysis';
 
 interface Measurement {clicks:number;impressions:number;ctr:number|null;position:number|null}
 interface Product {url:string|null;name:string;decision:string;current:Measurement|null;previous:Measurement|null;missing:string[];evidence:unknown[];queries?:{protect:boolean}[]}
@@ -13,7 +14,7 @@ export function reviewPerformance(saved:unknown, selectedMonth:string, now=new D
   if(!isMonth(selectedMonth))return unavailable('Geçersiz rapor ayı.');
   if(!saved||typeof saved!=='object')return unavailable('Kaydedilmiş ve doğrulanmış GSC raporu yok.');
   const r=saved as Partial<StoredReport>;
-  if(r.month!==selectedMonth||r.engine_version!=='1.2.2'||!r.created_at||!r.period||!r.previous_period||!Array.isArray(r.products)||!Array.isArray(r.missing))
+  if(r.month!==selectedMonth||r.engine_version!==ENGINE_VERSION||!r.created_at||!r.period||!r.previous_period||!Array.isArray(r.products)||!Array.isArray(r.missing))
     return unavailable('Aynı dönem için uygun GSC raporu bulunamadı.');
   const age=now.getTime()-Date.parse(r.created_at);
   if(!Number.isFinite(age)||age<0||age>=72*3600_000)return unavailable('Rapor güncelliği doğrulanamadı.');
