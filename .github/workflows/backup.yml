@@ -6,7 +6,7 @@ on:
         description: Salt okunur tanılama veya mevcut şifreli yedek
         type: choice
         default: backup
-        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl, quota-inspect, quota-contain, quota-builds, gsc-row-inspect, gsc-row-requeue]
+        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl, quota-inspect, quota-contain, quota-builds, gsc-row-inspect, gsc-row-requeue, gsc-progress-inspect]
   schedule:
     - cron: '17 2 * * *'
     - cron: '7 0 * * *' # 03:07 Turkey: read-only rollover evidence, may be delayed by GitHub
@@ -171,5 +171,28 @@ jobs:
         with:
           name: gsc-row-recovery-${{ github.run_id }}
           path: .local/gsc-row-recovery.json
+          retention-days: 3
+          if-no-files-found: warn
+
+  gsc-progress-inspect:
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'gsc-progress-inspect'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Salt okunur denetim sınırlarını yerelde test et
+        run: python3 -m unittest discover -s tests -p 'test_gsc_continuity_audit.py' -v
+      - name: Mevcut kapsam ve Eylül metriklerini yalnız SELECT ile denetle
+        run: python3 scripts/gsc_continuity_audit.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: gsc-continuity-audit-${{ github.run_id }}
+          path: .local/gsc-continuity-audit.json
           retention-days: 3
           if-no-files-found: warn
