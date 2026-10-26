@@ -26,7 +26,7 @@ export async function gscReviewOverview(env:Env,month?:string) {
   const observed=new Map(rows.results.filter(r=>r.observed_at).map(r=>[r.url,r]));
   // Limited sampled source snapshots; never claim an exhaustive inbound-link graph.
   const linkSources=await env.DB.prepare(`SELECT url,snapshot_json FROM seo_snapshots
-    WHERE id IN (SELECT MAX(rowid) FROM seo_snapshots GROUP BY url ORDER BY MAX(rowid) DESC LIMIT 100)`).all<{url:string;snapshot_json:string}>();
+    WHERE rowid IN (SELECT MAX(rowid) FROM seo_snapshots GROUP BY url ORDER BY MAX(rowid) DESC LIMIT 100)`).all<{url:string;snapshot_json:string}>();
   const inbound=new Map<string,string[]>();
   const targetSet=new Set(targets);
   for(const source of linkSources.results){
