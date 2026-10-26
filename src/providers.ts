@@ -12,7 +12,16 @@ const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFi
 // Fixed categories only: never persist the rejected URL, query, metrics or tokens.
 export function gscRowIssue(row: GscRow, day: string): string|null {
   if(row.date!==day)return 'DATE';
-  if(!siteURL(row.page))return 'PAGE_ORIGIN';
+  if(!siteURL(row.page)){
+    try{
+      const url=new URL(row.page);
+      if(!url.username&&!url.password){
+        if(url.hostname==='mavibasim.com'&&url.protocol==='http:')return 'PAGE_HTTP_APEX';
+        if(url.hostname==='www.mavibasim.com'&&['http:','https:'].includes(url.protocol))return 'PAGE_WWW';
+      }
+    }catch{/* Only a fixed category leaves this validator. */}
+    return 'PAGE_ORIGIN';
+  }
   if(!/^[a-zA-Z]{3}$/.test(row.country))return 'COUNTRY';
   if(!['MOBILE','DESKTOP','TABLET'].includes(row.device))return 'DEVICE';
   if(![row.clicks,row.impressions,row.ctr,row.position].every(finite))return 'METRIC_NUMBER';

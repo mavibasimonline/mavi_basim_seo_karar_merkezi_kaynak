@@ -7,6 +7,7 @@ const good:GscRow={date:DAY,page:'https://mavibasim.com/brosur',country:'tur',de
 beforeEach(init);
 it.each([
  ['DATE',{date:'2026-08-17'}],['PAGE_ORIGIN',{page:'https://other.example/private'}],
+ ['PAGE_HTTP_APEX',{page:'http://mavibasim.com/private'}],['PAGE_WWW',{page:'https://www.mavibasim.com/private'}],
  ['COUNTRY',{country:'??'}],['DEVICE',{device:'UNKNOWN'}],['METRIC_NUMBER',{ctr:NaN}],
  ['COUNTS',{clicks:20}],['COUNTS',{impressions:1.5}],['METRIC_RANGE',{position:-1}],
  ['CTR_RATIO',{ctr:0.2}],['QUERY',{query:'   '}],
