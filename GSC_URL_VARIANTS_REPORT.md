@@ -1,6 +1,6 @@
 # GSC URL varyantları ve blocked iş karantinası
 
-26 Ekim 2026, Türkiye saati. Dal: `fix/gsc-owned-url-variants`, taban main `5f04525975e2c255151c4a4158cf9cf031d07679`. Bu değişiklik üretime yayımlanmadı; gerçek iki iş yeniden kuyruğa alınmadı.
+26 Ekim 2026, Türkiye saati. Dal: `fix/gsc-owned-url-variants`, taban main `5f04525975e2c255151c4a4158cf9cf031d07679`, kaynak düzeltmesi `9f4283f`. [PR #24](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/24) açık ve main ile çakışmasız; tam HEAD CI sonucu PR kontrol kaydında izlenir. Bu değişiklik üretime yayımlanmadı; gerçek iki iş yeniden kuyruğa alınmadı.
 
 ## Gerçek hata ve kök neden
 
