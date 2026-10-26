@@ -35,6 +35,12 @@ export function renderGscReview(container, report) {
         comparison.textContent='GSC doğrulanmış dönem: '+String(item.performance.previous.clicks)+' → '+String(item.performance.current.clicks)+' tıklama · '+String(item.performance.decision)+' · Korunan sorgu: '+String(item.performance.protected_queries);
         li.append(comparison);
       }
+      const sources=Array.isArray(item.observed_inbound_sources)?item.observed_inbound_sources:[];
+      if(sources.length){
+        const evidence=document.createElement('p');evidence.className='muted';
+        evidence.textContent='Gözlenen bağlantı kaynakları ('+String(sources.length)+', sınırlı tarama): '+sources.slice(0,5).join(', ');
+        li.append(evidence);
+      }
       list.append(li);
     }
     section.append(list);container.append(section);
