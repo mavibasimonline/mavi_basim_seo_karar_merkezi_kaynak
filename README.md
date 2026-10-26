@@ -1,4 +1,4 @@
-**26 Ekim GSC düzeltmesi — henüz yayımlanmadı:** sahip olunan apex/www URL gözlemleri, gerçek mülk kapsamı ve blocked iş karantinası için [kod/test/kapsam raporu](GSC_URL_VARIANTS_REPORT.md). Güncel devam kaydı [TODO.md](TODO.md); aşağıdaki tarihli üretim kayıtları tarihçedir.
+**26 Ekim GSC üretim kabulü başarılı:** PR #24, main `cb8062d`, 589 test ve kontrollü yayınla gerçek Worker'a alındı. İki 18 Ağustos işi doğal 20.30/21.00 Cron'unda tamamlandı; **21.01 Türkiye kapsamı 105/184, 79 eksik**. Şema, arayüz, OAuth, 15 dakikalık Cron, bütçeler ve 521 CSV korundu. [Gerçek yayın/Cron/kota kanıtları](GSC_PR24_PRODUCTION_REPORT.md), [kod/test sınırları](GSC_URL_VARIANTS_REPORT.md), [devam kaydı](TODO.md). Aşağıdaki tarihli üretim kayıtları tarihçedir; tam geçmiş/aylık rapor kabulü henüz tamamlanmadı.
 
 Veri kaynakları ve bağımsız metrik denetimi: [DATA_INTEGRITY_AUDIT.md](DATA_INTEGRITY_AUDIT.md).
 

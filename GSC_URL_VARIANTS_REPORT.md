@@ -1,5 +1,7 @@
 # GSC URL varyantları ve blocked iş karantinası
 
+**Gerçek üretim kabulü tamamlandı — 26 Ekim 21.01 Türkiye:** PR #24 main `cb8062d` ve Worker `da882c4b-9702-46d6-a89c-785f3c3cc4b9`/v2 ile yayımlandı. İki 18 Ağustos işi birer kez kurtarıldı, doğal Cron'da done/error=null oldu. Kapsam 105/184, 79 eksik; güncel kota ve gerçek kanıtlar [GSC_PR24_PRODUCTION_REPORT.md](GSC_PR24_PRODUCTION_REPORT.md). Aşağıdaki hazırlık/yayın bekleme kayıtları tarihçedir.
+
 26 Ekim 2026, Türkiye saati. Dal: `fix/gsc-owned-url-variants`, taban main `5f04525975e2c255151c4a4158cf9cf031d07679`, kaynak düzeltmesi `9f4283f`. [PR #24](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/24) açık ve main ile çakışmasız; tam HEAD CI sonucu PR kontrol kaydında izlenir. Bu değişiklik üretime yayımlanmadı; gerçek iki iş yeniden kuyruğa alınmadı.
 
 **Yeni kullanıcı onayı alındı:** PR #24 main birleştirmesi, kontrollü yayın ve yalnız iki eski işin birer kez doğal Cron'a bırakılması açıkça onaylandı. Yeni migration yasağına uymak için mevcut production workflow'undaki `migrations apply`, altı mevcut şema kaydını yerel manifest ile karşılaştıran tek salt okunur SELECT'e dönüştürüldü. Eksik/fazla/tekrarlı/bozuk şema varsa yayın durur; otomatik şema uygulaması artık yoktur. Diğer sürüm/CI/kota/binding/smoke/rollback kapıları korunur. Bu ek güvenlik düzeltmesi de aynı PR'da CI'dan geçmeden birleştirilmeyecek.
