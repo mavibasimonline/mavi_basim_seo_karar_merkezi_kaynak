@@ -27,6 +27,7 @@ import {
 } from "./evidence.js";
 import { drawChart, metricNames } from "./chart.js";
 import { setupModules } from "./modules.js";
+import { renderGscReview } from "./gsc-review.js";
 import { setupPeriod, currentMonth, scopeParams } from "./period.js";
 const views = {
   overview: "Genel Bakış",
@@ -1303,6 +1304,20 @@ document.querySelectorAll("[data-question]").forEach((b) =>
     $("questionText").focus();
   }),
 );
+$("loadGscReview").addEventListener("click", async () => {
+  const button = $("loadGscReview");
+  const target = $("gscReviewResults");
+  button.disabled = true;
+  target.textContent = "İnceleme kayıtları yükleniyor…";
+  try {
+    const report = await api("/api/gsc-review");
+    if (!$("app").hidden) renderGscReview(target, report);
+  } catch (error) {
+    target.textContent = "İnceleme verisi alınamadı: " + (error.message || "Bilinmeyen hata");
+  } finally {
+    button.disabled = false;
+  }
+});
 setInterval(() => {
   if (!document.hidden && !$("app").hidden && state.view === "radar")
     modules.radar();
