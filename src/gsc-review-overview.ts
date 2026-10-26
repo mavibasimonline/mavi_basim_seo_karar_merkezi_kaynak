@@ -24,6 +24,26 @@ export async function gscReviewOverview(env:Env,month?:string) {
     LEFT JOIN seo_snapshots s ON s.id=(SELECT id FROM seo_snapshots
       WHERE url=q.url ORDER BY observed_at DESC,rowid DESC LIMIT 1)`).bind(JSON.stringify(targets)).all<CrawlRow>();
   const observed=new Map(rows.results.filter(r=>r.observed_at).map(r=>[r.url,r]));
+  // Limited sampled source snapshots; never claim an exhaustive inbound-link graph.
+  const linkSources=await env.DB.prepare(`SELECT url,snapshot_json FROM seo_snapshots
+    WHERE id IN (SELECT id FROM seo_snapshots ORDER BY observed_at DESC LIMIT 200)`).all<{url:string;snapshot_json:string}>();
+  const inbound=new Map<string,string[]>();
+  for(const source of linkSources.results){
+    try{
+      const snap=JSON.parse(source.snapshot_json) as Partial<LinkSnapshot>;
+      if(snap.status!==200||!Array.isArray(snap.links))continue;
+      const sourceUrl=canonical(source.url);
+      if(!sourceUrl)continue;
+      for(const raw of snap.links){
+        const target=canonical(raw);
+        if(target && targets.includes(target)){
+          const list=inbound.get(target)||[];
+          if(!list.includes(sourceUrl))list.push(sourceUrl);
+          inbound.set(target,list);
+        }
+      }
+    }catch{/* A malformed historical snapshot is missing evidence, not a confirmed zero. */}
+  }
   return {
     source:GSC_REVIEW_SOURCE,created_at:new Date().toISOString(),performance,
     totals:{products:8,cities:18,review_candidates:26,observed_target_snapshots:observed.size},
@@ -46,6 +66,8 @@ export async function gscReviewOverview(env:Env,month?:string) {
       const measured=performance&&'rows' in performance?performance.rows.find(p=>p.path===c.path):undefined;
       return {
         path:c.path,name:c.name,group:c.group,performance:measured||null,
+        observed_inbound_sources:(inbound.get(base+c.path)||[]).slice(0,20),
+        inbound_source_scope:'Son 200 tarama kaydının HTML bağlantıları; tüm siteyi temsil etmez.',
         sampled_gsc_internal_links:c.gscInternalLinks,
         status:'Veri bekle' as const,
         observed_at:item?.observed_at||null,http_status:status,self_canonical:selfCanonical,
