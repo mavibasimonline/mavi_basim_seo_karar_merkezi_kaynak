@@ -13,17 +13,19 @@ export function reviewPerformance(saved:unknown, selectedMonth:string, now=new D
   if(!isMonth(selectedMonth))return unavailable('Geçersiz rapor ayı.');
   if(!saved||typeof saved!=='object')return unavailable('Kaydedilmiş ve doğrulanmış GSC raporu yok.');
   const r=saved as Partial<StoredReport>;
-  if(r.month!==selectedMonth||!r.created_at||!r.period||!r.previous_period||!Array.isArray(r.products)||!Array.isArray(r.missing))
+  if(r.month!==selectedMonth||r.engine_version!=='1.2.2'||!r.created_at||!r.period||!r.previous_period||!Array.isArray(r.products)||!Array.isArray(r.missing))
     return unavailable('Aynı dönem için uygun GSC raporu bulunamadı.');
   const age=now.getTime()-Date.parse(r.created_at);
   if(!Number.isFinite(age)||age<0||age>=72*3600_000)return unavailable('Rapor güncelliği doğrulanamadı.');
   if(r.missing.length)return unavailable('Raporda veri kapsamı veya sağlık kanıtı eksik.');
+  const periodEnd=Date.parse(r.period.end+'T23:59:59Z');
+  if(!Number.isFinite(periodEnd)||periodEnd+3*86400_000>=now.getTime())return unavailable('Seçili ay kesinleşmedi.');
   if(!r.period.start.startsWith(selectedMonth)||r.previous_period.end>=r.period.start)
     return unavailable('GSC dönemleri karşılaştırmaya uygun değil.');
   const rows=GSC_REVIEW_CANDIDATES.map(candidate=>{
     const product=r.products!.find(p=>normal(p.url)===origin+candidate.path);
     if(candidate.group==='city-content')return {path:candidate.path,available:false,reason:'Şehir URL için doğrulanmış ayrı sayfa raporu henüz yok.'};
-    if(!product||product.missing.length||!product.current||!product.previous||!product.evidence?.length)
+    if(!product||!Array.isArray(product.missing)||product.missing.length||!product.current||!product.previous||!Array.isArray(product.evidence)||!product.evidence.length)
       return {path:candidate.path,available:false,reason:'Bu URL için iki dönemlik doğrulanmış performans bulunamadı.'};
     if(!['Koru','İncele'].includes(product.decision))
       return {path:candidate.path,available:false,reason:'Kaynak SEO kararı veya kanıtı yeterli değil.'};
