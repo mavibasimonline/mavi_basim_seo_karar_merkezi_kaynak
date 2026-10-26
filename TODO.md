@@ -1,3 +1,17 @@
+# 26 Ekim 2026 — PR #24 gerçek üretim yayını ve tek kurtarma
+
+- [x] Kullanıcının açık onayıyla PR #24 main'e birleşti: **cb8062da45927d79c351aed96dcb46718fc67e68**, 20.16 Türkiye. PR CI **40366499513**, main CI **40367117621 SUCCESS**: **434 Workers/D1 + 121 Python + 34 Chromium = 589 test**, audit 0.
+- [x] Kontrollü yayın **40367672260 SUCCESS**, 20.21 Türkiye. Canlı Worker **da882c4b-9702-46d6-a89c-785f3c3cc4b9**, tam cb8062d ve **owned-url-variants-v2** HTTP/Cloudflare kimliği eşleşti. Mevcut D1/OAuth binding'leri ve kaynaklar **29/521/9.075** postflight ile korundu. 12 canlı arayüz dosyası yayın öncesi/sonrası birebir aynı; tanımlı yayın istemcisiyle özel API oturumsuz 401.
+- [x] Yeni migration yasağı için production workflow artık **yalnız mevcut 6 şema adını SELECT ile doğruluyor**. Gerçek logda `rows_read=6`, `migration_application_started=false`; migration uygulaması başlatılmadı. Cron `*/15 * * * *`, sayfa limiti 1, günlük yazma 60.000 ve kota korumaları değişmedi. Ücretli hizmet, kaynak silme veya mavibasim.com içerik değişikliği yok.
+- [x] **20.22 Türkiye**, tek kurtarma **40367971675 SUCCESS**: yalnız 18 Ağustos page/query pending; cursor **0/200**, attempts **2** korundu. **593 okuma / 4 yazma**, Google veya tarama tetiklenmedi. İkinci requeue yapılmayacak. Normal 15 dakikalık Cron bekleniyor; işlemler henüz tamamlandı sayılmaz.
+- Son gerçek kapsam **20.22'de 103/184 (%55,98), 81 eksik**. Önceki 20.14 ölçümü 102 idi; 20.15 doğal Cron, 9 Ağustos page'i tamamladı. Bu artış URL düzeltmesine atfedilmez. Son hesap analitiği **603.362 okuma / 22.719 yazma**, 20.00'a kadar, mode=open; kayıtlı izin 21.36'ya kadar. Eski 98/184 ve süresi dolan kota kayıtları aşağıda tarihçedir.
+- [ ] Sonraki somut adım: iki işin gerçek doğal Cron sonucunu **sınırlı gsc-row-inspect** ile oku; yeniden hata olursa bir daha açma, sabit güvenli hata kategorisini raporla. Tam kapsam/aylık rapor hâlâ eksik. İşlerin düzelmesi, gerçek sonucun kaydıyla doğrulanacak; başka migration veya toplu aktarım yapılmayacak.
+- Kanıt dizini: `/workspace/reports/gsc-pr24-release-2026-10-26/`; son kaynak main cb8062d. Bu kontrol noktası yalnız belge dalında tutulur: `docs/pr24-production-results`, son belge commit'i `git log -1`. Yeni kaynak veya canlı yayın gerektirmez.
+
+---
+
+# Önceki kontrol noktaları
+
 # 26 Ekim 2026 — sahip olunan GSC URL'leri ve kalıcı iş karantinası
 
 - **Yeni açık yetki:** kullanıcı PR #24 birleştirme/kontrollü yayın ve iki 18 Ağustos işinin birer kez doğal Cron'a bırakılmasını onayladı. Yeni migration/toplu aktarım yasak. Bu nedenle production workflow'un otomatik migration uygulaması, mevcut altı şema adını tek SELECT ile doğrulayan fail-closed kontrole çevrildi; 9 yeni test dahil Python **121/121**, toplam yerel **589 test** başarılı. Son tam HEAD CI'si beklenir; eski 580 testli CI yeni commit için izin değildir.
