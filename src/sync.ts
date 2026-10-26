@@ -70,7 +70,9 @@ export async function enqueueDaily(env: Env, time = new Date()): Promise<boolean
   statements.push(...progressStatements);
   statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,attempts=0,next_attempt_at=?,updated_at=? WHERE status='done' AND provider IN ('gsc','ga4') AND ((day>=? AND day<=?) OR day IN (?,?)) AND substr(updated_at,1,10)<?")
     .bind(stamp,stamp,dateDaysAgo(9,time),dateDaysAgo(3,time),monthEnds[0]||'',monthEnds[1]||'',day));
-  if(connected)statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,attempts=0,next_attempt_at=?,updated_at=? WHERE status='blocked' AND substr(updated_at,1,10)<?").bind(stamp,stamp,day));
+  // blocked is terminal for automatic scheduling: permanent validation failures
+  // and exhausted retries need explicit operator recovery after the cause is
+  // addressed. A new UTC day must not erase their cursor, generation or attempts.
   statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,next_attempt_at=?,updated_at=? WHERE status='done' AND provider IN ('gsc','ga4') AND NOT EXISTS(SELECT 1 FROM dataset_coverage c WHERE c.provider=sync_jobs.provider AND c.day=sync_jobs.day AND c.scope=sync_jobs.scope AND c.complete=1)").bind(stamp,stamp));
   statements.push(env.DB.prepare("INSERT OR IGNORE INTO health_checks VALUES('planner',?,?,?,?)").bind(day,stamp,connected?'queued':'blocked',connected?null:'GOOGLE_NOT_CONNECTED'));
   statements.push(env.DB.prepare("INSERT OR IGNORE INTO health_checks VALUES('scheduler',?,?,?,?)").bind(day,stamp,connected ? 'queued' : 'blocked',connected ? null : 'GOOGLE_NOT_CONNECTED'));

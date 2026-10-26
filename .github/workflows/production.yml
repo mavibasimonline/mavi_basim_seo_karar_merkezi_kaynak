@@ -75,10 +75,10 @@ jobs:
           retention-days: 7
       - name: Kaynak ve bağımsız Worker hedefini doğrula
         run: python3 scripts/release_checks.py --base HEAD
-      - name: Kota yenilenmeden migration veya yeni aktarım başlatma
+      - name: Mevcut şemayı salt okunur doğrula ve kota iznini yenile
         run: |
           python3 -c "from datetime import datetime,timezone; from pathlib import Path; import sys; sys.path.insert(0,'scripts'); from d1_quota_checkpoint import NOT_BEFORE; assert datetime.now(timezone.utc)>=NOT_BEFORE, 'WAIT_FOR_UTC_QUOTA_RESET'"
-          node scripts/run.mjs wrangler d1 migrations apply DB --remote --config deploy/wrangler.production.jsonc
+          python3 scripts/production_guard.py verify-schema
           python3 scripts/d1_quota_checkpoint.py
       - name: Aynı Worker'a, mevcut secret ve D1 binding'lerini koruyarak yayımla
         id: publish

@@ -1,3 +1,22 @@
+# 26 Ekim 2026 — sahip olunan GSC URL'leri ve kalıcı iş karantinası
+
+- **Yeni açık yetki:** kullanıcı PR #24 birleştirme/kontrollü yayın ve iki 18 Ağustos işinin birer kez doğal Cron'a bırakılmasını onayladı. Yeni migration/toplu aktarım yasak. Bu nedenle production workflow'un otomatik migration uygulaması, mevcut altı şema adını tek SELECT ile doğrulayan fail-closed kontrole çevrildi; 9 yeni test dahil Python **121/121**, toplam yerel **589 test** başarılı. Son tam HEAD CI'si beklenir; eski 580 testli CI yeni commit için izin değildir.
+- **20.09 Türkiye:** güncel kota workflow **40365938792 SUCCESS**, 601.207 hesap okuması / 22.463 yazma; analitik 20.00'a kadar, mode=open, lease 21.24'e kadar. Yerel defter 436.750/11.962. Kabul 229 okuma + tek kota kaydı; Google/tarama başlamadı. Main/canlı Worker henüz değişmedi. Sıradaki somut adım yeni tam HEAD CI → aynı PR merge/main CI → migration çalıştırmayan kontrollü yayın → canlı v2/tam SHA → sadece iki eski URL hatasının bir defalık kurtarması ve Cron kanıtı.
+
+- **Mevcut görev:** `fix/gsc-owned-url-variants`, taban main `5f045259`; kaynak düzeltmesi `9f4283f`, [PR #24](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/24) açık ve birleştirilmemiş. Son belge commit'i `git log -1 --oneline`; tam HEAD CI sonucu PR'da izlenir. Ayrıntılar [GSC_URL_VARIANTS_REPORT.md](GSC_URL_VARIANTS_REPORT.md). Aşağıdaki PR #23 onay bekliyor kayıtları tarihçedir: PR #23 birleştirildi ve 10.19 Türkiye'de yayımlandı.
+- [x] Gerçek iki 18 Ağustos işinin tek tanılama denemesi, `INVALID_GSC_ROW_PAGE_WWW` nedenini kanıtladı. Yeni kod yalnız sahip olunan apex/www HTTP/HTTPS GSC gözlemlerini gerçek mülk kapsamıyla kabul ediyor; başka alan adları reddediliyor. Tarama allowlist'i, eski staging kimliği ve ayrı URL kanıtı korunuyor.
+- [x] Günlük planlayıcının tüm blocked işleri sıfırlaması kaldırıldı. OAuth onayı yalnız açık yetkilendirme hatalarını kurtarıyor; kalıcı veri hataları ve tükenen tekrarlar korunuyor. Gelecekte ayrıca onaylı iki-iş kurtarma aracı v2/tam SHA/taze kota kapılarıyla hazır; **çalıştırılmadı**.
+- [x] **434 Workers/D1 + 112 Python + 34 Chromium = 580 başarılı** yerel test. Eski main üzerinde 11 karantina regresyonu yeniden üretildi; düzeltmeyle geçti. İlk entegrasyon fixture FK sorunu giderildi; yanıt vermeyen eski yerel sunucu kapatılıp tarayıcı testleri temiz Worker'da geçti. Son başarısız/atlanmış test yok. Type/build/üretim dry-run, audit 0, kaynak/secret denetimi başarılı.
+- [x] Bu görevde yeni uzaktan D1 sorgusu, Google isteği, requeue, tarama, migration veya yayın yok. Mevcut UI/public, D1 kota kodu, 15 dakikalık Cron, deploy yapılandırması, 29 ürün ve 521 CSV/9.075 kaynak satırı main'e göre korunuyor. Gerçek OAuth bağlantısı değiştirilmedi.
+- **Son doğrulanmış tam kapsam:** 11.01 Türkiye, Actions **40289393422**, **98/184 (%53,26), 86 eksik**. Temmuz 0/62, Ağustos 38/62, Eylül 60/60. İki iş blocked/attempts=2, cursor 0/200. Bu sayılar şu anın yeni ölçümü değildir.
+- **En yeni mevcut kota artifact'ı:** 15.48 Türkiye, Actions **40325390216**: 590.790 hesap okuması / 21.654 yazma; o an güvenli, kabul 227 okuma. İzindeki sonraki Cron satır sayıları yeni kapsam hesabı için yeterli değil. Kota izni 17.03'te bitti; güncel izin diye kullanma. Açık HTTP kontrolünde canlı sürüm hâlâ `7a51b63e-51e7-4334-9afb-1e56d1ce0aa0` / main `5f045259`, yeni v2 henüz canlı değil.
+- [ ] **Bir sonraki somut adım:** PR tam HEAD CI → kullanıcıdan istenen ayrı yeni yayın onayı → main CI ve taze kota/binding/sürüm kapıları → kontrollü yayın/smoke. Bu PR birleştirilmedi, yayımlanmadı. Şema değişikliği yok, yeni migration gerekmiyor. İki gerçek işi açmak ayrıca açık onay gerektirir; yayımdan sonra bile kendiliğinden açılmaz. Toplu aktarım veya sınırsız tekrar yok.
+- [ ] Yeni gerçek kapsam ve aylık rapor kabulü, kalan kaynak/tarama kabulü ve bağımsız uzak yedek kabulü henüz tamamlanmış sayılmaz. Bu düzeltme için yeni token, OAuth onayı veya ücretli plan gerekmiyor; yalnız kullanıcı talimatındaki yeni yayın yetkisi bekleniyor.
+
+---
+
+# Önceki kontrol noktaları
+
 # 26 Ekim 2026 — GSC iki hata: yayın onayı engeli ve devam kaydı
 
 - Son kaynak commit'i `a72e7fa`; [PR #23](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/23) açık/birleştirilmemiş. Tam kaynak HEAD CI **40282140567 SUCCESS**: **348 Workers/D1 + 104 Python + 34 Chromium = 486 test**, audit/type/build/üretim dry-run/kaynak koruma başarılı. Bu belgeyi içeren son commit ve CI PR'da ayrıca izlenir.
