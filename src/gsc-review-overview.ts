@@ -2,7 +2,6 @@ import {Env} from './types';
 import {GSC_REVIEW_CANDIDATES,GSC_REVIEW_SOURCE,reviewChecks} from './gsc-review-cohorts';
 
 interface CrawlRow {url:string;observed_at:string;snapshot_json:string}
-interface CoverageRow {provider:string;scope:string;day:string;complete:number}
 interface LinkSnapshot {status:number;canonical:string[];links:string[];title:string;excerpt:string;robots:string[];x_robots:string|null}
 const base='https://mavibasim.com';
 const canonical=(u:string)=>{try{const x=new URL(u);return x.origin===base?x.origin+x.pathname.replace(/\/$/,''):null;}catch{return null;}};
