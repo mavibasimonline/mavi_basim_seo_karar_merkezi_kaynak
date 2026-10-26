@@ -1,3 +1,14 @@
+# 26 Ekim 2026 — 18 Ağustos GSC doğrulama incelemesi
+
+- Gerçek 09.15 Türkiye üretim kontrolü: main `f96f184`, Worker `d2b8f1dc-0c49-40d0-886c-da18948868d6`, PR #21/#22 arayüz/kota koruması canlı; kaynaklar 29/521/9.075.
+- Temmuz–Eylül 96/184 (%52,17), kalan 88 gün/scope. 18 Ağustos sayfa/sorgu işleri `INVALID_GSC_ROW` hatasında; eski kod hangi alanın reddedildiğini kaydetmemiş. Gerçek neden henüz bilinmiyor.
+- Alan kategorisi tanılaması hazır; doğrulama koşulları gevşetilmedi. Ham URL/sorgu/metrik/secret kaydı yok. Yerel **346 Workers + 104 Python = 450** test ve paketleme başarılı. İlk sandbox denemesi yerel socket izni nedeniyle test başlatamadı; izinli tekrar başarılı. Arayüz ve diğer kaynaklar değişmedi.
+- `gsc-row-inspect` salt okunur, en çok 5.000 satır maliyet sınırıyla kapsam/iki iş/kota/son Cron kaydını kontrol eder. `gsc-row-requeue` yalnız yayımlanmış tam commit ve güncel güvenli hesap/yerel bütçeyle iki eski hatayı bir kez pending yapar. Cursor, generation, attempts ve hata geçmişini korur; Google isteği başlatmaz. Yeni alan koduyla tekrar başarısız olan işi tekrar açmaz.
+- Sonraki adım: tam PR/main CI → mevcut kontrollü yayın → iki işin sınırlı yeniden kuyruğa alınması → doğal 15 dakikalık Cron'da gerçek alan nedenini gör → kanıt varsa düzeltme/test/yayın. Geçmiş veri kapsamı henüz tamamlandı veya hata çözüldü sayılmaz.
+- OAuth, 15 dakikalık Cron, okuma/yazma korumaları, UI, D1 ve 521 CSV korunur. Yeni migration/toplu aktarım yok. Bu kontrol noktasının son commit'i `git log -1` ile izlenir.
+
+---
+
 # Üretim bekleme kontrolü — 25 Ekim 2026, main hazır
 
 - [x] **PR #22 main'e birleşti:** `dcd4b493a7a2b4b361ee623384a7e10a6f887fff`. PR CI **40211912177**, main CI **40212255314 SUCCESS**; gerçek loglarda **334 Workers/D1 + 99 Python + 34 Chromium = 467 test**, audit 0 doğrulandı. PR #21/#20 de içerilen commit'leriyle birleşmiş durumdadır; arayüz/CSV kaynakları korundu. Son uygulama commit'i `a111835`; bu belge kontrol noktasının son commit'i `git log -1 --oneline` ile izlenir.

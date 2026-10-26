@@ -52,7 +52,7 @@ it('retries quotas with backoff and resumes the same generation',async()=>{
 it('blocks malformed Google metrics and preserves the last valid dataset',async()=>{
   const cfg=await connected();await enqueue();const job=(await claimJob(cfg))!;
   await processJob(cfg,job,fetcher(async()=>Response.json({responseAggregationType:'byPage',rows:[{...rawRow(),clicks:100,impressions:10}]})));
-  expect((await env.DB.prepare('SELECT status,error_code FROM sync_jobs').first())).toMatchObject({status:'blocked',error_code:'INVALID_GSC_ROW'});
+  expect((await env.DB.prepare('SELECT status,error_code FROM sync_jobs').first())).toMatchObject({status:'blocked',error_code:'INVALID_GSC_ROW_COUNTS'});
   expect(await env.DB.prepare('SELECT * FROM dataset_coverage').first()).toBeNull();
 });
 it('marks incomplete or sampled data unusable and does not merge page/query dimensions',async()=>{

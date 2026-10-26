@@ -6,7 +6,7 @@ on:
         description: Salt okunur tanılama veya mevcut şifreli yedek
         type: choice
         default: backup
-        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl, quota-inspect, quota-contain, quota-builds]
+        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl, quota-inspect, quota-contain, quota-builds, gsc-row-inspect, gsc-row-requeue]
   schedule:
     - cron: '17 2 * * *'
     - cron: '7 0 * * *' # 03:07 Turkey: read-only rollover evidence, may be delayed by GitHub
@@ -145,3 +145,31 @@ jobs:
           path: .local/d1-quota-incident.json
           retention-days: 3
           if-no-files-found: error
+
+  gsc-row-recovery:
+    if: github.event_name == 'workflow_dispatch' && (inputs.operation == 'gsc-row-inspect' || inputs.operation == 'gsc-row-requeue')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Yalnız iki eski hata; kota ve tam canlı commit zorunlu, aktarım başlatmaz
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          if [ "$OPERATION" = 'gsc-row-requeue' ]; then
+            python3 scripts/gsc_row_recovery.py requeue
+          else
+            python3 scripts/gsc_row_recovery.py inspect
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: gsc-row-recovery-${{ github.run_id }}
+          path: .local/gsc-row-recovery.json
+          retention-days: 3
+          if-no-files-found: warn

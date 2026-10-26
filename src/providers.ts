@@ -9,12 +9,22 @@ export interface Page<T> { rows: T[]; next: number | null; complete: boolean; no
 interface GscReply { rows?: { keys: string[]; clicks: number; impressions: number; ctr: number; position: number }[]; responseAggregationType?: string; metadata?: { first_incomplete_date?: string } }
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
+// Fixed categories only: never persist the rejected URL, query, metrics or tokens.
+export function gscRowIssue(row: GscRow, day: string): string|null {
+  if(row.date!==day)return 'DATE';
+  if(!siteURL(row.page))return 'PAGE_ORIGIN';
+  if(!/^[a-zA-Z]{3}$/.test(row.country))return 'COUNTRY';
+  if(!['MOBILE','DESKTOP','TABLET'].includes(row.device))return 'DEVICE';
+  if(![row.clicks,row.impressions,row.ctr,row.position].every(finite))return 'METRIC_NUMBER';
+  if(row.clicks<0||row.impressions<row.clicks||!Number.isInteger(row.clicks)||!Number.isInteger(row.impressions))return 'COUNTS';
+  if(row.ctr<0||row.ctr>1||row.position<0)return 'METRIC_RANGE';
+  if(row.impressions>0&&Math.abs(row.ctr-row.clicks/row.impressions)>0.000001)return 'CTR_RATIO';
+  if(row.query!==undefined&&(!row.query.trim()||row.query.length>2000))return 'QUERY';
+  return null;
+}
 export function validateGscRow(row: GscRow, day: string): void {
-  if (row.date !== day || !siteURL(row.page) || !/^[a-zA-Z]{3}$/.test(row.country) || !['MOBILE','DESKTOP','TABLET'].includes(row.device)
-      || ![row.clicks,row.impressions,row.ctr,row.position].every(finite) || row.clicks < 0 || row.impressions < row.clicks
-      || !Number.isInteger(row.clicks) || !Number.isInteger(row.impressions) || row.ctr < 0 || row.ctr > 1 || row.position < 0
-      || (row.impressions > 0 && Math.abs(row.ctr - row.clicks / row.impressions) > 0.000001)
-      || (row.query !== undefined && (!row.query.trim() || row.query.length > 2000))) throw new ProviderError('INVALID_GSC_ROW');
+  const issue=gscRowIssue(row,day);
+  if(issue)throw new ProviderError('INVALID_GSC_ROW_'+issue);
 }
 export async function fetchGsc(env: Env, day: string, scope: string, cursor = 0, fetcher: Fetch = fetch): Promise<Page<GscRow>> {
   if (!env.GSC_PROPERTY || !['page','query'].includes(scope)) throw new ProviderError('GSC_CONFIGURATION_MISSING');
