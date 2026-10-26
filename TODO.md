@@ -1,3 +1,27 @@
+# 26 Ekim 2026 — GSC iki hata: yayın onayı engeli ve devam kaydı
+
+- Son kaynak commit'i `a72e7fa`; [PR #23](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/23) açık/birleştirilmemiş. Tam kaynak HEAD CI **40282140567 SUCCESS**: **348 Workers/D1 + 104 Python + 34 Chromium = 486 test**, audit/type/build/üretim dry-run/kaynak koruma başarılı. Bu belgeyi içeren son commit ve CI PR'da ayrıca izlenir.
+- Son sınırlı gerçek inceleme **40282015379**, 09.48 Türkiye: **97/184 (%52,72) tamamlandı, 87 eksik**; 09.15'teki 96'ya göre +1. Temmuz 0/62, Ağustos 37/62 (19 sayfa, 18 sorgu günü), Eylül 60/60. İşlem **574 D1 satırı okudu, 0 yazdı, Google aktarımı başlatmadı**.
+- 18 Ağustos iki iş hâlâ legacy `INVALID_GSC_ROW` ile blocked; sayfa cursor 0, sorgu cursor 200. Hangi alanın reddedildiği eski kayıtta yok. Gerçek kök neden veya çözüm iddia edilmez; doğrulama koşullarını değiştirmeyen alan tanılaması hazır.
+- Otomatik onay denetimi PR #23 main birleştirmesini reddetti: bu PR özelinde açık merge/yayın onayı olmadığını, ana dal ve olası üretim otomasyonunun değişeceğini belirtti. Reddedilen işlem başka API/araç/dolaylı dağıtımla denenmedi. **Main ve canlı Worker f96f184 / d2b8f1dc-0c49-40d0-886c-da18948868d6 olarak korundu.**
+- Gerekli tek sonraki kullanıcı yetkisi: **PR #23'ü main'e birleştirme ve mevcut güvenli workflow'la sınırlı tanılama kodunu yayımlama onayı**. Yeni token, Google OAuth veya ücretli plan gerekmez.
+- Yetki sonrası: PR'ın tam güncel CI'sini ve main CI'yı doğrula → gerçek Worker UUID/kota/binding korumalarıyla kontrollü yayın → main tam SHA ile `gsc-row-requeue` işlemini bir kez çalıştır → doğal Cron sonucunu `gsc-row-inspect` ile oku → yalnız gerçek alan kanıtına göre düzeltme/test/yayın. Yeni sınıflandırılmış hatalar aynı kurtarma işlemiyle tekrar açılamaz; cursor/generation/attempts korunur. Toplu aktarım/migration yok.
+- Mevcut Cron 15 dakikada bir; sıradaki planlı slot 26 Ekim 10.00 Türkiye, gerçek çalışma güncel kota izni ve sağlayıcı zamanlamasına bağlı. Bu slot blocked iki işi kendiliğinden çözer diye gösterilmez. Saatlik kota izni geçerliliği eski gözlemde 10.19 Türkiye'ye kadardı; sonraki izni güncel gerçek gözlemle doğrula, korumayı kaldırma.
+- Üretim kaynakları 29 ürün / 521 CSV / 9.075 satır; UI, OAuth, D1 bütçeleri ve Cron değişmedi. Uygulama tam geçmiş/aylık kabulü henüz tamamlanmadı.
+
+---
+
+# 26 Ekim 2026 — 18 Ağustos GSC doğrulama incelemesi
+
+- Gerçek 09.15 Türkiye üretim kontrolü: main `f96f184`, Worker `d2b8f1dc-0c49-40d0-886c-da18948868d6`, PR #21/#22 arayüz/kota koruması canlı; kaynaklar 29/521/9.075.
+- Temmuz–Eylül 96/184 (%52,17), kalan 88 gün/scope. 18 Ağustos sayfa/sorgu işleri `INVALID_GSC_ROW` hatasında; eski kod hangi alanın reddedildiğini kaydetmemiş. Gerçek neden henüz bilinmiyor.
+- Alan kategorisi tanılaması hazır; doğrulama koşulları gevşetilmedi. Ham URL/sorgu/metrik/secret kaydı yok. Yerel **348 Workers + 104 Python = 452** test ve paketleme başarılı. İlk sandbox denemesi yerel socket izni nedeniyle test başlatamadı; izinli tekrar başarılı. Arayüz ve diğer kaynaklar değişmedi.
+- `gsc-row-inspect` salt okunur, en çok 5.000 satır maliyet sınırıyla kapsam/iki iş/kota/son Cron kaydını kontrol eder. `gsc-row-requeue` yalnız yayımlanmış tam commit ve güncel güvenli hesap/yerel bütçeyle iki eski hatayı bir kez pending yapar. Cursor, generation, attempts ve hata geçmişini korur; Google isteği başlatmaz. Yeni alan koduyla tekrar başarısız olan işi tekrar açmaz.
+- Sonraki adım: tam PR/main CI → mevcut kontrollü yayın → iki işin sınırlı yeniden kuyruğa alınması → doğal 15 dakikalık Cron'da gerçek alan nedenini gör → kanıt varsa düzeltme/test/yayın. Geçmiş veri kapsamı henüz tamamlandı veya hata çözüldü sayılmaz.
+- OAuth, 15 dakikalık Cron, okuma/yazma korumaları, UI, D1 ve 521 CSV korunur. Yeni migration/toplu aktarım yok. Bu kontrol noktasının son commit'i `git log -1` ile izlenir.
+
+---
+
 # Üretim bekleme kontrolü — 25 Ekim 2026, main hazır
 
 - [x] **PR #22 main'e birleşti:** `dcd4b493a7a2b4b361ee623384a7e10a6f887fff`. PR CI **40211912177**, main CI **40212255314 SUCCESS**; gerçek loglarda **334 Workers/D1 + 99 Python + 34 Chromium = 467 test**, audit 0 doğrulandı. PR #21/#20 de içerilen commit'leriyle birleşmiş durumdadır; arayüz/CSV kaynakları korundu. Son uygulama commit'i `a111835`; bu belge kontrol noktasının son commit'i `git log -1 --oneline` ile izlenir.
@@ -25,7 +49,7 @@ Kullanıcıdan şu anda başka işlem gerekmiyor. Bu bir GitHub Actions zamanlam
 
 # Acil D1 okuma kotası — 25 Ekim 2026 19.00 Türkiye kontrol noktası
 
-**Sorun tamamen çözüldü sayılmaz; gerçek üretim kabulü bekliyor.** Dal `fix/d1-account-read-budget`, [PR #22](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/22). Son uygulama commit'i **`7ec4f8ee3fcf8b291519248a4a6bb4f02f2abd4a`**, tam HEAD CI **[40209576264 — SUCCESS](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40209576264)** (334 + 82 + 34 = 450 test); önceki temel uygulama `40967a7`; bu kaydı içeren son commit `git log -1 --oneline` ile bulunur. PR #21 / `d97c34b` bu dalın atasıdır; bütün arayüz ve tarayıcı test dosyaları birebir korunur.
+**Sorun tamamen çözüldü sayılmaz; gerçek üretim kabulü bekliyor.** Dal `fix/d1-account-read-budget`, [PR #22](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/22). Son uygulama commit'i **`7ec4f8ee3fcf8b291519248a4a6bb4f02f2abd4a`**, tam HEAD CI **[40209576264 — SUCCESS](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40209576264)** (334 + 82 + 34 = 452 test); önceki temel uygulama `40967a7`; bu kaydı içeren son commit `git log -1 --oneline` ile bulunur. PR #21 / `d97c34b` bu dalın atasıdır; bütün arayüz ve tarayıcı test dosyaları birebir korunur.
 
 ## Tamamlananlar ve gerçek kanıt
 
@@ -35,7 +59,7 @@ Kullanıcıdan şu anda başka işlem gerekmiyor. Bu bir GitHub Actions zamanlam
 - [x] Hesap geneli saatlik kota gözlemi, 75 dakikalık/UTC gece yarısıyla sınırlı izin, atomik yerel okuma/yazma rezervasyonu, gerçek D1 maliyet kaydı, eksik metadata/hata durumunda rezervasyonu koruma hazır. Üretimde bayrak eksik/false olsa da version binding korumayı zorunlu tutar. Worker'a Cloudflare API token'ı eklenmez.
 - [x] Olay başına bir sağlayıcı sayfası; güncel/geçmiş dengesi, cursor/generation/retry ve 60.000 yazma koruması sürer. Eski dakika olayları DB/Google'a dokunmaz. Tarama yalnız son tamamlanmış GSC kümesini keşifte kullanır.
 - [x] `0005` kontrol/indeks/önbellek, `0006` gerçek `cron` / `manual` / `legacy` ayrımı migration'ları; yerel veri bütünlüğü ve restore testleri. Üretimde uygulanmadı.
-- [x] Yerel son kabul: **334 Workers/D1 + 82 Python + 34 Chromium = 450 başarılı test**; npm audit 0, tip/build/üretim dry-run/kaynak ve secret taraması başarılı. Son başarısız/atlanmış test yok. İlk geliştirme denemelerindeki kapasite/freshness/fixture hataları düzeltildi. Uzak kod CI **40209576264 SUCCESS**; ham CI logunda aynı 450 test doğrulandı. Bu belge kontrol noktası commit'i ve son CI PR'da izlenir.
+- [x] Yerel son kabul: **334 Workers/D1 + 82 Python + 34 Chromium = 452 başarılı test**; npm audit 0, tip/build/üretim dry-run/kaynak ve secret taraması başarılı. Son başarısız/atlanmış test yok. İlk geliştirme denemelerindeki kapasite/freshness/fixture hataları düzeltildi. Uzak kod CI **40209576264 SUCCESS**; ham CI logunda aynı 450 test doğrulandı. Bu belge kontrol noktası commit'i ve son CI PR'da izlenir.
 - [x] 521 CSV / 9.075 satır / 29 ürün kaynak doğrulaması geçti; CSV'ler ve kaynak talimatları değiştirilmedi. Üretim /api/health 18.56 Türkiye: hâlâ **2f502c68-76ae-48a7-b87a-5b7e45bf62e4**, commit etiketi null. Bu yeni düzeltmenin canlı olduğu anlamına gelmez.
 
 ## Kalanlar — bağımlılık sırasıyla
