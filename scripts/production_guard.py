@@ -13,6 +13,22 @@ from d1_quota_checkpoint import NOT_BEFORE
 CONFIG=Path('deploy/wrangler.production.jsonc')
 APP='https://mavi-basim-seo-prod.mavibasimonline.workers.dev'
 
+def verify_schema(client,config,migrations_dir=None):
+ # Code-only releases must never create the migrations table or apply pending
+ # schema changes. Read the existing ledger through the fixed SELECT allowlist.
+ if config_errors(config):raise ValueError('PRODUCTION_CONFIG_REJECTED')
+ folder=Path(migrations_dir) if migrations_dir is not None else Path(__file__).resolve().parents[1]/'migrations'
+ expected=sorted(p.name for p in folder.glob('*.sql') if p.is_file())
+ if not expected or any(not re.fullmatch(r'[0-9]{4}_[a-z0-9_]+\.sql',name) for name in expected):raise ValueError('LOCAL_SCHEMA_MANIFEST_INVALID')
+ result=client.query(config['d1_databases'][0]['database_id'],QUERIES['migrations'])
+ if not isinstance(result,dict):raise ValueError('EXISTING_SCHEMA_READ_FAILED')
+ rows=result.get('rows')
+ if result.get('ok') is not True or not isinstance(rows,list):raise ValueError('EXISTING_SCHEMA_READ_FAILED')
+ if any(not isinstance(row,dict) or not isinstance(row.get('name'),str) for row in rows):raise ValueError('EXISTING_SCHEMA_RECORD_INVALID')
+ names=[row['name'] for row in rows]
+ if len(names)!=len(set(names)) or names!=expected:raise ValueError('EXISTING_SCHEMA_MISMATCH')
+ return {'verified':True,'migrations':names,'database_queries':1,'rows_returned':len(rows),'rows_read':result.get('rows_read'),'schema_changes':False,'migration_application_started':False}
+
 def preflight(client,config,expected):
  errors=config_errors(config)
  if errors:raise ValueError('PRODUCTION_CONFIG_REJECTED')
@@ -101,6 +117,8 @@ if __name__=='__main__':
    result=preflight(client,json.loads(CONFIG.read_text()),os.environ.get('EXPECTED_PREVIOUS_VERSION'));path.write_text(json.dumps(result,indent=2));print(json.dumps(result))
    if os.environ.get('GITHUB_OUTPUT'):
     with open(os.environ['GITHUB_OUTPUT'],'a') as out:out.write('previous_version='+result['previous_version']+'\n')
+  elif mode=='verify-schema':
+   result=verify_schema(client,json.loads(CONFIG.read_text()));Path('.local/schema-verification.json').write_text(json.dumps(result,indent=2));print(json.dumps(result))
   elif mode=='pause-cron':pause_cron(client);print('Failed-release cron held; queue and Google/source records preserved')
   elif mode=='restore-cron':restore_cron(client,json.loads(path.read_text()));print('Previous cron restored; no database or secret modified')
   elif mode=='smoke':print(json.dumps(postflight(client,json.loads(CONFIG.read_text()),json.loads(path.read_text()),os.environ.get('GITHUB_SHA',''))))

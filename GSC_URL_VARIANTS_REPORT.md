@@ -2,6 +2,10 @@
 
 26 Ekim 2026, Türkiye saati. Dal: `fix/gsc-owned-url-variants`, taban main `5f04525975e2c255151c4a4158cf9cf031d07679`, kaynak düzeltmesi `9f4283f`. [PR #24](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/pull/24) açık ve main ile çakışmasız; tam HEAD CI sonucu PR kontrol kaydında izlenir. Bu değişiklik üretime yayımlanmadı; gerçek iki iş yeniden kuyruğa alınmadı.
 
+**Yeni kullanıcı onayı alındı:** PR #24 main birleştirmesi, kontrollü yayın ve yalnız iki eski işin birer kez doğal Cron'a bırakılması açıkça onaylandı. Yeni migration yasağına uymak için mevcut production workflow'undaki `migrations apply`, altı mevcut şema kaydını yerel manifest ile karşılaştıran tek salt okunur SELECT'e dönüştürüldü. Eksik/fazla/tekrarlı/bozuk şema varsa yayın durur; otomatik şema uygulaması artık yoktur. Diğer sürüm/CI/kota/binding/smoke/rollback kapıları korunur. Bu ek güvenlik düzeltmesi de aynı PR'da CI'dan geçmeden birleştirilmeyecek.
+
+**20.09 Türkiye taze kota kontrolü:** [40365938792](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40365938792) başarılı: hesap 601.207 okuma / 22.463 yazma, analitik 20.00'a kadar, mode=open ve izin 21.24'e kadar. Yerel defter 436.750 okuma / 11.962 yazma. Mevcut kabul 229 satır okudu; tek kota kaydı güncellendi. GSC aktarımı/tarama tetiklenmedi. Yayın sırasında taze kontrol yeniden zorunludur.
+
 ## Gerçek hata ve kök neden
 
 PR #23'ün onaylı tanılama yayını 10.19'da tamamlandı. İki 18 Ağustos işi yalnız birer kez yeniden açıldı; doğal Cron sayfa işini 10.30, sorgu işini 11.00'de `INVALID_GSC_ROW_PAGE_WWW` ile durdurdu. Kanıt: Actions [40286263327](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40286263327), [40289393422](https://github.com/mavibasimonline/mavi_basim_seo_karar_merkezi_kaynak/actions/runs/40289393422).
@@ -23,15 +27,15 @@ Tanılama yalnız host kategorisini kanıtlar; gerçek satırın HTTP/HTTPS prot
 ## Test ve inceleme
 
 - Workers/D1: **434/434 başarılı**. Sahiplik/prefix saldırı matrisi; bağımsız gerçek SQLite/D1 SQL doğrulaması; 200 satırlık eski staging'den devam; yabancı satırda eski aktif kapsamı koruma; ağırlıklı konum/CTR; doğrulanmamış alias; tarama sınırı; çok günlü karantina ve OAuth regresyonları.
-- Python: **112/112 başarılı**. İlgili kurtarma testleri 13/13; gerçek SQLite ile kimlik/kategori/lease/kota/idempotence sınırları; 521 CSV ve 9.075 satırın tamamı; yedek/geri dönüş, migration ve yayın korumaları.
-- Chromium masaüstü/mobil: **34/34 başarılı**; giriş, gerçek yerel API'ler, veri yokluğu, korunan ay çubuğu/tablo/filtreler ve erişilebilirlik dahil. Toplam **580/580** otomatik test başarılı. Uzak CI tam HEAD sonucu PR'da ayrıca izlenir.
+- Python: **121/121 başarılı**. İlgili kurtarma testleri 13/13; gerçek SQLite ile kimlik/kategori/lease/kota/idempotence sınırları; 521 CSV ve 9.075 satırın tamamı; yedek/geri dönüş, migration ve yayın korumaları. Ek 9 test otomatik migration yerine salt okunur şema doğrulamasını sınar.
+- Chromium masaüstü/mobil: **34/34 başarılı**; giriş, gerçek yerel API'ler, veri yokluğu, korunan ay çubuğu/tablo/filtreler ve erişilebilirlik dahil. Toplam **589/589** otomatik test başarılı. Uzak CI tam HEAD sonucu PR'da ayrıca izlenir.
 - TypeScript, Worker build, ayrı üretim dry-run, gizli değer/kaynak kontrolü ve `npm audit` başarılı (0 açık).
 - Karantina regresyonu eski main üzerinde 13 testin 11'inde hatayı yeniden üretti; düzeltme sonrası tamamı geçti. İlk yeni entegrasyon fixture'ının kaydedilmemiş analiz kimliği FK hatası düzeltildi. Yanıt vermeyen eski yerel geliştirme sunucusu nedeniyle ilk tarayıcı koşusu durduruldu; temiz yerel Worker ile yeniden başlatıldı. Bunlar üretim GSC sonucu değildir.
 - Bağımsız kod incelemesinde somut güvenlik veya regresyon açığı bulunmadı. UI/public dosyaları, migration'lar, Cron/üretim yapılandırması, D1 bütçeleri ve CSV'lerde main farkı yok.
 
 ## Yeni D1 sorgusu olmadan gerçek durum
 
-Bu görevde yalnız mevcut Actions kayıtları/artifact'ları ve D1 kullanmayan açık `/api/health` okundu. Yeni uzaktan D1 okuması/yazması, Google isteği, requeue, tarama, migration veya dağıtım başlatılmadı.
+İlk PR hazırlığında yalnız mevcut Actions kayıtları/artifact'ları ve D1 kullanmayan açık `/api/health` okundu. Sonraki açık kullanıcı yayın onayıyla yukarıdaki taze kota gözlemcisi çalıştırıldı. Henüz Google isteği, requeue, tarama, migration veya dağıtım başlatılmadı.
 
 Son tam kapsam kanıtı **26 Ekim 11.01 Türkiye**, Actions 40289393422:
 
@@ -51,7 +55,7 @@ Bu turdaki açık HTTP kontrolünde canlı Worker hâlâ **7a51b63e-51e7-4334-9a
 ## Yayın öncesi kalan kapılar
 
 1. Ayrı PR'ın tam HEAD CI'si ve korunan kaynak/dry-run kontrolleri başarılı olmalı.
-2. Kullanıcının istediği **yeni, ayrı yayın onayı** alınmadan main birleştirmesi veya production workflow başlatılmayacak.
+2. Kullanıcının istediği **yeni, ayrı yayın onayı alındı**. Yeni şema güvenlik düzenlemesinin son HEAD CI'si ve güncel kota/sürüm kapıları da başarılı olmadan main birleştirmesi veya production workflow başlatılmayacak.
 3. Onay sonrası main tam SHA CI, gerçek eski Worker UUID/binding/secret koruması ve **taze** hesap/yerel kota yeniden doğrulanmalı; eski kota kaydı kullanılamaz. Şema değişikliği yok; yeni migration gerekmiyor. Mevcut rollback ve smoke kapıları korunur.
 4. Yeni Worker'ın tam SHA/v2 kimliği canlı doğrulanmadan iki iş açılmayacak. İş kurtarma ayrıca açıkça onaylanmalı; yalnız iki eski URL hatası bir kez ve doğal Cron üzerinden. Yeni hata varsa durdurulup sabit güvenli kategori incelenmeli.
 5. Gerçek yeni kapsam ve aylık rapor kabulü henüz tamamlanmadı. Ek D1 gözlemi gerekirse önce mevcut sınırlı sorguların planı/maliyeti ve taze kota değerlendirilir; toplu yeniden aktarım yapılmaz.

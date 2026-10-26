@@ -2,6 +2,7 @@ import importlib.util
 import io
 import json
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 from datetime import datetime,timezone
@@ -111,3 +112,61 @@ class ProductionGuardTests(unittest.TestCase):
   class Opener:
    def open(self,req,timeout):return io.BytesIO(json.dumps({'deployment':{'commit':'c'*40,'runtime_revision':'gsc-catchup-v1'}}).encode())
   with self.assertRaisesRegex(ValueError,'COMMIT_MISMATCH'):guard.smoke('c'*40,Opener())
+
+class ExistingSchemaTests(unittest.TestCase):
+ def setUp(self):
+  self.config=json.loads((ROOT/'deploy/wrangler.production.jsonc').read_text())
+  self.names=sorted(p.name for p in (ROOT/'migrations').glob('*.sql'))
+  self.calls=[]
+  class Client:
+   def query(inner,database,sql):
+    self.calls.append((database,sql))
+    return self.reply
+   def request(inner,*args):raise AssertionError('NO_RESOURCE_WRITE_OR_DIRECT_API_CALL')
+  self.client=Client();self.reply={'ok':True,'rows':[{'name':name} for name in self.names],'rows_read':len(self.names)}
+ def test_existing_schema_matches_actual_local_files_with_one_fixed_read_only_select(self):
+  before=json.dumps(self.config)
+  result=guard.verify_schema(self.client,self.config)
+  self.assertEqual(result,{'verified':True,'migrations':self.names,'database_queries':1,'rows_returned':len(self.names),'rows_read':len(self.names),'schema_changes':False,'migration_application_started':False})
+  self.assertEqual(self.calls,[(self.config['d1_databases'][0]['database_id'],guard.QUERIES['migrations'])])
+  self.assertTrue(self.calls[0][1].startswith('SELECT name FROM d1_migrations'))
+  self.assertEqual(json.dumps(self.config),before)
+ def test_a_pending_migration_blocks_release_without_applying_it(self):
+  self.reply['rows']=self.reply['rows'][:-1]
+  with self.assertRaisesRegex(ValueError,'SCHEMA_MISMATCH'):guard.verify_schema(self.client,self.config)
+  self.assertEqual(len(self.calls),1)
+ def test_unexpected_or_reordered_applied_migration_blocks_release(self):
+  for names in (self.names+['0007_unapproved.sql'],list(reversed(self.names))):
+   with self.subTest(names=names):
+    self.reply['rows']=[{'name':name} for name in names]
+    with self.assertRaisesRegex(ValueError,'SCHEMA_MISMATCH'):guard.verify_schema(self.client,self.config)
+ def test_duplicate_applied_migration_is_not_accepted_as_a_matching_count(self):
+  self.reply['rows'][-1]=dict(self.reply['rows'][0])
+  with self.assertRaisesRegex(ValueError,'SCHEMA_MISMATCH'):guard.verify_schema(self.client,self.config)
+ def test_unavailable_or_malformed_schema_response_fails_closed(self):
+  for response in (None,{}, {'ok':False}, {'ok':True}, {'ok':True,'rows':None}, {'ok':True,'rows':{}}):
+   with self.subTest(response=response):
+    self.reply=response
+    with self.assertRaisesRegex(ValueError,'SCHEMA_READ_FAILED'):guard.verify_schema(self.client,self.config)
+ def test_malformed_applied_row_cannot_be_a_verified_schema(self):
+  for row in (None, [], {}, {'name':None}, {'name':1}, {'name':[]}, {'name':True}):
+   with self.subTest(row=row):
+    self.reply={'ok':True,'rows':[row]}
+    with self.assertRaisesRegex(ValueError,'SCHEMA_RECORD_INVALID'):guard.verify_schema(self.client,self.config)
+ def test_empty_or_malformed_local_manifest_prevents_any_database_query(self):
+  with tempfile.TemporaryDirectory() as folder:
+   with self.assertRaisesRegex(ValueError,'LOCAL_SCHEMA_MANIFEST_INVALID'):guard.verify_schema(self.client,self.config,folder)
+   Path(folder,'unversioned.sql').write_text('SELECT 1;')
+   with self.assertRaisesRegex(ValueError,'LOCAL_SCHEMA_MANIFEST_INVALID'):guard.verify_schema(self.client,self.config,folder)
+  self.assertEqual(self.calls,[])
+ def test_unreviewed_production_target_prevents_schema_lookup(self):
+  self.config['name']='another-worker'
+  with self.assertRaisesRegex(ValueError,'PRODUCTION_CONFIG_REJECTED'):guard.verify_schema(self.client,self.config)
+  self.assertEqual(self.calls,[])
+ def test_production_workflow_verifies_existing_schema_and_cannot_apply_migrations(self):
+  workflow=(ROOT/'.github/workflows/production.yml').read_text()
+  self.assertIn('python3 scripts/production_guard.py verify-schema',workflow)
+  self.assertNotIn('migrations apply',workflow)
+  self.assertIn('python3 scripts/d1_quota_checkpoint.py',workflow)
+  self.assertIn('python3 scripts/production_guard.py preflight',workflow)
+  self.assertIn('python3 scripts/production_guard.py smoke',workflow)
