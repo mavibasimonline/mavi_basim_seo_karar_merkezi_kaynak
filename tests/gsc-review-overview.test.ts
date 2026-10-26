@@ -24,7 +24,7 @@ describe('read-only 26-page GSC overview',()=>{
     const db={prepare:(sql:string)=>({bind:()=>({first:async()=>null,all:async()=>({results:sql.includes('MAX(rowid)')?[source]:[]})}),all:async()=>({results:sql.includes('MAX(rowid)')?[source]:[]})})};
     const result=await gscReviewOverview({DB:db} as unknown as Env);
     const page=result.rows.find(x=>x.path==='/perakende-satis-fisi');
-    expect(page?.observed_inbound_sources).toEqual(['https://mavibasim.com/']);
+    expect(page?.observed_inbound_sources).toEqual(['https://mavibasim.com']);
     expect(page?.status).toBe('Veri bekle');
     expect(page?.inbound_source_scope).toMatch(/100 farklı URL/);
   });
