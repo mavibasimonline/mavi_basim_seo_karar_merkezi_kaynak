@@ -19,6 +19,10 @@ describe('GSC cohort performance safety',()=>{
   expect(result.rows.find(r=>r.path==='/perakende-satis-fisi')).toMatchObject({available:true,decision:'Koru',protected_queries:1});
   expect(result.rows.find(r=>r.path==='/ardahan-matbaa')).toMatchObject({available:false});
  });
+ it('rejects an unfinished month or mismatched analysis engine',()=>{
+  expect(reviewPerformance({...report,period:{start:'2026-10-01',end:'2026-10-31'},month:'2026-10'},'2026-10',now).available).toBe(false);
+  expect(reviewPerformance({...report,engine_version:'0.0.0'},'2026-09',now).available).toBe(false);
+ });
  it('rejects incomplete per-page evidence',()=>{
   const result=reviewPerformance({...report,products:[{...product,evidence:[]}]},'2026-09',now);
   if(!('rows' in result))throw Error('missing rows');
