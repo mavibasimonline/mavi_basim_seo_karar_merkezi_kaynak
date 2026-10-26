@@ -1,5 +1,7 @@
 # 26 Ekim 2026 — PR #24 gerçek üretim yayını ve tek kurtarma
 
+- **20.31 güncellemesi:** salt okunur **40369385140**, 581 okuma / 0 yazma. 18 Ağustos **page**, doğal **20.30 Cron'unda 107 gerçek satırla done**, error=null. Query hâlâ pending/cursor=200/attempts=2; ikinci requeue yapılmadı. Kapsam **104/184 (%56,52), 80 eksik**. Hesap 623.220/22.724, mode=open; kayıtlı izin 21.36'ya kadar. Sıradaki olası GSC dilimi 21.00 (20.45 tarama); gerçek sorgu kabulü beklenir. [Gerçek yayın/iş kanıtları](GSC_PR24_PRODUCTION_REPORT.md).
+
 - [x] Kullanıcının açık onayıyla PR #24 main'e birleşti: **cb8062da45927d79c351aed96dcb46718fc67e68**, 20.16 Türkiye. PR CI **40366499513**, main CI **40367117621 SUCCESS**: **434 Workers/D1 + 121 Python + 34 Chromium = 589 test**, audit 0.
 - [x] Kontrollü yayın **40367672260 SUCCESS**, 20.21 Türkiye. Canlı Worker **da882c4b-9702-46d6-a89c-785f3c3cc4b9**, tam cb8062d ve **owned-url-variants-v2** HTTP/Cloudflare kimliği eşleşti. Mevcut D1/OAuth binding'leri ve kaynaklar **29/521/9.075** postflight ile korundu. 12 canlı arayüz dosyası yayın öncesi/sonrası birebir aynı; tanımlı yayın istemcisiyle özel API oturumsuz 401.
 - [x] Yeni migration yasağı için production workflow artık **yalnız mevcut 6 şema adını SELECT ile doğruluyor**. Gerçek logda `rows_read=6`, `migration_application_started=false`; migration uygulaması başlatılmadı. Cron `*/15 * * * *`, sayfa limiti 1, günlük yazma 60.000 ve kota korumaları değişmedi. Ücretli hizmet, kaynak silme veya mavibasim.com içerik değişikliği yok.
