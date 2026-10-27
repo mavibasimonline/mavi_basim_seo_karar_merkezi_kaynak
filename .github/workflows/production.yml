@@ -6,6 +6,9 @@ on:
         description: Tanılamada doğrulanan mevcut Worker version UUID
         required: true
         type: string
+      source_commit:
+        description: Optional reviewed PR28-only source; live UI and exact source CI must match
+        type: string
   schedule:
     - cron: '17,47 0-2 26 10 *' # One-time recovery window; script rejects any date except 2026-10-26.
 permissions:
@@ -22,15 +25,18 @@ jobs:
     outputs:
       needed: ${{ steps.ready.outputs.needed }}
       previous_version: ${{ steps.ready.outputs.previous_version }}
+      source_commit: ${{ steps.ready.outputs.source_commit }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       GITHUB_TOKEN: ${{ github.token }}
       EXPECTED_PREVIOUS_VERSION: ${{ inputs.previous_version }}
+      RELEASE_SOURCE_COMMIT: ${{ inputs.source_commit }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: D1 okumadan yenilenme tarihi, tam main CI ve gerçek sürümü kontrol et
         id: ready
         run: python3 scripts/release_readiness.py
@@ -49,6 +55,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      RELEASE_SOURCE_COMMIT: ${{ needs.prepare.outputs.source_commit }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -63,6 +70,8 @@ jobs:
       - run: npm ci --ignore-scripts --no-fund
       - run: npm audit --audit-level=moderate
       - run: npm run check
+      - name: Stage only the verified source; keep trusted deployment guards on main
+        run: python3 scripts/scoped_release.py stage
       - name: Canlı sürümü ve korunan ayarları doğrula
         id: guard
         env:
@@ -82,10 +91,24 @@ jobs:
           python3 scripts/d1_quota_checkpoint.py
       - name: Aynı Worker'a, mevcut secret ve D1 binding'lerini koruyarak yayımla
         id: publish
-        run: node scripts/run.mjs wrangler deploy --config deploy/wrangler.production.jsonc --keep-vars --var D1_READ_GUARD_ENABLED:true --var SYNC_MAX_PAGES_PER_TICK:1 --tag "$GITHUB_SHA" --message "GSC queue $GITHUB_SHA"
+        run: |
+          cd "$RELEASE_SOURCE_DIR"
+          node "$GITHUB_WORKSPACE/scripts/run.mjs" wrangler deploy --config deploy/wrangler.production.jsonc --keep-vars --var D1_READ_GUARD_ENABLED:true --var SYNC_MAX_PAGES_PER_TICK:1 --tag "$RELEASE_SOURCE_COMMIT" --message "Reviewed source $RELEASE_SOURCE_COMMIT via main $GITHUB_SHA"
       - name: Gerçek HTTP yanıtında tam commit'i doğrula
         id: smoke
-        run: python3 scripts/production_guard.py smoke
+        run: |
+          python3 scripts/production_guard.py smoke
+          if [ "$RELEASE_SOURCE_COMMIT" != "$GITHUB_SHA" ]; then
+            python3 scripts/scoped_release.py assets
+            python3 scripts/mapping_canary.py
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: mapping-canary-${{ github.run_id }}
+          path: .local/mapping-canary/result.json
+          retention-days: 2
+          if-no-files-found: ignore
       - name: Yeni yayın doğrulanmazsa Cron’u tut ve önceki Worker sürümüne dön
         if: failure() && steps.publish.outcome == 'success' && steps.smoke.outcome != 'success'
         env:

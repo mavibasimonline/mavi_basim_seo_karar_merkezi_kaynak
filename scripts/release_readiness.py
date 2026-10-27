@@ -59,10 +59,18 @@ def readiness(client,sha,event,previous=None,now=None,github=None,health=None):
 if __name__=='__main__':
  try:
   result=readiness(Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID')),os.environ.get('GITHUB_SHA'),os.environ.get('GITHUB_EVENT_NAME'),os.environ.get('EXPECTED_PREVIOUS_VERSION') or None)
+  source=os.environ.get('RELEASE_SOURCE_COMMIT')
+  if source:
+   from scoped_release import ROOT,plan,assets
+   live=live_guard_deployment()
+   if not live:raise ValueError('LIVE_GUARD_REQUIRED')
+   selected=plan(ROOT,source,os.environ.get('GITHUB_SHA'),live,lambda path:get_json('https://api.github.com/repos/'+REPOSITORY+path,os.environ.get('GITHUB_TOKEN')))
+   result.update(source_commit=source,scoped_source=selected,source_assets=assets(ROOT,source),needed=live.get('commit')!=source)
+  else:result['source_commit']=os.environ.get('GITHUB_SHA')
   folder=Path('.local');folder.mkdir(exist_ok=True);(folder/'release-readiness.json').write_text(json.dumps(result,indent=2));print(json.dumps(result))
   if os.environ.get('GITHUB_OUTPUT'):
    with open(os.environ['GITHUB_OUTPUT'],'a') as out:
-    out.write('needed='+str(result['needed']).lower()+'\nprevious_version='+result.get('previous_version','')+'\n')
+    out.write('needed='+str(result['needed']).lower()+'\nprevious_version='+result.get('previous_version','')+'\nsource_commit='+result['source_commit']+'\n')
  except Exception as error:
   code=str(error) if isinstance(error,ValueError) and re.fullmatch(r'[A-Z0-9_]+',str(error)) else type(error).__name__
   raise SystemExit('RELEASE_READINESS_FAILED:'+code)
