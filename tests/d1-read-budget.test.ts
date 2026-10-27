@@ -113,5 +113,5 @@ it('interactive headroom preserves the login attempt limiter',async()=>{
  const {login}=await import('../src/security');
  const attempt=(token:string)=>withReadBudget(cfg,'/api/session',safe=>login(new Request('https://app.example/api/session',{method:'POST',headers:{Origin:'https://app.example'},body:JSON.stringify({token})}),safe),TIME);
  for(let i=0;i<5;i++)expect((await attempt('TEST wrong')).status).toBe(401);
- const blocked=await attempt(env.ADMIN_TOKEN);expect(blocked.status).toBe(429);expect(await blocked.json()).toEqual({error:'Çok fazla deneme. 15 dakika sonra tekrar deneyin.'});
+ const blocked=await attempt(env.ADMIN_TOKEN!);expect(blocked.status).toBe(429);expect(await blocked.json()).toEqual({error:'Çok fazla deneme. 15 dakika sonra tekrar deneyin.'});
 });
