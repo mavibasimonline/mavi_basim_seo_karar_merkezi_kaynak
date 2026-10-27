@@ -14,7 +14,7 @@ import gsc_continuity_audit as audit
 ROOT=Path(__file__).resolve().parents[1]
 QUERY='month=2026-09&device=ALL&rangeMonths=1'
 CRITICAL=('analysis.ts','validation.ts','performance.ts','read-cache.ts','d1-read-budget.ts','urls.ts','types.ts','sync.ts','security.ts','periods.ts')
-SAVED_REPORT="""SELECT id,created_at,length(result_json) result_bytes,engine_version,
+SAVED_REPORT="""SELECT id,created_at,length(CAST(result_json AS BLOB)) result_bytes,engine_version,
  json_extract(result_json,'$.period') period,json_extract(result_json,'$.filters') filters,
  json_extract(result_json,'$.missing') missing FROM analysis_runs
  WHERE month='2026-09' AND engine_version='1.2.2' AND json_extract(filters_json,'$.device') IS NULL ORDER BY created_at DESC LIMIT 1"""
@@ -27,7 +27,7 @@ SOURCE_PRODUCTS="""SELECT COALESCE(p.id,pg.product_id,pc.id) product_id,sum(d.cl
  LEFT JOIN page_aliases a ON a.alias_url=d.page LEFT JOIN products pc ON pc.canonical_url=a.canonical_url
  WHERE c.provider='gsc' AND c.scope='page' AND c.complete=1 AND c.day BETWEEN '2026-09-01' AND '2026-09-30'
  AND d.dataset_id=c.dataset_id AND d.date=c.day GROUP BY 1"""
-SAVED_KPI="""SELECT created_at,length(result_json) result_bytes,json_extract(result_json,'$.current') current_metrics,
+SAVED_KPI="""SELECT created_at,length(CAST(result_json AS BLOB)) result_bytes,json_extract(result_json,'$.current') current_metrics,
  json_extract(result_json,'$.measured_at') measured_at,
  json_extract(result_json,'$.period') period,json_extract(result_json,'$.device') device,
  json_extract(result_json,'$.comparison_available') comparison_available,json_extract(result_json,'$.coverage') coverage,

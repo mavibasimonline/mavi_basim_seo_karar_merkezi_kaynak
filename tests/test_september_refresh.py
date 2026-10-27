@@ -1,4 +1,4 @@
-import copy,json,subprocess,sys,unittest
+import copy,json,sqlite3,subprocess,sys,unittest
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
@@ -58,6 +58,14 @@ class RefreshTests(unittest.TestCase):
  def test_saved_verification_projects_fields_instead_of_reading_full_large_json(self):
   for sql in (op.SAVED_REPORT,op.SAVED_PRODUCTS,op.SAVED_KPI):
    self.assertNotIn('SELECT result_json',sql);self.assertIn('json_',sql)
+ def test_json_size_diagnostic_counts_utf8_bytes_instead_of_turkish_characters(self):
+  c=sqlite3.connect(':memory:');c.row_factory=sqlite3.Row
+  for p in sorted((ROOT/'migrations').glob('*.sql')):c.executescript(p.read_text())
+  value=json.dumps({'period':{},'filters':{'device':None},'missing':['Türkçe ölçüm']},ensure_ascii=False)
+  c.execute('INSERT INTO analysis_runs VALUES(?,?,?,?,?,?)',('TEST','2026-09','1.2.2',NOW.isoformat(),'{"device":null}',value))
+  result=dict(c.execute(op.SAVED_REPORT).fetchone())
+  self.assertEqual(result['result_bytes'],len(value.encode('utf-8')))
+  self.assertGreater(result['result_bytes'],len(value))
  def test_receipt_only_public_key_can_encrypt_but_wrong_private_key_and_tampering_fail(self):
   code="""import {generateKeyPairSync} from 'node:crypto';
 import {seal,open} from './scripts/operator-receipt.mjs';
