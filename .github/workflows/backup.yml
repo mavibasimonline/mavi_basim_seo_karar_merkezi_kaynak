@@ -6,7 +6,7 @@ on:
         description: Salt okunur tanılama veya mevcut şifreli yedek
         type: choice
         default: backup
-        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl, quota-inspect, quota-contain, quota-builds, gsc-row-inspect, gsc-row-requeue, september-report-refresh]
+        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl, quota-inspect, quota-contain, quota-builds, gsc-row-inspect, gsc-row-requeue, september-report-refresh, september-report-verify]
       expected_worker_commit:
         description: Approved live Worker commit for September-only acceptance
         type: string
@@ -184,7 +184,7 @@ jobs:
           if-no-files-found: warn
 
   september-report-refresh:
-    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'september-report-refresh'
+    if: github.event_name == 'workflow_dispatch' && (inputs.operation == 'september-report-refresh' || inputs.operation == 'september-report-verify')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -193,6 +193,7 @@ jobs:
       EXPECTED_WORKER_COMMIT: ${{ inputs.expected_worker_commit }}
       EXPECTED_WORKER_VERSION: ${{ inputs.expected_worker_version }}
       RECEIPT_PUBLIC_KEY: ${{ inputs.receipt_public_key }}
+      SEPTEMBER_OPERATION: ${{ inputs.operation }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -207,7 +208,12 @@ jobs:
           node scripts/run.mjs vitest run tests/september-operator.test.ts
           python3 -m unittest discover -s tests -p 'test_september_refresh.py' -v
       - name: Existing September routes once; guarded real D1; encrypted receipt only
-        run: python3 scripts/september_refresh.py
+        run: |
+          if [ "$SEPTEMBER_OPERATION" = 'september-report-verify' ]; then
+            python3 scripts/september_refresh.py --verify-only
+          else
+            python3 scripts/september_refresh.py
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

@@ -45,6 +45,19 @@ class RefreshTests(unittest.TestCase):
    if change=='attempt':value['report_attempts']=2
    if change=='month':value['report']['month']='2026-10'
    with self.assertRaises(ValueError):op.verify_payload(value,snapshot())
+ def test_narrow_saved_product_checks_preserve_unobserved_null_and_weighted_position(self):
+  products=[{'product_id':str(i),'current_metrics':None} for i in range(29)]
+  sources=[{'product_id':'0','clicks':30,'impressions':1100,'weighted':12200}]
+  products[0]['current_metrics']=json.dumps(dict(clicks=30,impressions=1100,ctr=30/1100,position=12200/1100))
+  self.assertTrue(op.verify_product_rows(products,sources))
+  products[0]['current_metrics']=json.dumps(dict(clicks=30,impressions=1100,ctr=30/1100,position=7))
+  with self.assertRaises(ValueError):op.verify_product_rows(products,sources)
+  products[0]['current_metrics']=json.dumps(dict(clicks=30,impressions=1100,ctr=30/1100,position=12200/1100))
+  products[1]['current_metrics']=json.dumps(dict(clicks=0,impressions=0,ctr=None,position=None))
+  with self.assertRaises(ValueError):op.verify_product_rows(products,sources)
+ def test_saved_verification_projects_fields_instead_of_reading_full_large_json(self):
+  for sql in (op.SAVED_REPORT,op.SAVED_PRODUCTS,op.SAVED_KPI):
+   self.assertNotIn('SELECT result_json',sql);self.assertIn('json_',sql)
  def test_receipt_only_public_key_can_encrypt_but_wrong_private_key_and_tampering_fail(self):
   code="""import {generateKeyPairSync} from 'node:crypto';
 import {seal,open} from './scripts/operator-receipt.mjs';

@@ -14,6 +14,24 @@ import gsc_continuity_audit as audit
 ROOT=Path(__file__).resolve().parents[1]
 QUERY='month=2026-09&device=ALL&rangeMonths=1'
 CRITICAL=('analysis.ts','validation.ts','performance.ts','read-cache.ts','d1-read-budget.ts','urls.ts','types.ts','sync.ts','security.ts','periods.ts')
+SAVED_REPORT="""SELECT id,created_at,length(result_json) result_bytes,engine_version,
+ json_extract(result_json,'$.period') period,json_extract(result_json,'$.filters') filters,
+ json_extract(result_json,'$.missing') missing FROM analysis_runs
+ WHERE month='2026-09' AND engine_version='1.2.2' AND json_extract(filters_json,'$.device') IS NULL ORDER BY created_at DESC LIMIT 1"""
+SAVED_PRODUCTS="""SELECT json_extract(p.value,'$.id') product_id,json_extract(p.value,'$.current') current_metrics,
+ json_extract(p.value,'$.decision') decision,json_array_length(p.value,'$.missing') missing_count
+ FROM analysis_runs a,json_each(a.result_json,'$.products') p WHERE a.id=?"""
+SOURCE_PRODUCTS="""SELECT COALESCE(p.id,pg.product_id,pc.id) product_id,sum(d.clicks) clicks,sum(d.impressions) impressions,
+ sum(d.position*d.impressions) weighted FROM dataset_coverage c INDEXED BY coverage_active CROSS JOIN gsc_daily_by_page d
+ LEFT JOIN products p ON p.canonical_url=d.page LEFT JOIN pages pg ON pg.url=d.page
+ LEFT JOIN page_aliases a ON a.alias_url=d.page LEFT JOIN products pc ON pc.canonical_url=a.canonical_url
+ WHERE c.provider='gsc' AND c.scope='page' AND c.complete=1 AND c.day BETWEEN '2026-09-01' AND '2026-09-30'
+ AND d.dataset_id=c.dataset_id AND d.date=c.day GROUP BY 1"""
+SAVED_KPI="""SELECT created_at,length(result_json) result_bytes,json_extract(result_json,'$.current') current_metrics,
+ json_extract(result_json,'$.measured_at') measured_at,
+ json_extract(result_json,'$.period') period,json_extract(result_json,'$.device') device,
+ json_extract(result_json,'$.comparison_available') comparison_available,json_extract(result_json,'$.coverage') coverage,
+ json_extract(result_json,'$.archive') archive FROM api_read_cache WHERE cache_key=?"""
 
 def ensure(condition,code):
  if not condition:raise ValueError(code)
@@ -32,6 +50,17 @@ def metric_match(actual,expected):
   (actual.get(k) is None and expected.get(k) is None) or
   (type(actual.get(k)) in (int,float) and type(expected.get(k)) in (int,float) and abs(actual[k]-expected[k])<1e-7)
   for k in ('ctr','position'))
+
+def verify_product_rows(products,sources):
+ ensure(len(products)==29 and len({p['product_id'] for p in products})==29,'STORED_PRODUCT_COUNT')
+ for product in products:
+  row=next((r for r in sources if r['product_id']==product['product_id']),None)
+  expected=None if row is None else dict(clicks=row['clicks'],impressions=row['impressions'],
+   ctr=row['clicks']/row['impressions'] if row['impressions'] else None,
+   position=row['weighted']/row['impressions'] if row['impressions'] else None)
+  actual=json.loads(product['current_metrics']) if product['current_metrics'] else None
+  ensure(metric_match(actual,expected),'STORED_PRODUCT_RAW_MISMATCH')
+ return True
 
 def verify_payload(value,before):
  ensure(value.get('report_attempts')==1 and value.get('kpi_attempts')==1,'EXACTLY_ONE_ATTEMPT_REQUIRED')
@@ -59,6 +88,37 @@ def source_parity(commit):
   path='src/'+name;ensure(original(path)==(ROOT/path).read_bytes(),'DEPLOYED_ENGINE_PARITY_REQUIRED')
  def core(data):return data.split(b'const reportFlights=',1)[1].split(b'\nfunction reportSelection',1)[0]
  ensure(core(original('src/index.ts'))==core((ROOT/'src/index.ts').read_bytes()),'DEPLOYED_REPORT_PARITY_REQUIRED')
+
+def verify_only(client,receipt):
+ # Recovery of verification only. Never constructs a Worker, calls an API route,
+ # renews quota or writes report/cache records. Large JSON stays in D1.
+ ensure(datetime.now(timezone.utc).date().isoformat()=='2026-10-27','ONE_TIME_CONTEXT_REQUIRED')
+ live=live_guard_deployment()
+ ensure(live and live.get('commit')==os.environ.get('EXPECTED_WORKER_COMMIT') and live.get('version_id')==os.environ.get('EXPECTED_WORKER_VERSION'),'LIVE_VERSION_CHANGED')
+ receipt['live_after']=live;source_parity(live['commit'])
+ after=audit.collect(client);receipt['after']=after;require_snapshot(after,datetime.now(timezone.utc))
+ costs={'rows_read':0,'rows_written':0}
+ def query(sql,params=()):
+  r=client.request('POST',f'/accounts/{client.account}/d1/database/{audit.DATABASE}/query',{'sql':sql,'params':list(params)})
+  ensure(r.get('ok') and isinstance(r.get('result'),list),'READONLY_PROJECTION_FAILED')
+  for statement in r['result']:
+   m=statement.get('meta',{});ensure(audit.integer(m.get('rows_read')) and m.get('rows_written')==0,'READONLY_PROJECTION_COST_REQUIRED');costs['rows_read']+=m['rows_read']
+  ensure(costs['rows_read']<=100_000,'READONLY_PROJECTION_CAP')
+  return [row for s in r['result'] for row in s.get('results',[])]
+ reports=query(SAVED_REPORT);ensure(len(reports)==1,'SAVED_REPORT_REQUIRED');report=reports[0]
+ ensure(json.loads(report['period'])['start']=='2026-09-01' and json.loads(report['period'])['end']=='2026-09-30' and json.loads(report['filters']).get('device') is None,'STORED_REPORT_SCOPE')
+ products=query(SAVED_PRODUCTS,[report['id']]);sources=query(SOURCE_PRODUCTS)
+ verify_product_rows(products,sources)
+ key=hashlib.sha256(('/api/performance?'+QUERY+':'+datetime.now(timezone.utc).date().isoformat()).encode()).hexdigest()
+ kpis=query(SAVED_KPI,[key]);ensure(len(kpis)==1,'SAVED_KPI_REQUIRED');kpi=kpis[0]
+ ensure(kpi['device'] is None and json.loads(kpi['period'])['start']=='2026-09-01' and json.loads(kpi['period'])['end']=='2026-09-30','STORED_KPI_SCOPE')
+ ensure(metric_match(json.loads(kpi['current_metrics']),after['september_metrics']['page']['totals']),'STORED_KPI_RAW_MISMATCH')
+ if after['coverage']['months']['2026-08']['completed']<62:
+  ensure(json.loads(report['missing']) and all(p['decision']=='Veri bekle' for p in products),'STORED_AUGUST_DECISION_GATE')
+  ensure(kpi['comparison_available']==0,'STORED_AUGUST_COMPARISON_GATE')
+ receipt.update(status='verified_read_only',stored_report=report,stored_kpi=kpi,read_only_projection_costs=costs,
+  checks={'stored_29_product_metrics_match_raw':True,'stored_kpi_metrics_match_raw':True,'incomplete_august_gate_verified':True},
+  note='Verification only; writing routes were NOT invoked again. Compare with the original encrypted operation receipt locally.')
 
 def run(client,folder,receipt):
  now=datetime.now(timezone.utc)
@@ -100,18 +160,6 @@ def run(client,folder,receipt):
   receipt['operator_request_attempts']=1
   value=request('/refresh','POST') # Deliberately no retry.
   receipt['checks']=verify_payload(value,before)
-  # Read exact stored results, without re-invoking either writing route.
-  cache_key=hashlib.sha256(('/api/performance?'+QUERY+':'+datetime.now(timezone.utc).date().isoformat()).encode()).hexdigest()
-  for name,sql,params,expected_json in (
-   ('report',"SELECT result_json FROM analysis_runs WHERE id=?",[value['report']['id']],value['report']),
-   ('kpi',"SELECT result_json FROM api_read_cache WHERE cache_key=?",[cache_key],value['kpi'])):
-   r=client.request('POST',f'/accounts/{client.account}/d1/database/{audit.DATABASE}/query',{'sql':sql,'params':params})
-   ensure(r.get('ok') and isinstance(r.get('result'),list),'SAVED_RESULT_READ_FAILED')
-   statements=r['result'];rows=[v for s in statements for v in s.get('results',[])]
-   ensure(all(audit.integer(s.get('meta',{}).get('rows_read')) and s['meta'].get('rows_written')==0 for s in statements),'SAVED_RESULT_READONLY_COST_REQUIRED')
-   ensure(sum(s['meta']['rows_read'] for s in statements)<=10,'SAVED_RESULT_LOOKUP_CAP')
-   ensure(len(rows)==1 and json.loads(rows[0]['result_json'])==expected_json,'SAVED_'+name.upper()+'_MISMATCH')
-   receipt['checks']['stored_'+name+'_matches_response']=True
  finally:
   if process is not None:
    process.terminate()
@@ -119,8 +167,12 @@ def run(client,folder,receipt):
    except subprocess.TimeoutExpired:process.kill();process.wait()
   if log is not None:log.close()
   secret.unlink(missing_ok=True)
- after=audit.collect(client);receipt['after']=after
- ensure(after.get('status')=='observed' and after.get('production_lease_valid') is True,'POSTFLIGHT_VERIFICATION_REQUIRED')
+ original_checks=receipt['checks'].copy()
+ verify_only(client,receipt)
+ ensure(receipt['stored_report']['id']==original_checks['report_id'] and receipt['stored_report']['created_at']==original_checks['report_created_at'],'SAVED_REPORT_ID_MISMATCH')
+ ensure(receipt['stored_kpi']['measured_at']==original_checks['kpi_measured_at'] and metric_match(json.loads(receipt['stored_kpi']['current_metrics']),original_checks['kpi']),'SAVED_KPI_RESPONSE_MISMATCH')
+ receipt['checks'].update(original_checks)
+ after=receipt['after']
  ensure(before['september_metrics']==after['september_metrics'],'SOURCE_CHANGED_DURING_OPERATION')
  receipt['checks']['raw_metrics_unchanged_before_after']=True
  live=live_guard_deployment();ensure(live and all(live.get(k)==v for k,v in expected.items()),'LIVE_VERSION_CHANGED')
@@ -136,13 +188,17 @@ def main():
   subprocess.run(['node','--input-type=module','-e',"import {createPublicKey} from 'node:crypto';import {readFileSync} from 'node:fs';const k=createPublicKey(readFileSync(process.argv[1]));if(k.asymmetricKeyType!=='rsa'||k.asymmetricKeyDetails.modulusLength<2048)process.exit(1)",str(public_key)],check=True,capture_output=True)
  except Exception:raise SystemExit('RECEIPT_PUBLIC_KEY_INVALID') from None
  receipt={'status':'stopped','report_month':'2026-09','operator_request_attempts':0,'worker_deploy_started':False,'migration_started':False,'google_sync_triggered':False,'public_plaintext_receipt':False}
- try:run(Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID')),folder,receipt)
+ try:
+  import sys
+  client=Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID'))
+  if '--verify-only' in sys.argv:verify_only(client,receipt)
+  else:run(client,folder,receipt)
  except Exception as error:receipt['failure']=str(error) if isinstance(error,ValueError) and re.fullmatch('[A-Z_]+',str(error)) else type(error).__name__
  finally:
   raw.write_text(json.dumps(receipt,ensure_ascii=False,indent=2));raw.chmod(0o600)
   try:subprocess.run(['node','scripts/operator-receipt.mjs','seal',str(raw),str(public_key),str(folder/'receipt.encrypted.json')],cwd=ROOT,check=True,capture_output=True)
   finally:raw.unlink(missing_ok=True)
- if receipt['status']!='verified':raise SystemExit('SEPTEMBER_REFRESH_STOPPED_SEE_ENCRYPTED_RECEIPT')
+ if receipt['status'] not in ('verified','verified_read_only'):raise SystemExit('SEPTEMBER_REFRESH_STOPPED_SEE_ENCRYPTED_RECEIPT')
  print('September-only operation verified; private receipt encrypted; no Worker deployment or Google transfer.')
 
 if __name__=='__main__':main()
