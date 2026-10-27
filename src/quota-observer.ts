@@ -17,7 +17,9 @@ type Sample={day:string;observed_at:string;data_through:string;valid_until:strin
 export const CHECKPOINT_SQL=`INSERT INTO d1_quota_state(day,observed_at,data_through,valid_until,account_reads,account_writes,mode,reason) VALUES(?,?,?,?,?,?,?,?)
  ON CONFLICT(day) DO UPDATE SET observed_at=excluded.observed_at,data_through=excluded.data_through,valid_until=excluded.valid_until,
  account_reads=max(d1_quota_state.account_reads,excluded.account_reads),account_writes=max(d1_quota_state.account_writes,excluded.account_writes),
- mode=CASE WHEN d1_quota_state.mode='blocked' THEN 'blocked' ELSE excluded.mode END,
+ mode=CASE WHEN d1_quota_state.mode='blocked' OR max(d1_quota_state.account_reads,excluded.account_reads)>=${ACCOUNT_READ_STOP}
+ OR max(d1_quota_state.account_writes,excluded.account_writes)>=${ACCOUNT_WRITE_STOP} THEN 'blocked'
+ WHEN max(d1_quota_state.account_reads,excluded.account_reads)>=2000000 OR excluded.mode='slow' THEN 'slow' ELSE 'open' END,
  reason=CASE WHEN d1_quota_state.mode='blocked' THEN d1_quota_state.reason ELSE excluded.reason END
  WHERE excluded.observed_at>d1_quota_state.observed_at`;
 
