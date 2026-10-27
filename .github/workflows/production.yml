@@ -100,7 +100,15 @@ jobs:
           python3 scripts/production_guard.py smoke
           if [ "$RELEASE_SOURCE_COMMIT" != "$GITHUB_SHA" ]; then
             python3 scripts/scoped_release.py assets
+            python3 scripts/mapping_canary.py
           fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: mapping-canary-${{ github.run_id }}
+          path: .local/mapping-canary/result.json
+          retention-days: 2
+          if-no-files-found: ignore
       - name: Yeni yayın doğrulanmazsa Cron’u tut ve önceki Worker sürümüne dön
         if: failure() && steps.publish.outcome == 'success' && steps.smoke.outcome != 'success'
         env:
