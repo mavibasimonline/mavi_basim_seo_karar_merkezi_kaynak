@@ -121,7 +121,7 @@ if __name__=='__main__':
    result=verify_schema(client,json.loads(CONFIG.read_text()));Path('.local/schema-verification.json').write_text(json.dumps(result,indent=2));print(json.dumps(result))
   elif mode=='pause-cron':pause_cron(client);print('Failed-release cron held; queue and Google/source records preserved')
   elif mode=='restore-cron':restore_cron(client,json.loads(path.read_text()));print('Previous cron restored; no database or secret modified')
-  elif mode=='smoke':print(json.dumps(postflight(client,json.loads(CONFIG.read_text()),json.loads(path.read_text()),os.environ.get('GITHUB_SHA',''))))
+  elif mode=='smoke':print(json.dumps(postflight(client,json.loads(CONFIG.read_text()),json.loads(path.read_text()),os.environ.get('RELEASE_SOURCE_COMMIT') or os.environ.get('GITHUB_SHA',''))))
   else:raise ValueError('INVALID_OPERATION')
  except Exception as error:
   code=str(error) if isinstance(error,ValueError) and re.fullmatch(r'[A-Z0-9_]+',str(error)) else type(error).__name__
