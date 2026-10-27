@@ -123,7 +123,10 @@ async function mapVerifiedPage(env:Env,url:string,snapshot:Snapshot,observed:str
   const product=candidates.results[0];
   if(product.canonical_url&&product.canonical_url!==url)return;
   await env.DB.batch([
-    env.DB.prepare('UPDATE products SET canonical_url=?,url_verified_at=? WHERE id=? AND (canonical_url IS NULL OR canonical_url=?)').bind(url,observed,product.id,url),
+    // This is the mapping's first verification, not the latest crawl time.
+    // Repeat observations stay in crawls/snapshots; an unchanged mapping must
+    // not make every report and KPI cache miss after each successful crawl.
+    env.DB.prepare('UPDATE products SET canonical_url=?,url_verified_at=? WHERE id=? AND (canonical_url IS NULL OR canonical_url=?) AND (canonical_url IS NULL OR url_verified_at IS NULL)').bind(url,observed,product.id,url),
     env.DB.prepare("UPDATE pages SET product_id=?,canonical_url=?,mapping_source='crawl-200-self-canonical-exact-slug' WHERE url=?").bind(product.id,url,url),
   ]);
 }
