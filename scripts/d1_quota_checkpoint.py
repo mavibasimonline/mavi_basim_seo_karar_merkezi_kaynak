@@ -1,4 +1,4 @@
-"""Hourly account-wide D1 allowance. No application-data scans, no tokens in Worker."""
+"""Account-wide D1 allowance. No application-data scans, no tokens in Worker."""
 import json
 import os
 from datetime import datetime,timedelta,timezone
@@ -60,11 +60,29 @@ def monitored_checkpoint(client,now=None,require_live_guard=False,probe=None):
  return checkpoint(client,now)
 
 
+def observer_acceptance_due(event,schedule):
+ # Extra renewal opportunities must not multiply the heavier acceptance scans.
+ # An unknown event/rule fails before any analytics, Worker or D1 request.
+ if event=='workflow_dispatch' and not schedule:return True
+ if event=='schedule' and schedule=='7 * * * *':return True
+ if event=='schedule' and schedule=='22,37,52 * * * *':return False
+ raise ValueError('UNREVIEWED_QUOTA_OBSERVER_EVENT')
+
+
+def observer_checkpoint(client,event,schedule,now=None,probe=None):
+ due=observer_acceptance_due(event,schedule)
+ result=monitored_checkpoint(client,now,require_live_guard=True,probe=probe)
+ return {**result,'acceptance_due':bool(result.get('updated')) and due}
+
+
 if __name__=='__main__':
  import sys
- result=monitored_checkpoint(Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID')),require_live_guard='--require-live-guard' in sys.argv)
+ client=Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID'))
+ result=observer_checkpoint(client,os.environ.get('QUOTA_OBSERVER_EVENT'),os.environ.get('QUOTA_OBSERVER_SCHEDULE','')) if '--observer' in sys.argv else monitored_checkpoint(client,require_live_guard='--require-live-guard' in sys.argv)
  folder=Path('.local');folder.mkdir(exist_ok=True);(folder/'d1-quota-checkpoint.json').write_text(json.dumps(result,indent=2))
  print(json.dumps(result,indent=2))
  if os.environ.get('GITHUB_OUTPUT'):
-  with open(os.environ['GITHUB_OUTPUT'],'a') as out:out.write('ready='+str(bool(result.get('updated'))).lower()+'\n')
+  with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+   out.write('ready='+str(bool(result.get('updated'))).lower()+'\n')
+   if '--observer' in sys.argv:out.write('acceptance_due='+str(result['acceptance_due']).lower()+'\n')
  if not result.get('updated') and result.get('reason') not in ('LIVE_READ_GUARD_NOT_DEPLOYED','WAIT_FOR_2026_10_26_UTC_RESET'):raise SystemExit('D1_QUOTA_CHECKPOINT_NOT_EXTENDED')
