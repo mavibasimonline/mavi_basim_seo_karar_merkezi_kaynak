@@ -5,7 +5,10 @@ import {Env,hash} from './types';
 export const ACCOUNT_READ_STOP=3_500_000,ACCOUNT_WRITE_STOP=85_000;
 export const LOCAL_READ_STOP=2_000_000,LOCAL_WRITE_STOP=65_000;
 export function guardRequired(env:Env){return env.D1_READ_GUARD_ENABLED==='true'||!!env.CF_VERSION_METADATA;}
-export class D1BudgetError extends Error {constructor(public code='D1_READ_BUDGET_WAIT'){super(code);}}
+export class D1BudgetError extends Error {constructor(public code='D1_READ_BUDGET_WAIT',public reason='OPERATION_LIMIT'){super(code);}}
+// Background collection must leave room for bounded login/status and report reads.
+// These are held INSIDE the existing daily/account ceilings, never extra quota.
+export const INTERACTIVE_READ_HEADROOM=1_000_000,INTERACTIVE_WRITE_HEADROOM=5_000;
 interface State {day:string;observed_at:string;data_through:string;valid_until:string;account_reads:number;account_writes:number;mode:'open'|'slow'|'blocked';reason:string}
 const databaseRoots=new WeakMap<D1Database,D1Database>();
 export function originalDatabase(db:D1Database){return databaseRoots.get(db)||db;}
@@ -16,51 +19,74 @@ export function queryAllowance(sql:string){
   if(/keyword_metric_observations/i.test(sql))return 50_000;
   return 10_000;
 }
-function usableState(state:State|null,time:Date):state is State{
-  if(!state)return false;
+export function stateIssue(state:State|null,time:Date):string|null{
+  if(!state)return 'CHECKPOINT_MISSING';
   const now=time.getTime(),observed=Date.parse(state.observed_at),until=Date.parse(state.valid_until),through=Date.parse(state.data_through);
-  return [observed,until,through].every(Number.isFinite)&&state.day===time.toISOString().slice(0,10)&&observed<=now&&now-observed<=75*60_000&&until>now&&through<=now&&now-through<=2*3600_000
-    &&Number.isSafeInteger(state.account_reads)&&state.account_reads>=0&&Number.isSafeInteger(state.account_writes)&&state.account_writes>=0;
+  if(![observed,until,through].every(Number.isFinite))return 'CHECKPOINT_INVALID';
+  if(state.day!==time.toISOString().slice(0,10))return 'CHECKPOINT_WRONG_DAY';
+  if(observed>now)return 'CHECKPOINT_FUTURE';
+  if(now-observed>75*60_000)return 'CHECKPOINT_STALE';
+  if(until<=now)return 'LEASE_EXPIRED';
+  if(through>now)return 'ANALYTICS_FUTURE';
+  if(now-through>2*3600_000)return 'ANALYTICS_STALE';
+  if(!Number.isSafeInteger(state.account_reads)||state.account_reads<0||!Number.isSafeInteger(state.account_writes)||state.account_writes<0||!['open','slow','blocked'].includes(state.mode))return 'CHECKPOINT_INVALID';
+  if(state.mode==='blocked')return 'CHECKPOINT_BLOCKED';
+  if(state.account_reads>=ACCOUNT_READ_STOP)return 'ACCOUNT_READ_LIMIT';
+  if(state.account_writes>=ACCOUNT_WRITE_STOP)return 'ACCOUNT_WRITE_LIMIT';
+  return null;
 }
+function leaseExpiry(state:State){return Math.min(Date.parse(state.valid_until),Date.parse(state.observed_at)+75*60_000,Date.parse(state.data_through)+2*3600_000,Date.parse(state.day)+86400_000);}
 export async function readBudgetStatus(env:Env,time=new Date()){
   if(!guardRequired(env))return {enabled:false,mode:'local',reason:'Yerel ortam; üretim hesabı kotası doğrulanmadı.'};
   const state=await env.DB.prepare('SELECT * FROM d1_quota_state WHERE day=?').bind(time.toISOString().slice(0,10)).first<State>();
-  const fresh=usableState(state,time);
-  return {enabled:true,mode:fresh?state.mode:'blocked',reason:fresh?state.reason:'Güncel hesap kotası doğrulaması bekleniyor.',observed_at:state?.observed_at||null,data_through:state?.data_through||null,account_reads:state?.account_reads??null,account_writes:state?.account_writes??null};
+  const issue=stateIssue(state,time),fresh=!issue&&state!==null;
+  return {enabled:true,reason_code:issue,valid_until:state?.valid_until||null,effective_valid_until:state&&Number.isFinite(leaseExpiry(state))?new Date(leaseExpiry(state)).toISOString():null,mode:fresh?state.mode:'blocked',reason:fresh?state.reason:'Güncel hesap kotası doğrulaması bekleniyor.',observed_at:state?.observed_at||null,data_through:state?.data_through||null,account_reads:state?.account_reads??null,account_writes:state?.account_writes??null};
 }
 
 export async function withReadBudget<T>(env:Env,kind:string,work:(safe:Env)=>Promise<T>,time=new Date()):Promise<T>{
   if(!guardRequired(env))return work(env);
   const startedAt=Date.now(),stamp=time.toISOString(),day=stamp.slice(0,10);
   const state=await env.DB.prepare('SELECT * FROM d1_quota_state WHERE day=?').bind(day).first<State>();
-  if(!usableState(state,time)||state.mode==='blocked')throw new D1BudgetError();
+  const issue=stateIssue(state,time);
+  if(issue||!state)throw new D1BudgetError('D1_READ_BUDGET_WAIT',issue||'CHECKPOINT_MISSING');
   const expensive=/report|radar|data-integrity|questions|export|change-impact/.test(kind);
-  if(state.mode==='slow'&&expensive)throw new D1BudgetError();
+  if(state.mode==='slow'&&expensive)throw new D1BudgetError('D1_READ_BUDGET_WAIT','SLOW_MODE_HEAVY_OPERATION');
   const maximumReads=kind==='cron'?600_000:expensive?1_000_000:/performance/.test(kind)?600_000:200_000;
   let readReserve=20_000;
   const writeReserve=kind==='cron'?5_000:expensive?4_000:1_000;
-  const readLimit=Math.min(LOCAL_READ_STOP,ACCOUNT_READ_STOP-state.account_reads),writeLimit=Math.min(LOCAL_WRITE_STOP,ACCOUNT_WRITE_STOP-state.account_writes);
+  const background=kind==='cron';
+  const readLimit=Math.min(LOCAL_READ_STOP,ACCOUNT_READ_STOP-state.account_reads)-(background?INTERACTIVE_READ_HEADROOM:0),writeLimit=Math.min(LOCAL_WRITE_STOP,ACCOUNT_WRITE_STOP-state.account_writes)-(background?INTERACTIVE_WRITE_HEADROOM:0);
+  async function reservationDenied(extraReads:number,extraWrites:number):Promise<never>{
+    // One primary-key lookup only; no application rows, raw SQL or secrets in diagnostics.
+    const ledger=await env.DB.prepare('SELECT reads,writes FROM d1_quota_ledger WHERE day=?').bind(day).first<{reads:number;writes:number}>();
+    const nextReads=(ledger?.reads||0)+extraReads,nextWrites=(ledger?.writes||0)+extraWrites;
+    const fullReadLimit=Math.min(LOCAL_READ_STOP,ACCOUNT_READ_STOP-state!.account_reads),fullWriteLimit=Math.min(LOCAL_WRITE_STOP,ACCOUNT_WRITE_STOP-state!.account_writes);
+    const reason=nextReads>fullReadLimit?(fullReadLimit===LOCAL_READ_STOP?'LOCAL_READ_LIMIT':'ACCOUNT_READ_RESERVATION_LIMIT')
+      :nextWrites>fullWriteLimit?(fullWriteLimit===LOCAL_WRITE_STOP?'LOCAL_WRITE_LIMIT':'ACCOUNT_WRITE_RESERVATION_LIMIT')
+      :nextReads>readLimit?'BACKGROUND_READ_HEADROOM':nextWrites>writeLimit?'BACKGROUND_WRITE_HEADROOM':'RESERVATION_CONTENDED';
+    throw new D1BudgetError('D1_READ_BUDGET_WAIT',reason);
+  }
   const reserved=await env.DB.prepare(`INSERT INTO d1_quota_ledger(day,reads,writes,updated_at) SELECT ?,?,?,? WHERE ?<=? AND ?<=?
     ON CONFLICT(day) DO UPDATE SET reads=reads+excluded.reads,writes=writes+excluded.writes,updated_at=excluded.updated_at
     WHERE reads+excluded.reads<=? AND writes+excluded.writes<=? RETURNING day`)
     .bind(day,readReserve,writeReserve,stamp,readReserve,readLimit,writeReserve,writeLimit,readLimit,writeLimit).first();
-  if(!reserved)throw new D1BudgetError();
+  if(!reserved)await reservationDenied(readReserve,writeReserve);
   let reads=500,writes=200,inFlight=0,unknown=false;
   const costs=new Map<string,Cost>();
-  const leaseUntil=Date.parse(state.valid_until);
+  const leaseUntil=leaseExpiry(state);
   let growing=Promise.resolve();
   const pending=new Set<Promise<unknown>>();
   async function enter(allowance:number){
     const previous=growing;let release!:()=>void;growing=new Promise<void>(resolve=>{release=resolve;});await previous;
     try{
       const operationTime=time.getTime()+Math.max(0,Date.now()-startedAt);
-      if(operationTime>=leaseUntil||new Date(operationTime).toISOString().slice(0,10)!==day)throw new D1BudgetError();
+      if(operationTime>=leaseUntil||new Date(operationTime).toISOString().slice(0,10)!==day)throw new D1BudgetError('D1_READ_BUDGET_WAIT','LEASE_ENDED_DURING_OPERATION');
       const required=reads+inFlight+allowance;
       if(required>maximumReads||writes>=writeReserve)throw new D1BudgetError('D1_OPERATION_BUDGET_WAIT');
       if(required>readReserve){
         const additional=required-readReserve;
         const added=await original.prepare('UPDATE d1_quota_ledger SET reads=reads+? WHERE day=? AND reads+?<=? RETURNING day').bind(additional,day,additional,readLimit).first();
-        if(!added)throw new D1BudgetError();readReserve+=additional;
+        if(!added)await reservationDenied(additional,0);readReserve+=additional;
       }
       inFlight+=allowance;
     }finally{release();}
