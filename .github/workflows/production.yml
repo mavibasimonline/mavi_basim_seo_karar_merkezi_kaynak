@@ -117,6 +117,13 @@ jobs:
         env:
           PREVIOUS_VERSION: ${{ steps.guard.outputs.previous_version }}
         run: |
-          python3 scripts/production_guard.py pause-cron
+          if [ "$RELEASE_SOURCE_COMMIT" != "f888618954a49f0117ac1dfbd1d43ea80393a03b" ]; then
+            python3 scripts/production_guard.py pause-cron
+          fi
           node scripts/run.mjs wrangler rollback "$PREVIOUS_VERSION" --config deploy/wrangler.production.jsonc --message "Automatic rollback after failed release verification" --yes
-          python3 scripts/production_guard.py pause-cron
+          if [ "$RELEASE_SOURCE_COMMIT" != "f888618954a49f0117ac1dfbd1d43ea80393a03b" ]; then
+            python3 scripts/production_guard.py pause-cron
+          fi
+          if [ "$RELEASE_SOURCE_COMMIT" = "f888618954a49f0117ac1dfbd1d43ea80393a03b" ]; then
+            python3 scripts/pr30_rollover_gate.py --verify-rollback-cron
+          fi

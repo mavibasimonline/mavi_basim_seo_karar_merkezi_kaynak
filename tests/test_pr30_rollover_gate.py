@@ -22,3 +22,13 @@ class GateTests(unittest.TestCase):
  def test_old_day_expired_lease_and_insufficient_headroom_fail_closed(self):
   for k,v in [('day','2026-10-27'),('valid_until',self.now.isoformat()),('mode','blocked'),('reads',1000001),('writes',60001),('account_reads',3000000),('data_through',(self.now-timedelta(hours=3)).isoformat()),('reads',True)]:
    with self.subTest(k=k,v=v),self.assertRaises(ValueError):gate.verify(Fake({**self.row,k:v}),self.now)
+
+class RollbackTests(unittest.TestCase):
+ def test_rollback_checks_schedule_without_any_schedule_write(self):
+  class Client:
+   account='fixture'
+   def request(self,method,path):
+    assert method=='GET'
+    return {'ok':True,'result':{'schedules':[{'cron':'*/15 * * * *'}]}}
+  self.assertTrue(gate.verify_rollback_cron(Client(),{'previous_crons':['*/15 * * * *']})['cron_preserved'])
+  with self.assertRaisesRegex(ValueError,'CRON_DRIFT'):gate.verify_rollback_cron(Client(),{'previous_crons':[]})

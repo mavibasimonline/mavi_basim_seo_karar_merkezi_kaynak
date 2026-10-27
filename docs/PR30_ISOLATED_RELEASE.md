@@ -54,3 +54,8 @@ publication preparation offline. Full selected-source and guard-PR CI must pass.
 
 PR29 stays pending. No limit increase, reset, migration, bulk import, OAuth,
 Cron or UI changes are authorized by this preparation.
+
+For the pinned PR30 source only, failed-smoke rollback restores the already
+D1-guarded base without the older PR28 schedule-pause commands. Afterwards the
+saved Cron schedule is checked through GET only; drift is reported and never
+repaired by a schedule write. Other release paths retain their existing behavior.

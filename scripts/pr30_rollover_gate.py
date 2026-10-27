@@ -23,5 +23,18 @@ def verify(client,now=None):
  if not valid:raise ValueError('PR30_FRESH_QUOTA_AND_INTERACTIVE_HEADROOM_REQUIRED')
  return {'passed':True,'utc_day':day,'natural_day_ledger_observed':True,'counter_reset':False,'database_queries':1}
 
+def verify_rollback_cron(client,saved):
+ # PR30 rolls back only to the pinned, already guarded live source. Preserve the
+ # existing schedule; report drift without issuing a schedule mutation.
+ result=client.request('GET',f'/accounts/{client.account}/workers/scripts/mavi-basim-seo-prod/schedules')
+ if not result.get('ok'):raise ValueError('PR30_ROLLBACK_CRON_READ_FAILED')
+ data=result.get('result',[]);rows=data.get('schedules',[]) if isinstance(data,dict) else data
+ if [r.get('cron') for r in rows]!=saved.get('previous_crons'):raise ValueError('PR30_ROLLBACK_CRON_DRIFT')
+ return {'cron_preserved':True,'schedule_writes':0}
+
 if __name__=='__main__':
- print(json.dumps(verify(Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID')))))
+ import sys
+ from pathlib import Path
+ client=Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID'))
+ result=verify_rollback_cron(client,json.loads(Path('.local/production-before.json').read_text())) if sys.argv[1:]==['--verify-rollback-cron'] else verify(client)
+ print(json.dumps(result))
