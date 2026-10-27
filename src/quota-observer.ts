@@ -23,7 +23,7 @@ export const CHECKPOINT_SQL=`INSERT INTO d1_quota_state(day,observed_at,data_thr
 
 export function parseObservation(value:unknown,now:Date):Sample{
  const v=value as any;
- if(!Number.isFinite(now.getTime())||(v?.errors!==undefined&&(!Array.isArray(v.errors)||v.errors.length!==0))||!Array.isArray(v?.data?.viewer?.accounts)||v.data.viewer.accounts.length!==1)throw Error('ANALYTICS_INVALID');
+ if(!Number.isFinite(now.getTime())||(v?.errors!=null&&(!Array.isArray(v.errors)||v.errors.length!==0))||!Array.isArray(v?.data?.viewer?.accounts)||v.data.viewer.accounts.length!==1)throw Error('ANALYTICS_INVALID');
  const rows=v.data.viewer.accounts[0]?.d1AnalyticsAdaptiveGroups;
  // Only datetimeHour is selected: at most 24 hourly groups in one UTC day.
  if(!Array.isArray(rows)||rows.length===0||rows.length>48)throw Error('ANALYTICS_EMPTY_OR_TRUNCATED');
