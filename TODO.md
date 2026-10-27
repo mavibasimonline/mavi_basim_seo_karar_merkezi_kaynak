@@ -1,3 +1,18 @@
+# 27 Ekim 2026 — bağımsız kota gözlemcisi, onay bekleyen hazırlık
+
+- [x] Ana uygulamadan ayrı, HTTP erişimi olmayan ve varsayılan kapalı Worker hazırlandı. Hesap analitiği ve canlı read guard doğrulanınca yalnız mevcut kota kaydına bir PK upsert; eski/belirsiz/limit aşan veride yenileme yok. Ana OAuth, arayüz, veri modeli, Cron ve D1 koruma kodu değişmedi.
+- [x] 35 gözlemci senaryosu, Temmuz sırasına geçiş için gerçek yerel D1 regresyonu ve 9 Python kuyruk/config kontrolü eklendi. Tam yerel 488 Workers/D1 +142 Python =630 test, type/build ve yeni Worker dry-run başarılı. Gerçek üretim tüketimi veya yeni Worker yayını bu testlerden çıkarılmaz.
+- [x] Düşük maliyetli kuyruk kabulü yalnız SELECT ve şifreli receipt kullanır. Açık PR #27'nin mevcut şifreleme yardımcısı aynen yeniden kullanıldı; rapor üretimi/aktarım veya migration yok.
+- [ ] Ayrı PR'ın son tam SHA CI'sini ve açık PR farklarını doğrula. Üretim ölçümleri yalnız özel yerel raporlara kaydedilir; public GitHub'a aktarılmaz.
+- [ ] Kullanıcı ayrı merge/dağıtım onayı vermeden yeni gözlemciyi etkinleştirme. Sonrasında yalnız yeni Worker'a ilgili hesap için dar yetkili Analytics:Read secret'ı gerekir; mevcut geniş deploy token'ını runtime'a kopyalama.
+- [ ] Ücretsiz plan/hesap Cron sınırı/gerçek CPU, ilk otomatik checkpoint maliyeti ve kalıcı izin ile ana Cron devamı gerçek hesapta ayrıca kabul edilecek. Ana Worker yeniden yayımlanmayacak. Yeni Worker'ın varlığı veya kesintisiz otomasyon henüz iddia edilmez.
+
+Ayrıntı ve seçenek maliyetleri: [INDEPENDENT_QUOTA_OBSERVER.md](docs/INDEPENDENT_QUOTA_OBSERVER.md). Son commit `git log -1 --oneline`; canlı operasyon sonuçları bu public TODO'ya eklenmez.
+
+---
+
+# Önceki kayıtlar
+
 # 26 Ekim 2026 — sahip olunan GSC URL'leri ve kalıcı iş karantinası
 
 - **Yeni açık yetki:** kullanıcı PR #24 birleştirme/kontrollü yayın ve iki 18 Ağustos işinin birer kez doğal Cron'a bırakılmasını onayladı. Yeni migration/toplu aktarım yasak. Bu nedenle production workflow'un otomatik migration uygulaması, mevcut altı şema adını tek SELECT ile doğrulayan fail-closed kontrole çevrildi; 9 yeni test dahil Python **121/121**, toplam yerel **589 test** başarılı. Son tam HEAD CI'si beklenir; eski 580 testli CI yeni commit için izin değildir.

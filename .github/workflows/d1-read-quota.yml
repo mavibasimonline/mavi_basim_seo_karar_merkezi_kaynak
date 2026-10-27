@@ -1,6 +1,21 @@
 name: Hesap genelinde D1 okuma koruması
 on:
   workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        default: checkpoint
+        options: [checkpoint, queue-metadata]
+        description: Existing checkpoint or bounded SELECT-only queue audit
+      expected_worker_commit:
+        type: string
+        description: Pinned live source SHA for queue audit only
+      expected_worker_version:
+        type: string
+        description: Pinned live version UUID for queue audit only
+      receipt_public_key:
+        type: string
+        description: Base64 PUBLIC receipt key; never a private key or token
   schedule:
     - cron: '7 * * * *'
     - cron: '22,37,52 * * * *'
@@ -11,7 +26,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   checkpoint:
-    if: github.ref_name == 'main'
+    if: github.ref_name == 'main' && inputs.operation != 'queue-metadata'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     env:
@@ -38,3 +53,29 @@ jobs:
             .local/d1-read-acceptance.json
           retention-days: 2
           if-no-files-found: warn
+
+  queue-inspect:
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'queue-metadata'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      EXPECTED_WORKER_COMMIT: ${{ inputs.expected_worker_commit }}
+      EXPECTED_WORKER_VERSION: ${{ inputs.expected_worker_version }}
+      RECEIPT_PUBLIC_KEY: ${{ inputs.receipt_public_key }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: python3 -m unittest discover -s tests -p 'test_queue_metadata.py' -v
+      - run: python3 scripts/queue_metadata.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: private-queue-metadata-${{ github.run_id }}
+          path: .local/queue-metadata/queue-receipt.encrypted.json
+          retention-days: 2
+          if-no-files-found: error
