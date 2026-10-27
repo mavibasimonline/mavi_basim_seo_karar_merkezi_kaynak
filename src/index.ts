@@ -179,7 +179,7 @@ export default {
       }
       return securityHeaders(await route(request,env));
     }catch(error){
-      if(error instanceof D1BudgetError)return securityHeaders(json({error:'Ücretsiz D1 okuma bütçesi veya güncel kota doğrulaması bekleniyor. Kayıtlar korunuyor; aktarım uygun bütçeyle devam edecek.',code:error.code},429));
+      if(error instanceof D1BudgetError)return securityHeaders(json({error:'Ücretsiz D1 okuma bütçesi veya güncel kota doğrulaması bekleniyor. Kayıtlar korunuyor; aktarım uygun bütçeyle devam edecek.',code:error.code,reason:error.reason},429));
       const code=error instanceof ProviderError?error.code:error instanceof Error?error.message:'UNKNOWN';
       if(code==='AUDIT_ROW_LIMIT')return securityHeaders(json({error:'Seçili dönem ayrıntılı denetim sınırını aşıyor; daha kısa bir dönem seçin. Kaynak veriler korundu.',code},422));
       const invalid=['INVALID_MONTH','INVALID_RANGE','INVALID_DEVICE','INVALID_QUERY_SORT','INVALID_QUERY_PAGE','INVALID_QUERY_FILTER','INVALID_QUESTION','INVALID_QUESTION_CONTEXT','INVALID_APPLIED_CHANGE','INVALID_CHANGE_DAY','INVALID_CHANGE_ID','CHANGE_NOT_FOUND'].includes(code)||error instanceof SyntaxError;
