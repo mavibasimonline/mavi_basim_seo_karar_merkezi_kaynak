@@ -7,7 +7,7 @@ on:
         required: true
         type: string
       source_commit:
-        description: Optional reviewed PR28-only source; live UI and exact source CI must match
+        description: Optional pinned reviewed source; live UI and exact source CI must match
         type: string
   schedule:
     - cron: '17,47 0-2 26 10 *' # One-time recovery window; script rejects any date except 2026-10-26.
@@ -89,6 +89,9 @@ jobs:
           python3 -c "from datetime import datetime,timezone; from pathlib import Path; import sys; sys.path.insert(0,'scripts'); from d1_quota_checkpoint import NOT_BEFORE; assert datetime.now(timezone.utc)>=NOT_BEFORE, 'WAIT_FOR_UTC_QUOTA_RESET'"
           python3 scripts/production_guard.py verify-schema
           python3 scripts/d1_quota_checkpoint.py
+      - name: PR30 doğal UTC gün geçişi ve kullanıcı payını salt okunur doğrula
+        if: needs.prepare.outputs.source_commit == 'f888618954a49f0117ac1dfbd1d43ea80393a03b'
+        run: python3 scripts/pr30_rollover_gate.py
       - name: Aynı Worker'a, mevcut secret ve D1 binding'lerini koruyarak yayımla
         id: publish
         run: |
