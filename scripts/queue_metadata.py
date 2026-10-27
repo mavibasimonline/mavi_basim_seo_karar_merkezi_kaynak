@@ -20,6 +20,9 @@ NEXT="""SELECT id,day,scope,status,cursor,attempts,error_code FROM sync_jobs
  WHERE provider='gsc' AND day BETWEEN '2026-07-01' AND '2026-09-30'
  AND ((status IN ('pending','retry') AND next_attempt_at<=?) OR (status='running' AND lease_until<?))
  ORDER BY day DESC,provider,scope LIMIT 1"""
+RECENT="""SELECT j.day,j.scope,r.started_at,r.finished_at,r.status,r.rows_received,r.trigger_source
+ FROM sync_runs r JOIN sync_jobs j ON j.id=r.job_id WHERE j.provider='gsc' AND r.trigger_source='cron'
+ ORDER BY r.started_at DESC LIMIT 5"""
 
 def ensure(ok,code):
  if not ok:raise ValueError(code)
@@ -52,7 +55,7 @@ def collect(client,expected,now=None,probe=live_guard_deployment):
  ledger=query('SELECT reads,writes FROM d1_quota_ledger WHERE day=?',[day])
  ensure(len(ledger)==1 and type(ledger[0]['reads']) is int and type(ledger[0]['writes']) is int and 0<=ledger[0]['reads']<1900000 and 0<=ledger[0]['writes']<64000 and usage['account_reads']+ledger[0]['reads']+5000<3400000 and usage['account_writes']+ledger[0]['writes']<84000,'LOCAL_HEADROOM_REQUIRED')
  matrix=query(MATRIX,[stamp,stamp]);ensure(len(matrix)==6 and {(v['month'],v['scope']) for v in matrix}=={(m,s) for m in ('2026-07','2026-08','2026-09') for s in ('page','query')},'MATRIX_REQUIRED')
- out.update(quota=quota[0],ledger=ledger[0],matrix=matrix,next_history_job=query(NEXT,[stamp,stamp]),live=live)
+ out.update(quota=quota[0],ledger=ledger[0],matrix=matrix,next_history_job=query(NEXT,[stamp,stamp]),recent_natural_cron=query(RECENT,[]),live=live)
  return out
 
 def seal(receipt,public_key,folder):

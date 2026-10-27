@@ -23,7 +23,7 @@ class QueueTests(unittest.TestCase):
   with patch.object(audit,'observation',return_value=usage or {'ok':True,'mode':'open','account_reads':1000,'account_writes':100}):
    return audit.collect(client,EXPECTED,TIME,probe or (lambda:EXPECTED))
  def test_all_reads_are_bounded_prepared_selects(self):
-  c=Fake();v=self.run_audit(c);self.assertEqual(v['rows_written'],0);self.assertEqual(v['statements'],4);self.assertTrue(all(x['sql'].startswith(('SELECT','WITH RECURSIVE')) for x in c.calls));self.assertEqual(sum(r['jobs'] for r in v['matrix'] if r['month']=='2026-07'),62)
+  c=Fake();v=self.run_audit(c);self.assertEqual(v['rows_written'],0);self.assertEqual(v['statements'],5);self.assertTrue(all(x['sql'].startswith(('SELECT','WITH RECURSIVE')) for x in c.calls));self.assertEqual(sum(r['jobs'] for r in v['matrix'] if r['month']=='2026-07'),62)
  def test_expired_lease_stops_before_any_queue_read(self):
   c=Fake();c.expired=True
   with self.assertRaisesRegex(ValueError,'CURRENT_STORED_LEASE_REQUIRED'):self.run_audit(c)

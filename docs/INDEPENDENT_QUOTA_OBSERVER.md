@@ -48,7 +48,7 @@ node scripts/run.mjs wrangler deploy --dry-run --config deploy/wrangler.quota-ob
 
 ## Salt okunur Temmuz kuyruk kabulü
 
-Mevcut `d1-read-quota.yml` workflow'una ayrı `queue-metadata` manuel operasyonu eklendi. Varsayılan checkpoint ve iki schedule kuralı değişmedi. Bu operasyon checkpoint işini atlar; önce gerçek sürüm, hesap analitiği, kayıtlı güncel izin ve yerel boşluğu doğrular. En çok5000 okuma; yalnız4 SELECT; 184 gün/scope üzerinde indeksli JOIN ile bütün Temmuz işlerinin varlığını/uygunluğunu sayar ve sıradaki geçmiş adayı gösterir. Fact/rapor/tarama/OAuth sorgusu veya iş claim'i yoktur.
+Mevcut `d1-read-quota.yml` workflow'una ayrı `queue-metadata` manuel operasyonu eklendi. Varsayılan checkpoint ve iki schedule kuralı değişmedi. Bu operasyon checkpoint işini atlar; önce gerçek sürüm, hesap analitiği, kayıtlı güncel izin ve yerel boşluğu doğrular. En çok5000 okuma; yalnız5 SELECT; 184 gün/scope üzerinde indeksli JOIN ile bütün Temmuz işlerinin varlığını/uygunluğunu sayar, sıradaki geçmiş adayı ve son5 doğal Cron kaydını gösterir. Fact/rapor/tarama/OAuth sorgusu veya iş claim'i yoktur.
 
 Sonuç yalnız public key ile şifreli artifact'tır; private key çalışma alanından çıkmaz. Public receipt anahtarı token değildir. `operator-receipt.mjs`, açık PR #27'deki aynı mevcut şifreleme yardımcısının byte olarak aynısıdır; ikinci şifreleme sistemi yazılmadı. PR #27 ile tek ortak yeni dosyanın içeriği aynıdır; backup.yml ve PR27 rapor kodu değiştirilmedi.
 
