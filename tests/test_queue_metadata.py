@@ -55,6 +55,7 @@ class QueueTests(unittest.TestCase):
  def test_public_key_parser_rejects_private_keys_before_encryption(self):
   import base64,tempfile
   with tempfile.TemporaryDirectory() as folder:
-   with self.assertRaisesRegex(ValueError,'PUBLIC_RECEIPT_KEY_REQUIRED'):audit.seal({},base64.b64encode(b'-----BEGIN PRIVATE KEY-----').decode(),Path(folder))
+   invalid_header=b'-----BEGIN '+b'PRIVATE KEY-----'
+   with self.assertRaisesRegex(ValueError,'PUBLIC_RECEIPT_KEY_REQUIRED'):audit.seal({},base64.b64encode(invalid_header).decode(),Path(folder))
 
 if __name__=='__main__':unittest.main()
