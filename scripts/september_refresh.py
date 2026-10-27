@@ -120,6 +120,38 @@ def verify_only(client,receipt):
   checks={'stored_29_product_metrics_match_raw':True,'stored_kpi_metrics_match_raw':True,'incomplete_august_gate_verified':True},
   note='Verification only; writing routes were NOT invoked again. Compare with the original encrypted operation receipt locally.')
 
+def source_metadata_only(client,receipt):
+ # No fact-table scans, route invocations or quota renewal. The single quota
+ # lookup is required before any other D1 statement and fails closed.
+ now=datetime.now(timezone.utc);day=now.date().isoformat()
+ live=live_guard_deployment()
+ ensure(live and live.get('commit')==os.environ.get('EXPECTED_WORKER_COMMIT') and live.get('version_id')==os.environ.get('EXPECTED_WORKER_VERSION'),'LIVE_VERSION_CHANGED')
+ usage=audit.observation(client,now);receipt['account_usage']=usage
+ ensure(usage.get('ok') is True and usage.get('mode')=='open','FRESH_SAFE_ACCOUNT_REQUIRED')
+ costs={'rows_read':0,'rows_written':0,'statements':0}
+ receipt['metadata_costs']=costs
+ def query(sql,params=()):
+  ensure(sql.startswith(('SELECT','WITH RECURSIVE')),'SELECT_ONLY_REQUIRED')
+  r=client.request('POST',f'/accounts/{client.account}/d1/database/{audit.DATABASE}/query',{'sql':sql,'params':list(params)})
+  ensure(r.get('ok') and isinstance(r.get('result'),list),'METADATA_QUERY_FAILED')
+  for s in r['result']:
+   m=s.get('meta',{});ensure(audit.integer(m.get('rows_read')) and m.get('rows_written')==0,'METADATA_READONLY_COST_REQUIRED');costs['rows_read']+=m['rows_read']
+  costs['statements']+=1;ensure(costs['rows_read']<=5000,'METADATA_READ_CAP')
+  return [v for s in r['result'] for v in s.get('results',[])]
+ quota=query(audit.SQL['quota'],[day]);receipt['quota']=quota
+ state=quota[0] if len(quota)==1 else {}
+ ensure(state.get('day')==day and state.get('mode')=='open' and audit.instant(state.get('valid_until')) and audit.instant(state['valid_until'])>now+timedelta(minutes=2),'CURRENT_STORED_LEASE_REQUIRED')
+ ensure(audit.instant(state.get('observed_at')) and timedelta(0)<=now-audit.instant(state['observed_at'])<=timedelta(minutes=75) and audit.instant(state.get('data_through')) and timedelta(0)<=now-audit.instant(state['data_through'])<=timedelta(hours=2),'STORED_LEASE_FRESHNESS_REQUIRED')
+ ledger=query(audit.SQL['ledger'],[day]);receipt['ledger']=ledger
+ ensure(len(ledger)==1 and ledger[0]['reads']<1_900_000 and ledger[0]['writes']<64_000 and usage['account_reads']+ledger[0]['reads']+5000<3_400_000 and usage['account_writes']+ledger[0]['writes']<84_000,'METADATA_HEADROOM_REQUIRED')
+ receipt['revisions']=query(audit.SQL['revision'])
+ receipt['report_cache']=query(audit.SQL['cache'])
+ receipt['products_verification']=query('SELECT id,canonical_url,url_verified_at FROM products ORDER BY url_verified_at DESC,id')
+ receipt['coverage']=query("SELECT substr(day,1,7) month,scope,count(*) days,max(fetched_at) fetched_at FROM dataset_coverage WHERE provider='gsc' AND scope IN ('page','query') AND complete=1 AND day BETWEEN '2026-07-01' AND '2026-09-30' GROUP BY month,scope")
+ receipt['pending_priority_jobs']=query("SELECT day,scope,status,cursor,attempts,error_code,next_attempt_at,updated_at FROM sync_jobs WHERE provider='gsc' AND day BETWEEN '2026-07-01' AND '2026-09-30' AND status!='done' ORDER BY day DESC,scope LIMIT 15")
+ receipt['health']=query(audit.SQL['health'],[day]);receipt['recent_cron']=query(audit.SQL['recent'])
+ receipt.update(status='verified_read_only',observed_at=now.isoformat(),live_after=live,metadata_costs=costs,note='Metadata only; no report, KPI, fact scan, sync or quota renewal.')
+
 def run(client,folder,receipt):
  now=datetime.now(timezone.utc)
  ensure(now.date().isoformat()=='2026-10-27' and os.environ.get('GITHUB_RUN_ATTEMPT','1')=='1','ONE_TIME_CONTEXT_REQUIRED')
@@ -191,7 +223,8 @@ def main():
  try:
   import sys
   client=Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID'))
-  if '--verify-only' in sys.argv:verify_only(client,receipt)
+  if '--source-metadata-only' in sys.argv:source_metadata_only(client,receipt)
+  elif '--verify-only' in sys.argv:verify_only(client,receipt)
   else:run(client,folder,receipt)
  except Exception as error:receipt['failure']=str(error) if isinstance(error,ValueError) and re.fullmatch('[A-Z_]+',str(error)) else type(error).__name__
  finally:

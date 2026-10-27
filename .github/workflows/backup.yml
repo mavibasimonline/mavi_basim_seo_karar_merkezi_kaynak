@@ -6,7 +6,7 @@ on:
         description: Salt okunur tanılama veya mevcut şifreli yedek
         type: choice
         default: backup
-        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl, quota-inspect, quota-contain, quota-builds, gsc-row-inspect, gsc-row-requeue, september-report-refresh, september-report-verify]
+        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl, quota-inspect, quota-contain, quota-builds, gsc-row-inspect, gsc-row-requeue, september-report-refresh, september-report-verify, september-source-metadata]
       expected_worker_commit:
         description: Approved live Worker commit for September-only acceptance
         type: string
@@ -184,7 +184,7 @@ jobs:
           if-no-files-found: warn
 
   september-report-refresh:
-    if: github.event_name == 'workflow_dispatch' && (inputs.operation == 'september-report-refresh' || inputs.operation == 'september-report-verify')
+    if: github.event_name == 'workflow_dispatch' && (inputs.operation == 'september-report-refresh' || inputs.operation == 'september-report-verify' || inputs.operation == 'september-source-metadata')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -209,7 +209,9 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_september_refresh.py' -v
       - name: Existing September routes once; guarded real D1; encrypted receipt only
         run: |
-          if [ "$SEPTEMBER_OPERATION" = 'september-report-verify' ]; then
+          if [ "$SEPTEMBER_OPERATION" = 'september-source-metadata' ]; then
+            python3 scripts/september_refresh.py --source-metadata-only
+          elif [ "$SEPTEMBER_OPERATION" = 'september-report-verify' ]; then
             python3 scripts/september_refresh.py --verify-only
           else
             python3 scripts/september_refresh.py

@@ -1,6 +1,7 @@
-import copy,json,sqlite3,subprocess,sys,unittest
+import copy,json,os,sqlite3,subprocess,sys,unittest
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
+from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
 import september_refresh as op
 
@@ -17,6 +18,30 @@ def payload():
  'current':snapshot()['september_metrics']['page']['totals'],'archive':{'csv_files':521,'csv_rows':9075},'coverage':{'verified_days':30,'invalid_days':[]},'comparison_available':False}}
 
 class RefreshTests(unittest.TestCase):
+ def metadata_client(self,expired=False):
+  now=datetime.now(timezone.utc)
+  class Client:
+   account='a'*32
+   def __init__(self):self.calls=[]
+   def request(self,method,path,body):
+    self.calls.append(body['sql'])
+    if body['sql']==op.audit.SQL['quota']:
+     rows=[{'day':now.date().isoformat(),'mode':'open','observed_at':now.isoformat(),'valid_until':(now+timedelta(minutes=-1 if expired else 30)).isoformat(),'data_through':now.isoformat()}]
+    elif body['sql']==op.audit.SQL['ledger']:rows=[{'reads':20000,'writes':2000}]
+    else:rows=[]
+    return {'ok':True,'result':[{'results':rows,'meta':{'rows_read':1,'rows_written':0}}]}
+  return Client()
+ def test_metadata_missing_or_expired_permission_stops_after_only_the_lease_lookup(self):
+  client=self.metadata_client(True);receipt={}
+  with patch.dict(os.environ,EXPECTED_WORKER_COMMIT='TEST',EXPECTED_WORKER_VERSION='TEST'),patch.object(op,'live_guard_deployment',return_value={'commit':'TEST','version_id':'TEST'}),patch.object(op.audit,'observation',return_value={'ok':True,'mode':'open','account_reads':100000,'account_writes':1000}):
+   with self.assertRaisesRegex(ValueError,'CURRENT_STORED_LEASE_REQUIRED'):op.source_metadata_only(client,receipt)
+  self.assertEqual(client.calls,[op.audit.SQL['quota']]);self.assertEqual(receipt['metadata_costs']['rows_written'],0)
+ def test_metadata_mode_uses_only_small_selects_and_never_runs_application_routes(self):
+  client=self.metadata_client();receipt={}
+  with patch.dict(os.environ,EXPECTED_WORKER_COMMIT='TEST',EXPECTED_WORKER_VERSION='TEST'),patch.object(op,'live_guard_deployment',return_value={'commit':'TEST','version_id':'TEST'}),patch.object(op.audit,'observation',return_value={'ok':True,'mode':'open','account_reads':100000,'account_writes':1000}),patch.object(op,'run',side_effect=AssertionError('NO_REPORT_CALL')):
+   op.source_metadata_only(client,receipt)
+  self.assertEqual(receipt['status'],'verified_read_only');self.assertEqual(receipt['metadata_costs']['rows_written'],0)
+  self.assertTrue(all(s.startswith('SELECT') for s in client.calls));self.assertFalse(any('gsc_daily_by_' in s for s in client.calls))
  def test_snapshot_requires_real_lease_and_enough_time_not_just_unused_account_quota(self):
   op.require_snapshot(snapshot(),NOW)
   for valid,minutes in [(False,30),(True,-1),(True,5)]:
