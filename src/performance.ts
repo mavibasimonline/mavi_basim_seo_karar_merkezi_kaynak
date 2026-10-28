@@ -1,4 +1,4 @@
-import {boundedDataScope} from './d1-read-budget';
+import {boundedCoverageRead} from './d1-read-budget';
 import {GSC_PAGE_SQL_VALID} from './urls';
 import { selectedPeriods, rangeCount, periodSelection } from "./periods";
 import { Env, dateDaysAgo } from "./types";
@@ -41,9 +41,8 @@ async function daily(
   device: string | null,
   time: Date,
 ): Promise<Daily[]> {
-  await boundedDataScope(env,start,end,scope);
   return (
-    await env.DB.prepare(
+    await (await boundedCoverageRead(env,env.DB.prepare(
       `SELECT c.day,c.dataset_id,c.row_count,c.fetched_at,count(d.dataset_id) actual_rows,
     COALESCE(sum(CASE WHEN d.dataset_id IS NOT NULL AND (d.clicks!=CAST(d.clicks AS INTEGER) OR d.impressions!=CAST(d.impressions AS INTEGER)
       OR d.clicks<0 OR d.impressions<d.clicks OR d.position<0 OR d.device NOT IN ('MOBILE','DESKTOP','TABLET')
@@ -72,7 +71,7 @@ async function daily(
         end,
         dateDaysAgo(3, time),
       )
-      .all<Daily>()
+      ,scope,start,end)).all<Daily>()
   ).results;
 }
 function aggregate(row: {
@@ -124,7 +123,7 @@ async function productMetrics(
   const ids = usable.map((r) => r.dataset_id);
   if (!ids.length) return [];
   const rows = (
-    await env.DB.prepare(
+    await (await boundedCoverageRead(env,env.DB.prepare(
       `SELECT COALESCE(p.id,pg.product_id,pc.id) product_id,
  CASE WHEN d.date>=? THEN 'current' ELSE 'previous' END period,
  count(*) selected_rows,count(DISTINCT d.date) observed_days,sum(d.clicks) clicks,sum(d.impressions) impressions,
@@ -134,18 +133,20 @@ async function productMetrics(
  LEFT JOIN pages pg ON pg.url=d.page
  LEFT JOIN page_aliases a ON a.alias_url=d.page
  LEFT JOIN products pc ON pc.canonical_url=a.canonical_url
- WHERE d.dataset_id IN (SELECT value FROM json_each(?)) AND d.date BETWEEN ? AND ? AND (? IS NULL OR d.device=?)
+ WHERE c.day BETWEEN ? AND ? AND d.dataset_id IN (SELECT value FROM json_each(?)) AND d.date BETWEEN ? AND ? AND (? IS NULL OR d.device=?)
  GROUP BY 1,2`,
     )
       .bind(
         period.start,
+        previous.start,
+        period.end,
         JSON.stringify(ids),
         previous.start,
         period.end,
         device,
         device,
       )
-      .all<
+      ,'page',previous.start,period.end)).all<
         Daily & {
           product_id: string | null;
           period: string;
@@ -332,18 +333,20 @@ export async function performanceQueries(
   const pattern =
     "%" + search.toLocaleLowerCase("tr-TR").replace(/[\\%_]/g, "\\$&") + "%";
   const rows = (
-    await env.DB.prepare(
+    await (await boundedCoverageRead(env,env.DB.prepare(
       `SELECT d.query,d.page,d.device,d.is_brand,p.id product_id,p.name product_name,
     sum(d.clicks) clicks,sum(d.impressions) impressions,CASE WHEN sum(d.impressions)>0 THEN sum(d.clicks)/sum(d.impressions) END ctr,
     CASE WHEN sum(d.impressions)>0 THEN sum(d.position*d.impressions)/sum(d.impressions) END position,max(c.fetched_at) fetched_at
     FROM dataset_coverage c INDEXED BY coverage_active CROSS JOIN gsc_daily_by_query_device d ON c.dataset_id=d.dataset_id AND c.day=d.date AND c.provider='gsc' AND c.scope='query' AND c.complete=1
     LEFT JOIN products p ON p.canonical_url=d.page AND p.url_verified_at IS NOT NULL
-    WHERE d.dataset_id IN (SELECT value FROM json_each(?)) AND (? IS NULL OR d.device=?)
+    WHERE c.day BETWEEN ? AND ? AND d.dataset_id IN (SELECT value FROM json_each(?)) AND (? IS NULL OR d.device=?)
     AND lower(replace(replace(d.query,'İ','i'),'I','ı')) LIKE ? ESCAPE '\\'
     AND (?='' OR p.id=?) AND (?='all' OR d.is_brand=?)
     GROUP BY d.query,d.page,d.device,d.is_brand,p.id,p.name ORDER BY ${sorts[sort as keyof typeof sorts]} ${direction},d.query,d.page,d.device LIMIT 51 OFFSET ?`,
     )
       .bind(
+        period.start,
+        period.end,
         JSON.stringify(ids),
         device,
         device,
@@ -354,7 +357,7 @@ export async function performanceQueries(
         brand === "brand" ? 1 : 0,
         (page - 1) * 50,
       )
-      .all()
+      ,'query',period.start,period.end)).all()
   ).results;
   return {
     source: "Google Search Console",
