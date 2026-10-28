@@ -11,6 +11,11 @@ export async function evidenceRevision(env:Env){
   (SELECT MAX(imported_at) FROM keyword_sources) archive`).first());
 }
 export async function cachedRead<T>(env:Env,key:string,produce:()=>Promise<T>,time=new Date()):Promise<T>{
+ if(key.startsWith('/api/performance?')||key.startsWith('/api/performance/queries?')){
+  const [path,query]=key.split('?'),params=new URLSearchParams(query);
+  for(const [name,value] of Object.entries({rangeMonths:'1',device:'ALL',q:'',product:'',brand:'all',page:'1',sort:'impressions',direction:'desc'}))if(params.get(name)===value)params.delete(name);
+  params.sort();key=path+'?'+params.toString();
+ }
  const revision=await evidenceRevision(env),cacheKey=await hash(key+':'+time.toISOString().slice(0,10));
  const row=await env.DB.prepare('SELECT result_json,created_at FROM api_read_cache WHERE cache_key=? AND revision=?').bind(cacheKey,revision).first<{result_json:string;created_at:string}>();
  if(row&&Date.parse(row.created_at)<=time.getTime()){

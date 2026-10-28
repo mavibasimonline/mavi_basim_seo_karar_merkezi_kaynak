@@ -127,3 +127,9 @@ it('unchanged performance evidence reuses its original measured response beyond 
  await env.DB.prepare("INSERT INTO health_checks VALUES('gsc','2026-10-26',?,'ok',NULL)").bind(new Date(t.getTime()+4000000).toISOString()).run();
  expect((await cachedRead(env,'/api/performance?month=2026-10',compute,new Date(t.getTime()+4000000))).call).toBe(2);
 });
+
+it('default filters and URL ordering cannot multiply identical GSC cache scans',async()=>{
+ let calls=0;const compute=async()=>({fixture:++calls});
+ expect(await cachedRead(env,'/api/performance?month=2026-10',compute)).toEqual(await cachedRead(env,'/api/performance?device=ALL&rangeMonths=1&month=2026-10',compute));
+ expect(calls).toBe(1);
+});
