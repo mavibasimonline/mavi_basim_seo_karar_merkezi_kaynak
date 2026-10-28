@@ -3,7 +3,7 @@
 import {Env,json} from '../src/types';
 import {crawlOne} from '../src/crawler';
 import {withReadBudget} from '../src/d1-read-budget';
-export function createCanary(crawl:typeof crawlOne=crawlOne){
+export function createCanary(crawl:typeof crawlOne=crawlOne,wait:(ms:number)=>Promise<void>=ms=>new Promise(resolve=>setTimeout(resolve,ms))){
  let used=false;
  return {async fetch(request:Request,env:Env){
   const url=new URL(request.url);
@@ -20,11 +20,21 @@ export function createCanary(crawl:typeof crawlOne=crawlOne){
    const before=await mapping(),oldReport=await report(),oldCrawl=await latest();
    if(!before.results.length||before.results.some(p=>!p.canonical_url||!p.url_verified_at))return json({error:'VERIFIED_PRODUCTS_REQUIRED'},409);
    await crawl(safe);
+   let observed=await latest();
+   // A robots refresh deliberately defers the first page request. Respect both
+   // queue backoff and shared robots timing; never retry real crawl failures.
+   if(observed&&observed.id!==oldCrawl?.id&&observed.error_code==='CRAWL_DELAY'&&observed.status_code===null){
+    const unchanged=JSON.stringify(before.results)===JSON.stringify((await mapping()).results)&&JSON.stringify(oldReport)===JSON.stringify(await report());
+    const timing=await safe.DB.prepare('SELECT q.next_crawl_at,p.next_request_at FROM crawl_queue q CROSS JOIN crawl_policies p WHERE q.url=? AND p.origin=?').bind(observed.url,'https://mavibasim.com').first<{next_crawl_at:string;next_request_at:string}>();
+    const stamps=timing?[Date.parse(timing.next_crawl_at),Date.parse(timing.next_request_at)]:[];
+    const delay=stamps.length===2&&stamps.every(Number.isFinite)?Math.max(0,...stamps.map(t=>t-Date.now()))+100:Infinity;
+    if(unchanged&&delay<=30_000){await wait(delay);await crawl(safe);}
+   }
    const after=await mapping(),newReport=await report(),newCrawl=await latest();
    const checks={real_existing_product_recrawled:!!newCrawl&&newCrawl.id!==oldCrawl?.id&&before.results.some(p=>p.canonical_url===newCrawl.url)&&newCrawl.status_code===200&&!newCrawl.error_code&&!!newCrawl.finished_at,
     existing_mapping_evidence_unchanged:JSON.stringify(before.results)===JSON.stringify(after.results),
     september_report_unchanged:!!oldReport&&JSON.stringify(oldReport)===JSON.stringify(newReport),d1_guard_used:true,google_sync_triggered:false};
-   return json({verified:checks.real_existing_product_recrawled&&checks.existing_mapping_evidence_unchanged&&checks.september_report_unchanged,checks});
+   return json({verified:checks.real_existing_product_recrawled&&checks.existing_mapping_evidence_unchanged&&checks.september_report_unchanged,checks,crawl_error:newCrawl?.error_code&&/^[A-Z0-9_]{1,80}$/.test(newCrawl.error_code)?newCrawl.error_code:null});
   });
  }};
 }

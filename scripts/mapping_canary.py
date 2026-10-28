@@ -41,4 +41,6 @@ def main():
 
 if __name__=='__main__':
  try:main()
- except Exception:raise SystemExit('MAPPING_CANARY_STOPPED_NO_AUTOMATIC_RETRY') from None
+ except Exception as error:
+  code=str(error) if isinstance(error,ValueError) and str(error) in ('CANARY_LIVE_SOURCE_REQUIRED','CANARY_SOURCE_PARITY_REQUIRED','CANARY_RUNTIME_FAILED','CANARY_NOT_READY','CANARY_NOT_VERIFIED') else type(error).__name__
+  raise SystemExit('MAPPING_CANARY_STOPPED_NO_AUTOMATIC_RETRY:'+code) from None
