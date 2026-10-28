@@ -13,7 +13,14 @@ export async function evidenceRevision(env:Env){
 export async function cachedRead<T>(env:Env,key:string,produce:()=>Promise<T>,time=new Date()):Promise<T>{
  const revision=await evidenceRevision(env),cacheKey=await hash(key+':'+time.toISOString().slice(0,10));
  const row=await env.DB.prepare('SELECT result_json,created_at FROM api_read_cache WHERE cache_key=? AND revision=?').bind(cacheKey,revision).first<{result_json:string;created_at:string}>();
- if(row&&Date.parse(row.created_at)<=time.getTime()&&time.getTime()-Date.parse(row.created_at)<5*60_000)return JSON.parse(row.result_json) as T;
+ if(row&&Date.parse(row.created_at)<=time.getTime()){
+  const value=JSON.parse(row.result_json);
+  // Daily cutoff and verified evidence are unchanged. Re-running these GSC
+  // aggregations every five minutes needlessly spends the daily read budget.
+  const stable=key.startsWith('/api/performance')&&row.created_at.slice(0,10)===time.toISOString().slice(0,10);
+  const freshnessSafe=!value.fresh||[value.last_fetched_at,value.health?.checked_at].every(stamp=>typeof stamp==='string'&&time.getTime()-Date.parse(stamp)>=0&&time.getTime()-Date.parse(stamp)<72*3600_000);
+  if((stable&&freshnessSafe)||time.getTime()-Date.parse(row.created_at)<5*60_000)return value as T;
+ }
  const result=await produce();
  // A failed/replaced generation or revoked connection during calculation must
  // never persist a valid-looking response over its replacement.
