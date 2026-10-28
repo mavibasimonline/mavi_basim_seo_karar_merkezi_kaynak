@@ -12,6 +12,8 @@ export const INTERACTIVE_READ_HEADROOM=1_000_000,INTERACTIVE_WRITE_HEADROOM=5_00
 interface State {day:string;observed_at:string;data_through:string;valid_until:string;account_reads:number;account_writes:number;mode:'open'|'slow'|'blocked';reason:string}
 const databaseRoots=new WeakMap<D1Database,D1Database>();
 export function originalDatabase(db:D1Database){return databaseRoots.get(db)||db;}
+const statementProofs=new WeakMap<object,{sql:string;params:unknown[]}>();
+const readEstimates=new WeakMap<object,number>();
 interface Cost {reads:number;writes:number;count:number;max:number}
 export function queryAllowance(sql:string){
   if(/^\s*(WITH incoming|INSERT (?:OR (?:REPLACE|IGNORE) )?INTO (?:gsc_daily_|ga4_daily_))/i.test(sql))return 5_000;
@@ -91,8 +93,8 @@ export async function withReadBudget<T>(env:Env,kind:string,work:(safe:Env)=>Pro
       inFlight+=allowance;
     }finally{release();}
   }
-  async function perform<R>(sqls:string[],operation:()=>Promise<R>):Promise<R>{
-    const allowance=sqls.reduce((n,s)=>n+queryAllowance(s),0);
+  async function perform<R>(sqls:string[],operation:()=>Promise<R>,estimate?:number):Promise<R>{
+    const allowance=estimate??sqls.reduce((n,s)=>n+queryAllowance(s),0);
     await enter(allowance);
     try{
       const result=await operation();
@@ -108,20 +110,20 @@ export async function withReadBudget<T>(env:Env,kind:string,work:(safe:Env)=>Pro
       return result;
     }catch(error){unknown=true;throw error;}finally{inFlight-=allowance;}
   }
-  function execute<R>(sqls:string[],operation:()=>Promise<R>):Promise<R>{
-    const task=perform(sqls,operation);pending.add(task);task.then(()=>pending.delete(task),()=>pending.delete(task));return task;
+  function execute<R>(sqls:string[],operation:()=>Promise<R>,estimate?:number):Promise<R>{
+    const task=perform(sqls,operation,estimate);pending.add(task);task.then(()=>pending.delete(task),()=>pending.delete(task));return task;
   }
   const original=env.DB;
   const raw=new WeakMap<object,{statement:D1PreparedStatement;sql:string}>();
-  function prepared(sql:string,statement:D1PreparedStatement):D1PreparedStatement{
+  function prepared(sql:string,statement:D1PreparedStatement,params:unknown[]=[]):D1PreparedStatement{
     const proxy={
-      bind(...values:unknown[]){return prepared(sql,statement.bind(...values));},
-      all<T>(){return execute([sql],()=>statement.all<T>());},
-      run<T>(){return execute([sql],()=>statement.run<T>());},
-      async first<T>(column?:string){const result=await execute([sql],()=>statement.all<T>());const row=result.results[0]??null;if(column&&row!==null){if(!Object.hasOwn(row as object,column))throw Error('D1_COLUMN_NOT_FOUND');return (row as Record<string,unknown>)[column] as T;}return row;},
+      bind(...values:unknown[]){return prepared(sql,statement.bind(...values),values);},
+      all<T>(){return execute([sql],()=>statement.all<T>(),readEstimates.get(proxy));},
+      run<T>(){return execute([sql],()=>statement.run<T>(),readEstimates.get(proxy));},
+      async first<T>(column?:string){const result=await execute([sql],()=>statement.all<T>(),readEstimates.get(proxy));const row=result.results[0]??null;if(column&&row!==null){if(!Object.hasOwn(row as object,column))throw Error('D1_COLUMN_NOT_FOUND');return (row as Record<string,unknown>)[column] as T;}return row;},
       async raw<T>(options?:{columnNames?:boolean}){throw new D1BudgetError('D1_UNMETERED_METHOD');},
     } as D1PreparedStatement;
-    raw.set(proxy,{statement,sql});return proxy;
+    statementProofs.set(proxy,{sql,params});raw.set(proxy,{statement,sql});return proxy;
   }
   const db={prepare(sql:string){return prepared(sql,original.prepare(sql));},async batch<T>(statements:D1PreparedStatement[]){
     if(!statements.length)return [];
@@ -145,9 +147,32 @@ export async function withReadBudget<T>(env:Env,kind:string,work:(safe:Env)=>Pro
 }
 
 export async function boundedDataScope(env:Env,start:string,end:string,scope:'page'|'query'|'organic',provider='gsc'){
-  if(!guardRequired(env))return;
+  if(!guardRequired(env))return 0;
   const row=await env.DB.prepare('SELECT COALESCE(sum(row_count),0) rows FROM dataset_coverage WHERE provider=? AND scope=? AND complete=1 AND day BETWEEN ? AND ?').bind(provider,scope,start,end).first<{rows:number}>();
   // Aggregates and GROUP BY can scan far more than their output LIMIT. Bound
   // input evidence before running them. Narrower periods stay available.
   if(!row||!Number.isSafeInteger(row.rows)||row.rows<0||row.rows>20_000)throw new D1BudgetError('D1_SCOPE_BUDGET_WAIT');
+  return row.rows;
+}
+
+
+// Narrow read estimate for indexed performance queries, never a raised limit.
+// Coverage is validated before estimating. Actual metadata accounting, unknown
+// cost retention and overrun blocking remain mandatory in perform().
+export async function boundedCoverageRead(env:Env,statement:D1PreparedStatement,scope:'page'|'query',start:string,end:string){
+ if(!guardRequired(env))return statement;
+ const proof=statementProofs.get(statement),table=scope==='page'?'gsc_daily_by_page':'gsc_daily_by_query_device';
+ if(!proof)throw new D1BudgetError('D1_UNMETERED_METHOD');
+ const {sql,params}=proof,range=/c\.day BETWEEN \? AND \?/i.exec(sql);
+ const offset=range?(sql.slice(0,range.index).match(/\?/g)||[]).length:-1;
+ const scopeParam=/c\.scope=\?/.exec(sql),scopeOffset=scopeParam?(sql.slice(0,scopeParam.index).match(/\?/g)||[]).length:-1;
+ const tables=[...sql.matchAll(/\b(?:FROM|JOIN)\s+([a-z_]+)/gi)].map(m=>m[1]);
+ const knownTables=new Set(['dataset_coverage',table,'products','pages','page_aliases','json_each']);
+ if(tables.some(name=>!knownTables.has(name))||/\bUNION\b/i.test(sql))throw new D1BudgetError('D1_SCOPE_BUDGET_WAIT');
+ if(!/^\s*SELECT\b/i.test(sql)||sql.includes(';')||!sql.includes('dataset_coverage c INDEXED BY coverage_active')||!sql.includes(table+' d')||!sql.includes('c.complete=1')||!(/d.dataset_id=c.dataset_id|c.dataset_id=d.dataset_id/.test(sql))||!(/d.date=c.day|c.day=d.date/.test(sql))||!range||params[offset]!==start||params[offset+1]!==end||!(sql.includes("c.scope='"+scope+"'")||scopeOffset>=0&&params[scopeOffset]===scope))throw new D1BudgetError('D1_SCOPE_BUDGET_WAIT');
+ const rows=await boundedDataScope(env,start,end,scope);
+ // Fact row + bounded unique product/page/alias index lookups; retain a large
+ // metadata/index margin. Unknown or changed source counts still fail closed.
+ readEstimates.set(statement,Math.min(queryAllowance(sql),10_000+rows*12));
+ return statement;
 }

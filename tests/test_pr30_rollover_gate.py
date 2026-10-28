@@ -32,3 +32,11 @@ class RollbackTests(unittest.TestCase):
     return {'ok':True,'result':{'schedules':[{'cron':'*/15 * * * *'}]}}
   self.assertTrue(gate.verify_rollback_cron(Client(),{'previous_crons':['*/15 * * * *']})['cron_preserved'])
   with self.assertRaisesRegex(ValueError,'CRON_DRIFT'):gate.verify_rollback_cron(Client(),{'previous_crons':[]})
+
+class PerformanceAdmissionTests(GateTests):
+ def test_same_daily_limits_apply_to_performance_release(self):
+  row={**self.row,'reads':1845332,'account_reads':1416659}
+  self.assertTrue(gate.verify(Fake(row),self.now,performance=True)['passed'])
+  with self.assertRaises(ValueError):gate.verify(Fake(row),self.now)
+  for reads in (1980001,2000000):
+   with self.assertRaises(ValueError):gate.verify(Fake({**row,'reads':reads}),self.now,performance=True)

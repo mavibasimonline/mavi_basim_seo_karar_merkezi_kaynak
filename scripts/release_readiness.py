@@ -75,11 +75,11 @@ if __name__=='__main__':
   result=readiness(Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID')),os.environ.get('GITHUB_SHA'),os.environ.get('GITHUB_EVENT_NAME'),os.environ.get('EXPECTED_PREVIOUS_VERSION') or None)
   source=os.environ.get('RELEASE_SOURCE_COMMIT')
   if source:
-   from scoped_release import ROOT,plan,assets
+   from scoped_release import ROOT,plan,assets,PERFORMANCE_SOURCE
    live=live_guard_deployment()
    if not live:raise ValueError('LIVE_GUARD_REQUIRED')
    selected=plan(ROOT,source,os.environ.get('GITHUB_SHA'),live,lambda path:get_json('https://api.github.com/repos/'+REPOSITORY+path,os.environ.get('GITHUB_TOKEN')))
-   result.update(source_commit=source,scoped_source=selected,source_assets=assets(ROOT,source),needed=live.get('commit')!=source)
+   result.update(source_commit=source,scoped_source=selected,source_assets=assets(ROOT,live['commit'] if source==PERFORMANCE_SOURCE else source),needed=live.get('commit')!=source)
   else:result['source_commit']=os.environ.get('GITHUB_SHA')
   folder=Path('.local');folder.mkdir(exist_ok=True);(folder/'release-readiness.json').write_text(json.dumps(result,indent=2));print(json.dumps(result))
   if os.environ.get('GITHUB_OUTPUT'):

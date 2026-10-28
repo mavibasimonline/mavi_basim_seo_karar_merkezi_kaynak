@@ -92,6 +92,11 @@ jobs:
       - name: PR30 doğal UTC gün geçişi ve kullanıcı payını salt okunur doğrula
         if: needs.prepare.outputs.source_commit == 'f888618954a49f0117ac1dfbd1d43ea80393a03b'
         run: python3 scripts/pr30_rollover_gate.py
+      - name: İzole performans sürümünün aynı limitlerde gerçek API kabulü
+        if: needs.prepare.outputs.source_commit == '8b56115f52ef2e7690927614365165ade4bfbdaa'
+        run: |
+          python3 scripts/pr30_rollover_gate.py --performance
+          python3 scripts/performance_acceptance.py
       - name: Aynı Worker'a, mevcut secret ve D1 binding'lerini koruyarak yayımla
         id: publish
         run: |
@@ -103,7 +108,11 @@ jobs:
           python3 scripts/production_guard.py smoke
           if [ "$RELEASE_SOURCE_COMMIT" != "$GITHUB_SHA" ]; then
             python3 scripts/scoped_release.py assets
-            python3 scripts/mapping_canary.py
+            if [ "$RELEASE_SOURCE_COMMIT" = "8b56115f52ef2e7690927614365165ade4bfbdaa" ]; then
+              python3 scripts/performance_acceptance.py
+            else
+              python3 scripts/mapping_canary.py
+            fi
           fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
@@ -117,13 +126,13 @@ jobs:
         env:
           PREVIOUS_VERSION: ${{ steps.guard.outputs.previous_version }}
         run: |
-          if [ "$RELEASE_SOURCE_COMMIT" != "f888618954a49f0117ac1dfbd1d43ea80393a03b" ]; then
+          if [ "$RELEASE_SOURCE_COMMIT" != "f888618954a49f0117ac1dfbd1d43ea80393a03b" ] && [ "$RELEASE_SOURCE_COMMIT" != "8b56115f52ef2e7690927614365165ade4bfbdaa" ]; then
             python3 scripts/production_guard.py pause-cron
           fi
           node scripts/run.mjs wrangler rollback "$PREVIOUS_VERSION" --config deploy/wrangler.production.jsonc --message "Automatic rollback after failed release verification" --yes
-          if [ "$RELEASE_SOURCE_COMMIT" != "f888618954a49f0117ac1dfbd1d43ea80393a03b" ]; then
+          if [ "$RELEASE_SOURCE_COMMIT" != "f888618954a49f0117ac1dfbd1d43ea80393a03b" ] && [ "$RELEASE_SOURCE_COMMIT" != "8b56115f52ef2e7690927614365165ade4bfbdaa" ]; then
             python3 scripts/production_guard.py pause-cron
           fi
-          if [ "$RELEASE_SOURCE_COMMIT" = "f888618954a49f0117ac1dfbd1d43ea80393a03b" ]; then
+          if [ "$RELEASE_SOURCE_COMMIT" = "f888618954a49f0117ac1dfbd1d43ea80393a03b" ] || [ "$RELEASE_SOURCE_COMMIT" = "8b56115f52ef2e7690927614365165ade4bfbdaa" ]; then
             python3 scripts/pr30_rollover_gate.py --verify-rollback-cron
           fi

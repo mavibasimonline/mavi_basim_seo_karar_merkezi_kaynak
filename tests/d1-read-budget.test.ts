@@ -115,3 +115,21 @@ it('interactive headroom preserves the login attempt limiter',async()=>{
  for(let i=0;i<5;i++)expect((await attempt('TEST wrong')).status).toBe(401);
  const blocked=await attempt(env.ADMIN_TOKEN!);expect(blocked.status).toBe(429);expect(await blocked.json()).toEqual({error:'Çok fazla deneme. 15 dakika sonra tekrar deneyin.'});
 });
+it('indexed coverage estimate rejects a different SQL-bound date scope',async()=>{
+ const {boundedCoverageRead}=await import('../src/d1-read-budget');const cfg=await guarded();
+ await expect(withReadBudget(cfg,'/api/performance',safe=>boundedCoverageRead(safe,safe.DB.prepare("SELECT d.* FROM dataset_coverage c INDEXED BY coverage_active CROSS JOIN gsc_daily_by_page d ON d.dataset_id=c.dataset_id AND d.date=c.day WHERE c.scope='page' AND c.complete=1 AND c.day BETWEEN ? AND ?").bind('2026-01-01','2026-12-31'),'page','2026-10-01','2026-10-31'),TIME)).rejects.toThrow('D1_SCOPE_BUDGET_WAIT');
+});
+it('unchanged performance evidence reuses its original measured response beyond five minutes',async()=>{
+ const t=new Date('2026-10-26T10:00:00Z');let calls=0;
+ const compute=async()=>({measured_at:t.toISOString(),rows:[{fixture:true}],fresh:false,call:++calls});
+ const first=await cachedRead(env,'/api/performance?month=2026-10',compute,t);
+ expect(await cachedRead(env,'/api/performance?month=2026-10',compute,new Date(t.getTime()+3600000))).toEqual(first);expect(calls).toBe(1);
+ await env.DB.prepare("INSERT INTO health_checks VALUES('gsc','2026-10-26',?,'ok',NULL)").bind(new Date(t.getTime()+4000000).toISOString()).run();
+ expect((await cachedRead(env,'/api/performance?month=2026-10',compute,new Date(t.getTime()+4000000))).call).toBe(2);
+});
+
+it('default filters and URL ordering cannot multiply identical GSC cache scans',async()=>{
+ let calls=0;const compute=async()=>({fixture:++calls});
+ expect(await cachedRead(env,'/api/performance?month=2026-10',compute)).toEqual(await cachedRead(env,'/api/performance?device=ALL&rangeMonths=1&month=2026-10',compute));
+ expect(calls).toBe(1);
+});
