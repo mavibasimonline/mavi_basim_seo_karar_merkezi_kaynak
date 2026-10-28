@@ -270,8 +270,8 @@ function unavailableReport(data, error) {
     products: data.catalog.map((p) => ({
       ...p,
       url_verified: !!p.url_verified_at,
-      current: null,
-      previous: null,
+      current: data.products.find((row) => row.id === p.id)?.current ?? null,
+      previous: data.products.find((row) => row.id === p.id)?.previous ?? null,
       decision: "Veri bekle",
       reason:
         "SEO analizine şu anda erişilemiyor. Grafik yalnız bağımsız doğrulanmış günlük kayıtları gösterir.",
@@ -284,7 +284,9 @@ function unavailableReport(data, error) {
         non_brand: null,
         note: "Sorgu analizi henüz doğrulanmadı.",
       },
-      evidence: [],
+      evidence: data.products.some((row) => row.id === p.id && row.current)
+        ? data.series.filter((day) => day.verified && day.dataset_id).map((day) => ({source: 'GSC', ref: day.dataset_id, fetched_at: day.fetched_at}))
+        : [],
       missing: ["SEO analizi alınamadı; kesin öneri üretilmedi."],
       comparisons: {},
     })),

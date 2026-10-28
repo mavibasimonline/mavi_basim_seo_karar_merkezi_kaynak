@@ -519,3 +519,21 @@ it("protects multi-month HTTP APIs, validates range parameters and exports expli
     });
   }
 });
+
+it('guarded performance and queries fit a small remaining daily budget without raising any limit',async()=>{
+ const now=new Date(),day=now.toISOString().slice(0,10);
+ await seed('2026-10-02',[{clicks:7,impressions:100,position:3}]);
+ await seed('2026-10-02',[{clicks:7,impressions:100,position:3}],'query');
+ await env.DB.prepare('INSERT INTO d1_quota_state VALUES(?,?,?,?,?,?,?,?)').bind(day,now.toISOString(),now.toISOString(),new Date(now.getTime()+4500000).toISOString(),1000,1000,'open','TEST').run();
+ await env.DB.prepare('INSERT INTO d1_quota_ledger VALUES(?,?,?,?)').bind(day,1850000,0,now.toISOString()).run();
+ await env.DB.prepare('UPDATE products SET url_verified_at=?').bind(now.toISOString()).run();
+ const cfg={...env,D1_READ_GUARD_ENABLED:'true'};
+ for(const path of ['/api/performance?month=2026-10','/api/performance/queries?month=2026-10&product=brosur']){
+  const response=await worker.fetch(request(path),cfg);const payload=await response.json() as {code?:string;reason?:string;products?:{id:string;current:{clicks:number}}[];rows?:{clicks:number}[]};
+  expect({status:response.status,code:payload.code,reason:payload.reason}).toEqual({status:200,code:undefined,reason:undefined});
+  if(payload.products)expect(payload.products.find(p=>p.id==='brosur')!.current.clicks).toBe(7);
+  if(payload.rows)expect(payload.rows[0].clicks).toBe(7);
+ }
+ const ledger=await env.DB.prepare('SELECT reads FROM d1_quota_ledger WHERE day=?').bind(day).first<{reads:number}>();
+ expect(ledger!.reads).toBeGreaterThan(1850000);expect(ledger!.reads).toBeLessThan(2000000);
+});
