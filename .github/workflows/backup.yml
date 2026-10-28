@@ -83,7 +83,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Salt okunur üretim tanılaması — secret veya ham sorgu çıktısı yok
-        run: python3 scripts/cloudflare_diagnostics.py
+        run: |
+          npm ci --ignore-scripts --no-fund
+          python3 scripts/performance_probe.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: production-diagnostics-${{ github.run_id }}
