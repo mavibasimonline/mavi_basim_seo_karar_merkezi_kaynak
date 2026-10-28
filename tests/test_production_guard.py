@@ -20,6 +20,7 @@ class Fake:
   self.calls.append((method,path,body))
   if method=='PUT':return {'ok':True,'result':[]}
   if path.endswith('/deployments'):return {'ok':True,'result':{'deployments':[{'created_on':'2026-10-24','versions':[{'version_id':VERSION if not self.changed else 'other','percentage':100}]}]}}
+  if '/versions/' in path:return {'ok':True,'result':{'annotations':{'workers/tag':'c'*40}}}
   if path.endswith('/schedules'):return {'ok':True,'result':{'schedules':[{'cron':'*/15 * * * *'}]}}
   bindings=[{'name':name,'type':'plain_text','text':value} for name,value in self.config['vars'].items()]
   bindings += [{'name':name,'type':'secret_text'} for name in ('ADMIN_TOKEN','TOKEN_ENCRYPTION_KEY','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET')]
