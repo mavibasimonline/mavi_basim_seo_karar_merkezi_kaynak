@@ -21,12 +21,21 @@ try:
     with urllib.request.urlopen('http://127.0.0.1:8796/',timeout=2) as response:statuses.add(response.status)
    except urllib.error.HTTPError as error:
     statuses.add(error.code)
-    if error.code==404:break
+    break # The loopback server is listening; authorization is tested below.
    except OSError:pass
    time.sleep(1)
   else:raise ValueError('EDGE_PREVIEW_START_TIMEOUT')
   req=urllib.request.Request('http://127.0.0.1:8796/',headers={'Authorization':'Bearer '+key})
-  with urllib.request.urlopen(req,timeout=40) as response:result=json.loads(response.read(20000))
+  try:response=urllib.request.urlopen(req,timeout=40)
+  except urllib.error.HTTPError as error:response=error
+  with response:
+   body=response.read(20000)
+   if response.status!=200:
+    text=body.decode(errors='replace').lower()
+    result={'authorized_preview_http_status':response.status,'server':response.headers.get('Server','unknown'),
+      'error_numbers':sorted(set(re.findall(r'\b(?:error|code)[: ]+(\d{3,6})\b',text))),
+      'response_flags':{word:word in text for word in ('preview','forbidden','proxy','blocked','cloudflare','token','invalid','1042','localhost','origin','host')}}
+   else:result=json.loads(body)
   print(json.dumps(result),flush=True)
 except Exception:
  text=(folder/'runtime.log').read_text(errors='replace') if (folder/'runtime.log').exists() else ''
