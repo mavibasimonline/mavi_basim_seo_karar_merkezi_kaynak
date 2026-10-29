@@ -5,6 +5,8 @@ import re
 from pathlib import Path
 from cloudflare_diagnostics import Cloudflare
 from d1_quota_checkpoint import observation
+import urllib.request
+import urllib.error
 
 WORKER = 'mavi-basim-quota-observer'
 APP = 'mavi-basim-seo-prod'
@@ -13,6 +15,42 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def require(value, code):
  if not value: raise ValueError(code)
+
+
+def deployment_identity(client):
+ class NoRedirect(urllib.request.HTTPRedirectHandler):
+  def redirect_request(self, *args, **kwargs): return None
+ opener = urllib.request.build_opener(NoRedirect())
+ def read(path):
+  request = urllib.request.Request('https://api.cloudflare.com/client/v4' + path,
+   headers={'Authorization': 'Bearer ' + client.token, 'Accept': 'application/json'})
+  try:
+   with opener.open(request, timeout=20) as response:
+    raw = response.read(64001)
+   if len(raw) > 64000: return {'ok': False, 'code': 'RESPONSE_LIMIT'}
+   value = json.loads(raw)
+   return {'ok': value.get('success') is True, 'result': value.get('result')}
+  except urllib.error.HTTPError as error: return {'ok': False, 'code': 'HTTP_' + str(error.code)}
+  except (OSError, ValueError): return {'ok': False, 'code': 'TRANSPORT_OR_JSON_ERROR'}
+ result = read('/user/tokens/verify'); scope = '/user/tokens/'
+ if not result.get('ok'):
+  scope = '/accounts/' + client.account + '/tokens/'
+  result = read(scope + 'verify')
+ if not result.get('ok'): return {'verified': False, 'code': result.get('code')}
+ record = result.get('result') or {}; token_id = record.get('id', '')
+ if not re.fullmatch('[a-f0-9]{32}', token_id): return {'verified': False, 'code': 'TOKEN_ID_UNAVAILABLE'}
+ details = read(scope + token_id)
+ out = {'verified': True, 'token_id': token_id, 'status': record.get('status'),
+        'token_details_access': details.get('ok') is True, 'token_details_code': details.get('code'),
+        'application_account_suffix': client.account[-6:]}
+ if details.get('ok'):
+  metadata = details.get('result') or {}
+  out['matches_expected_name'] = metadata.get('name') == 'mavi-basim-seo-deploy'
+  out['policies'] = [{'effect': p.get('effect'),
+     'permissions': [g.get('name') or g.get('id') for g in p.get('permission_groups', [])],
+     'applies_to_application_account': ('com.cloudflare.api.account.' + client.account) in p.get('resources', {})
+      or p.get('resources', {}).get('com.cloudflare.api.account') == '*'} for p in metadata.get('policies', [])]
+ return out
 
 
 def inspect(client):
@@ -29,7 +67,9 @@ def inspect(client):
  secret = os.environ.get('CF_QUOTA_ANALYTICS_TOKEN')
  plain_subscriptions = client.request('GET', base + '/subscriptions')
  sample = observation(Cloudflare(secret, client.account)) if secret else {'ok': False, 'reason': 'MISSING_SECRET'}
- return {'read_only': True, 'runtime_token_available': bool(secret),
+ return {'deployment_identity': deployment_identity(client),
+         'application_present_in_bound_account': any(s.get('id') == APP for s in scripts.get('result', []) if isinstance(s, dict)),
+         'read_only': True, 'runtime_token_available': bool(secret),
          'separate_token_required': True,
          'account_token_metadata_access': tokens.get('ok') is True,
          'subscriptions_access': subscriptions.get('ok') is True,
