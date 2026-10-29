@@ -3,6 +3,8 @@ import json
 import os
 import sys
 import unittest
+import io
+from contextlib import redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -38,6 +40,46 @@ def scheduled():
 
 
 class ObserverReleaseTests(unittest.TestCase):
+ def test_only_the_exact_reviewed_stopped_observer_can_resume(self):
+  client = Client()
+  settings = {'bindings': [
+   {'name': 'DB', 'type': 'd1', 'id': release.DATABASE},
+   {'name': 'CF_VERSION_METADATA', 'type': 'version_metadata'},
+   {'name': 'QUOTA_OBSERVER_ENABLED', 'type': 'plain_text', 'text': 'true'},
+   {'name': 'CLOUDFLARE_ACCOUNT_ID', 'type': 'plain_text', 'text': client.account},
+   {'name': 'CF_QUOTA_ANALYTICS_TOKEN', 'type': 'secret_text'}]}
+  deployments = {'deployments': [{'created_on': '2026-10-29', 'versions': [
+   {'version_id': VERSION, 'percentage': 100}]}]}
+  metadata = {'annotations': {'workers/tag': release.FAILED_OBSERVER_SOURCE}}
+  with patch.object(release, 'api', side_effect=[deployments, metadata]):
+   release.verify_stopped_observer(client, settings, [], VERSION)
+  for crons, pin in ([release.CRON], VERSION), ([], ''), ([], 'invalid'):
+   with patch.object(release, 'api') as api, self.assertRaises(ValueError):
+    release.verify_stopped_observer(client, settings, crons, pin)
+   api.assert_not_called()
+  with patch.object(release, 'api', return_value=deployments):
+   with self.assertRaisesRegex(ValueError, 'STOPPED_OBSERVER_VERSION_CHANGED'):
+    release.verify_stopped_observer(client, settings, [], '22222222-2222-4222-8222-222222222222')
+  with patch.object(release, 'api', side_effect=[deployments, {'annotations': {'workers/tag': 'd'*40}}]):
+   with self.assertRaisesRegex(ValueError, 'STOPPED_OBSERVER_SOURCE_CHANGED'):
+    release.verify_stopped_observer(client, settings, [], VERSION)
+
+ def test_rejected_event_retains_safe_reason_and_phase_without_private_payloads(self):
+  event = scheduled()
+  result = {'event': 'quota-observer', 'commit': SHA, 'version_id': VERSION,
+            'status': 'held', 'code': 'OBSERVER_UNAVAILABLE_NO_RETRY', 'phase': 'health'}
+  for code, phase in [('OBSERVER_UNAVAILABLE_NO_RETRY', 'health'), ('TEST_PRIVATE_TOKEN', 'TEST_PRIVATE_URL')]:
+   event['logs'][0]['message'] = [json.dumps({**result, 'code': code, 'phase': phase})]
+   output = io.StringIO()
+   with redirect_stdout(output), self.assertRaisesRegex(ValueError, 'OBSERVER_SCHEDULED_CHECKPOINT_NOT_RECORDED'):
+    release.recorded_event(event, SHA, VERSION, 1)
+   safe = json.loads(output.getvalue())
+   if code == result['code']:
+    self.assertEqual((safe['code'], safe['phase']), (code, phase))
+   else:
+    self.assertEqual(safe['code'], 'UNKNOWN_OBSERVER_RESULT'); self.assertIsNone(safe['phase'])
+   self.assertNotIn('TEST_PRIVATE', output.getvalue())
+
  def test_inspection_and_publication_use_the_unpaginated_subscriptions_api(self):
   client = Client()
   def request(method, path, body=None):
@@ -71,7 +113,10 @@ class ObserverReleaseTests(unittest.TestCase):
   for key, value in [('route', 'mavibasim.com/*'), ('workers_dev', True),
                      ('preview_urls', True), ('limits', {'cpu_ms': 100}),
                      ('assets', {'directory': '../public'}), ('name', release.APP),
-                     ('d1_databases', [{'binding': 'DB', 'database_id': 'other'}])]:
+                     ('d1_databases', [{'binding': 'DB', 'database_id': 'other'}]),
+                     ('services', []),
+                     ('services', [{'binding': 'APP_HEALTH', 'service': 'wrong-worker'}]),
+                     ('compatibility_flags', ['global_fetch_private_origin'])]:
    config = {**original, key: value}
    with self.subTest(key=key), self.assertRaises(ValueError): release.validate_config(config)
 

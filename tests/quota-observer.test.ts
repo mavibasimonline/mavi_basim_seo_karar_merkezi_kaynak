@@ -9,14 +9,36 @@ const health={ok:true,deployment:{read_guard_revision:'d1-account-reads-v1',comm
 function analytics(reads:unknown=1000,writes:unknown=100,stamp='2026-10-27T15:00:00Z'){
  return {data:{viewer:{accounts:[{d1AnalyticsAdaptiveGroups:[{sum:{rowsRead:reads,rowsWritten:writes},dimensions:{datetimeHour:stamp}}]}]}}};
 }
-function cfg(extra:Partial<ObserverEnv>={}):ObserverEnv{return {DB:env.DB,QUOTA_OBSERVER_ENABLED:'true',CLOUDFLARE_ACCOUNT_ID:'a'.repeat(32),CF_QUOTA_ANALYTICS_TOKEN:'TEST_READ_ONLY_ANALYTICS_TOKEN',...extra};}
-function remote(value=analytics(),live=health){return vi.fn(async(url:any)=>Response.json(String(url).includes('/api/health')?live:value)) as unknown as ReturnType<typeof vi.fn>&typeof fetch;}
+function cfg(extra:Partial<ObserverEnv>={}):ObserverEnv{return {DB:env.DB,APP_HEALTH:{fetch:async()=>Response.json(health)} as unknown as Fetcher,QUOTA_OBSERVER_ENABLED:'true',CLOUDFLARE_ACCOUNT_ID:'a'.repeat(32),CF_QUOTA_ANALYTICS_TOKEN:'TEST_READ_ONLY_ANALYTICS_TOKEN',...extra};}
+function remote(value=analytics(),live=health){return vi.fn(async(url:any,init:any)=>{new Request(url,init);return Response.json(String(url).includes('/api/health')?live:value);}) as unknown as ReturnType<typeof vi.fn>&typeof fetch;}
 async function state(){return env.DB.prepare('SELECT * FROM d1_quota_state').first<any>();}
 
 it('is disabled by default and makes no network or D1 calls',async()=>{const f=remote();expect(await observeQuota(cfg({QUOTA_OBSERVER_ENABLED:'false'}),f)).toEqual({status:'disabled'});expect(f).not.toHaveBeenCalled();expect(await state()).toBeNull();});
-it.each([{CF_QUOTA_ANALYTICS_TOKEN:undefined},{CLOUDFLARE_ACCOUNT_ID:'invalid'},{CF_QUOTA_ANALYTICS_TOKEN:'bad\r\nvalue'}])('missing or unsafe bindings hold without network',async(extra)=>{const f=remote();expect(await observeQuota(cfg(extra),f)).toMatchObject({status:'held'});expect(f).not.toHaveBeenCalled();});
+it.each([{CF_QUOTA_ANALYTICS_TOKEN:undefined},{CLOUDFLARE_ACCOUNT_ID:'invalid'},{CF_QUOTA_ANALYTICS_TOKEN:'bad\r\nvalue'},{APP_HEALTH:undefined}])('missing or unsafe bindings hold without network',async(extra)=>{const f=remote();expect(await observeQuota(cfg(extra),f)).toMatchObject({status:'held'});expect(f).not.toHaveBeenCalled();});
 it('renews only the existing primary-key quota record and never resets reservations',async()=>{await env.DB.prepare('INSERT INTO d1_quota_ledger VALUES(?,?,?,?)').bind('2026-10-27',12345,4321,TIME.toISOString()).run();const f=remote();const r=await observeQuota(cfg(),f,()=>TIME);expect(r.status).toBe('checkpoint_recorded');expect(r.rows_read).toBeLessThanOrEqual(10);expect(r.rows_written).toBeLessThanOrEqual(10);expect(await state()).toMatchObject({account_reads:1000,account_writes:100,mode:'open',valid_until:'2026-10-27T16:22:00.000Z'});expect(await env.DB.prepare('SELECT reads,writes FROM d1_quota_ledger').first()).toEqual({reads:12345,writes:4321});expect(f).toHaveBeenCalledTimes(2);});
-it('queries all databases in the account and sends the read-only token only to fixed GraphQL',async()=>{const f=remote();await observeQuota(cfg(),f,()=>TIME);const [url,init]=f.mock.calls[1];expect(url).toBe('https://api.cloudflare.com/client/v4/graphql');const body=JSON.parse(init.body);expect(body.variables.accountTag).toBe('a'.repeat(32));expect(JSON.stringify(body)).not.toContain('databaseId');expect(f.mock.calls[0][1].headers.Authorization).toBeUndefined();expect(init.redirect).toBe('error');});
+it('queries all databases in the account and sends the read-only token only to fixed GraphQL',async()=>{const f=remote();await observeQuota(cfg(),f,()=>TIME);const [url,init]=f.mock.calls[1];expect(url).toBe('https://api.cloudflare.com/client/v4/graphql');const body=JSON.parse(init.body);expect(body.variables.accountTag).toBe('a'.repeat(32));expect(JSON.stringify(body)).not.toContain('databaseId');expect(f.mock.calls[0][1].headers.Authorization).toBeUndefined();expect(init.redirect).toBe('manual');});
+
+it.each([301,302,303,307,308])('rejects HTTP %s on both fixed upstreams without following a redirect or writing D1',async(status)=>{
+ for(const at of ['health','analytics']){
+  const f=vi.fn(async(url:any,init:any)=>{
+   const request=new Request(url,init);expect(request.redirect).toBe('manual');
+   if(at==='health'||!String(url).includes('/api/health'))return new Response(null,{status,headers:{Location:'https://untrusted.example/'}});
+   return Response.json(health);
+  }) as unknown as ReturnType<typeof vi.fn>&typeof fetch;
+  expect(await observeQuota(cfg(),f,()=>TIME)).toMatchObject({status:'held'});
+  expect(f).toHaveBeenCalledTimes(at==='health'?1:2);
+  expect(f.mock.calls.every(call=>!String(call[0]).includes('untrusted.example'))).toBe(true);
+  expect(await state()).toBeNull();
+ }
+});
+
+it('uses only the fixed service binding for health and global fetch only for authenticated Analytics',async()=>{
+ const service=vi.fn(async(input:any,init:any)=>{expect(String(input)).toContain('/api/health');expect(new Request(input,init).redirect).toBe('manual');expect(init.headers.Authorization).toBeUndefined();return Response.json(health);});
+ const network=vi.fn(async(input:any,init:any)=>{expect(String(input)).toBe('https://api.cloudflare.com/client/v4/graphql');expect(init.headers.Authorization).toBe('Bearer TEST_READ_ONLY_ANALYTICS_TOKEN');new Request(input,init);return Response.json(analytics());});
+ vi.stubGlobal('fetch',network);
+ try{expect(await observeQuota(cfg({APP_HEALTH:{fetch:service} as unknown as Fetcher}),undefined,()=>TIME)).toMatchObject({status:'checkpoint_recorded'});expect(service).toHaveBeenCalledTimes(1);expect(network).toHaveBeenCalledTimes(1);}
+ finally{vi.unstubAllGlobals();}
+});
 it.each([[3500000,0],[0,85000],[5000000,100000]])('account stop values do not touch D1 (%s,%s)',async(reads,writes)=>{expect(await observeQuota(cfg(),remote(analytics(reads,writes)),()=>TIME)).toMatchObject({status:'held',code:'ACCOUNT_BUDGET_HOLD'});expect(await state()).toBeNull();});
 it.each([-1,0.1,Infinity,NaN,'0',true,null])('invalid account counters hold: %s',async(value)=>{expect(await observeQuota(cfg(),remote(analytics(value)),()=>TIME)).toMatchObject({status:'held'});expect(await state()).toBeNull();});
 it.each(['2026-10-27T16:00:00Z','2026-10-27T12:00:00Z','2026-10-26T23:00:00Z','2026-10-27T15:07:00Z','2026-10-27T15:00:00','nonsense'])('invalid or stale hourly source holds: %s',async(stamp)=>{expect(await observeQuota(cfg(),remote(analytics(1,1,stamp)),()=>TIME)).toMatchObject({status:'held'});expect(await state()).toBeNull();});
@@ -50,7 +72,7 @@ it('Cloudflare scheduled renewal restores guarded access after a four-hour GitHu
    cfg({CF_VERSION_METADATA:{id:health.deployment.version_id,tag:health.deployment.commit}}),
    {waitUntil:(task:Promise<unknown>)=>tasks.push(task)} as any);
   await Promise.all(tasks);
-  expect(f).toHaveBeenCalledTimes(2);
+  expect(f).toHaveBeenCalledTimes(1);
   expect(await env.DB.prepare('SELECT reads,writes FROM d1_quota_ledger').first()).toEqual({reads:12345,writes:4321});
   expect(await state()).toMatchObject({observed_at:TIME.toISOString(),valid_until:'2026-10-27T16:22:00.000Z'});
   expect(JSON.parse(log.mock.calls[0][0])).toMatchObject({event:'quota-observer',status:'checkpoint_recorded',commit:health.deployment.commit,version_id:health.deployment.version_id});
