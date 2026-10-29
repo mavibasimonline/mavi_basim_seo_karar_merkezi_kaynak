@@ -38,6 +38,24 @@ def scheduled():
 
 
 class ObserverReleaseTests(unittest.TestCase):
+ def test_inspection_and_publication_use_the_unpaginated_subscriptions_api(self):
+  client = Client()
+  def request(method, path, body=None):
+   self.assertEqual(method, 'GET')
+   self.assertIsNone(body)
+   client.calls.append((method, path, body))
+   if '/subscriptions' in path:
+    return {'ok': True, 'result': []} if path.endswith('/subscriptions') else {'ok': False, 'code': 'HTTP_400'}
+   return {'ok': True, 'result': []}
+  client.request = request
+  self.assertTrue(release.inspect(client)['subscriptions_access'])
+  client.calls.clear()
+  with patch.dict(os.environ, {'GITHUB_REF': 'refs/heads/main', 'CF_QUOTA_ANALYTICS_TOKEN': 'TEST_ANALYTICS_ONLY'}), \
+       patch.object(release, 'observation', return_value={'ok': True, 'mode': 'open'}), \
+       patch.object(release, 'application_lock', return_value={'fixture': True}):
+   self.assertTrue(release.preflight(client, SHA, ci)['free_plan_verified'])
+  self.assertIn(('GET', '/accounts/' + client.account + '/subscriptions', None), client.calls)
+
  def test_real_free_plan_is_required_and_unknown_workers_plans_are_held(self):
   self.assertTrue(release.free_plan([]))
   self.assertTrue(release.free_plan([{'rate_plan': {'id': 'workers_free', 'public_name': 'Workers Free'}}]))
