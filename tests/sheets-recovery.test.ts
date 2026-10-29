@@ -1,7 +1,8 @@
 import {beforeEach,it,expect} from 'vitest';
 import {init,env,enqueue} from './helpers';
 import {hash} from '../src/types';
-import pilot,{importEvidence,SHEETS_SOURCE} from '../src/sheets-recovery-pilot';
+import pilot from '../src/sheets-recovery-pilot';
+import {importEvidence,SHEETS_SOURCE} from '../src/sheets-recovery';
 beforeEach(init);
 async function record(day='2026-07-01'){
  const content={source:SHEETS_SOURCE,section:'GSC_GUNLUK',family:'site_daily_total',identity:day,start:day,end:day,payload:{clicks:1,impressions:10,manual_note:'TEST preserve unknown fields'}};
