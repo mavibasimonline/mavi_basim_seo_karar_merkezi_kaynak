@@ -26,7 +26,8 @@ def require(value, code):
 def inspect(client):
  """Read-only access/plan discovery; deliberately excludes secret values."""
  base = '/accounts/' + client.account
- subscriptions = client.request('GET', base + '/subscriptions?per_page=100&page=1')
+ # Cloudflare subscriptions is a SinglePage API; pagination parameters return 400.
+ subscriptions = client.request('GET', base + '/subscriptions')
  scripts = client.request('GET', base + '/workers/scripts')
  tokens = client.request('GET', base + '/tokens?per_page=1')
  plans = []
@@ -135,7 +136,7 @@ def preflight(client, sha, github=None):
  token = os.environ.get('CF_QUOTA_ANALYTICS_TOKEN')
  require(bool(token) and token != client.token and not re.search(r'[\r\n]', token),
          'SEPARATE_ANALYTICS_READ_TOKEN_REQUIRED')
- free_plan(api(client, 'GET', '/subscriptions?per_page=100&page=1'))
+ free_plan(api(client, 'GET', '/subscriptions'))
  scripts = api(client, 'GET', '/workers/scripts')
  require(isinstance(scripts, list) and len(scripts) < 100, 'FREE_WORKER_LIMIT_REQUIRED')
  total_crons = 0
