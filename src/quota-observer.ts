@@ -1,7 +1,7 @@
 // Independent scheduled observer. Never imports the application, OAuth or sync engine.
 import {ACCOUNT_READ_STOP,ACCOUNT_WRITE_STOP} from './d1-read-budget';
 
-export const OBSERVER_CRON='2,32 * * * *';
+export const OBSERVER_CRON='2,17,32,47 * * * *';
 const APP='https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/health';
 const GRAPHQL='https://api.cloudflare.com/client/v4/graphql';
 const QUERY=`query D1ReadBudget($accountTag: string, $filter: ZoneWorkersRequestsFilter_InputObject) {
@@ -12,6 +12,7 @@ export interface ObserverEnv {
  QUOTA_OBSERVER_ENABLED?:string;
  CLOUDFLARE_ACCOUNT_ID?:string;
  CF_QUOTA_ANALYTICS_TOKEN?:string;
+ CF_VERSION_METADATA?:{id?:string;tag?:string};
 }
 type Sample={day:string;observed_at:string;data_through:string;valid_until:string;account_reads:number;account_writes:number;mode:'open'|'slow'|'blocked';reason:string};
 export const CHECKPOINT_SQL=`INSERT INTO d1_quota_state(day,observed_at,data_through,valid_until,account_reads,account_writes,mode,reason) VALUES(?,?,?,?,?,?,?,?)
@@ -28,14 +29,14 @@ export function parseObservation(value:unknown,now:Date):Sample{
  if(!Number.isFinite(now.getTime())||(v?.errors!=null&&(!Array.isArray(v.errors)||v.errors.length!==0))||!Array.isArray(v?.data?.viewer?.accounts)||v.data.viewer.accounts.length!==1)throw Error('ANALYTICS_INVALID');
  const rows=v.data.viewer.accounts[0]?.d1AnalyticsAdaptiveGroups;
  // Only datetimeHour is selected: at most 24 hourly groups in one UTC day.
- if(!Array.isArray(rows)||rows.length===0||rows.length>48)throw Error('ANALYTICS_EMPTY_OR_TRUNCATED');
+ if(!Array.isArray(rows)||rows.length===0||rows.length>24)throw Error('ANALYTICS_EMPTY_OR_TRUNCATED');
  const day=now.toISOString().slice(0,10),start=Date.parse(day+'T00:00:00Z');
  let reads=0,writes=0,latest=0;
  const seen=new Set<string>();
  for(const r of rows){
   const read=r?.sum?.rowsRead,write=r?.sum?.rowsWritten,stamp=r?.dimensions?.datetimeHour;
   const at=typeof stamp==='string'&&/(Z|[+]00:00)$/.test(stamp)?Date.parse(stamp):NaN;
-  if(!Number.isSafeInteger(read)||read<0||!Number.isSafeInteger(write)||write<0||!Number.isFinite(at)||at<start||at>now.getTime()||seen.has(new Date(at).toISOString()))throw Error('ANALYTICS_INVALID');
+  if(!Number.isSafeInteger(read)||read<0||!Number.isSafeInteger(write)||write<0||!Number.isFinite(at)||at%3_600_000!==0||at<start||at>now.getTime()||seen.has(new Date(at).toISOString()))throw Error('ANALYTICS_INVALID');
   seen.add(new Date(at).toISOString());reads+=read;writes+=write;latest=Math.max(latest,at);
  }
  if(!Number.isSafeInteger(reads)||!Number.isSafeInteger(writes)||now.getTime()-latest>7_200_000)throw Error('ANALYTICS_STALE_OR_INVALID');
@@ -70,8 +71,8 @@ export async function observeQuota(env:ObserverEnv,fetcher:typeof fetch=fetch,cl
   if(state.mode==='blocked')return {status:'held',code:'ACCOUNT_BUDGET_HOLD'};
   // One primary-key upsert only. No ledger reset, fact reads, retries or work dispatch.
   const r=await env.DB.prepare(CHECKPOINT_SQL).bind(...['day','observed_at','data_through','valid_until','account_reads','account_writes','mode','reason'].map(k=>state[k as keyof Sample])).run();
-  if(r.success!==true||!Number.isSafeInteger(r.meta?.rows_read)||!Number.isSafeInteger(r.meta?.rows_written)||r.meta.rows_read>10||r.meta.rows_written>10)throw Error('CHECKPOINT_COST_OR_WRITE_UNVERIFIED');
-  return {status:r.meta.changes?'checkpoint_recorded':'newer_checkpoint_preserved',rows_read:r.meta.rows_read,rows_written:r.meta.rows_written};
+  if(r.success!==true||!Number.isSafeInteger(r.meta?.rows_read)||!Number.isSafeInteger(r.meta?.rows_written)||r.meta.rows_read<0||r.meta.rows_written<0||r.meta.rows_read>10||r.meta.rows_written>10)throw Error('CHECKPOINT_COST_OR_WRITE_UNVERIFIED');
+  return {status:r.meta.changes?'checkpoint_recorded':'newer_checkpoint_preserved',rows_read:r.meta.rows_read,rows_written:r.meta.rows_written,observed_at:state.observed_at,valid_until:state.valid_until};
  }catch{
   // Never log secrets, provider payloads, URLs, query terms or account usage.
   return {status:'held',code:'OBSERVER_UNAVAILABLE_NO_RETRY'};
@@ -83,6 +84,6 @@ export default {
   if(event.cron!==OBSERVER_CRON)return;
   const now=Date.now();
   if(!Number.isFinite(event.scheduledTime)||event.scheduledTime>now||now-event.scheduledTime>30*60_000)return;
-  context.waitUntil(observeQuota(env).then(result=>{console.log(JSON.stringify({event:'quota-observer',...result}));}));
+  context.waitUntil(observeQuota(env).then(result=>{console.log(JSON.stringify({event:'quota-observer',commit:env.CF_VERSION_METADATA?.tag,version_id:env.CF_VERSION_METADATA?.id,...result}));}));
  },
 };

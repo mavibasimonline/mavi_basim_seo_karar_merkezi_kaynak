@@ -19,7 +19,7 @@ it('renews only the existing primary-key quota record and never resets reservati
 it('queries all databases in the account and sends the read-only token only to fixed GraphQL',async()=>{const f=remote();await observeQuota(cfg(),f,()=>TIME);const [url,init]=f.mock.calls[1];expect(url).toBe('https://api.cloudflare.com/client/v4/graphql');const body=JSON.parse(init.body);expect(body.variables.accountTag).toBe('a'.repeat(32));expect(JSON.stringify(body)).not.toContain('databaseId');expect(f.mock.calls[0][1].headers.Authorization).toBeUndefined();expect(init.redirect).toBe('error');});
 it.each([[3500000,0],[0,85000],[5000000,100000]])('account stop values do not touch D1 (%s,%s)',async(reads,writes)=>{expect(await observeQuota(cfg(),remote(analytics(reads,writes)),()=>TIME)).toMatchObject({status:'held',code:'ACCOUNT_BUDGET_HOLD'});expect(await state()).toBeNull();});
 it.each([-1,0.1,Infinity,NaN,'0',true,null])('invalid account counters hold: %s',async(value)=>{expect(await observeQuota(cfg(),remote(analytics(value)),()=>TIME)).toMatchObject({status:'held'});expect(await state()).toBeNull();});
-it.each(['2026-10-27T16:00:00Z','2026-10-27T12:00:00Z','2026-10-26T23:00:00Z','2026-10-27T15:00:00','nonsense'])('invalid or stale hourly source holds: %s',async(stamp)=>{expect(await observeQuota(cfg(),remote(analytics(1,1,stamp)),()=>TIME)).toMatchObject({status:'held'});expect(await state()).toBeNull();});
+it.each(['2026-10-27T16:00:00Z','2026-10-27T12:00:00Z','2026-10-26T23:00:00Z','2026-10-27T15:07:00Z','2026-10-27T15:00:00','nonsense'])('invalid or stale hourly source holds: %s',async(stamp)=>{expect(await observeQuota(cfg(),remote(analytics(1,1,stamp)),()=>TIME)).toMatchObject({status:'held'});expect(await state()).toBeNull();});
 it('valid delayed analytics renews only a slow lease',async()=>{const v=analytics(1,1,'2026-10-27T14:00:00Z');expect(parseObservation(v,new Date('2026-10-27T15:31:00Z')).mode).toBe('slow');expect(parseObservation(analytics(2000000),TIME).mode).toBe('slow');});
 it('duplicates, empty groups and upstream errors cannot be treated as unused quota',async()=>{for(const value of [{data:{viewer:{accounts:[]}}},{errors:[{message:'TEST upstream error'}],...analytics()}, {data:{viewer:{accounts:[{d1AnalyticsAdaptiveGroups:[]}]}}}]){expect(await observeQuota(cfg(),remote(value as any),()=>TIME)).toMatchObject({status:'held'});}const v=analytics();v.data.viewer.accounts[0].d1AnalyticsAdaptiveGroups.push(v.data.viewer.accounts[0].d1AnalyticsAdaptiveGroups[0]);expect(()=>parseObservation(v,TIME)).toThrow();expect(await state()).toBeNull();});
 it('null errors are a valid envelope; malformed errors and non-200 responses fail closed',async()=>{expect(parseObservation({...analytics(),errors:null},TIME).mode).toBe('open');expect(()=>parseObservation({...analytics(),errors:{message:'TEST malformed'}},TIME)).toThrow();const f=vi.fn(async(url:any)=>String(url).includes('/api/health')?Response.json(health):new Response('TEST forbidden',{status:403})) as unknown as typeof fetch;expect(await observeQuota(cfg(),f,()=>TIME)).toMatchObject({status:'held'});expect(f).toHaveBeenCalledTimes(2);expect(await state()).toBeNull();});
@@ -34,3 +34,34 @@ it('retained high counters keep slow mode and a locally blocked state stays bloc
 it('existing application guard accepts a verified lease and still enforces its original local ceiling',async()=>{await observeQuota(cfg(),remote(),()=>TIME);const app={...env,D1_READ_GUARD_ENABLED:'true'};expect(await withReadBudget(app,'cron',async()=>7,TIME)).toBe(7);await env.DB.prepare('UPDATE d1_quota_ledger SET reads=1999999').run();await expect(withReadBudget(app,'cron',async()=>7,TIME)).rejects.toThrow('D1_READ_BUDGET_WAIT');expect((await state()).mode).toBe('open');});
 it('SQL targets no ledger, facts, report, products or OAuth table',()=>{for(const table of ['d1_quota_ledger','gsc_daily','analysis_runs','products','oauth_credentials'])expect(CHECKPOINT_SQL).not.toContain(table);expect(CHECKPOINT_SQL).not.toMatch(/DELETE|DROP|ALTER|CREATE/);});
 it('public HTTP and unknown schedule rules never renew quota',async()=>{expect((await observer.fetch()).status).toBe(404);const waitUntil=vi.fn();await observer.scheduled({cron:'* * * * *',scheduledTime:Date.now()} as ScheduledController,cfg(),{waitUntil} as any);await observer.scheduled({cron:OBSERVER_CRON,scheduledTime:Date.now()-31*60000} as ScheduledController,cfg(),{waitUntil} as any);expect(waitUntil).not.toHaveBeenCalled();expect(await state()).toBeNull();});
+
+it('Cloudflare scheduled renewal restores guarded access after a four-hour GitHub gap without resetting the ledger',async()=>{
+ const before=new Date(TIME.getTime()-4*3600000);
+ await observeQuota(cfg(),remote(analytics(100,10,'2026-10-27T11:00:00Z')),()=>before);
+ await env.DB.prepare('INSERT INTO d1_quota_ledger VALUES(?,?,?,?)').bind('2026-10-27',12345,4321,before.toISOString()).run();
+ const app={...env,D1_READ_GUARD_ENABLED:'true'};
+ await expect(withReadBudget(app,'/api/performance',async()=>7,TIME)).rejects.toMatchObject({reason:'CHECKPOINT_STALE'});
+ vi.useFakeTimers();vi.setSystemTime(TIME);
+ const f=remote(),log=vi.spyOn(console,'log').mockImplementation(()=>{});
+ vi.stubGlobal('fetch',f);
+ try{
+  const tasks:Promise<unknown>[]=[];
+  await observer.scheduled({cron:OBSERVER_CRON,scheduledTime:TIME.getTime()} as ScheduledController,
+   cfg({CF_VERSION_METADATA:{id:health.deployment.version_id,tag:health.deployment.commit}}),
+   {waitUntil:(task:Promise<unknown>)=>tasks.push(task)} as any);
+  await Promise.all(tasks);
+  expect(f).toHaveBeenCalledTimes(2);
+  expect(await env.DB.prepare('SELECT reads,writes FROM d1_quota_ledger').first()).toEqual({reads:12345,writes:4321});
+  expect(await state()).toMatchObject({observed_at:TIME.toISOString(),valid_until:'2026-10-27T16:22:00.000Z'});
+  expect(JSON.parse(log.mock.calls[0][0])).toMatchObject({event:'quota-observer',status:'checkpoint_recorded',commit:health.deployment.commit,version_id:health.deployment.version_id});
+  expect(await withReadBudget(app,'/api/performance',async()=>7,TIME)).toBe(7);
+ }finally{vi.unstubAllGlobals();log.mockRestore();vi.useRealTimers();}
+});
+
+it('unavailable analytics leaves an existing lease and its counters unchanged',async()=>{
+ await observeQuota(cfg(),remote(),()=>TIME);
+ const before=await state();
+ const error={errors:[{message:'TEST upstream failure'}]};
+ expect(await observeQuota(cfg(),remote(error as any),()=>new Date(TIME.getTime()+1000))).toMatchObject({status:'held'});
+ expect(await state()).toEqual(before);
+});

@@ -153,4 +153,4 @@ python3 scripts/verify_restore.py --sql .local/restore.sql
 
 Testler, gerçek entegrasyon engelleri ve sonraki somut işler [TODO.md](TODO.md) dosyasındadır. İlk uygulama PR #1 ile main dalına birleştirildi; sonraki denetim düzeltmeleri ayrı PR ile sunulur. Oturumun kendiliğinden yeniden başlatılacağına dair garanti yoktur.
 
-GitHub zamanlama gecikmelerinden bağımsız kota yenileme için [ayrı gözlemci karşılaştırması ve kontrollü kurulum](docs/INDEPENDENT_QUOTA_OBSERVER.md) hazırdır. Yeni Worker varsayılan olarak kapalıdır; kaynak kodunun bulunması gerçek dağıtım veya hesap yetkisi kabulü değildir.
+Bağımsız kota yenileme ve kontrollü kurulum: [Cloudflare gözlemcisi](docs/INDEPENDENT_QUOTA_OBSERVER.md). Runtime yalnız ayrı Analytics:Read secret’ı kullanır; ana Worker yeniden yayımlanmaz.
