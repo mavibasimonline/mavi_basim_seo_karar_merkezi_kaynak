@@ -1,7 +1,8 @@
 import {beforeEach,it,expect} from 'vitest';
 import {init,env,enqueue} from './helpers';
 import {hash} from '../src/types';
-import pilot,{importEvidence,SHEETS_SOURCE} from '../src/sheets-recovery-pilot';
+import pilot from '../src/sheets-recovery-pilot';
+import {importEvidence,SHEETS_SOURCE} from '../src/sheets-recovery';
 beforeEach(init);
 async function record(day='2026-07-01'){
  const content={source:SHEETS_SOURCE,section:'GSC_GUNLUK',family:'site_daily_total',identity:day,start:day,end:day,payload:{clicks:1,impressions:10,manual_note:'TEST preserve unknown fields'}};
@@ -34,6 +35,18 @@ it('background headroom holds the importer without deleting or resetting anythin
  await expect(importEvidence({...env,D1_READ_GUARD_ENABLED:'true'},[await record()],now)).rejects.toMatchObject({reason:'BACKGROUND_READ_HEADROOM'});
  expect(await env.DB.prepare('SELECT * FROM d1_quota_ledger').first()).toEqual(original);
  expect(await env.DB.prepare('SELECT count(*) n FROM insight_runs').first('n')).toBe(0);
+});
+it('records real D1 cost and shared sync writes when fresh quota permits an import',async()=>{
+ const now=new Date(),day=now.toISOString().slice(0,10);
+ await env.DB.prepare('INSERT INTO d1_quota_state VALUES(?,?,?,?,?,?,?,?)').bind(day,now.toISOString(),now.toISOString(),new Date(now.getTime()+3600000).toISOString(),1000,1000,'open','TEST source quota').run();
+ const cfg={...env,D1_READ_GUARD_ENABLED:'true',CATCHUP_ENABLED:'true',SYNC_DAILY_WRITE_LIMIT:'60000'};
+ expect(await importEvidence(cfg,[await record(),await record('2026-07-02')],now)).toMatchObject({inserted:2,daily_jobs_completed:0});
+ const ledger=await env.DB.prepare('SELECT reads,writes FROM d1_quota_ledger WHERE day=?').bind(day).first<{reads:number;writes:number}>();
+ expect(ledger!.reads).toBeGreaterThan(0);expect(ledger!.reads).toBeLessThan(1000000);
+ expect(ledger!.writes).toBeGreaterThan(0);expect(ledger!.writes).toBeLessThan(60000);
+ expect(Number(await env.DB.prepare("SELECT code FROM health_checks WHERE provider='sync-budget'").first('code'))).toBeGreaterThan(0);
+ expect(await env.DB.prepare('SELECT count(*) n FROM d1_query_costs').first('n')).toBeGreaterThan(0);
+ expect(await env.DB.prepare('SELECT count(*) n FROM dataset_coverage').first('n')).toBe(0);
 });
 it('a spent shared sync write budget holds ingestion without raising it',async()=>{
  const now=new Date();await env.DB.prepare("INSERT INTO health_checks VALUES('sync-budget',?,?,'ok','60000')").bind(now.toISOString().slice(0,10),now.toISOString()).run();

@@ -34,6 +34,8 @@ jobs:
           RELEASE_BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}
         run: python3 scripts/release_checks.py --base "$RELEASE_BASE"
       - run: npm run check
+      - name: Sheets aktarıcısını gerçek yerel Workers çalışma zamanında başlat — üretim erişimi yok
+        run: python3 scripts/sheets_runtime_acceptance.py
       - run: python3 scripts/local_secrets.py
       - run: npm run db:migrate
       - run: npm run data:import

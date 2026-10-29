@@ -55,7 +55,7 @@ def source_ci(github=None):
         previous = failed[0].get('head_sha', '')
         if not re.fullmatch('[a-f0-9]{40}', previous) or previous == sha:
             return 'PREVIOUS_FAILURE_REQUIRES_REVIEWED_SOURCE'
-        relevant = ('scripts/sheets_recovery.py', 'scripts/sheets_recovery_plan.py', 'src/sheets-recovery-pilot.ts', '.github/workflows/sheets-recovery.yml')
+        relevant = ('scripts/sheets_recovery.py', 'scripts/sheets_recovery_plan.py', 'src/sheets-recovery.ts', 'src/sheets-recovery-pilot.ts', '.github/workflows/sheets-recovery.yml')
         changed = subprocess.check_output(['git', 'diff', '--name-only', previous, sha, '--', *relevant], cwd=ROOT, stderr=subprocess.DEVNULL)
         if not changed.strip():
             return 'PREVIOUS_FAILURE_REQUIRES_REVIEWED_SOURCE'
