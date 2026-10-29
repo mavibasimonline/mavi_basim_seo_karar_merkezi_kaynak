@@ -28,6 +28,27 @@ it.each([
  ['account writes',"account_writes=85000"],
 ])('%s fails closed without changing Google or queued data',async(_label,update)=>{const cfg=await guarded();await env.DB.prepare('UPDATE d1_quota_state SET '+update).run();let called=0;await expect(withReadBudget(cfg,'cron',async()=>{called++;},TIME)).rejects.toBeInstanceOf(D1BudgetError);expect(called).toBe(0);});
 it('a new UTC day requires a new account observation, never assumed zero use',async()=>{const cfg=await guarded();await expect(withReadBudget(cfg,'cron',async()=>7,new Date('2026-10-27T00:00:00Z'))).rejects.toThrow('D1_READ_BUDGET_WAIT');});
+it('a headroom-paused July job resumes on the next observed UTC day without resetting the old ledger or generation',async()=>{
+ const cfg=await guarded({...await connected(),AUTOMATION_ENABLED:'true',CATCHUP_ENABLED:'true',SYNC_MAX_PAGES_PER_TICK:'1'});
+ const next=new Date('2026-10-27T00:15:00Z');
+ await enqueue('gsc','page','2026-07-26');
+ await env.DB.prepare('INSERT INTO d1_quota_ledger VALUES(?,?,?,?)').bind('2026-10-26',1357051,26938,TIME.toISOString()).run();
+ for(const time of [TIME,next])await env.DB.prepare("INSERT INTO health_checks VALUES('planner',?,?,'queued',NULL)").bind(time.toISOString().slice(0,10),time.toISOString()).run();
+ const prior=await env.DB.prepare("SELECT * FROM d1_quota_ledger WHERE day='2026-10-26'").first();
+ let calls=0;
+ const google=fetcher(async()=>{calls++;return Response.json({responseAggregationType:'byPage',rows:[{keys:['2026-07-26','https://mavibasim.com/brosur','tur','MOBILE'],clicks:1,impressions:10,ctr:0.1,position:3}]});});
+ await expect(tick(cfg,google,TIME,'cron')).rejects.toMatchObject({reason:'BACKGROUND_READ_HEADROOM'});
+ await expect(tick(cfg,google,next,'cron')).rejects.toMatchObject({reason:'CHECKPOINT_MISSING'});
+ expect(calls).toBe(0);
+ expect(await env.DB.prepare('SELECT status,generation,cursor,attempts FROM sync_jobs').first()).toEqual({status:'pending',generation:'fixture-generation',cursor:0,attempts:0});
+ const observed=await guarded(cfg,next);
+ expect(await tick(observed,google,next,'cron')).toEqual({phase:'processed',pages:1});
+ expect(calls).toBe(1);
+ expect(await env.DB.prepare('SELECT status,generation FROM sync_jobs').first()).toEqual({status:'done',generation:'fixture-generation'});
+ expect(await env.DB.prepare('SELECT day,scope,complete,row_count FROM dataset_coverage').first()).toEqual({day:'2026-07-26',scope:'page',complete:1,row_count:1});
+ expect(await env.DB.prepare("SELECT * FROM d1_quota_ledger WHERE day='2026-10-26'").first()).toEqual(prior);
+ expect(await env.DB.prepare("SELECT reads,writes FROM d1_quota_ledger WHERE day='2026-10-27'").first()).toMatchObject({reads:expect.any(Number),writes:expect.any(Number)});
+});
 it('a slow analytics lease permits bounded collection and blocks new heavy analyses',async()=>{const cfg=await guarded();await env.DB.prepare("UPDATE d1_quota_state SET mode='slow'").run();await expect(withReadBudget(cfg,'/api/report',async()=>7,TIME)).rejects.toThrow('D1_READ_BUDGET_WAIT');expect(await withReadBudget(cfg,'cron',async safe=>safe.SYNC_MAX_PAGES_PER_TICK,TIME)).toBe('1');});
 it('concurrent reservations cannot pass the shared account read ceiling',async()=>{const cfg=await guarded();await env.DB.prepare('UPDATE d1_quota_state SET account_reads=3300000').run();let release!:()=>void;const gate=new Promise<void>(r=>{release=r;});const calls=Array.from({length:20},()=>withReadBudget(cfg,'small',async()=>{await gate;return true;},TIME));const settled=Promise.allSettled(calls);await new Promise(r=>setTimeout(r,50));release();const results=await settled;expect(results.filter(r=>r.status==='fulfilled').length).toBeLessThanOrEqual(10);expect(results.some(r=>r.status==='rejected')).toBe(true);expect((await ledger())!.reads).toBeLessThanOrEqual(200_000);});
 it('actual D1 metadata refunds unused reads and retains bookkeeping margin',async()=>{const cfg=await guarded();expect(await withReadBudget(cfg,'small',async safe=>safe.DB.prepare('SELECT count(*) n FROM products').first('n'),TIME)).toBe(2);const l=await ledger();expect(l!.reads).toBeGreaterThanOrEqual(100);expect(l!.reads).toBeLessThan(20_000);expect((await env.DB.prepare('SELECT count(*) n FROM d1_query_costs').first<{n:number}>())!.n).toBe(1);});
