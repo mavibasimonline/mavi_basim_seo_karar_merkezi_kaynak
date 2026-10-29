@@ -12,6 +12,7 @@ export interface ObserverEnv {
  QUOTA_OBSERVER_ENABLED?:string;
  CLOUDFLARE_ACCOUNT_ID?:string;
  CF_QUOTA_ANALYTICS_TOKEN?:string;
+ APP_HEALTH?:Fetcher;
  CF_VERSION_METADATA?:{id?:string;tag?:string};
 }
 type Sample={day:string;observed_at:string;data_through:string;valid_until:string;account_reads:number;account_writes:number;mode:'open'|'slow'|'blocked';reason:string};
@@ -48,7 +49,9 @@ async function boundedJson(fetcher:typeof fetch,url:string,init:RequestInit,maxi
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8_000);
  let reader:ReadableStreamDefaultReader<Uint8Array>|undefined;
  try{
-  const r=await fetcher(url,{...init,redirect:'error',signal:controller.signal});
+  // Workers supports only manual/follow. Manual never forwards credentials to
+  // a redirect destination; every non-2xx response below still fails closed.
+  const r=await fetcher(url,{...init,redirect:'manual',signal:controller.signal});
   if(!r.ok||!r.body)throw Error('UPSTREAM_UNAVAILABLE');
   reader=r.body.getReader();const chunks:Uint8Array[]=[];let size=0;
   for(;;){const part=await reader.read();if(part.done)break;size+=part.value.byteLength;if(size>maximum)throw Error('UPSTREAM_RESPONSE_LIMIT');chunks.push(part.value);}
@@ -56,26 +59,33 @@ async function boundedJson(fetcher:typeof fetch,url:string,init:RequestInit,maxi
   return JSON.parse(new TextDecoder().decode(bytes));
  }finally{clearTimeout(timer);if(reader)await reader.cancel().catch(()=>{});}
 }
-export async function observeQuota(env:ObserverEnv,fetcher:typeof fetch=fetch,clock:()=>Date=()=>new Date()){
+export function observerTransport(env:ObserverEnv):typeof fetch {
+ return (input,init)=>String(input)===APP?env.APP_HEALTH!.fetch(input,init):fetch(input,init);
+}
+export async function observeQuota(env:ObserverEnv,fetcher:typeof fetch=observerTransport(env),clock:()=>Date=()=>new Date()){
  if(env.QUOTA_OBSERVER_ENABLED!=='true')return {status:'disabled'};
- if(!/^[a-f0-9]{32}$/.test(env.CLOUDFLARE_ACCOUNT_ID||'')||!env.CF_QUOTA_ANALYTICS_TOKEN||/[\r\n]/.test(env.CF_QUOTA_ANALYTICS_TOKEN))return {status:'held',code:'OBSERVER_BINDINGS_REQUIRED'};
+ if(!/^[a-f0-9]{32}$/.test(env.CLOUDFLARE_ACCOUNT_ID||'')||!env.CF_QUOTA_ANALYTICS_TOKEN||/[\r\n]/.test(env.CF_QUOTA_ANALYTICS_TOKEN)||typeof env.APP_HEALTH?.fetch!=='function')return {status:'held',code:'OBSERVER_BINDINGS_REQUIRED'};
+ let phase:'health'|'analytics'|'validation'|'checkpoint'='health';
  try{
   const start=clock();
   const health=await boundedJson(fetcher,APP,{method:'GET',headers:{'Cache-Control':'no-cache'}},4096);
   const deployment=health?.deployment;
   if(health.ok!==true||deployment?.read_guard_revision!=='d1-account-reads-v1'||!/^[a-f0-9]{40}$/.test(deployment.commit||'')||!/^[a-f0-9-]{36}$/.test(deployment.version_id||''))return {status:'held',code:'LIVE_READ_GUARD_REQUIRED'};
+  phase='analytics';
   const response=await boundedJson(fetcher,GRAPHQL,{method:'POST',headers:{Authorization:'Bearer '+env.CF_QUOTA_ANALYTICS_TOKEN,'Content-Type':'application/json'},body:JSON.stringify({query:QUERY,variables:{accountTag:env.CLOUDFLARE_ACCOUNT_ID,filter:{AND:[{datetimeHour_geq:start.toISOString().slice(0,10)+'T00:00:00Z',datetimeHour_leq:start.toISOString()}]}}})},64_000);
   const now=clock();
   if(start.toISOString().slice(0,10)!==now.toISOString().slice(0,10))return {status:'held',code:'UTC_DAY_CHANGED'};
+  phase='validation';
   const state=parseObservation(response,now);
   if(state.mode==='blocked')return {status:'held',code:'ACCOUNT_BUDGET_HOLD'};
   // One primary-key upsert only. No ledger reset, fact reads, retries or work dispatch.
+  phase='checkpoint';
   const r=await env.DB.prepare(CHECKPOINT_SQL).bind(...['day','observed_at','data_through','valid_until','account_reads','account_writes','mode','reason'].map(k=>state[k as keyof Sample])).run();
   if(r.success!==true||!Number.isSafeInteger(r.meta?.rows_read)||!Number.isSafeInteger(r.meta?.rows_written)||r.meta.rows_read<0||r.meta.rows_written<0||r.meta.rows_read>10||r.meta.rows_written>10)throw Error('CHECKPOINT_COST_OR_WRITE_UNVERIFIED');
   return {status:r.meta.changes?'checkpoint_recorded':'newer_checkpoint_preserved',rows_read:r.meta.rows_read,rows_written:r.meta.rows_written,observed_at:state.observed_at,valid_until:state.valid_until};
  }catch{
   // Never log secrets, provider payloads, URLs, query terms or account usage.
-  return {status:'held',code:'OBSERVER_UNAVAILABLE_NO_RETRY'};
+  return {status:'held',code:'OBSERVER_UNAVAILABLE_NO_RETRY',phase};
  }
 }
 export default {

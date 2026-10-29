@@ -17,6 +17,7 @@ APP = 'mavi-basim-seo-prod'
 ROOT = Path(__file__).resolve().parents[1]
 CRON = '2,17,32,47 * * * *'
 APP_SOURCE = '8b56115f52ef2e7690927614365165ade4bfbdaa'
+FAILED_OBSERVER_SOURCE = 'cb287d97f16195dccb574c2fbb0445f0242286a6'
 
 
 def require(value, code):
@@ -111,15 +112,40 @@ def validate_config(config):
          'OBSERVER_CONFIG_REJECTED')
  require(config.get('workers_dev') is False and config.get('preview_urls') is False,
          'PUBLIC_OBSERVER_FORBIDDEN')
- require(set(config) <= {'$schema', 'name', 'main', 'compatibility_date', 'workers_dev',
+ require(set(config) <= {'$schema', 'name', 'main', 'compatibility_date', 'services', 'workers_dev',
          'preview_urls', 'd1_databases', 'vars', 'triggers', 'observability', 'version_metadata'},
          'OBSERVER_RESOURCE_OR_LIMIT_CHANGE_FORBIDDEN')
+ require(config.get('services') == [{'binding': 'APP_HEALTH', 'service': APP}],
+         'OBSERVER_FIXED_HEALTH_SERVICE_REQUIRED')
  require(config.get('d1_databases') == [{'binding': 'DB', 'database_name': 'mavi-basim-seo',
                                      'database_id': DATABASE}], 'OBSERVER_DATABASE_DRIFT')
  require(config.get('vars') == {'QUOTA_OBSERVER_ENABLED': 'false', 'CLOUDFLARE_ACCOUNT_ID': ''}
          and config.get('triggers') == {'crons': [CRON]}
          and config.get('version_metadata') == {'binding': 'CF_VERSION_METADATA'},
          'OBSERVER_CONFIG_REJECTED')
+
+
+def verify_stopped_observer(client, settings, schedules, expected_version):
+ bindings = settings.get('bindings', [])
+ plain = {b['name']: b.get('text') for b in bindings if b.get('type') == 'plain_text'}
+ require(not schedules, 'EXISTING_ACTIVE_OBSERVER_REQUIRES_REVIEW')
+ if plain.get('QUOTA_OBSERVER_ENABLED') == 'false': return
+ # Only the exact, reviewed failed deployment with a stopped Cron may resume.
+ require(plain == {'QUOTA_OBSERVER_ENABLED': 'true', 'CLOUDFLARE_ACCOUNT_ID': client.account}
+         and bool(re.fullmatch('[a-f0-9-]{36}', expected_version or '')),
+         'STOPPED_OBSERVER_VERSION_PIN_REQUIRED')
+ require({b.get('name') for b in bindings} == {'DB', 'CF_VERSION_METADATA',
+         'QUOTA_OBSERVER_ENABLED', 'CLOUDFLARE_ACCOUNT_ID', 'CF_QUOTA_ANALYTICS_TOKEN'},
+         'STOPPED_OBSERVER_BINDING_DRIFT')
+ require(any(b.get('name') == 'DB' and b.get('type') == 'd1' and
+         (b.get('id') or b.get('database_id')) == DATABASE for b in bindings),
+         'OBSERVER_DATABASE_DRIFT')
+ base = '/workers/scripts/' + WORKER
+ version = active_version(api(client, 'GET', base + '/deployments'))
+ require(version == expected_version, 'STOPPED_OBSERVER_VERSION_CHANGED')
+ metadata = api(client, 'GET', base + '/versions/' + version)
+ require(metadata.get('annotations', {}).get('workers/tag') == FAILED_OBSERVER_SOURCE,
+         'STOPPED_OBSERVER_SOURCE_CHANGED')
 
 
 def preflight(client, sha, github=None):
@@ -149,10 +175,8 @@ def preflight(client, sha, github=None):
    # A first installation may resume only our dormant Worker, never overwrite
    # an unrelated/active Worker with the same name.
    settings = api(client, 'GET', '/workers/scripts/' + name + '/settings')
-   plain = {b['name']: b.get('text') for b in settings.get('bindings', [])
-            if b.get('type') == 'plain_text'}
-   require(plain.get('QUOTA_OBSERVER_ENABLED') == 'false' and not schedules,
-           'EXISTING_ACTIVE_OBSERVER_REQUIRES_REVIEW')
+   verify_stopped_observer(client, settings, schedules,
+                           os.environ.get('EXPECTED_STOPPED_OBSERVER_VERSION'))
  require(total_crons + 1 <= 5, 'FREE_CRON_LIMIT_REQUIRED')
  sample = observation(Cloudflare(token, client.account))
  require(sample.get('ok') and sample.get('mode') in ('open', 'slow'),
@@ -191,11 +215,14 @@ def observer_settings(client, sha, enabled):
  metadata = api(client, 'GET', base + '/versions/' + version)
  require(metadata.get('annotations', {}).get('workers/tag') == sha, 'OBSERVER_COMMIT_MISMATCH')
  bindings = api(client, 'GET', base + '/settings').get('bindings', [])
- expected = {'DB', 'CF_VERSION_METADATA', 'QUOTA_OBSERVER_ENABLED', 'CLOUDFLARE_ACCOUNT_ID'}
+ expected = {'DB', 'CF_VERSION_METADATA', 'QUOTA_OBSERVER_ENABLED', 'CLOUDFLARE_ACCOUNT_ID', 'APP_HEALTH'}
  require(expected <= {b.get('name') for b in bindings} <= expected | {'CF_QUOTA_ANALYTICS_TOKEN'},
          'OBSERVER_BINDING_DRIFT')
  require(any(b.get('name') == 'DB' and b.get('type') == 'd1' and
              (b.get('id') or b.get('database_id')) == DATABASE for b in bindings), 'OBSERVER_DATABASE_DRIFT')
+ require(any(b.get('name') == 'APP_HEALTH' and b.get('type') == 'service' and
+             b.get('service') == APP and b.get('environment', 'production') == 'production'
+             for b in bindings), 'OBSERVER_HEALTH_SERVICE_DRIFT')
  plain = {b['name']: b.get('text') for b in bindings if b.get('type') == 'plain_text'}
  require(plain == {'QUOTA_OBSERVER_ENABLED': str(enabled).lower(), 'CLOUDFLARE_ACCOUNT_ID': client.account},
          'OBSERVER_BINDING_DRIFT')
@@ -224,6 +251,12 @@ def recorded_event(event, sha, version, activated):
    if not isinstance(result, dict) or result.get('event') != 'quota-observer': continue
    require(result.get('commit') == sha and result.get('version_id') == version,
            'OBSERVER_SCHEDULED_VERSION_MISMATCH')
+   if result.get('status') != 'checkpoint_recorded':
+    known_codes = {'OBSERVER_BINDINGS_REQUIRED', 'LIVE_READ_GUARD_REQUIRED',
+                   'UTC_DAY_CHANGED', 'ACCOUNT_BUDGET_HOLD', 'OBSERVER_UNAVAILABLE_NO_RETRY'}
+    print(json.dumps({'event': 'observer-acceptance-rejected',
+      'code': result.get('code') if result.get('code') in known_codes else 'UNKNOWN_OBSERVER_RESULT',
+      'phase': result.get('phase') if result.get('phase') in ('health', 'analytics', 'validation', 'checkpoint') else None}), flush=True)
    require(result.get('status') == 'checkpoint_recorded', 'OBSERVER_SCHEDULED_CHECKPOINT_NOT_RECORDED')
    require(all(type(result.get(k)) is int and 0 <= result[k] <= 10
                for k in ('rows_read', 'rows_written')), 'OBSERVER_COST_METADATA_REQUIRED')

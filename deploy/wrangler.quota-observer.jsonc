@@ -3,6 +3,7 @@
   "name": "mavi-basim-quota-observer",
   "main": "../src/quota-observer.ts",
   "compatibility_date": "2026-10-01",
+  "services": [{"binding": "APP_HEALTH", "service": "mavi-basim-seo-prod"}],
   "workers_dev": false,
   "preview_urls": false,
   "d1_databases": [{

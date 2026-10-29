@@ -6,6 +6,9 @@ on:
         type: choice
         options: [inspect, deploy]
         default: inspect
+      previous_observer_version:
+        type: string
+        description: Exact reviewed failed observer version; required to resume a stopped observer
 permissions:
   contents: read
   actions: read
@@ -35,6 +38,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CF_QUOTA_ANALYTICS_TOKEN: ${{ secrets.CF_QUOTA_ANALYTICS_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      EXPECTED_STOPPED_OBSERVER_VERSION: ${{ inputs.previous_observer_version }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
