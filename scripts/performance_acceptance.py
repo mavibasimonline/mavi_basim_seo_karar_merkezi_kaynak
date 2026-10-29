@@ -6,7 +6,7 @@ from scoped_release import git,require,PERFORMANCE_SOURCE
 from release_readiness import live_guard_deployment
 root=Path(__file__).resolve().parents[1]
 require(os.environ.get('RELEASE_SOURCE_COMMIT')==PERFORMANCE_SOURCE,'PERFORMANCE_SOURCE_REQUIRED')
-for path in ('src/d1-read-budget.ts','src/performance.ts','src/read-cache.ts','src/security.ts','src/types.ts','src/urls.ts','src/periods.ts','src/analysis.ts'):
+for path in ('src/index.ts','src/d1-read-budget.ts','src/performance.ts','src/read-cache.ts','src/security.ts','src/types.ts','src/urls.ts','src/periods.ts','src/analysis.ts'):
  require(git(root,'show',PERFORMANCE_SOURCE+':'+path)==(root/path).read_bytes(),'PERFORMANCE_SOURCE_PARITY_REQUIRED')
 config=json.loads((root/'deploy/wrangler.production.jsonc').read_text())
 folder=root/'.local/performance-probe';folder.mkdir(parents=True,exist_ok=True)
@@ -23,7 +23,7 @@ try:
     break
    except OSError:time.sleep(1)
   else:raise ValueError('PROBE_RUNTIME_TIMEOUT')
-  for path in ('/api/status','/api/performance?month=2026-10','/api/performance/queries?month=2026-10','/api/performance/queries?month=2026-10&product=brosur'):
+  for path in ('/api/status','/api/performance?month=2026-10','/api/performance/queries?month=2026-10','/api/performance/queries?month=2026-10&product=brosur','/api/performance?month=2026-09','/api/performance/queries?month=2026-09'):
    started=time.monotonic();req=urllib.request.Request('http://127.0.0.1:8795'+path,headers={'Authorization':'Bearer '+key})
    try:r=urllib.request.urlopen(req,timeout=90)
    except urllib.error.HTTPError as error:r=error

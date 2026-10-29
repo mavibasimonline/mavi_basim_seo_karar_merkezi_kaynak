@@ -82,14 +82,23 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Salt okunur üretim tanılaması — secret veya ham sorgu çıktısı yok
-        run: python3 scripts/cloudflare_diagnostics.py
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Exact live source guarded performance acceptance
+        env:
+          RELEASE_SOURCE_COMMIT: 8b56115f52ef2e7690927614365165ade4bfbdaa
+        run: |
+          git fetch --no-tags origin 8b56115f52ef2e7690927614365165ade4bfbdaa
+          git restore --source=8b56115f52ef2e7690927614365165ade4bfbdaa -- src/index.ts
+          python3 scripts/performance_acceptance.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: production-diagnostics-${{ github.run_id }}
           path: .local/production-diagnostics.json
           retention-days: 3
-          if-no-files-found: error
+          if-no-files-found: warn
 
   crawl-pilot:
     if: github.event_name == 'workflow_dispatch' && (inputs.operation == 'crawl-pilot' || inputs.operation == 'frontend-check' || inputs.operation == 'product-crawl')
