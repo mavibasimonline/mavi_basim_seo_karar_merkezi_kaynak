@@ -21,6 +21,9 @@ export default {async fetch(request:Request,env:ProbeEnv){
   }catch(error){
    const message=error instanceof Error?error.message:'';
    trace[stage+'_exception_kind']=error instanceof TypeError?'TypeError':error instanceof DOMException?error.name:'Error';
+   let safe=message;
+   for(const secret of [env.CF_QUOTA_ANALYTICS_TOKEN,env.PROBE_KEY,env.CLOUDFLARE_ACCOUNT_ID])if(secret)safe=safe.split(secret).join('[REDACTED]');
+   trace[stage+'_exception_detail']=safe.replace(/(?:Bearer\s+\S+|(?:cfat_|ghp_|github_pat_)[A-Za-z0-9_]+)/g,'[REDACTED]').slice(0,180);
    trace[stage+'_cross_script_error']=/1042|same zone|cross.script/i.test(message);
    throw error;
   }
