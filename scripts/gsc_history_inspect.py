@@ -1,5 +1,6 @@
 """Bounded read-only evidence for the existing July–September GSC queue."""
 import json
+import base64
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,6 +10,10 @@ from d1_quota_control import DATABASE
 from release_readiness import get_json, APP
 
 QUERIES = {
+    'google_scopes': ("SELECT provider,scopes,updated_at FROM oauth_credentials WHERE provider='google'", []),
+    'backup_records': ("SELECT id,created_at,format,row_count,restored_at FROM backups_manifest ORDER BY created_at DESC LIMIT 3", []),
+    'archive_kinds': ("SELECT kind,count(*) records FROM insight_runs GROUP BY kind", []),
+    'july_d1_page_totals': ("SELECT c.day,sum(d.clicks) clicks,sum(d.impressions) impressions,count(*) rows FROM dataset_coverage c INDEXED BY coverage_active CROSS JOIN gsc_daily_by_page d WHERE c.provider='gsc' AND c.scope='page' AND c.complete=1 AND c.day BETWEEN '2026-07-01' AND '2026-07-31' AND d.dataset_id=c.dataset_id AND d.date=c.day GROUP BY c.day ORDER BY c.day", []),
     'gaps': ("""WITH RECURSIVE days(day) AS (
       SELECT '2026-07-01' UNION ALL SELECT date(day,'+1 day') FROM days WHERE day<'2026-09-30'
     ), scopes(scope) AS (VALUES('page'),('query'))
@@ -62,6 +67,12 @@ def main():
                 'SYNC_MAX_PAGES_PER_TICK', 'D1_READ_GUARD_ENABLED'}
     out['runtime'] = {b['name']: b.get('text') for b in settings['result'].get('bindings', [])
                       if b.get('name') in selected and b.get('type') == 'plain_text'}
+    out['runtime_binding_types'] = [{'name': b.get('name'), 'type': b.get('type')} for b in settings['result'].get('bindings', [])]
+    try:
+        key_ready = len(base64.b64decode(os.environ.get('BACKUP_ENCRYPTION_KEY', ''), validate=True)) == 32
+    except (ValueError, TypeError):
+        key_ready = False
+    out['backup_encryption_key_ready'] = key_ready
     raw = schedules['result']
     out['crons'] = [s.get('cron') for s in (raw.get('schedules', []) if isinstance(raw, dict) else raw)]
     destination = Path('.local/production-diagnostics.json')
