@@ -69,7 +69,10 @@ def assets(root,source,opener=None):
  opener=opener or urllib.request.build_opener(NoRedirect)
  for path in paths:
   require(path.startswith('public/') and '..' not in path,'SCOPED_ASSET_PATH')
-  target='/' if path=='public/index.html' else '/'+urllib.parse.quote(path.removeprefix('public/'),safe='/')
+  # Workers Assets canonicalizes this new HTML file with a 307 to /drive.
+  # Fetch the known canonical route directly; redirects remain forbidden and
+  # the actual response must still equal the selected source bytes exactly.
+  target='/' if path=='public/index.html' else '/drive' if path=='public/drive.html' else '/'+urllib.parse.quote(path.removeprefix('public/'),safe='/')
   request=urllib.request.Request(APP+target+'?source-parity='+source,headers={'User-Agent':'MaviBasimScopedRelease/1.0','Accept-Encoding':'identity'})
   with opener.open(request,timeout=20) as response:data=response.read(1_500_001)
   require(len(data)<=1_500_000 and data==git(root,'show',source+':'+path),'SCOPED_LIVE_ASSET_MISMATCH')

@@ -54,6 +54,17 @@ class ScopedReleaseTests(unittest.TestCase):
   self.assertNotIn('migrations apply',s);self.assertIn('production_guard.py preflight',s)
   self.assertIn('d1_quota_checkpoint.py',s);self.assertIn('wrangler rollback',s)
   self.assertIn('--tag "$RELEASE_SOURCE_COMMIT"',s)
+ def test_drive_html_uses_the_real_canonical_route_without_following_redirects(self):
+  import urllib.parse,urllib.error
+  self.write('public/drive.html','private Drive connection page');self.commit('new Drive page');source=self.sha();root=self.root;seen=[]
+  class Opener:
+   def open(self,request,timeout):
+    path=urllib.parse.urlparse(request.full_url).path;seen.append(path)
+    if path=='/drive.html':raise urllib.error.HTTPError(request.full_url,307,'Temporary Redirect',{},None)
+    name='public/drive.html' if path=='/drive' else 'public/app.js' if path=='/app.js' else 'public/index.html'
+    return io.BytesIO(subprocess.check_output(['git','show',source+':'+name],cwd=root))
+  self.assertEqual(scoped.assets(root,source,Opener())['files'],3)
+  self.assertIn('/drive',seen);self.assertNotIn('/drive.html',seen)
  def test_drive_release_excludes_other_main_ui_and_index_changes_and_rejects_unreviewed_files(self):
   self.git('checkout','-q',self.base);self.write('src/index.ts','existing\n');self.commit('performance base');base=self.sha()
   self.git('checkout','-qb','drive-review');self.write('public/index.html','unreleased main UI');self.write('src/index.ts','existing\nunreleased\n');self.commit('main review base');review=self.sha()
