@@ -2,7 +2,7 @@ name: Mevcut Sheets GSC kanıtlarını koruyarak al
 on:
   workflow_dispatch:
   schedule:
-    - cron: '37 * * * *'
+    - cron: '37 0,4,8,12,16,20 * * *'
 permissions:
   contents: read
   actions: read
