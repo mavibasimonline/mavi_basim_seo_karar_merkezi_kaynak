@@ -82,17 +82,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '24'
-      - run: npm ci --ignore-scripts --no-fund
-      - name: Exact live source guarded performance acceptance
+      - name: Read-only observer access and Free plan preflight
         env:
-          RELEASE_SOURCE_COMMIT: 8b56115f52ef2e7690927614365165ade4bfbdaa
-        run: |
-          git fetch --no-tags origin 8b56115f52ef2e7690927614365165ade4bfbdaa
-          git restore --source=8b56115f52ef2e7690927614365165ade4bfbdaa -- src/index.ts
-          python3 scripts/performance_acceptance.py
+          CF_QUOTA_ANALYTICS_TOKEN: ${{ secrets.CF_QUOTA_ANALYTICS_TOKEN }}
+        run: python3 scripts/quota_observer_release.py inspect
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: production-diagnostics-${{ github.run_id }}
