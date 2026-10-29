@@ -15,6 +15,7 @@ import {performance,performanceQueries,deviceFilter} from './performance';
 import {calendarMonth,periodSelection,rangeCount} from './periods';
 import {cachedRead} from './read-cache';
 import {withReadBudget,readBudgetStatus,D1BudgetError,originalDatabase} from './d1-read-budget';
+import {driveStatus,scheduledDriveArchive} from './drive-archive';
 
 const RUNTIME_REVISION='gsc-catchup-v1';
 function deploymentInfo(env:Env){const metadata=env.CF_VERSION_METADATA;return {runtime_revision:RUNTIME_REVISION,read_guard_revision:'d1-account-reads-v1',gsc_validation_revision:'owned-url-variants-v2',version_id:metadata?.id&&/^[a-f0-9-]{36}$/i.test(metadata.id)?metadata.id:null,commit:metadata?.tag&&/^[a-f0-9]{40}$/.test(metadata.tag)?metadata.tag:null};}
@@ -64,7 +65,8 @@ async function route(request:Request,env:Env):Promise<Response>{
 }
 async function dataRoute(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url),path=url.pathname;
-  if(request.method==='POST'&&path==='/api/oauth/google/start')return oauthStart(env);
+  if(request.method==='POST'&&path==='/api/oauth/google/start')return oauthStart(env,url.searchParams.get('purpose')==='drive'?'drive':'seo');
+  if(request.method==='GET'&&path==='/api/drive/status')return driveStatus(env);
   if(request.method==='GET'&&path==='/api/gsc/verify')return json(await verifyGscAccess(env));
   if(request.method==='POST'&&path==='/api/gsc/pilot')return json(await pilotGscDay(env));
   if(request.method==='GET'&&path==='/api/status'){
@@ -187,6 +189,7 @@ export default {
   async scheduled(_event:ScheduledController,env:Env,context:ExecutionContext){if(env.AUTOMATION_ENABLED!=='true')return;context.waitUntil((async()=>{
     try{
       const time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
+      await scheduledDriveArchive(env,time);
       const result=await tick(env,fetch,time,'cron');
       if(time.getUTCMinutes()%15!==0)return;
     }catch(error){
