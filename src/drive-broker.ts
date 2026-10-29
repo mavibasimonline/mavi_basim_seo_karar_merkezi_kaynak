@@ -24,7 +24,8 @@ export class DriveGoogleBroker extends WorkerEntrypoint<BrokerEnv>{
   }catch{return json({code:'DRIVE_PROVIDER_TOKEN_UNAVAILABLE'},503);}
  }
 }
-export async function independentDriveRoute(request:Request,env:{DRIVE_ARCHIVE_SERVICE?:Fetcher}){
- if(!env.DRIVE_ARCHIVE_SERVICE)return json({error:'Bağımsız Drive servisi henüz yapılandırılmadı.'},503);
+export async function independentDriveRoute(request:Request,bindings:unknown){
+ const env=bindings as {DRIVE_ARCHIVE_SERVICE?:Fetcher};
+ if(typeof env.DRIVE_ARCHIVE_SERVICE?.fetch!=='function')return json({error:'Bağımsız Drive servisi henüz yapılandırılmadı.'},503);
  return env.DRIVE_ARCHIVE_SERVICE.fetch(new Request(request,{redirect:'manual'}));
 }

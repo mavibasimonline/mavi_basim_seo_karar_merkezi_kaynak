@@ -4,7 +4,7 @@ import app from '../src/index';
 describe('independent Drive routing never touches D1',()=>{
  function config(){
   const fetcher=vi.fn(async(request:Request)=>{expect(request.redirect).toBe('manual');return Response.json({connected:false,d1_requests:0});});
-  const env=configured({DRIVE_ARCHIVE_SERVICE:{fetch:fetcher} as any,D1_READ_GUARD_ENABLED:'true'});
+  const env={...configured({D1_READ_GUARD_ENABLED:'true'}),DRIVE_ARCHIVE_SERVICE:{fetch:fetcher} as any};
   Object.defineProperty(env,'DB',{get(){throw Error('FORBIDDEN_D1_ACCESS');}});return {env,fetcher};
  }
  it('serves health and owner status/start and routes the new callback with zero D1 reads or writes',async()=>{
