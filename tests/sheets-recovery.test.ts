@@ -36,6 +36,18 @@ it('background headroom holds the importer without deleting or resetting anythin
  expect(await env.DB.prepare('SELECT * FROM d1_quota_ledger').first()).toEqual(original);
  expect(await env.DB.prepare('SELECT count(*) n FROM insight_runs').first('n')).toBe(0);
 });
+it('records real D1 cost and shared sync writes when fresh quota permits an import',async()=>{
+ const now=new Date(),day=now.toISOString().slice(0,10);
+ await env.DB.prepare('INSERT INTO d1_quota_state VALUES(?,?,?,?,?,?,?,?)').bind(day,now.toISOString(),now.toISOString(),new Date(now.getTime()+3600000).toISOString(),1000,1000,'open','TEST source quota').run();
+ const cfg={...env,D1_READ_GUARD_ENABLED:'true',CATCHUP_ENABLED:'true',SYNC_DAILY_WRITE_LIMIT:'60000'};
+ expect(await importEvidence(cfg,[await record(),await record('2026-07-02')],now)).toMatchObject({inserted:2,daily_jobs_completed:0});
+ const ledger=await env.DB.prepare('SELECT reads,writes FROM d1_quota_ledger WHERE day=?').bind(day).first<{reads:number;writes:number}>();
+ expect(ledger!.reads).toBeGreaterThan(0);expect(ledger!.reads).toBeLessThan(1000000);
+ expect(ledger!.writes).toBeGreaterThan(0);expect(ledger!.writes).toBeLessThan(60000);
+ expect(Number(await env.DB.prepare("SELECT code FROM health_checks WHERE provider='sync-budget'").first('code'))).toBeGreaterThan(0);
+ expect(await env.DB.prepare('SELECT count(*) n FROM d1_query_costs').first('n')).toBeGreaterThan(0);
+ expect(await env.DB.prepare('SELECT count(*) n FROM dataset_coverage').first('n')).toBe(0);
+});
 it('a spent shared sync write budget holds ingestion without raising it',async()=>{
  const now=new Date();await env.DB.prepare("INSERT INTO health_checks VALUES('sync-budget',?,?,'ok','60000')").bind(now.toISOString().slice(0,10),now.toISOString()).run();
  expect(await importEvidence({...env,CATCHUP_ENABLED:'true',SYNC_DAILY_WRITE_LIMIT:'60000'},[await record()],now)).toMatchObject({inserted:0,held:'SYNC_WRITE_BUDGET'});
