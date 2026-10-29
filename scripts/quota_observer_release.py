@@ -4,6 +4,7 @@ import os
 import re
 from pathlib import Path
 from cloudflare_diagnostics import Cloudflare
+from d1_quota_checkpoint import observation
 
 WORKER = 'mavi-basim-quota-observer'
 APP = 'mavi-basim-seo-prod'
@@ -26,11 +27,18 @@ def inspect(client):
    plan = row.get('rate_plan', {})
    plans.append({k: plan.get(k) for k in ('id', 'public_name', 'currency', 'scope')})
  secret = os.environ.get('CF_QUOTA_ANALYTICS_TOKEN')
+ plain_subscriptions = client.request('GET', base + '/subscriptions')
+ sample = observation(Cloudflare(secret, client.account)) if secret else {'ok': False, 'reason': 'MISSING_SECRET'}
  return {'read_only': True, 'runtime_token_available': bool(secret),
          'separate_token_required': True,
          'account_token_metadata_access': tokens.get('ok') is True,
          'subscriptions_access': subscriptions.get('ok') is True,
          'plans': plans,
+         'subscriptions_error': {k: subscriptions.get(k) for k in ('code','error_codes')},
+         'plain_subscriptions_access': plain_subscriptions.get('ok') is True,
+         'plain_subscriptions_error': {k: plain_subscriptions.get(k) for k in ('code','error_codes')},
+         'analytics_token_verified': sample.get('ok') is True,
+         'analytics_status': sample.get('mode') or sample.get('reason'),
          'worker_inventory_access': scripts.get('ok') is True,
          'worker_count': len(scripts['result']) if scripts.get('ok') else None,
          'observer_exists': any(r.get('id') == WORKER for r in scripts.get('result', []) if isinstance(r, dict))}
