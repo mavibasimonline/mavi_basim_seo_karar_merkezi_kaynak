@@ -15,7 +15,7 @@ export default {async fetch(request:Request,env:ProbeEnv){
    if(!response.ok){
     const reader=response.clone().body?.getReader();let bytes=0,text='';
     if(reader)try{for(;;){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>4096)break;text+=new TextDecoder().decode(part.value);}}finally{await reader.cancel().catch(()=>{});}
-    trace[stage+'_cloudflare_error']=text.match(/\b(1042|1019|1102|1027)\b/)?.[1]??null;
+    trace[stage+'_cloudflare_error']=text.match(/\b(1010|1042|1019|1102|1027)\b/)?.[1]??null;
    }
    return response;
   }catch(error){

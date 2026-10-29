@@ -18,14 +18,14 @@ try:
   for attempt in range(60):
    if p.poll() is not None:raise ValueError('EDGE_PREVIEW_NOT_AVAILABLE')
    try:
-    with urllib.request.urlopen('http://127.0.0.1:8796/',timeout=2) as response:statuses.add(response.status)
+    with urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8796/',headers={'User-Agent':'MaviBasimObserverProbe/1.0'}),timeout=2) as response:statuses.add(response.status)
    except urllib.error.HTTPError as error:
     statuses.add(error.code)
     break # The loopback server is listening; authorization is tested below.
    except OSError:pass
    time.sleep(1)
   else:raise ValueError('EDGE_PREVIEW_START_TIMEOUT')
-  req=urllib.request.Request('http://127.0.0.1:8796/',headers={'Authorization':'Bearer '+key})
+  req=urllib.request.Request('http://127.0.0.1:8796/',headers={'Authorization':'Bearer '+key,'User-Agent':'MaviBasimObserverProbe/1.0'})
   try:response=urllib.request.urlopen(req,timeout=40)
   except urllib.error.HTTPError as error:response=error
   with response:
