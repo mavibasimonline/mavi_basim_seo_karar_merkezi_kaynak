@@ -82,10 +82,14 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Read-only observer access and Free plan preflight
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Read-only observer edge runtime probe; no production deploy or Cron
         env:
           CF_QUOTA_ANALYTICS_TOKEN: ${{ secrets.CF_QUOTA_ANALYTICS_TOKEN }}
-        run: python3 scripts/quota_observer_release.py inspect
+        run: python3 scripts/observer_runtime_probe.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: production-diagnostics-${{ github.run_id }}
