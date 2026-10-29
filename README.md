@@ -152,3 +152,5 @@ python3 scripts/verify_restore.py --sql .local/restore.sql
 `/api/applied-changes` yalnızca geçmişte uygulanmış değişikliğin beyanını ve kanıtını kaydeder; site/CMS değiştirmez. Snapshot farkları için kesin yayın zamanı bilinmiyorsa `published_at=null`, `observed_from` ve `observed_to` kullanılır.
 
 Testler, gerçek entegrasyon engelleri ve sonraki somut işler [TODO.md](TODO.md) dosyasındadır. İlk uygulama PR #1 ile main dalına birleştirildi; sonraki denetim düzeltmeleri ayrı PR ile sunulur. Oturumun kendiliğinden yeniden başlatılacağına dair garanti yoktur.
+
+Bağımsız kota yenileme ve kontrollü kurulum: [Cloudflare gözlemcisi](docs/INDEPENDENT_QUOTA_OBSERVER.md). Runtime yalnız ayrı Analytics:Read secret’ı kullanır; ana Worker yeniden yayımlanmaz.

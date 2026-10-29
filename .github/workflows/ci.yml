@@ -40,5 +40,7 @@ jobs:
       - run: npm run test:e2e
       - name: Üretim paketi denetimi — dağıtım yapmaz
         run: node scripts/run.mjs wrangler deploy --dry-run --config deploy/wrangler.production.jsonc --outdir .local/production-build
+      - name: Bağımsız kota gözlemcisi paketi — dağıtım veya görev etkinleştirmez
+        run: node scripts/run.mjs wrangler deploy --dry-run --config deploy/wrangler.quota-observer.jsonc --outdir .local/quota-observer-build
       - name: Kaynak CSV dosyaları değişmedi
         run: git diff --exit-code -- '*.csv'

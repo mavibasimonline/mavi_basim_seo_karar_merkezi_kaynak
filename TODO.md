@@ -1,3 +1,9 @@
+# 29 Ekim 2026 — bağımsız Cloudflare kota gözlemcisi
+
+PR #29 yalnız bağımsız gözlemci ve kontrollü yayın kapsamına indirildi; ilgisiz kuyruk incelemesi çıkarıldı. Ana uygulama, veriler, OAuth, Cron ve bütçe limitleri korunur. Kurulumdan önce ayrı `CF_QUOTA_ANALYTICS_TOKEN` Actions secret’ı ve CI dağıtım kimliğinde yalnız Billing:Read erişimi gerekiyor. Bunlar gerçek ön kontrolde eksik; yayın başlatılmadı. Son tam SHA CI’si, ücretsiz plan ve gerçek scheduled kabulü yayın kapısıdır. Ayrıntılar: [kontrollü kurulum](docs/INDEPENDENT_QUOTA_OBSERVER.md).
+
+---
+
 # 26 Ekim 2026 — sahip olunan GSC URL'leri ve kalıcı iş karantinası
 
 - **Yeni açık yetki:** kullanıcı PR #24 birleştirme/kontrollü yayın ve iki 18 Ağustos işinin birer kez doğal Cron'a bırakılmasını onayladı. Yeni migration/toplu aktarım yasak. Bu nedenle production workflow'un otomatik migration uygulaması, mevcut altı şema adını tek SELECT ile doğrulayan fail-closed kontrole çevrildi; 9 yeni test dahil Python **121/121**, toplam yerel **589 test** başarılı. Son tam HEAD CI'si beklenir; eski 580 testli CI yeni commit için izin değildir.
