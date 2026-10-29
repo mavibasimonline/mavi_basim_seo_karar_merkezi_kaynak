@@ -1,4 +1,5 @@
 import io,subprocess,sys,tempfile,unittest
+from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 import scoped_release as scoped
@@ -53,5 +54,21 @@ class ScopedReleaseTests(unittest.TestCase):
   self.assertNotIn('migrations apply',s);self.assertIn('production_guard.py preflight',s)
   self.assertIn('d1_quota_checkpoint.py',s);self.assertIn('wrangler rollback',s)
   self.assertIn('--tag "$RELEASE_SOURCE_COMMIT"',s)
+ def test_drive_release_excludes_other_main_ui_and_index_changes_and_rejects_unreviewed_files(self):
+  self.git('checkout','-q',self.base);self.write('src/index.ts','existing\n');self.commit('performance base');base=self.sha()
+  self.git('checkout','-qb','drive-review');self.write('public/index.html','unreleased main UI');self.write('src/index.ts','existing\nunreleased\n');self.commit('main review base');review=self.sha()
+  self.git('checkout','-qb','release/drive-archive-only',base)
+  for path in scoped.DRIVE_ALLOWED:self.write(path,'existing\ndrive\n' if path=='src/index.ts' else 'drive '+path)
+  self.commit('isolated Drive source');source=self.sha()
+  self.git('checkout','-q','drive-review')
+  for path in scoped.DRIVE_ALLOWED:self.write(path,'existing\ndrive\nunreleased\n' if path=='src/index.ts' else 'drive '+path)
+  self.commit('reviewed Drive changes');main=self.sha()
+  with patch.object(scoped,'DRIVE_SOURCE',source),patch.object(scoped,'PERFORMANCE_SOURCE',base),patch.object(scoped,'DRIVE_REVIEW_BASE',review):
+   result=scoped.validate_tree(self.root,source,main,base)
+   self.assertTrue(result['ui_preserved_by_source_tree']);self.assertEqual(set(result['changed_files']),scoped.DRIVE_ALLOWED)
+   run={'head_sha':source,'head_branch':'release/drive-archive-only','event':'workflow_dispatch','status':'completed','conclusion':'success'}
+   self.assertEqual(scoped.plan(self.root,source,main,{'commit':base},lambda _: {'workflow_runs':[run]})['source_commit'],source)
+   self.write('src/google.ts','unreviewed OAuth');self.commit('drift')
+   with self.assertRaisesRegex(ValueError,'APPROVED_FILE_MISMATCH'):scoped.validate_tree(self.root,source,self.sha(),base)
 
 if __name__=='__main__':unittest.main()
