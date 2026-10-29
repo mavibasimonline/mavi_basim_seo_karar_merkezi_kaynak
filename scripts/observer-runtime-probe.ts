@@ -1,6 +1,6 @@
 // Temporary CI/edge diagnostic. Production observation is intercepted BEFORE
 // its upsert; the only D1 operation permitted here is one primary-key SELECT.
-import {observeQuota,CHECKPOINT_SQL,ObserverEnv} from '../src/quota-observer';
+import {observeQuota,observerTransport,CHECKPOINT_SQL,ObserverEnv} from '../src/quota-observer';
 interface ProbeEnv extends ObserverEnv {PROBE_KEY:string}
 export default {async fetch(request:Request,env:ProbeEnv){
  if(request.headers.get('Authorization')!=='Bearer '+env.PROBE_KEY)return new Response(null,{status:404});
@@ -10,7 +10,7 @@ export default {async fetch(request:Request,env:ProbeEnv){
   if(!stage)throw Error('PROBE_UNEXPECTED_DESTINATION');
   trace.last_stage=stage;
   try{
-   const response=await fetch(input,init);
+   const response=await observerTransport(env)(input,init);
    trace[stage+'_http_status']=response.status;
    if(!response.ok){
     const reader=response.clone().body?.getReader();let bytes=0,text='';
