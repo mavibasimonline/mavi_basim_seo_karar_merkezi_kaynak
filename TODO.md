@@ -371,6 +371,9 @@ GSC salt okunur OAuth ve site ağ erişimi sağlanınca mevcut adaptörlerle bir
 
 ## Oturumlar arasında devam
 
+- Sheets aktarımının gerçek kayıt sayısı yalnız başarılı D1 yazımından sonra bildirilir; 52 günlük işi toplam/aylık yedekle kapatma. Güncel bütçe kullanıcının payını koruyarak bekletiyorsa bunu açıkça belirt.
+- Bu oturumda 11 JSON dosyası için erişilebilir dosya kimliği bulunmadı; mevcut Sheets kaynağıyla devam edildi. Kaynakta olmayan `workRecords` geçmişini kurtarılmış sayma. R2 metadata erişimi HTTP 403; Drive kapsamı mevcut GSC OAuth'unda yok. Bu yolları etkinleştirilmiş/doğrulanmış gibi bildirme; Sheets aktarımına bağlama.
+
 README komutları tekrarlanabilir. `.dev.vars`, `.local/` ve `.wrangler/` özel/yerel çıktılardır; Git'e girmez. Mevcut kullanıcı dosyalarını ve kimlik bilgilerini koruyun. Son commit: `git log -1 --oneline`. Oturumun kendiliğinden yeniden başlayacağı garanti edilmez.
 
 Güvenlik güncellemesi: 2026-10-23 CI'de yeni undici uyarıları görüldü; miniflare için 7.30.1 sabitlendi. npm ci ve audit tekrar geçti (0 açık). Ayrıntı SECURITY_CHANGELOG.md; sonraki dal CI sonuçları ayrıca doğrulanacak.
