@@ -73,6 +73,10 @@ def main():
     except (ValueError, TypeError):
         key_ready = False
     out['backup_encryption_key_ready'] = key_ready
+    scripts = client.request('GET', f'/accounts/{client.account}/workers/scripts')
+    out['related_workers'] = {'ok': scripts.get('ok'), 'names': [s.get('id') for s in scripts.get('result', []) if isinstance(s, dict) and str(s.get('id', '')).startswith('mavi-basim')]} if scripts.get('ok') else scripts
+    buckets = client.request('GET', f'/accounts/{client.account}/r2/buckets')
+    out['r2_inventory'] = {'ok': buckets.get('ok'), 'names': [b.get('name') for b in buckets.get('result', {}).get('buckets', []) if str(b.get('name', '')).startswith('mavi')]} if buckets.get('ok') else buckets
     raw = schedules['result']
     out['crons'] = [s.get('cron') for s in (raw.get('schedules', []) if isinstance(raw, dict) else raw)]
     destination = Path('.local/production-diagnostics.json')
