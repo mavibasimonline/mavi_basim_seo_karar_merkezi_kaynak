@@ -377,3 +377,6 @@ GSC salt okunur OAuth ve site ağ erişimi sağlanınca mevcut adaptörlerle bir
 README komutları tekrarlanabilir. `.dev.vars`, `.local/` ve `.wrangler/` özel/yerel çıktılardır; Git'e girmez. Mevcut kullanıcı dosyalarını ve kimlik bilgilerini koruyun. Son commit: `git log -1 --oneline`. Oturumun kendiliğinden yeniden başlayacağı garanti edilmez.
 
 Güvenlik güncellemesi: 2026-10-23 CI'de yeni undici uyarıları görüldü; miniflare için 7.30.1 sabitlendi. npm ci ve audit tekrar geçti (0 açık). Ayrıntı SECURITY_CHANGELOG.md; sonraki dal CI sonuçları ayrıca doğrulanacak.
+- Drive arşiv bağlantısı: `/drive.html` üzerinden hesap sahibinin bir defalık
+  `drive.file` çevrimdışı onayı gerekiyor. Sonrasında gerçek yükleme/geri okuma
+  sonucu `/api/drive/status` ekranında doğrulanmalı; onay öncesi arşiv yok.

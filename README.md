@@ -158,3 +158,23 @@ Doğrulanan site günlük toplamları ve kapanmış aylık dönem kanıtları `i
 Testler, gerçek entegrasyon engelleri ve sonraki somut işler [TODO.md](TODO.md) dosyasındadır. İlk uygulama PR #1 ile main dalına birleştirildi; sonraki denetim düzeltmeleri ayrı PR ile sunulur. Oturumun kendiliğinden yeniden başlatılacağına dair garanti yoktur.
 
 Bağımsız kota yenileme ve kontrollü kurulum: [Cloudflare gözlemcisi](docs/INDEPENDENT_QUOTA_OBSERVER.md). Runtime yalnız ayrı Analytics:Read secret’ı kullanır; ana Worker yeniden yayımlanmaz.
+# Google Drive günlük Sheets arşivi
+
+`/drive.html` mevcut yönetici oturumuyla bir defalık Drive onayını başlatır. Mevcut
+Google OAuth client/callback kullanılır; yalnız `drive.file` + `access_type=offline`
+istenir. Drive tokenları mevcut AES-GCM anahtarıyla ayrı `google-drive` kaydında
+saklanır/yenilenir; çalışan GSC tokenı ve izinleri değiştirilmez. Tokenlar loga,
+tarayıcı depolamasına, GitHub'a veya arşive yazılmaz.
+
+Mevcut Cloudflare Cron'u her saat :15 UTC'de günlük arşivi dener. Aynı (UTC) gün
+için D1'de atomik ayrılan Drive dosya kimliği yeniden kullanılır; kayıp yükleme
+yanıtı ikinci dosya üretmez. Kaynak, sabit ve erişimi doğrulanmış Sheets dosyasının
+kayıpsız XLSX çıktısıdır. Özel Drive dosyasının SHA-256 değeri gerçek geri okumayla
+doğrulanmadan başarılı sayılmaz. Kullanıcının diğer dosyaları listelenmez,
+değiştirilmez veya silinmez. Depolama doluysa işlem durur; ücretli alan açılmaz.
+
+Tüm D1 erişimleri mevcut `cron` bütçe korumasından geçer. Kota engelinde sonraki
+uygun Cron kendiliğinden devam eder; sayaç/limit/kota izni değiştirilmez. Google
+onayı verilmeden gerçek arşiv alındığı iddia edilmez. Google projesinde Drive API
+kapalıysa etkinleştirilmesi ve OAuth uygulaması test modundaysa çevrimdışı iznin
+7 günlük Google süresi için uygulamanın yayın durumunun kontrolü gerekir.

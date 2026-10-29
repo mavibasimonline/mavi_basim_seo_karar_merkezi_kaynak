@@ -1,0 +1,7 @@
+'use strict';
+const statusText=document.getElementById('driveStatus'),button=document.getElementById('connectDrive');
+async function responseJSON(response){const body=await response.json();if(!response.ok)throw Error(response.status===401?'Önce aşağıdaki bağlantıdan SEO uygulamasına giriş yapın, ardından bu sayfayı yeniden açın.':body.error||'Bağlantı kontrol edilemedi.');return body;}
+async function loadDrive(){try{const data=await responseJSON(await fetch('/api/drive/status',{cache:'no-store'}));statusText.textContent=data.connected?'Google Drive bağlantısı kayıtlı. Günlük arşiv, uygun D1 bütçesinde otomatik çalışacak.':'Bir defalık Google onayı gerekiyor. Yenileme anahtarı yalnız sunucuda şifrelenerek saklanır.';if(data.last_archive?.status==='ok')statusText.textContent+=' Son doğrulanan arşiv: '+data.last_archive.day;button.disabled=false;button.textContent=data.connected?'Drive bağlantısını yeniden yetkilendir':'Google hesabımla Drive arşivine izin ver';}catch(error){statusText.textContent=error.message;}}
+button.addEventListener('click',async()=>{button.disabled=true;try{const data=await responseJSON(await fetch('/api/oauth/google/start?purpose=drive',{method:'POST'})),url=new URL(data.authorization_url);if(url.origin!=='https://accounts.google.com')throw Error('Google bağlantı adresi doğrulanamadı.');location.assign(url.href);}catch(error){statusText.textContent=error.message;button.disabled=false;}});
+history.replaceState(null,'','/drive.html');
+loadDrive();
