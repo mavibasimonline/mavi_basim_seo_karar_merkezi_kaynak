@@ -27,7 +27,7 @@ PARITY = ('src/d1-read-budget.ts', 'src/sync-budget.ts', 'src/types.ts', 'src/go
 
 def source_parity():
     for path in PARITY:
-        existing = subprocess.check_output(['git', 'show', (INDEPENDENT_DRIVE_SOURCE if path == 'src/types.ts' else DRIVE_SOURCE if path == 'src/google.ts' else EXPECTED_APP) + ':' + path], cwd=ROOT, stderr=subprocess.DEVNULL)
+        existing = subprocess.check_output(['git', 'show', (DRIVE_SOURCE if path == 'src/google.ts' else EXPECTED_APP) + ':' + path], cwd=ROOT, stderr=subprocess.DEVNULL)
         if existing != (ROOT / path).read_bytes():
             raise ValueError('SOURCE_GUARD_PARITY_REQUIRED')
 

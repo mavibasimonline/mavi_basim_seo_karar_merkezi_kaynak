@@ -8,10 +8,10 @@ from release_readiness import get_json,REPOSITORY,live_guard_deployment
 ROOT=Path(__file__).resolve().parents[1]
 LIVE='0e2361cc7360a2a549584948b63e3881dd526aa7'
 REVIEW='03b27ececf0af2214ca747f939fdfea33de21435'
-SOURCE='3bdf21cb662ad32bc5568165379264aeed26c5c1'
+SOURCE='c64e0c3128a41c5851833cf644faa8c48b6bba53'
 APP='mavi-basim-seo-prod';ARCHIVE='mavi-basim-drive-archive';OBSERVER='mavi-basim-quota-observer'
 ORIGIN='https://mavi-basim-seo-prod.mavibasimonline.workers.dev'
-ALLOWED={'src/index.ts','src/types.ts','src/drive-broker.ts','src/drive-independent.ts','src/drive-records.ts',
+ALLOWED={'src/index.ts','src/drive-broker.ts','src/drive-independent.ts','src/drive-records.ts',
  'public/drive-independent.html','public/drive-independent.js','deploy/wrangler.drive-independent.jsonc','deploy/wrangler.drive-archive.jsonc',
  'tests/drive-independent-routing.test.ts','tests/drive-independent/worker.test.ts','vitest.config.ts','vitest.drive-independent.config.ts','.github/workflows/ci.yml'}
 
@@ -28,7 +28,7 @@ def source_tree(main):
  for path in ALLOWED-{'src/index.ts'}:need(git('show',SOURCE+':'+path)==git('show',main+':'+path),'INDEPENDENT_REVIEWED_FILE_MISMATCH')
  def edits(a,b):return [s for s in git('diff','--unified=0',a,b,'--','src/index.ts').decode().splitlines() if s.startswith(('+','-')) and not s.startswith(('+++','---'))]
  need(edits(REVIEW,main)==edits(LIVE,SOURCE),'INDEPENDENT_REVIEWED_ROUTING_MISMATCH')
- for path in ('src/google.ts','src/security.ts','src/d1-read-budget.ts','src/sync.ts','src/sync-budget.ts','package.json','package-lock.json','deploy/wrangler.production.jsonc'):
+ for path in ('src/google.ts','src/security.ts','src/d1-read-budget.ts','src/types.ts','src/sync.ts','src/sync-budget.ts','package.json','package-lock.json','deploy/wrangler.production.jsonc'):
   need(git('show',LIVE+':'+path)==git('show',SOURCE+':'+path),'INDEPENDENT_PROTECTED_FILE_CHANGED')
 
 def config_check(app,archive):
