@@ -5,6 +5,8 @@ import re
 from pathlib import Path
 from cloudflare_diagnostics import Cloudflare
 from d1_quota_checkpoint import observation
+from d1_quota_control import DATABASE
+from datetime import datetime, timezone
 import urllib.request
 import urllib.error
 
@@ -67,7 +69,27 @@ def inspect(client):
  secret = os.environ.get('CF_QUOTA_ANALYTICS_TOKEN')
  plain_subscriptions = client.request('GET', base + '/subscriptions')
  sample = observation(Cloudflare(secret, client.account)) if secret else {'ok': False, 'reason': 'MISSING_SECRET'}
- return {'deployment_identity': deployment_identity(client),
+ evidence={}
+ if any(s.get('id') == WORKER for s in scripts.get('result', []) if isinstance(s, dict)):
+  prefix=base+'/workers/scripts/'+WORKER
+  schedules=client.request('GET',prefix+'/schedules')
+  settings=client.request('GET',prefix+'/settings')
+  evidence['schedules']=schedules
+  if settings.get('ok'):
+   bindings=settings['result'].get('bindings',[])
+   evidence['enabled']=next((b.get('text') for b in bindings if b.get('name')=='QUOTA_OBSERVER_ENABLED'),None)
+   evidence['analytics_secret_bound']=any(b.get('name')=='CF_QUOTA_ANALYTICS_TOKEN' and b.get('type')=='secret_text' for b in bindings)
+  if sample.get('ok') and sample.get('mode') in ('open','slow'):
+   data=client.request('POST',base+'/d1/database/'+DATABASE+'/query',{'sql':'SELECT day,observed_at,data_through,valid_until,mode,reason FROM d1_quota_state WHERE day=?','params':[datetime.now(timezone.utc).date().isoformat()]})
+   evidence['checkpoint']=data
+  start=int(datetime(2026,10,29,13,31,tzinfo=timezone.utc).timestamp()*1000)
+  end=int(datetime(2026,10,29,13,34,tzinfo=timezone.utc).timestamp()*1000)
+  logs=client.request('POST',base+'/workers/observability/telemetry/query',{'queryId':'observer-failure-read-only','dry':True,'timeframe':{'from':start,'to':end},'limit':20,'parameters':{'datasets':[WORKER],'view':'events'}})
+  evidence['historical_logs_access']=logs.get('ok')
+  evidence['historical_logs_code']=logs.get('code')
+  encoded=json.dumps(logs.get('result',{}))
+  evidence['runtime_codes']=sorted(set(re.findall(r'(?:OBSERVER_[A-Z_]+|LIVE_READ_GUARD_REQUIRED|UTC_DAY_CHANGED|ACCOUNT_BUDGET_HOLD|checkpoint_recorded|newer_checkpoint_preserved)',encoded)))
+ return {'observer_evidence':evidence,'deployment_identity': deployment_identity(client),
          'application_present_in_bound_account': any(s.get('id') == APP for s in scripts.get('result', []) if isinstance(s, dict)),
          'read_only': True, 'runtime_token_available': bool(secret),
          'separate_token_required': True,
