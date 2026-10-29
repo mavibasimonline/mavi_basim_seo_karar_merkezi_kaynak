@@ -9,6 +9,7 @@ key=secrets.token_hex(32)
 secret=folder/'.dev.vars';secret.write_text('PROBE_KEY='+key+'\nCF_QUOTA_ANALYTICS_TOKEN='+token+'\n');secret.chmod(0o600)
 config={'name':'mavi-basim-observer-readonly-probe','main':'../../scripts/observer-runtime-probe.ts',
  'compatibility_date':'2026-10-01','workers_dev':False,'preview_urls':False,
+ 'compatibility_flags':['global_fetch_strictly_public'],
  'vars':{'CLOUDFLARE_ACCOUNT_ID':account,'QUOTA_OBSERVER_ENABLED':'true'},
  'd1_databases':[{'binding':'DB','database_name':'mavi-basim-seo','database_id':'18f8c90d-4af1-430c-ac86-ddf184c75a0b'}]}
 (folder/'wrangler.jsonc').write_text(json.dumps(config));p=None;statuses=set()
