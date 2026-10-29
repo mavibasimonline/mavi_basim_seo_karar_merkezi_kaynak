@@ -1,0 +1,53 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "mavi-basim-seo-prod",
+  "main": "../src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": "../public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mavi-basim-seo",
+      "database_id": "18f8c90d-4af1-430c-ac86-ddf184c75a0b",
+      "migrations_dir": "../migrations"
+    }
+  ],
+  "vars": {
+    "SITE_ORIGIN": "https://mavibasim.com",
+    "GSC_PROPERTY": "sc-domain:mavibasim.com",
+    "GA4_PROPERTY_ID": "",
+    "GOOGLE_REDIRECT_URI": "https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/oauth/google/callback",
+    "CRAWL_ENABLED": "true",
+    "AUTOMATION_ENABLED": "true",
+    "ENABLE_GOOGLE_ADS": "false",
+    "CATCHUP_ENABLED": "true",
+    "SYNC_DAILY_WRITE_LIMIT": "60000",
+    "SYNC_INITIAL_BUDGET_DAY": "2026-10-24",
+    "SYNC_INITIAL_WRITE_LIMIT": "10000",
+    "D1_READ_GUARD_ENABLED": "true",
+    "SYNC_MAX_PAGES_PER_TICK": "1"
+  },
+  "triggers": {
+    "crons": [
+      "*/15 * * * *"
+    ]
+  },
+  "observability": {
+    "enabled": false
+  },
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
+  "services": [
+    {
+      "binding": "DRIVE_ARCHIVE_SERVICE",
+      "service": "mavi-basim-drive-archive"
+    }
+  ]
+}

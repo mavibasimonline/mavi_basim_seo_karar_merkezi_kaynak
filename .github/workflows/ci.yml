@@ -34,11 +34,19 @@ jobs:
           RELEASE_BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}
         run: python3 scripts/release_checks.py --base "$RELEASE_BASE"
       - run: npm run check
+      - name: D1 bağlantısı olmayan gerçek SQLite Durable Object'te Drive güvenliğini doğrula
+        run: node scripts/run.mjs vitest run --config vitest.drive-independent.config.ts
+      - name: Sheets aktarıcısını gerçek yerel Workers çalışma zamanında başlat — üretim erişimi yok
+        run: python3 scripts/sheets_runtime_acceptance.py
       - run: python3 scripts/local_secrets.py
       - run: npm run db:migrate
       - run: npm run data:import
       - run: npm run test:e2e
       - name: Üretim paketi denetimi — dağıtım yapmaz
         run: node scripts/run.mjs wrangler deploy --dry-run --config deploy/wrangler.production.jsonc --outdir .local/production-build
+      - name: Bağımsız kota gözlemcisi paketi — dağıtım veya görev etkinleştirmez
+        run: node scripts/run.mjs wrangler deploy --dry-run --config deploy/wrangler.quota-observer.jsonc --outdir .local/quota-observer-build
+      - name: Bağımsız Drive paketi — D1 veya ücretli hizmet etkinleştirmez
+        run: node scripts/run.mjs wrangler deploy --dry-run --config deploy/wrangler.drive-archive.jsonc --outdir .local/drive-archive-build
       - name: Kaynak CSV dosyaları değişmedi
         run: git diff --exit-code -- '*.csv'

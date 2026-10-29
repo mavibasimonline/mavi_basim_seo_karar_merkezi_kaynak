@@ -1,4 +1,5 @@
 export interface Env {
+  DRIVE_ARCHIVE_SERVICE?: Fetcher;
   DB: D1Database;
   ASSETS: Fetcher;
   SITE_ORIGIN: string;
