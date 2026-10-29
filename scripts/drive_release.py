@@ -31,18 +31,32 @@ def preflight(client):
  SAVED.parent.mkdir(exist_ok=True);SAVED.write_text(json.dumps({'observer':observer,'crons':crons}))
  return {'free_plan_verified':True,'observer_and_app_cron_locked':True,'oauth_tokens_read':False,'r2_enabled':False}
 
+def verify_owner_boundary(opener=None):
+ class NoRedirect(urllib.request.HTTPRedirectHandler):
+  def redirect_request(self,*args,**kwargs):return None
+ opener=opener or urllib.request.build_opener(NoRedirect())
+ for path in ('/api/drive/status','/api/oauth/google/start?purpose=drive'):
+  post='start?' in path
+  request=urllib.request.Request(APP+path,method='POST' if post else 'GET',data=b'{}' if post else None,
+    headers={'User-Agent':'MaviBasimReleaseCheck/1.0','Accept':'application/json','Origin':APP,'Content-Type':'application/json'})
+  try:
+   with opener.open(request,timeout=15) as response:response.read(4097)
+   raise ValueError('DRIVE_OWNER_SESSION_REQUIRED')
+  except urllib.error.HTTPError as error:
+   with error:raw=error.read(4097)
+   require(error.code==401,'DRIVE_OWNER_HTTP_'+str(error.code))
+   require(len(raw)<=4096,'DRIVE_OWNER_RESPONSE_LIMIT')
+   try:body=json.loads(raw)
+   except ValueError:raise ValueError('DRIVE_OWNER_RESPONSE_INVALID') from None
+   require(body=={'error':'Giriş yapmanız gerekiyor.'},'DRIVE_OWNER_RESPONSE_INVALID')
+ return True
+
 def accepted(client):
  verify_source();saved=json.loads(SAVED.read_text())
  require(observer_lock(client)==saved['observer'],'DRIVE_OBSERVER_CHANGED')
  require(cron_rows(api(client,'GET','/workers/scripts/mavi-basim-seo-prod/schedules'))==saved['crons'],'DRIVE_APP_CRON_CHANGED')
  live=live_guard_deployment();require(live and live['commit']==DRIVE_SOURCE,'DRIVE_LIVE_COMMIT_MISMATCH')
- class NoRedirect(urllib.request.HTTPRedirectHandler):
-  def redirect_request(self,*args,**kwargs):return None
- opener=urllib.request.build_opener(NoRedirect())
- for path in ('/api/drive/status','/api/oauth/google/start?purpose=drive'):
-  request=urllib.request.Request(APP+path,method='POST' if 'start?' in path else 'GET')
-  try:opener.open(request,timeout=15);raise ValueError('DRIVE_OWNER_SESSION_REQUIRED')
-  except urllib.error.HTTPError as error:require(error.code==401,'DRIVE_OWNER_SESSION_REQUIRED')
+ verify_owner_boundary()
  return {'deployment':live,'observer_preserved':True,'existing_cron_preserved':True,'drive_screen_deployed':True,'owner_session_required':True,'actual_archive_pending_google_consent':True}
 
 if __name__=='__main__':
@@ -54,5 +68,5 @@ if __name__=='__main__':
   else:raise ValueError('DRIVE_RELEASE_MODE_REQUIRED')
   print(json.dumps(result))
  except Exception as error:
-  code=str(error) if isinstance(error,ValueError) and __import__('re').fullmatch('[A-Z_]+',str(error)) else type(error).__name__
+  code=str(error) if isinstance(error,ValueError) and __import__('re').fullmatch('[A-Z0-9_]+',str(error)) else type(error).__name__
   raise SystemExit('DRIVE_RELEASE_FAILED:'+code)
