@@ -1,0 +1,40 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "mavi-basim-drive-archive",
+  "main": "../src/drive-independent.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "services": [
+    {
+      "binding": "OAUTH_BROKER",
+      "service": "mavi-basim-seo-prod",
+      "entrypoint": "DriveGoogleBroker"
+    }
+  ],
+  "vars": {
+    "ARCHIVE_ENABLED": "true"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "DRIVE_ARCHIVE_STORE",
+        "class_name": "IndependentDriveStore"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "drive-independent-v1",
+      "new_sqlite_classes": [
+        "IndependentDriveStore"
+      ]
+    }
+  ],
+  "observability": {
+    "enabled": false
+  },
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  }
+}

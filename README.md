@@ -178,3 +178,24 @@ uygun Cron kendiliğinden devam eder; sayaç/limit/kota izni değiştirilmez. Go
 onayı verilmeden gerçek arşiv alındığı iddia edilmez. Google projesinde Drive API
 kapalıysa etkinleştirilmesi ve OAuth uygulaması test modundaysa çevrimdışı iznin
 7 günlük Google süresi için uygulamanın yayın durumunun kontrolü gerekir.
+# D1 kullanmayan Google Drive bağlantısı
+
+`/drive-independent` mevcut owner oturumuyla yeni bir `drive.file` çevrimdışı izni
+alır. OAuth state, yeni refresh token, şifreli geçici arşiv parçaları ve sabit dosya
+kimlikleri ayrı `mavi-basim-drive-archive` Worker'ının SQLite Durable Object'inde
+tutulur. Bu Worker'ın D1 bağlantısı yoktur. Ana Worker'daki özel named entrypoint
+yalnız OAuth client ayarlarını kullanır; eski token veya D1 kaydı okumaz.
+
+Yeni arşiv anahtarı yalnız Cloudflare secret olarak rastgele oluşturulur. SQLite
+Durable Objects Workers Free planında desteklenir; kurulum önce gerçek aboneliği
+doğrular, ücretli plan açmaz. Ayrı Worker internete açık değildir. GSC Worker'ı,
+Google client secret'ı, mevcut tokenlar ve Cron korunur; eski D1 bağımlı Drive Cron
+çağrısı kaldırılır. Yeni onaydan sonra DO alarmı ilk arşivi otomatik başlatır;
+sonraki günlük arşivler 24 saatlik alarmla çalışır, geçici hatalar sınırlı geri çekilir.
+
+Kaynak sabittir: `1uKs8G9hUbmUvU8tqKfnDkZ1PbiVk-JcuJTgGqD3lB-4`.
+Günlük özel JSON yalnız doğrulanmış/çelişkisiz hazır kayıtları içerir; tam XLSX
+diğer sekmeleri ve kullanıcı alanlarını da kayıpsız saklar. Kimlikler yüklemeden
+önce atomik ayrılır; kayıp yanıt tekrar dosya oluşturmaz. SHA-256 ve gerçek geri
+okuma başarılı olmadan kayıt sayısı başarılı sayılmaz. 52 GSC işi tamamlandı
+olarak işaretlenmez. D1 aktarımı kendi kota korumalarıyla ayrı sürer.

@@ -15,6 +15,7 @@ from d1_quota_checkpoint import observation
 from d1_quota_control import DATABASE
 from release_readiness import APP, REPOSITORY, get_json
 from scoped_release import DRIVE_SOURCE
+from independent_drive_release import SOURCE as INDEPENDENT_DRIVE_SOURCE
 from sheets_recovery_plan import SPREADSHEET, MAX_SOURCE, read_xlsx, plan, canonical
 import hashlib
 
@@ -26,7 +27,7 @@ PARITY = ('src/d1-read-budget.ts', 'src/sync-budget.ts', 'src/types.ts', 'src/go
 
 def source_parity():
     for path in PARITY:
-        existing = subprocess.check_output(['git', 'show', (DRIVE_SOURCE if path == 'src/google.ts' else EXPECTED_APP) + ':' + path], cwd=ROOT, stderr=subprocess.DEVNULL)
+        existing = subprocess.check_output(['git', 'show', (INDEPENDENT_DRIVE_SOURCE if path == 'src/types.ts' else DRIVE_SOURCE if path == 'src/google.ts' else EXPECTED_APP) + ':' + path], cwd=ROOT, stderr=subprocess.DEVNULL)
         if existing != (ROOT / path).read_bytes():
             raise ValueError('SOURCE_GUARD_PARITY_REQUIRED')
 
@@ -78,7 +79,7 @@ def locks(client):
         raw = schedules['result']
         crons = [s['cron'] for s in (raw.get('schedules', []) if isinstance(raw, dict) else raw)]
         found[worker] = {'version': versions[0]['version_id'], 'crons': crons}
-    if get_json(APP + '/api/health').get('deployment', {}).get('commit') not in (EXPECTED_APP, DRIVE_SOURCE):
+    if get_json(APP + '/api/health').get('deployment', {}).get('commit') not in (EXPECTED_APP, DRIVE_SOURCE, INDEPENDENT_DRIVE_SOURCE):
         raise ValueError('SOURCE_LIVE_COMMIT_CHANGED')
     return found
 

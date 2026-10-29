@@ -16,7 +16,8 @@ import {performance,performanceQueries,deviceFilter} from './performance';
 import {calendarMonth,periodSelection,rangeCount} from './periods';
 import {cachedRead} from './read-cache';
 import {withReadBudget,readBudgetStatus,D1BudgetError,originalDatabase} from './d1-read-budget';
-import {driveStatus,scheduledDriveArchive} from './drive-archive';
+import {independentDriveRoute} from './drive-broker';
+export {DriveGoogleBroker} from './drive-broker';
 
 const RUNTIME_REVISION='gsc-catchup-v1';
 function deploymentInfo(env:Env){const metadata=env.CF_VERSION_METADATA;return {runtime_revision:RUNTIME_REVISION,read_guard_revision:'d1-account-reads-v1',gsc_validation_revision:'owned-url-variants-v2',version_id:metadata?.id&&/^[a-f0-9-]{36}$/i.test(metadata.id)?metadata.id:null,commit:metadata?.tag&&/^[a-f0-9]{40}$/.test(metadata.tag)?metadata.tag:null};}
@@ -56,18 +57,20 @@ function reportSelection(params:URLSearchParams){const selected=periodSelection(
 async function route(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url),path=url.pathname;
   if(request.method==='GET'&&path==='/api/health')return json({ok:true,service:'Mavi Basım SEO Karar Merkezi',deployment:deploymentInfo(env)});
+  if(request.method==='GET'&&path==='/api/drive-independent/health')return independentDriveRoute(request,env);
   if(request.method==='POST'&&path==='/api/session')return withReadBudget(env,path,safe=>login(request,safe));
+  if(request.method==='GET'&&path==='/api/oauth/google/callback'&&(url.searchParams.get('state')||'').startsWith('drive2.'))return independentDriveRoute(request,env);
   if(request.method==='GET'&&path==='/api/oauth/google/callback')return withReadBudget(env,path,safe=>oauthCallback(request,safe));
   if(!path.startsWith('/api/'))return env.ASSETS.fetch(request);
   if(!await authenticated(request,env))return json({error:'Giriş yapmanız gerekiyor.'},401);
   if(!['GET','HEAD'].includes(request.method)&&!safeOrigin(request))return json({error:'Geçersiz istek kaynağı.'},403);
   if(request.method==='DELETE'&&path==='/api/session')return new Response(null,{status:204,headers:{'Set-Cookie':'mavi_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'}});
+  if(path.startsWith('/api/drive-independent/')||path==='/api/drive/status'||path==='/api/oauth/google/start'&&url.searchParams.get('purpose')==='drive')return independentDriveRoute(request,env);
   return withReadBudget(env,path,safe=>dataRoute(request,safe));
 }
 async function dataRoute(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url),path=url.pathname;
-  if(request.method==='POST'&&path==='/api/oauth/google/start')return oauthStart(env,url.searchParams.get('purpose')==='drive'?'drive':'seo');
-  if(request.method==='GET'&&path==='/api/drive/status')return driveStatus(env);
+  if(request.method==='POST'&&path==='/api/oauth/google/start')return oauthStart(env);
   if(request.method==='GET'&&path==='/api/gsc/verify')return json(await verifyGscAccess(env));
   if(request.method==='POST'&&path==='/api/gsc/pilot')return json(await pilotGscDay(env));
   if(request.method==='GET'&&path==='/api/status'){
@@ -191,7 +194,6 @@ export default {
   async scheduled(_event:ScheduledController,env:Env,context:ExecutionContext){if(env.AUTOMATION_ENABLED!=='true')return;context.waitUntil((async()=>{
     try{
       const time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
-      await scheduledDriveArchive(env,time);
       const result=await tick(env,fetch,time,'cron');
       if(time.getUTCMinutes()%15!==0)return;
     }catch(error){
