@@ -3,6 +3,9 @@ import json
 import os
 import re
 import urllib.request
+import urllib.error
+import socket
+import time
 from datetime import datetime,timezone
 from pathlib import Path
 from cloudflare_diagnostics import Cloudflare
@@ -20,11 +23,22 @@ def get_json(url,token=None,opener=None):
  headers={'Accept':'application/json','User-Agent':'MaviBasimReleaseCheck/1.0'}
  if token:headers['Authorization']='Bearer '+token
  request=urllib.request.Request(url,headers=headers)
- try:
-  with (opener or urllib.request.build_opener(NoRedirect())).open(request,timeout=30) as response:raw=response.read(2_000_001)
-  if len(raw)>2_000_000:raise ValueError('RELEASE_RESPONSE_LIMIT')
-  return json.loads(raw)
- except Exception:raise ValueError('RELEASE_OBSERVATION_UNAVAILABLE') from None
+ destination='WORKER_HEALTH' if url.startswith(APP+'/api/health?') else 'GITHUB_MAIN_REF' if url.endswith('/branches/main') else 'GITHUB_CI'
+ client=opener or urllib.request.build_opener(NoRedirect())
+ for attempt in range(2):
+  try:
+   with client.open(request,timeout=30) as response:raw=response.read(2_000_001)
+   if len(raw)>2_000_000:raise ValueError('RELEASE_RESPONSE_LIMIT')
+   return json.loads(raw)
+  except urllib.error.HTTPError as error:
+   code='HTTP_'+str(error.code);transient=error.code in (429,500,502,503,504)
+  except (TimeoutError,socket.timeout):code='TIMEOUT';transient=True
+  except urllib.error.URLError:code='TRANSPORT';transient=True
+  except ValueError:code='INVALID_JSON_OR_RESPONSE_LIMIT';transient=False
+  except OSError:code='TRANSPORT';transient=True
+  if not transient or attempt==1:raise ValueError('RELEASE_OBSERVATION_UNAVAILABLE_'+destination+'_'+code) from None
+  time.sleep(1)
+
 
 
 def live_guard_deployment(opener=None):
@@ -61,11 +75,11 @@ if __name__=='__main__':
   result=readiness(Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID')),os.environ.get('GITHUB_SHA'),os.environ.get('GITHUB_EVENT_NAME'),os.environ.get('EXPECTED_PREVIOUS_VERSION') or None)
   source=os.environ.get('RELEASE_SOURCE_COMMIT')
   if source:
-   from scoped_release import ROOT,plan,assets
+   from scoped_release import ROOT,plan,assets,PERFORMANCE_SOURCE
    live=live_guard_deployment()
    if not live:raise ValueError('LIVE_GUARD_REQUIRED')
    selected=plan(ROOT,source,os.environ.get('GITHUB_SHA'),live,lambda path:get_json('https://api.github.com/repos/'+REPOSITORY+path,os.environ.get('GITHUB_TOKEN')))
-   result.update(source_commit=source,scoped_source=selected,source_assets=assets(ROOT,source),needed=live.get('commit')!=source)
+   result.update(source_commit=source,scoped_source=selected,source_assets=assets(ROOT,live['commit'] if source==PERFORMANCE_SOURCE else source),needed=live.get('commit')!=source)
   else:result['source_commit']=os.environ.get('GITHUB_SHA')
   folder=Path('.local');folder.mkdir(exist_ok=True);(folder/'release-readiness.json').write_text(json.dumps(result,indent=2));print(json.dumps(result))
   if os.environ.get('GITHUB_OUTPUT'):

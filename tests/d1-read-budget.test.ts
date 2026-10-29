@@ -29,7 +29,7 @@ it.each([
 ])('%s fails closed without changing Google or queued data',async(_label,update)=>{const cfg=await guarded();await env.DB.prepare('UPDATE d1_quota_state SET '+update).run();let called=0;await expect(withReadBudget(cfg,'cron',async()=>{called++;},TIME)).rejects.toBeInstanceOf(D1BudgetError);expect(called).toBe(0);});
 it('a new UTC day requires a new account observation, never assumed zero use',async()=>{const cfg=await guarded();await expect(withReadBudget(cfg,'cron',async()=>7,new Date('2026-10-27T00:00:00Z'))).rejects.toThrow('D1_READ_BUDGET_WAIT');});
 it('a slow analytics lease permits bounded collection and blocks new heavy analyses',async()=>{const cfg=await guarded();await env.DB.prepare("UPDATE d1_quota_state SET mode='slow'").run();await expect(withReadBudget(cfg,'/api/report',async()=>7,TIME)).rejects.toThrow('D1_READ_BUDGET_WAIT');expect(await withReadBudget(cfg,'cron',async safe=>safe.SYNC_MAX_PAGES_PER_TICK,TIME)).toBe('1');});
-it('concurrent reservations cannot pass the shared account read ceiling',async()=>{const cfg=await guarded();await env.DB.prepare('UPDATE d1_quota_state SET account_reads=3300000').run();let release!:()=>void;const gate=new Promise<void>(r=>{release=r;});const calls=Array.from({length:20},()=>withReadBudget(cfg,'cron',async()=>{await gate;return true;},TIME));const settled=Promise.allSettled(calls);await new Promise(r=>setTimeout(r,50));release();const results=await settled;expect(results.filter(r=>r.status==='fulfilled').length).toBeLessThanOrEqual(10);expect(results.some(r=>r.status==='rejected')).toBe(true);expect((await ledger())!.reads).toBeLessThanOrEqual(200_000);});
+it('concurrent reservations cannot pass the shared account read ceiling',async()=>{const cfg=await guarded();await env.DB.prepare('UPDATE d1_quota_state SET account_reads=3300000').run();let release!:()=>void;const gate=new Promise<void>(r=>{release=r;});const calls=Array.from({length:20},()=>withReadBudget(cfg,'small',async()=>{await gate;return true;},TIME));const settled=Promise.allSettled(calls);await new Promise(r=>setTimeout(r,50));release();const results=await settled;expect(results.filter(r=>r.status==='fulfilled').length).toBeLessThanOrEqual(10);expect(results.some(r=>r.status==='rejected')).toBe(true);expect((await ledger())!.reads).toBeLessThanOrEqual(200_000);});
 it('actual D1 metadata refunds unused reads and retains bookkeeping margin',async()=>{const cfg=await guarded();expect(await withReadBudget(cfg,'small',async safe=>safe.DB.prepare('SELECT count(*) n FROM products').first('n'),TIME)).toBe(2);const l=await ledger();expect(l!.reads).toBeGreaterThanOrEqual(100);expect(l!.reads).toBeLessThan(20_000);expect((await env.DB.prepare('SELECT count(*) n FROM d1_query_costs').first<{n:number}>())!.n).toBe(1);});
 it('SQL failure retains its entire conservative reservation',async()=>{const cfg=await guarded();await expect(withReadBudget(cfg,'small',async safe=>safe.DB.prepare('SELECT * FROM not_a_table').all(),TIME)).rejects.toThrow();expect((await ledger())!.reads).toBe(20_000);});
 it('missing rows_read metadata never implies a free query',async()=>{const cfg=await guarded();cfg.DB=intercept(cfg.DB,sql=>sql==='SELECT fixture_missing_meta'?{all:async()=>({results:[],meta:{rows_written:0}})}:null);await withReadBudget(cfg,'small',async safe=>safe.DB.prepare('SELECT fixture_missing_meta').all(),TIME);expect((await ledger())!.reads).toBe(20_000);});
@@ -56,3 +56,80 @@ it('single-page quarters alternate historical and recent work without starving f
 it('D1 query plans search active datasets with the covering index instead of scanning the fact table',async()=>{const plan=(await env.DB.prepare("EXPLAIN QUERY PLAN SELECT d.clicks FROM dataset_coverage c INDEXED BY coverage_active CROSS JOIN gsc_daily_by_page d WHERE c.provider='gsc' AND c.scope='page' AND c.complete=1 AND c.day=? AND d.dataset_id=c.dataset_id AND d.date=c.day").bind('2026-09-01').all<{detail:string}>()).results.map(r=>r.detail).join(' ');expect(plan).toContain('coverage_active');expect(plan).toContain('SEARCH d ');expect(plan).not.toContain('SCAN d ');});
 
 it('production version metadata keeps the guard required even if keep-vars omits or disables a new flag',async()=>{for(const flag of [undefined,'false'])await expect(withReadBudget({...env,D1_READ_GUARD_ENABLED:flag,CF_VERSION_METADATA:{id:'12345678-1234-1234-1234-123456789abc'}},'cron',async()=>7,TIME)).rejects.toThrow('D1_READ_BUDGET_WAIT');});
+
+it.each([
+ ['reads',1000000,0,'BACKGROUND_READ_HEADROOM'],
+ ['writes',0,60000,'BACKGROUND_WRITE_HEADROOM'],
+])('background %s pressure leaves bounded login and reports inside the original ceilings',async(_label,reads,writes,reason)=>{
+ const cfg=await guarded();
+ await env.DB.prepare('INSERT INTO d1_quota_ledger VALUES(?,?,?,?)').bind('2026-10-26',reads,writes,TIME.toISOString()).run();
+ let calls=0;
+ await expect(withReadBudget(cfg,'cron',async()=>{calls++;},TIME)).rejects.toMatchObject({code:'D1_READ_BUDGET_WAIT',reason});
+ expect(calls).toBe(0);expect(await ledger()).toMatchObject({reads,writes});
+ // Real login keeps its D1 attempt limiter and signed cookie.
+ const {login}=await import('../src/security');
+ const response=await withReadBudget(cfg,'/api/session',safe=>login(new Request('https://app.example/api/session',{method:'POST',headers:{Origin:'https://app.example','Content-Type':'application/json'},body:JSON.stringify({token:env.ADMIN_TOKEN})}),safe),TIME);
+ expect(response.status).toBe(200);expect(response.headers.get('Set-Cookie')).toContain('HttpOnly; Secure; SameSite=Strict');
+ expect((await withReadBudget(cfg,'/api/report',safe=>getReport(safe,'2026-09'),TIME)).products).toHaveLength(2);
+ const current=(await ledger())!;expect(current.reads).toBeGreaterThanOrEqual(reads);expect(current.reads).toBeLessThanOrEqual(2000000);expect(current.writes).toBeGreaterThanOrEqual(writes);expect(current.writes).toBeLessThanOrEqual(65000);
+});
+it('interactive traffic still stops at the original local ceiling',async()=>{
+ const cfg=await guarded();await env.DB.prepare('INSERT INTO d1_quota_ledger VALUES(?,?,?,?)').bind('2026-10-26',2000000,0,TIME.toISOString()).run();
+ await expect(withReadBudget(cfg,'/api/session',async()=>7,TIME)).rejects.toMatchObject({reason:'LOCAL_READ_LIMIT'});
+ expect((await ledger())!.reads).toBe(2000000);
+});
+it.each([
+ ["valid_until='2026-10-26T03:14:59Z'",'LEASE_EXPIRED'],
+ ["data_through='2026-10-26T00:00:00Z'",'ANALYTICS_STALE'],
+ ["mode='blocked'",'CHECKPOINT_BLOCKED'],
+ ['account_reads=3500000','ACCOUNT_READ_LIMIT'],
+ ['account_writes=85000','ACCOUNT_WRITE_LIMIT'],
+])('diagnoses %s before any reservation or application query',async(update,reason)=>{
+ const cfg=await guarded();await env.DB.prepare('UPDATE d1_quota_state SET '+update).run();
+ await expect(withReadBudget(cfg,'/api/status',async()=>7,TIME)).rejects.toMatchObject({code:'D1_READ_BUDGET_WAIT',reason});
+ expect(await ledger()).toBeNull();expect(await readBudgetStatus(cfg,TIME)).toMatchObject({reason_code:reason,mode:'blocked'});
+});
+it('source freshness can end a lease earlier than its advertised valid_until',async()=>{
+ const cfg=await guarded();await env.DB.prepare('UPDATE d1_quota_state SET data_through=?').bind(new Date(TIME.getTime()-119*60000).toISOString()).run();
+ const status=await readBudgetStatus(cfg,TIME);expect(status).toMatchObject({effective_valid_until:new Date(TIME.getTime()+60000).toISOString()});
+ const clock=vi.spyOn(Date,'now').mockReturnValueOnce(1000).mockReturnValue(121000);
+ try{await expect(withReadBudget(cfg,'/api/status',safe=>safe.DB.prepare('SELECT 1').all(),TIME)).rejects.toMatchObject({reason:'LEASE_ENDED_DURING_OPERATION'});}finally{clock.mockRestore();}
+});
+it('429 diagnosis is bounded and does not expose quota counters, SQL or credentials',async()=>{
+ const response=await worker.fetch(new Request('https://app.example/api/session',{method:'POST',headers:{Origin:'https://app.example'},body:JSON.stringify({token:'TEST private token'})}),{...env,D1_READ_GUARD_ENABLED:'true'});
+ expect(response.status).toBe(429);const body=await response.json() as Record<string,unknown>;
+ expect(body).toMatchObject({code:'D1_READ_BUDGET_WAIT',reason:'CHECKPOINT_MISSING'});
+ expect(Object.keys(body).sort()).toEqual(['code','error','reason']);expect(JSON.stringify(body)).not.toContain('TEST private token');expect(await ledger()).toBeNull();
+});
+it('authorized status remains usable after background collection reaches its held read share',async()=>{
+ const now=new Date(),cfg=await guarded({},now),day=now.toISOString().slice(0,10);
+ await env.DB.prepare('INSERT INTO d1_quota_ledger VALUES(?,?,?,?)').bind(day,1000000,0,now.toISOString()).run();
+ await expect(withReadBudget(cfg,'cron',async()=>7,now)).rejects.toMatchObject({reason:'BACKGROUND_READ_HEADROOM'});
+ const response=await worker.fetch(new Request('https://app.example/api/status',{headers:{Authorization:'Bearer '+env.ADMIN_TOKEN}}),cfg);
+ expect(response.status).toBe(200);expect(await response.json()).toMatchObject({google_connected:false,read_budget:{enabled:true,mode:'open',reason_code:null}});
+});
+it('interactive headroom preserves the login attempt limiter',async()=>{
+ const cfg=await guarded();await env.DB.prepare('INSERT INTO d1_quota_ledger VALUES(?,?,?,?)').bind('2026-10-26',1000000,60000,TIME.toISOString()).run();
+ const {login}=await import('../src/security');
+ const attempt=(token:string)=>withReadBudget(cfg,'/api/session',safe=>login(new Request('https://app.example/api/session',{method:'POST',headers:{Origin:'https://app.example'},body:JSON.stringify({token})}),safe),TIME);
+ for(let i=0;i<5;i++)expect((await attempt('TEST wrong')).status).toBe(401);
+ const blocked=await attempt(env.ADMIN_TOKEN!);expect(blocked.status).toBe(429);expect(await blocked.json()).toEqual({error:'Çok fazla deneme. 15 dakika sonra tekrar deneyin.'});
+});
+it('indexed coverage estimate rejects a different SQL-bound date scope',async()=>{
+ const {boundedCoverageRead}=await import('../src/d1-read-budget');const cfg=await guarded();
+ await expect(withReadBudget(cfg,'/api/performance',safe=>boundedCoverageRead(safe,safe.DB.prepare("SELECT d.* FROM dataset_coverage c INDEXED BY coverage_active CROSS JOIN gsc_daily_by_page d ON d.dataset_id=c.dataset_id AND d.date=c.day WHERE c.scope='page' AND c.complete=1 AND c.day BETWEEN ? AND ?").bind('2026-01-01','2026-12-31'),'page','2026-10-01','2026-10-31'),TIME)).rejects.toThrow('D1_SCOPE_BUDGET_WAIT');
+});
+it('unchanged performance evidence reuses its original measured response beyond five minutes',async()=>{
+ const t=new Date('2026-10-26T10:00:00Z');let calls=0;
+ const compute=async()=>({measured_at:t.toISOString(),rows:[{fixture:true}],fresh:false,call:++calls});
+ const first=await cachedRead(env,'/api/performance?month=2026-10',compute,t);
+ expect(await cachedRead(env,'/api/performance?month=2026-10',compute,new Date(t.getTime()+3600000))).toEqual(first);expect(calls).toBe(1);
+ await env.DB.prepare("INSERT INTO health_checks VALUES('gsc','2026-10-26',?,'ok',NULL)").bind(new Date(t.getTime()+4000000).toISOString()).run();
+ expect((await cachedRead(env,'/api/performance?month=2026-10',compute,new Date(t.getTime()+4000000))).call).toBe(2);
+});
+
+it('default filters and URL ordering cannot multiply identical GSC cache scans',async()=>{
+ let calls=0;const compute=async()=>({fixture:++calls});
+ expect(await cachedRead(env,'/api/performance?month=2026-10',compute)).toEqual(await cachedRead(env,'/api/performance?device=ALL&rangeMonths=1&month=2026-10',compute));
+ expect(calls).toBe(1);
+});

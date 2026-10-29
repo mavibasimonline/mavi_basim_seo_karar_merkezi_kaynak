@@ -316,3 +316,19 @@ test("failed analysis or network never manufactures values and keeps the interfa
   );
   await expect(page.locator(".product")).toHaveCount(29);
 });
+
+test('verified product measurements remain visible when the separate SEO analysis fails',async({page})=>{
+ await page.route('**/api/report?*',r=>r.fulfill({status:503,json:{error:'TEST analysis unavailable'}}));
+ await page.route('**/api/performance?*',async r=>{
+  const response=await r.fetch(),data=await response.json();
+  data.products=[{id:'brosur',current:{clicks:7,impressions:100,ctr:0.07,position:3},previous:null,observed_days:1,last_fetched_at:'2026-10-28T03:00:00Z'}];
+  data.series[0]={...data.series[0],verified:true,dataset_id:'TEST_ONLY_VALIDATED_DAY',fetched_at:'2026-10-28T03:00:00Z'};
+  await r.fulfill({json:data});
+ });
+ await login(page);await navigate(page,'Ürün Performansı');
+ const row=page.locator('.product').filter({hasText:'Broşür'}).first();
+ await expect(row).toContainText('7');await expect(row).toContainText('Veri bekle');
+ await row.getByRole('button',{name:/kanıt/i}).click();
+ await expect(page.locator('#productDialog')).toContainText('Search Console');
+ await expect(page.locator('#productDialog')).not.toContainText('Search Console kaynak kanıtı yok.');
+});

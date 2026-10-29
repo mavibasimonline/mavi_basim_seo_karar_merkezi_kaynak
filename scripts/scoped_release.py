@@ -8,6 +8,12 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 ALLOWED={'src/crawler.ts','tests/crawl-mapping-cache.test.ts','docs/CRAWL_MAPPING_CACHE_FIX.md'}
+PR30_SOURCE='f888618954a49f0117ac1dfbd1d43ea80393a03b'
+PR30_BASE='20da9ba512b29b2844559f070d0db4c1b1c62f6c'
+PR30_REVIEW='93afeb06706351150b87b0138a0418ecfbb1839b'
+PR30_ALLOWED={'src/d1-read-budget.ts','src/index.ts','tests/d1-read-budget.test.ts','docs/D1_INTERACTIVE_AVAILABILITY.md'}
+PERFORMANCE_SOURCE='8b56115f52ef2e7690927614365165ade4bfbdaa'
+PERFORMANCE_ALLOWED={'public/app.js','src/d1-read-budget.ts','src/performance.ts','src/read-cache.ts','tests/d1-read-budget.test.ts','tests/performance.test.ts','tests/browser/dashboard.spec.ts'}
 PARITY=('package.json','package-lock.json','deploy/wrangler.production.jsonc')
 APP='https://mavi-basim-seo-prod.mavibasimonline.workers.dev'
 
@@ -21,15 +27,28 @@ def validate_tree(root,source,main,live):
  require(len(parents)==1,'SCOPED_SINGLE_PARENT_REQUIRED');base=parents[0]
  require(live in (base,source),'SCOPED_LIVE_BASE_CHANGED')
  changed=set(git(root,'diff','--name-only',base,source).decode().splitlines())
- require(changed==ALLOWED,'SCOPED_UNREVIEWED_SOURCE_DIFF')
- for path in sorted(ALLOWED):require(git(root,'show',source+':'+path)==git(root,'show',main+':'+path),'SCOPED_APPROVED_FILE_MISMATCH')
+ if source==PERFORMANCE_SOURCE:
+  require(base==PR30_SOURCE,'SCOPED_PERFORMANCE_BASE_MISMATCH')
+  require(changed==PERFORMANCE_ALLOWED,'SCOPED_UNREVIEWED_SOURCE_DIFF')
+  for path in PERFORMANCE_ALLOWED-{'public/app.js'}:require(git(root,'show',source+':'+path)==git(root,'show',main+':'+path),'SCOPED_APPROVED_FILE_MISMATCH')
+  def edits(old,new):return [line for line in git(root,'diff','--unified=0',old,new,'--','public/app.js').decode().splitlines() if line.startswith(('+','-')) and not line.startswith(('+++','---'))]
+  require(edits(PR30_REVIEW,main)==edits(PR30_SOURCE,source),'SCOPED_APPROVED_FILE_MISMATCH')
+ elif source==PR30_SOURCE:
+  require(base==PR30_BASE,'SCOPED_PR30_BASE_MISMATCH')
+  require(changed==PR30_ALLOWED,'SCOPED_UNREVIEWED_SOURCE_DIFF')
+  for path in sorted(PR30_ALLOWED):
+   require(git(root,'show',main+':'+path)==git(root,'show',PR30_REVIEW+':'+path),'SCOPED_APPROVED_FILE_MISMATCH')
+  for path in PR30_ALLOWED-{'src/index.ts'}:
+   require(git(root,'show',source+':'+path)==git(root,'show',PR30_REVIEW+':'+path),'SCOPED_APPROVED_FILE_MISMATCH')
+ else:require(changed==ALLOWED,'SCOPED_UNREVIEWED_SOURCE_DIFF')
+ for path in sorted(ALLOWED if source not in (PR30_SOURCE,PERFORMANCE_SOURCE) else []):require(git(root,'show',source+':'+path)==git(root,'show',main+':'+path),'SCOPED_APPROVED_FILE_MISMATCH')
  for path in PARITY:require(git(root,'show',source+':'+path)==git(root,'show',main+':'+path),'SCOPED_CONFIG_OR_DEPENDENCY_DRIFT')
- return {'source_commit':source,'main_commit':main,'base_commit':base,'changed_files':sorted(changed),'ui_preserved_by_source_tree':True}
+ return {'source_commit':source,'main_commit':main,'base_commit':base,'changed_files':sorted(changed),'ui_preserved_by_source_tree':source!=PERFORMANCE_SOURCE,'approved_ui_files':['public/app.js'] if source==PERFORMANCE_SOURCE else []}
 
 def plan(root,source,main,live,github):
  result=validate_tree(root,source,main,live['commit'])
  runs=github('/actions/workflows/ci.yml/runs?event=workflow_dispatch&head_sha='+source+'&per_page=20').get('workflow_runs',[])
- require(any(r.get('head_sha')==source and r.get('head_branch')=='release/pr28-cache-stability' and r.get('event')=='workflow_dispatch' and r.get('status')=='completed' and r.get('conclusion')=='success' for r in runs),'SUCCESSFUL_EXACT_SCOPED_CI_REQUIRED')
+ require(any(r.get('head_sha')==source and r.get('head_branch')==('release/performance-budget' if source==PERFORMANCE_SOURCE else 'release/pr30-interactive-only' if source==PR30_SOURCE else 'release/pr28-cache-stability') and r.get('event')=='workflow_dispatch' and r.get('status')=='completed' and r.get('conclusion')=='success' for r in runs),'SUCCESSFUL_EXACT_SCOPED_CI_REQUIRED')
  return result
 
 def assets(root,source,opener=None):

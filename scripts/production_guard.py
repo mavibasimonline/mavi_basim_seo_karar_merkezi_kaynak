@@ -1,6 +1,7 @@
 """Read deployment/settings and save rollback identity. No secret values are serialized."""
 import json
 import math
+import time
 import os
 import re
 import urllib.request
@@ -98,8 +99,34 @@ def smoke(commit,opener=None):
  if payload.get('deployment',{}).get('commit')!=commit or payload.get('deployment',{}).get('runtime_revision')!='gsc-catchup-v1' or payload.get('deployment',{}).get('read_guard_revision')!='d1-account-reads-v1':raise ValueError('DEPLOYED_COMMIT_MISMATCH')
  return payload['deployment']
 
+def converged_smoke(client,commit,previous,opener=None,wait=time.sleep):
+ if not re.fullmatch(r'[a-f0-9]{40}',commit or ''):raise ValueError('INVALID_COMMIT')
+ base=f'/accounts/{client.account}/workers/scripts/mavi-basim-seo-prod'
+ for attempt in range(6):
+  result=client.request('GET',base+'/deployments')
+  if not result.get('ok'):raise ValueError('LIVE_VERSION_READ_FAILED')
+  data=result['result'];records=data.get('deployments',[]) if isinstance(data,dict) else data
+  if not records:raise ValueError('LIVE_VERSION_READ_FAILED')
+  versions=max(records,key=lambda r:r.get('created_on','')).get('versions',[])
+  if len(versions)!=1 or versions[0].get('percentage')!=100:raise ValueError('SINGLE_PRODUCTION_VERSION_REQUIRED')
+  active=versions[0].get('version_id','')
+  if not re.fullmatch(r'[a-f0-9-]{36}',active):raise ValueError('LIVE_VERSION_READ_FAILED')
+  version=client.request('GET',base+'/versions/'+active)
+  if not version.get('ok'):raise ValueError('LIVE_VERSION_READ_FAILED')
+  tag=version['result'].get('annotations',{}).get('workers/tag')
+  if active!=previous and tag!=commit:raise ValueError('ACTIVE_SOURCE_COMMIT_MISMATCH')
+  request=urllib.request.Request(APP+'/api/health?release='+commit+'&check='+str(attempt),headers={'User-Agent':'MaviBasimReleaseCheck/1.0','Accept':'application/json','Cache-Control':'no-cache'})
+  with (opener or urllib.request.build_opener()).open(request,timeout=15) as response:payload=json.loads(response.read(20000))
+  d=payload.get('deployment',{})
+  if d.get('runtime_revision')!='gsc-catchup-v1' or d.get('read_guard_revision')!='d1-account-reads-v1':raise ValueError('DEPLOYED_RUNTIME_MISMATCH')
+  if tag==commit and d.get('commit')==commit and d.get('version_id')==active:return d
+  if d.get('version_id') not in (previous,active):raise ValueError('DEPLOYED_VERSION_MISMATCH')
+  if d.get('version_id')==active and active!=previous and d.get('commit')!=commit:raise ValueError('DEPLOYED_COMMIT_MISMATCH')
+  if attempt<5:wait(5)
+ raise ValueError('DEPLOYED_COMMIT_CONVERGENCE_TIMEOUT')
+
 def postflight(client,config,saved,commit,opener=None):
- deployment=smoke(commit,opener)
+ deployment=converged_smoke(client,commit,saved.get('previous_version'),opener)
  # HTTP identity must match the actual 100% Worker deployment and preserved D1/auth bindings.
  verified=preflight(client,config,deployment.get('version_id'))
  settings=client.request('GET',f'/accounts/{client.account}/workers/scripts/mavi-basim-seo-prod/settings')
