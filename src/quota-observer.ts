@@ -48,7 +48,7 @@ async function boundedJson(fetcher:typeof fetch,url:string,init:RequestInit,maxi
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8_000);
  let reader:ReadableStreamDefaultReader<Uint8Array>|undefined;
  try{
-  const r=await fetcher(url,{...init,redirect:'error',signal:controller.signal});
+  const r=await fetcher(url,{...init,redirect:'manual',signal:controller.signal});
   if(!r.ok||!r.body)throw Error('UPSTREAM_UNAVAILABLE');
   reader=r.body.getReader();const chunks:Uint8Array[]=[];let size=0;
   for(;;){const part=await reader.read();if(part.done)break;size+=part.value.byteLength;if(size>maximum)throw Error('UPSTREAM_RESPONSE_LIMIT');chunks.push(part.value);}
