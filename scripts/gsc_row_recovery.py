@@ -9,6 +9,9 @@ from release_readiness import get_json,APP
 
 JOB_IDS=['gsc:2026-08-18:page','gsc:2026-08-18:query']
 READS={
+ 'google_authorizations':"SELECT provider,scopes,updated_at FROM oauth_credentials",
+ 'sheets_archived':"SELECT count(*) records FROM insight_runs WHERE kind='sheets-source-evidence'",
+ 'original_missing_jobs':"WITH RECURSIVE days(day) AS (SELECT '2026-07-01' UNION ALL SELECT date(day,'+1 day') FROM days WHERE day<'2026-07-26'),scopes(scope) AS (VALUES('page'),('query')) SELECT count(*) expected,sum(CASE WHEN c.complete=1 THEN 1 ELSE 0 END) completed FROM days d CROSS JOIN scopes s LEFT JOIN dataset_coverage c ON c.provider='gsc' AND c.day=d.day AND c.scope=s.scope",
  'jobs':"SELECT id,day,scope,status,cursor,attempts,error_code,updated_at FROM sync_jobs WHERE id IN (?,?)",
  'quota':"SELECT day,valid_until,account_reads,account_writes,mode FROM d1_quota_state WHERE day=?",
  'ledger':"SELECT day,reads,writes,updated_at FROM d1_quota_ledger WHERE day=?",
@@ -55,7 +58,9 @@ def run(client,operation,sha,now=None,probe=None):
 
 if __name__=='__main__':
  try:
+  if sys.argv[1]!='inspect':raise ValueError('READ_ONLY_DRIVE_CHECK_REQUIRED')
   result=run(Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID')),sys.argv[1],os.environ.get('GITHUB_SHA'))
+  result['drive_connection_configured']={key:bool(os.environ.get(key)) for key in ('GOOGLE_DRIVE_CLIENT_ID','GOOGLE_DRIVE_CLIENT_SECRET','GOOGLE_DRIVE_REFRESH_TOKEN','GOOGLE_SERVICE_ACCOUNT_JSON')}
   path=Path('.local/gsc-row-recovery.json');path.parent.mkdir(exist_ok=True);path.write_text(json.dumps(result,ensure_ascii=False,indent=2));print(json.dumps(result,ensure_ascii=False,indent=2))
  except Exception as e:
   code=str(e) if isinstance(e,ValueError) and re.fullmatch('[A-Z_]+',str(e)) else type(e).__name__
