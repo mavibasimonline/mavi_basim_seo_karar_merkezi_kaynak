@@ -56,7 +56,17 @@ class SheetsRecoveryTests(unittest.TestCase):
         self.assertEqual(result['candidate_records'], 4)
         query = next(r for r in result['records'] if r['family'] == 'query_period')
         for key, value in data['SORGULAR'][0].items():
-            self.assertEqual(query['payload'][key], value)
+            self.assertEqual(query['provenance']['source_row'][key], value)
+
+    def test_equivalent_number_and_date_formats_do_not_duplicate_evidence(self):
+        original = plan(fixture(), 'a' * 64, STAMP)
+        changed = fixture()
+        for section in ('GSC_GUNLUK', 'OZET', 'URUNLER', 'SORGULAR'):
+            changed[section][0]['Tıklama'] = '1.0'
+            changed[section][0]['Gösterim'] = '10.0'
+        changed['GSC_GUNLUK'][0]['Tarih'] = '46204.0'
+        repeat = plan(changed, 'b' * 64, STAMP, [r['source_key'] for r in original['records']])
+        self.assertEqual(repeat['missing_evidence_records'], 0)
 
     def test_json_user_histories_keep_unknown_fields_and_work_links(self):
         original = {'manualDecisions': {'TEST id': {'note': 'TEST preserve', 'nested': [None, False]}}, 'workRecords': [{'id': 'TEST work', 'decision': 'TEST id', 'unknown': {'a': 1}}]}

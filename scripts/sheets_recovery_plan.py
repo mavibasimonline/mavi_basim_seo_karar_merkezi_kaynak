@@ -133,6 +133,17 @@ def plan(sheets, snapshot_sha, retrieved_at, existing_keys=()):
         if start > end or end > stamp.date().isoformat():
             raise ValueError('INVALID_SOURCE_PERIOD')
         normalized = {key: value for key, value in payload.items() if key != 'Son Güncelleme'}
+        for name in ('Tıklama', 'Gösterim'):
+            if name in normalized:
+                normalized[name] = int(float(normalized[name]))
+        for name in ('TO (%)', 'Ortalama Konum'):
+            if name in normalized:
+                normalized[name] = float(normalized[name])
+        if 'Tarih' in normalized:
+            normalized['Tarih'] = start
+        if 'Başlangıç Tarihi' in normalized:
+            normalized['Başlangıç Tarihi'] = start
+            normalized['Bitiş Tarihi'] = end
         content = {'source': SPREADSHEET, 'section': section, 'family': family,
                    'identity': identity, 'start': start, 'end': end, 'payload': normalized}
         key = digest(content)
@@ -141,7 +152,8 @@ def plan(sheets, snapshot_sha, retrieved_at, existing_keys=()):
         records[key] = {'source_key': key, **content,
                         'content_json': canonical(content),
                         'provenance': {'snapshot_sha256': snapshot_sha, 'retrieved_at': retrieved_at,
-                                       'source_updated_at': payload.get('Son Güncelleme')},
+                                       'source_updated_at': payload.get('Son Güncelleme'),
+                                       'source_row': {key: value for key, value in payload.items() if key != 'validated_metrics'}},
                         'daily_page_query_coverage': False, 'source_filters_verified': False}
     for row in sheets['OZET']:
         code = row['Dönem Kodu']
