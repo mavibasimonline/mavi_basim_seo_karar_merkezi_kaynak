@@ -1,6 +1,9 @@
 name: Kontrollü doğrulanmış aylık analiz yayını
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '42 2 31 10 *'
+    - cron: '42 2 1 11 *'
   workflow_run:
     workflows: ["Test ve kabul denetimi"]
     types: [completed]
@@ -13,7 +16,7 @@ concurrency:
 jobs:
   release:
     if: >-
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      ((github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' &&
        github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
@@ -34,6 +37,15 @@ jobs:
           VERIFIED_CI_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
+          if [ "$EVENT_NAME" = 'schedule' ]; then
+            case "$(date -u +%F)" in
+              2026-10-31|2026-11-01) ;;
+              *) exit 0 ;;
+            esac
+            if [ "$(git log -1 --format=%s)" != 'release: retry monthly cache on next safe D1 quota day' ]; then exit 0; fi
+            echo 'release=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "$EVENT_NAME" = 'workflow_dispatch' ]; then
             echo 'release=true' >> "$GITHUB_OUTPUT"
             exit 0
@@ -42,12 +54,37 @@ jobs:
           if [ "$(git log -1 --format=%s)" != 'release: activate verified monthly cache once' ]; then exit 0; fi
           if ! git diff-tree --no-commit-id --name-only -r HEAD | grep -Fxq '.github/workflows/monthly-release.yml'; then exit 0; fi
           echo 'release=true' >> "$GITHUB_OUTPUT"
+      - name: Tamamlanmış aylık sistemi yeniden yayımlama
+        id: installed
+        if: steps.gate.outputs.release == 'true' && github.event_name == 'schedule'
+        run: |
+          PYTHONPATH=scripts python3 - <<'PY'
+          import os
+          from cloudflare_diagnostics import Cloudflare
+          from quota_observer_release import api
+          client=Cloudflare(os.environ['CLOUDFLARE_API_TOKEN'],os.environ['CLOUDFLARE_ACCOUNT_ID'])
+          workers=api(client,'GET','/workers/scripts')
+          if not isinstance(workers,list):
+              raise SystemExit('MONTHLY_WORKER_INVENTORY_UNKNOWN')
+          names={w['id'] for w in workers}
+          store='mavi-basim-monthly-store'
+          warm='mavi-basim-monthly-source-warm'
+          if store in names:
+              bindings=api(client,'GET','/workers/scripts/mavi-basim-seo-prod/settings').get('bindings',[])
+              connected=any(b.get('name')=='MONTHLY_ANALYSES' and b.get('service')==store for b in bindings)
+              if not connected or warm in names:
+                  raise SystemExit('MONTHLY_PARTIAL_INSTALL_REQUIRES_REVIEW')
+              with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+                  out.write('skip=true\n')
+          elif warm in names:
+              raise SystemExit('MONTHLY_PARTIAL_WARM_INSTALL_REQUIRES_REVIEW')
+          PY
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        if: steps.gate.outputs.release == 'true'
+        if: steps.gate.outputs.release == 'true' && steps.installed.outputs.skip != 'true'
         with:
           node-version: '24'
       - run: npm ci --ignore-scripts --no-fund
-        if: steps.gate.outputs.release == 'true'
+        if: steps.gate.outputs.release == 'true' && steps.installed.outputs.skip != 'true'
       - name: Gerçek aylık kanıt, D1 bağımsız kabul ve izole kontrollü yayın
-        if: steps.gate.outputs.release == 'true'
+        if: steps.gate.outputs.release == 'true' && steps.installed.outputs.skip != 'true'
         run: python3 scripts/monthly_release.py
