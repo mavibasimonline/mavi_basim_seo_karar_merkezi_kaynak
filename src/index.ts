@@ -18,6 +18,7 @@ import {cachedRead} from './read-cache';
 import {withReadBudget,readBudgetStatus,D1BudgetError,originalDatabase} from './d1-read-budget';
 import {independentDriveRoute} from './drive-broker';
 import {monthlyRoute} from './monthly-route';
+import {independentSession} from './independent-session';
 export {MonthlyReportSource} from './monthly-source';
 export {DriveGoogleBroker} from './drive-broker';
 
@@ -60,7 +61,7 @@ async function route(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url),path=url.pathname;
   if(request.method==='GET'&&path==='/api/health')return json({ok:true,service:'Mavi Basım SEO Karar Merkezi',deployment:deploymentInfo(env)});
   if(request.method==='GET'&&path==='/api/drive-independent/health')return independentDriveRoute(request,env);
-  if(request.method==='POST'&&path==='/api/session')return withReadBudget(env,path,safe=>login(request,safe));
+  if(request.method==='POST'&&path==='/api/session')return (env as Env&{DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE?independentSession(request,env):withReadBudget(env,path,safe=>login(request,safe));
   if(request.method==='GET'&&path==='/api/oauth/google/callback'&&(url.searchParams.get('state')||'').startsWith('drive2.'))return independentDriveRoute(request,env);
   if(request.method==='GET'&&path==='/api/oauth/google/callback')return withReadBudget(env,path,safe=>oauthCallback(request,safe));
   if(!path.startsWith('/api/'))return env.ASSETS.fetch(request);
