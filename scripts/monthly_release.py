@@ -130,14 +130,15 @@ def run():
    complete=True
    print(json.dumps({'deployed':True,'source':SOURCE,'version':live['version_id'],'monthly_reports':True,'questions':True,'d1_reads_per_cached_request':0,'source_cost':warm['source_cost'],'automatic_refresh_alarm':alarm['alarm'],'background_refresh':held,'data_preserved':before,'drive_observer_cron_preserved':True,'rollback':False}),flush=True)
  except Exception:
+  if store_started:
+   own(STORE)
+   # Remove the new named-entrypoint dependency BEFORE reverting the app.
+   # Existing verified documents remain intact and alarms cannot refresh D1.
+   deploy(ROOT,op/'store.jsonc',('--var','STORE_ENABLED:false'))
   if started:
    current=lock(APP)['version']
    if current!=OLD_VERSION:
     own(APP);result=subprocess.run(['node','scripts/run.mjs','wrangler','rollback',OLD_VERSION,'--config','deploy/wrangler.drive-independent.jsonc','--message','Monthly cache acceptance rollback','--yes'],cwd=ROOT);need(result.returncode==0,'MONTHLY_ROLLBACK_FAILED')
-  if store_started:
-   own(STORE)
-   # On a failed release the dormant store keeps its verified data, without alarms.
-   deploy(ROOT,op/'store.jsonc',('--var','STORE_ENABLED:false'))
   raise
  finally:
   if p is not None:
