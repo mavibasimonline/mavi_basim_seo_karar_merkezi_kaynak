@@ -15,6 +15,22 @@ export function originalDatabase(db:D1Database){return databaseRoots.get(db)||db
 const statementProofs=new WeakMap<object,{sql:string;params:unknown[]}>();
 const readEstimates=new WeakMap<object,number>();
 interface Cost {reads:number;writes:number;count:number;max:number}
+// These exact routes have bounded SQL shapes. The margin covers two-index-row
+// cost upserts, at most one ledger growth per statement, reserve and settlement.
+// General writes/analyses keep their original reservations and accounting.
+const SESSION_SQL=new Set([
+ 'SELECT attempts, window_start FROM auth_attempts WHERE client_hash=?',
+ 'DELETE FROM auth_attempts WHERE client_hash=?',
+ 'INSERT INTO auth_attempts VALUES(?,?,?) ON CONFLICT(client_hash) DO UPDATE SET attempts=excluded.attempts, window_start=excluded.window_start',
+]);
+const CACHE_WRITE='INSERT INTO api_read_cache VALUES(?,?,?,?) ON CONFLICT(cache_key) DO UPDATE SET revision=excluded.revision,created_at=excluded.created_at,result_json=excluded.result_json';
+function interactiveProfile(kind:string){
+ if(kind==='/api/session')return {reserve:64,bookkeeping:16,statements:2,allows:(sql:string)=>SESSION_SQL.has(sql.replace(/\s+/g,' ').trim())};
+ const select=(sql:string)=>/^\s*SELECT\b/i.test(sql)&&!sql.includes(';');
+ if(kind==='/api/status')return {reserve:128,bookkeeping:64,statements:12,allows:select};
+ if(kind==='/api/performance'||kind==='/api/performance/queries')return {reserve:128,bookkeeping:80,statements:16,allows:(sql:string)=>select(sql)||sql===CACHE_WRITE};
+ return null;
+}
 export function queryAllowance(sql:string){
   if(/^\s*(WITH incoming|INSERT (?:OR (?:REPLACE|IGNORE) )?INTO (?:gsc_daily_|ga4_daily_))/i.test(sql))return 5_000;
   if(/gsc_daily_|ga4_daily_/i.test(sql))return 250_000;
@@ -55,7 +71,8 @@ export async function withReadBudget<T>(env:Env,kind:string,work:(safe:Env)=>Pro
   if(state.mode==='slow'&&expensive)throw new D1BudgetError('D1_READ_BUDGET_WAIT','SLOW_MODE_HEAVY_OPERATION');
   const maximumReads=kind==='cron'?600_000:expensive?1_000_000:/performance/.test(kind)?600_000:200_000;
   let readReserve=20_000;
-  const writeReserve=kind==='cron'?5_000:expensive?4_000:1_000;
+  const profile=interactiveProfile(kind);
+  const writeReserve=profile?.reserve??(kind==='cron'?5_000:expensive?4_000:1_000);
   const background=kind==='cron';
   const readLimit=Math.min(LOCAL_READ_STOP,ACCOUNT_READ_STOP-state.account_reads)-(background?INTERACTIVE_READ_HEADROOM:0),writeLimit=Math.min(LOCAL_WRITE_STOP,ACCOUNT_WRITE_STOP-state.account_writes)-(background?INTERACTIVE_WRITE_HEADROOM:0);
   async function reservationDenied(extraReads:number,extraWrites:number):Promise<never>{
@@ -73,7 +90,8 @@ export async function withReadBudget<T>(env:Env,kind:string,work:(safe:Env)=>Pro
     WHERE reads+excluded.reads<=? AND writes+excluded.writes<=? RETURNING day`)
     .bind(day,readReserve,writeReserve,stamp,readReserve,readLimit,writeReserve,writeLimit,readLimit,writeLimit).first();
   if(!reserved)await reservationDenied(readReserve,writeReserve);
-  let reads=500,writes=200,inFlight=0,unknown=false;
+  let reads=500,writes=profile?.bookkeeping??200,inFlight=0,unknown=false;
+  let profileStatements=0;
   const costs=new Map<string,Cost>();
   const leaseUntil=leaseExpiry(state);
   let growing=Promise.resolve();
@@ -94,6 +112,10 @@ export async function withReadBudget<T>(env:Env,kind:string,work:(safe:Env)=>Pro
     }finally{release();}
   }
   async function perform<R>(sqls:string[],operation:()=>Promise<R>,estimate?:number):Promise<R>{
+    if(profile){
+      if(profileStatements+sqls.length>profile.statements||sqls.some(sql=>!profile.allows(sql)))throw new D1BudgetError('D1_OPERATION_BUDGET_WAIT','INTERACTIVE_SQL_SCOPE');
+      profileStatements+=sqls.length;
+    }
     const allowance=estimate??sqls.reduce((n,s)=>n+queryAllowance(s),0);
     await enter(allowance);
     try{
