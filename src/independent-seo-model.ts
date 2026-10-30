@@ -43,7 +43,7 @@ export function independentReport(records:SheetRecord[],requested:string|undefin
 export function independentAnswer(report:ReturnType<typeof independentReport>,question:string){
  if(typeof question!=='string'||!question.trim()||question.length>1000)throw Error('INVALID_QUESTION');
  if(!report.available)return {answer:'İstenen dönem için doğrulanmış veri yok; yorum yapılamaz.',evidence:[],decision:'Veri bekle',d1_requests:0};
- const q=question.toLocaleLowerCase('tr-TR'),r=report as Extract<typeof report,{available:true}>;
+ const q=question.toLocaleLowerCase('tr-TR'),r=report;
  if(/şehir|şehirler|ilçe|bölge|cihaz|mobil|masaüstü/.test(q))return {answer:'Kaynak Sheets kayıtlarında bu kırılım doğrulanmadığı için şehir veya cihaz performansı hakkında karar veremem.',evidence:[],decision:'Veri bekle',d1_requests:0};
  const selected=[...r.products].sort((a,b)=>b.title.length-a.title.length).find(p=>q.includes(p.title.toLocaleLowerCase('tr-TR'))||q.includes(p.id.toLocaleLowerCase('tr-TR')));
  if(!selected)return {answer:'Doğrulanmış ürün raporuna göre hangi ürünü inceleyelim? Örneğin “broşür neden düştü?” yazabilirsiniz. Canlı GSC kanıtı olmayan nedenleri tahmin etmem.',evidence:[],decision:'Veri bekle',d1_requests:0};
