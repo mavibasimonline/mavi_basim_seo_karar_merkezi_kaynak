@@ -159,7 +159,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
   }catch(error){
    const reason=error instanceof Error?error.message:'INDEPENDENT_SOURCE_UNAVAILABLE';
    const invalid=reason==='INVALID_MONTH'||reason==='INVALID_QUESTION';
-   return json({error:invalid?'İstek geçersiz.':'Doğrulanmış bağımsız Sheets kaynağı henüz okunamıyor. Geçmiş SEO kayıtları korunuyor.',code:invalid?reason:'INDEPENDENT_SOURCE_UNAVAILABLE'},invalid?400:503);
+   return json({error:invalid?'İstek geçersiz.':'Doğrulanmış bağımsız Sheets kaynağı henüz okunamıyor. Geçmiş SEO kayıtları korunuyor.',code:invalid?reason:/^(?:INDEPENDENT|SOURCE|SHEETS|ARCHIVE|GOOGLE|VERIFIED)_[A-Z0-9_]{3,80}$/.test(reason)?reason:'INDEPENDENT_SOURCE_UNAVAILABLE'},invalid?400:503);
   }
  }
  private async staged(pending:Pending,part:Part){
