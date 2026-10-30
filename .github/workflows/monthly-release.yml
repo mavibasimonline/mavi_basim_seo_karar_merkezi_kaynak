@@ -1,6 +1,9 @@
 name: Kontrollü doğrulanmış aylık analiz yayını
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Test ve kabul denetimi"]
+    types: [completed]
 permissions:
   contents: read
   actions: read
@@ -9,7 +12,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 14
     env:
@@ -21,9 +27,27 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: Yalnızca onaylı tek seferlik ana dal sürümünde etkinleştir
+        id: gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          VERIFIED_CI_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = 'workflow_dispatch' ]; then
+            echo 'release=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$VERIFIED_CI_SHA" != "$(git rev-parse HEAD)" ]; then exit 0; fi
+          if [ "$(git log -1 --format=%s)" != 'release: activate verified monthly cache once' ]; then exit 0; fi
+          if ! git diff-tree --no-commit-id --name-only -r HEAD | grep -Fxq '.github/workflows/monthly-release.yml'; then exit 0; fi
+          echo 'release=true' >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        if: steps.gate.outputs.release == 'true'
         with:
           node-version: '24'
       - run: npm ci --ignore-scripts --no-fund
+        if: steps.gate.outputs.release == 'true'
       - name: Gerçek aylık kanıt, D1 bağımsız kabul ve izole kontrollü yayın
+        if: steps.gate.outputs.release == 'true'
         run: python3 scripts/monthly_release.py
