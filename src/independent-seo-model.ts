@@ -29,7 +29,7 @@ export function independentReport(records:SheetRecord[],requested:string|undefin
  if(!months.length)throw Error('INDEPENDENT_NO_COMPLETE_PERIOD');
  const month=requested||months.at(-1)!;
  if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))throw Error('INVALID_MONTH');
- if(!months.includes(month))return {available:false,month,months,source:'Google Sheets',message:'Bu ay için doğrulanmış tamamlanmış dönem kaydı yok. Eksik veri sıfır sayılamaz.',captured_at:capturedAt};
+ if(!months.includes(month))return {available:false as const,month,months,source:'Google Sheets',message:'Bu ay için doğrulanmış tamamlanmış dönem kaydı yok. Eksik veri sıfır sayılamaz.',captured_at:capturedAt};
  const previous=new Date(month+'-01T00:00:00Z');previous.setUTCMonth(previous.getUTCMonth()-1);
  const prevMonth=previous.toISOString().slice(0,7);
  const overview=values(records,'OZET',month),products=values(records,'URUNLER',month),queries=values(records,'SORGULAR',month);
@@ -38,7 +38,7 @@ export function independentReport(records:SheetRecord[],requested:string|undefin
   const old=previousMap.get(product.id),delta=old?product.metrics.clicks-old.metrics.clicks:null,rate=old&&old.metrics.clicks>0?delta!/old.metrics.clicks:null;
   return {...product,previous:old?.metrics||null,delta,rate,decision:!old?'Veri bekle':rate!==null&&rate>=-0.1?'Koru':rate!==null&&rate<-0.2&&delta!==null&&delta<=-30?'İncele':'Koru'};
  });
- return {available:true,month,months,previous_month:months.includes(prevMonth)?prevMonth:null,overview,products:productComparisons,queries:queries.slice(0,150),query_count:queries.length,quarantined_records:quarantined,captured_at:capturedAt,source:'Google Sheets',source_scope:'Eski doğrulanmış Sheets dönem özetleri; anlık GSC veya günlük sayfa/sorgu kanıtı değildir.',limitations:['Şehir/cihaz kırılımı kaynağın doğrulanmış alanlarında yoksa gösterilmez.','Eksik dönemler ve sorgular sıfır kabul edilmez.','Bu panel tek başına Google Search Console canlı bağlantısını kanıtlamaz.'],d1_requests:0};
+ return {available:true as const,month,months,previous_month:months.includes(prevMonth)?prevMonth:null,overview,products:productComparisons,queries:queries.slice(0,150),query_count:queries.length,quarantined_records:quarantined,captured_at:capturedAt,source:'Google Sheets',source_scope:'Eski doğrulanmış Sheets dönem özetleri; anlık GSC veya günlük sayfa/sorgu kanıtı değildir.',limitations:['Şehir/cihaz kırılımı kaynağın doğrulanmış alanlarında yoksa gösterilmez.','Eksik dönemler ve sorgular sıfır kabul edilmez.','Bu panel tek başına Google Search Console canlı bağlantısını kanıtlamaz.'],d1_requests:0};
 }
 export function independentAnswer(report:ReturnType<typeof independentReport>,question:string){
  if(typeof question!=='string'||!question.trim()||question.length>1000)throw Error('INVALID_QUESTION');
