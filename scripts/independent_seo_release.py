@@ -7,14 +7,18 @@ from release_readiness import get_json,REPOSITORY
 ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
-TITLE='release: activate guarded D1-independent SEO layer'
+TITLE='release: repair guarded D1-independent real data acceptance'
 EXPECTED={
- 'src/independent-seo-model.ts','src/independent-session.ts',
- 'src/drive-independent.ts','src/index.ts','public/index.html','public/app.css',
- 'public/independent-seo.html','public/independent-seo.js','public/independent-seo.css',
- 'tests/independent-seo-model.test.ts','tests/independent-session.test.ts','scripts/independent-acceptance-probe.ts',
- '.github/workflows/independent-seo-release.yml','scripts/independent_seo_release.py',
+ 'src/independent-snapshot.ts','src/drive-independent.ts',
+ 'scripts/independent-acceptance-probe.ts','scripts/independent_seo_release.py',
+ 'scripts/independent_real_data_acceptance.py',
+ 'tests/drive-independent/snapshot.test.ts','tests/independent-acceptance/real-source.test.ts',
+ 'tests/test_independent_seo_release.py',
+ 'tests/independent-acceptance-probe.test.ts',
+ 'vitest.config.ts','vitest.independent-acceptance.config.ts',
+ '.github/workflows/independent-seo-release.yml','docs/INDEPENDENT_REAL_DATA_REPAIR.md','TODO.md',
 }
+
 def need(condition,code):
  if not condition:raise ValueError(code)
 def git(*args):return subprocess.check_output(['git',*args],cwd=ROOT,stderr=subprocess.DEVNULL).decode().strip()
@@ -38,6 +42,31 @@ def deploy(config,sha):
 def rollback(config,version):
  result=subprocess.run(['node','scripts/run.mjs','wrangler','rollback',version,'--config',config,'--message','D1-free SEO acceptance rollback','--yes'],cwd=ROOT)
  need(result.returncode==0,'INDEPENDENT_ROLLBACK_FAILED')
+def acceptance_proof(proof):
+ need(isinstance(proof,dict) and proof.get('ok') is True
+      and type(proof.get('d1_requests')) is int and proof['d1_requests']==0
+      and type(proof.get('question_d1_requests')) is int and proof['question_d1_requests']==0
+      and isinstance(proof.get('products'),int) and not isinstance(proof.get('products'),bool)
+      and proof['products']>0 and proof.get('stale') is False
+      and isinstance(proof.get('source_hash'),str) and re.fullmatch('[a-f0-9]{64}',proof['source_hash'])
+      and isinstance(proof.get('month'),str) and re.fullmatch(r'20\d{2}-(0[1-9]|1[0-2])',proof['month']),
+      'INDEPENDENT_REAL_DATA_ACCEPTANCE_FAILED')
+ return proof
+
+def safe_probe_code(body):
+ try:
+  code=json.loads(body).get('code','')
+  if isinstance(code,str) and re.fullmatch(r'(INDEPENDENT_|SOURCE_|SHEETS_|ARCHIVE_|VERIFIED_)[A-Z0-9_]{1,100}',code):return code
+ except (ValueError,AttributeError,TypeError):pass
+ return 'INDEPENDENT_REMOTE_PROBE_HTTP_ERROR'
+
+def app_config(bindings):
+ services={b['name']:b.get('service') for b in bindings if b.get('type')=='service'}
+ need(services in ({'DRIVE_ARCHIVE_SERVICE':ARCHIVE},
+                 {'DRIVE_ARCHIVE_SERVICE':ARCHIVE,'MONTHLY_ANALYSES':'mavi-basim-monthly-store'}),
+      'INDEPENDENT_SERVICE_BINDINGS_UNREVIEWED')
+ return 'deploy/wrangler.monthly-app.jsonc' if 'MONTHLY_ANALYSES' in services else 'deploy/wrangler.drive-independent.jsonc'
+
 def run():
  sha=os.environ.get('GITHUB_SHA','')
  need(os.environ.get('GITHUB_REF')=='refs/heads/main' and os.environ.get('GITHUB_REPOSITORY')==REPOSITORY,'INDEPENDENT_MAIN_REQUIRED')
@@ -56,6 +85,7 @@ def run():
  need(existing[APP]['version'] and existing[ARCHIVE]['version'],'INDEPENDENT_OLD_VERSIONS_REQUIRED')
  main_bindings={x['name']:x for x in existing[APP]['bindings']}
  archive_bindings={x['name']:x for x in existing[ARCHIVE]['bindings']}
+ main_config=app_config(existing[APP]['bindings'])
  need('DB' in main_bindings and main_bindings['DB'].get('id') in (None,'18f8c90d-4af1-430c-ac86-ddf184c75a0b'),'INDEPENDENT_D1_BINDING_MISMATCH')
  need(main_bindings.get('DRIVE_ARCHIVE_SERVICE',{}).get('service')==ARCHIVE,'INDEPENDENT_PRIVATE_ARCHIVE_LINK_REQUIRED')
  need(archive_bindings.get('DRIVE_ARCHIVE_STORE',{}).get('class_name')=='IndependentDriveStore','INDEPENDENT_ARCHIVE_STORAGE_REQUIRED')
@@ -63,9 +93,12 @@ def run():
  need(original_health.get('ok') is True,'INDEPENDENT_OLD_HEALTH_FAILED')
  old_tag=original_health.get('deployment',{}).get('commit')
  need(re.fullmatch('[a-f0-9]{40}',old_tag or ''),'INDEPENDENT_OLD_SOURCE_UNVERIFIED')
+ # Prove the fixed live Sheets in actual local SQLite DO before ANY deployment.
+ from independent_real_data_acceptance import run as real_data_acceptance
+ real_data_acceptance()
  changed_workers=[]
  try:
-  deploy('deploy/wrangler.drive-archive.jsonc',sha);changed_workers.append(ARCHIVE)
+  changed_workers.append(ARCHIVE);deploy('deploy/wrangler.drive-archive.jsonc',sha)
   after_archive=snapshot(client,ARCHIVE)
   need(after_archive['bindings']==existing[ARCHIVE]['bindings'] and after_archive['crons']==existing[ARCHIVE]['crons'],'INDEPENDENT_ARCHIVE_BINDINGS_CHANGED')
   need(api(client,'GET','/workers/scripts/'+ARCHIVE+'/subdomain').get('enabled') is False,'INDEPENDENT_ARCHIVE_PUBLIC_EXPOSURE')
@@ -89,15 +122,20 @@ def run():
      req=urllib.request.Request('http://127.0.0.1:8801/',headers={'Authorization':'Bearer '+key})
      try:
       with urllib.request.urlopen(req,timeout=30) as res:proof=json.loads(res.read(30000));break
-     except (urllib.error.HTTPError,urllib.error.URLError,TimeoutError):time.sleep(1)
-    need(proof and proof.get('ok') is True and proof.get('d1_requests')==0 and proof.get('question_d1_requests')==0 and proof.get('products',0)>0,'INDEPENDENT_REAL_DATA_ACCEPTANCE_FAILED')
+     except urllib.error.HTTPError as error:
+      code=safe_probe_code(error.read(32768))
+      # Data/validation errors are terminal; only startup/transport errors retry.
+      if code!='INDEPENDENT_REMOTE_PROBE_HTTP_ERROR':raise ValueError(code) from None
+      time.sleep(1)
+     except (urllib.error.URLError,TimeoutError):time.sleep(1)
+    acceptance_proof(proof)
     print(json.dumps({'verified_private_archive':True,'month':proof['month'],'products':proof['products'],'d1_requests':0}),flush=True)
   finally:
    if preview is not None:
     preview.terminate()
     try:preview.wait(timeout=6)
     except subprocess.TimeoutExpired:preview.kill()
-  deploy('deploy/wrangler.drive-independent.jsonc',sha);changed_workers.append(APP)
+  changed_workers.append(APP);deploy(main_config,sha)
   after_main=snapshot(client,APP)
   need(after_main['crons']==existing[APP]['crons'] and after_main['bindings']==existing[APP]['bindings'],'INDEPENDENT_APP_BINDINGS_CHANGED')
   # Do not add a new DB instance, replace existing OAuth secrets, or expose the private archive worker.
@@ -117,9 +155,11 @@ def run():
   need(snapshot(client,APP)['crons']==existing[APP]['crons'],'INDEPENDENT_CRON_CHANGED')
   print(json.dumps({'deployed':True,'source':sha,'d1_data_mutated':False,'new_billed_resources':False,'backup_mutated':False,'new_layer':'D1-free Sheets/DO','login_uses_d1':False,'authenticated_data_acceptance':'requires existing admin session','public_endpoints_closed':True,'existing_site_changed':False}),flush=True)
  except Exception:
-  for worker,config in ((APP,'deploy/wrangler.drive-independent.jsonc'),(ARCHIVE,'deploy/wrangler.drive-archive.jsonc')):
+  for worker,config in ((APP,main_config),(ARCHIVE,'deploy/wrangler.drive-archive.jsonc')):
    if worker in changed_workers:
-    try:rollback(config,existing[worker]['version'])
+    try:
+     rollback(config,existing[worker]['version'])
+     need(snapshot(client,worker)==existing[worker],'INDEPENDENT_ROLLBACK_VERIFICATION_FAILED')
     except Exception:print('INDEPENDENT_REVIEW_REQUIRED_ROLLBACK_'+worker,flush=True)
   raise
 if __name__=='__main__':

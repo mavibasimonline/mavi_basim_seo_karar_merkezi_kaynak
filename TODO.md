@@ -1,3 +1,13 @@
+# 31 Ekim 2026 — D1 bağımsız gerçek veri kabulü onarımı
+
+- Gerçek Sheets verisi tek DO değerinde 1.354.853 UTF-8 bayt tutuyor; 128 KiB sınırını aşan saklama yolu, hash doğrulamalı parçalara ve atomik etkin manifest değişimine çevrildi. Eski kayıtlar/arşivler silinmez.
+- Gerçek kaynak + gerçek yerel SQLite DO rapor/geri okuma/Soru-Cevap kabulü geçti: Eylül 2026, 30 ürün, 1.294 sorgu. Bu, canlı GSC günlük sayfa/sorgu kapsamını tamamlamaz. 3.534 çelişkili kaynak kaydı karantinada korunur.
+- Günlük GSC toplayıcısı, D1 geçmişi, Drive yedekleri/OAuth/alarmlar ve özgün CSV'ler korunur. Yeni bağımsız rapor yolu D1 kullanmaz.
+- Yayın ancak tam main CI, ücretsiz hesap/binding/Cron/rollback kapıları, dağıtımdan önce gerçek yerel veri kabulü ve SEO uygulamasından önce özel uzak rapor/Soru-Cevap geri okuma kabulü ile yapılır. Eski önbellek kabul edilmez. Son yayın sonucu Actions'tan doğrulanmalıdır; bu hazırlık kaydı yayın başarısı iddiası değildir.
+- Ayrıntılar: [INDEPENDENT_REAL_DATA_REPAIR.md](docs/INDEPENDENT_REAL_DATA_REPAIR.md). Kaynakta olmayan aylar ve önceki ay karşılaştırmaları üretilmez. Kullanıcıdan yeni token/onay gerektiren kanıtlı bir eksik şu aşamada yok; gerçek uzak kabulün sonucu beklenir.
+
+---
+
 # 29 Ekim 2026 — bağımsız Cloudflare kota gözlemcisi
 
 PR #29 yalnız bağımsız gözlemci ve kontrollü yayın kapsamına indirildi; ilgisiz kuyruk incelemesi çıkarıldı. Ana uygulama, veriler, OAuth, Cron ve bütçe limitleri korunur. Kurulumdan önce ayrı `CF_QUOTA_ANALYTICS_TOKEN` Actions secret’ı ve CI dağıtım kimliğinde yalnız Billing:Read erişimi gerekiyor. Bunlar gerçek ön kontrolde eksik; yayın başlatılmadı. Son tam SHA CI’si, ücretsiz plan ve gerçek scheduled kabulü yayın kapısıdır. Ayrıntılar: [kontrollü kurulum](docs/INDEPENDENT_QUOTA_OBSERVER.md).

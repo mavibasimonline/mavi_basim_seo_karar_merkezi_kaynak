@@ -5,6 +5,7 @@ import {hash,json} from './types';
 import {boundedText,ProviderError} from './google';
 import {DRIVE_SHEET,DRIVE_SECTIONS,gvizRows,verifiedDriveRecords} from './drive-records';
 import {independentReport,independentAnswer,SheetRecord} from './independent-seo-model';
+import {readIndependentSnapshot,saveIndependentSnapshot,IndependentSnapshot} from './independent-snapshot';
 
 const SCOPE='https://www.googleapis.com/auth/drive.file',API='https://www.googleapis.com/drive/v3/';
 const XLSX='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -123,19 +124,19 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
   });
  }
  private async independentSnapshot(){
-  type Snapshot={format:'independent-sheets-v1';captured_at:string;source:string;records:SheetRecord[];quarantined_records:number;source_hash:string};
-  const cached=await this.ctx.storage.get<Snapshot>('independent:snapshot');
-  if(cached&&cached.format==='independent-sheets-v1'&&Date.now()-Date.parse(cached.captured_at)<24*3600000)return {...cached,stale:false};
+  const cached=await readIndependentSnapshot(this.ctx.storage);
+  const age=cached?Date.now()-Date.parse(cached.captured_at):Infinity;
+  if(cached&&cached.format==='independent-sheets-v1'&&age>=0&&age<24*3600000)return {...cached,stale:false};
   try{
    const base=`https://docs.google.com/spreadsheets/d/${DRIVE_SHEET}/gviz/tq?tqx=out:json&headers=1&sheet=`;
    const sheets=await Promise.all(DRIVE_SECTIONS.map(async name=>[name,gvizRows(new TextDecoder().decode(await publicSource(base+encodeURIComponent(name))))] as const));
    const verified=await verifiedDriveRecords(Object.fromEntries(sheets));
    requireValue(verified.record_count>0,'INDEPENDENT_VERIFIED_SOURCE_EMPTY');
    const data=JSON.stringify(verified.records);
-   requireValue(data.length<=MAX,'INDEPENDENT_SNAPSHOT_TOO_LARGE');
+   requireValue(new TextEncoder().encode(data).length<=MAX,'INDEPENDENT_SNAPSHOT_TOO_LARGE');
    const source_hash=await sha(new TextEncoder().encode(data));
-   const snapshot:Snapshot={format:'independent-sheets-v1',captured_at:new Date().toISOString(),source:DRIVE_SHEET,records:verified.records,quarantined_records:verified.quarantined_records,source_hash};
-   await this.ctx.storage.put('independent:snapshot',snapshot);
+   const snapshot:IndependentSnapshot={format:'independent-sheets-v1',captured_at:new Date().toISOString(),source:DRIVE_SHEET,records:verified.records,quarantined_records:verified.quarantined_records,source_hash};
+   await saveIndependentSnapshot(this.ctx.storage,snapshot);
    return {...snapshot,stale:false};
   }catch(error){
    if(cached&&cached.format==='independent-sheets-v1')return {...cached,stale:true};
@@ -159,7 +160,8 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
   }catch(error){
    const reason=error instanceof Error?error.message:'INDEPENDENT_SOURCE_UNAVAILABLE';
    const invalid=reason==='INVALID_MONTH'||reason==='INVALID_QUESTION';
-   return json({error:invalid?'İstek geçersiz.':'Doğrulanmış bağımsız Sheets kaynağı henüz okunamıyor. Geçmiş SEO kayıtları korunuyor.',code:invalid?reason:'INDEPENDENT_SOURCE_UNAVAILABLE'},invalid?400:503);
+   const safeCode=/^(INDEPENDENT_|SOURCE_|SHEETS_|ARCHIVE_RESPONSE_)[A-Z0-9_]+$/.test(reason)?reason:'INDEPENDENT_SOURCE_UNAVAILABLE';
+   return json({error:invalid?'İstek geçersiz.':'Doğrulanmış bağımsız Sheets kaynağı henüz okunamıyor. Geçmiş SEO kayıtları korunuyor.',code:invalid?reason:safeCode},invalid?400:503);
   }
  }
  private async staged(pending:Pending,part:Part){

@@ -8,6 +8,6 @@ export default defineConfig(async () => ({
   })],
   test: {
     include: ['tests/**/*.test.ts'],
-    exclude: ['tests/drive-independent/**/*.test.ts','tests/monthly-store/**/*.test.ts'],
+    exclude: ['tests/drive-independent/**/*.test.ts','tests/monthly-store/**/*.test.ts','tests/independent-acceptance/**/*.test.ts'],
   },
 }));
