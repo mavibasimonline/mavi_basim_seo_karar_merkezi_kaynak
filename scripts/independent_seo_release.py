@@ -1,5 +1,5 @@
 """One-time guarded D1-free SEO layer deployment. Never migrates/deletes D1 or Drive archives."""
-import json,os,re,subprocess,urllib.request,urllib.error,time
+import json,os,re,subprocess,urllib.request,urllib.error,time,secrets
 from pathlib import Path
 from cloudflare_diagnostics import Cloudflare
 from quota_observer_release import api,active_version,cron_rows,free_plan
@@ -12,7 +12,7 @@ EXPECTED={
  'src/independent-seo-model.ts','src/independent-session.ts',
  'src/drive-independent.ts','src/index.ts','public/index.html',
  'public/independent-seo.html','public/independent-seo.js',
- 'tests/independent-seo-model.test.ts',
+ 'tests/independent-seo-model.test.ts','scripts/independent-acceptance-probe.ts',
  '.github/workflows/independent-seo-release.yml','scripts/independent_seo_release.py',
 }
 def need(condition,code):
@@ -69,6 +69,34 @@ def run():
   after_archive=snapshot(client,ARCHIVE)
   need(after_archive['bindings']==existing[ARCHIVE]['bindings'] and after_archive['crons']==existing[ARCHIVE]['crons'],'INDEPENDENT_ARCHIVE_BINDINGS_CHANGED')
   need(api(client,'GET','/workers/scripts/'+ARCHIVE+'/subdomain').get('enabled') is False,'INDEPENDENT_ARCHIVE_PUBLIC_EXPOSURE')
+  # Remote preview is private to the account and proves real Sheets + private DO
+  # before touching the live SEO application.
+  folder=ROOT/'.local/independent-acceptance'
+  folder.mkdir(parents=True,exist_ok=True)
+  key=secrets.token_hex(32)
+  config={'name':APP,'main':str(ROOT/'scripts/independent-acceptance-probe.ts'),
+          'compatibility_date':'2026-10-01','workers_dev':False,'preview_urls':False,
+          'vars':{'PROBE_KEY':key},
+          'services':[{'binding':'ARCHIVE','service':ARCHIVE}]}
+  probe_config=folder/'wrangler.jsonc';probe_config.write_text(json.dumps(config))
+  preview=None
+  try:
+   with (folder/'runtime.log').open('w') as logs:
+    preview=subprocess.Popen(['node','scripts/run.mjs','wrangler','dev','--remote','--config',str(probe_config),'--ip','127.0.0.1','--port','8801','--log-level','error'],cwd=ROOT,stdout=logs,stderr=logs)
+    proof=None
+    for attempt in range(40):
+     need(preview.poll() is None,'INDEPENDENT_REMOTE_PROBE_CRASHED')
+     req=urllib.request.Request('http://127.0.0.1:8801/',headers={'Authorization':'Bearer '+key})
+     try:
+      with urllib.request.urlopen(req,timeout=30) as res:proof=json.loads(res.read(30000));break
+     except (urllib.error.HTTPError,urllib.error.URLError,TimeoutError):time.sleep(1)
+    need(proof and proof.get('ok') is True and proof.get('d1_requests')==0 and proof.get('question_d1_requests')==0 and proof.get('products',0)>0,'INDEPENDENT_REAL_DATA_ACCEPTANCE_FAILED')
+    print(json.dumps({'verified_private_archive':True,'month':proof['month'],'products':proof['products'],'d1_requests':0}),flush=True)
+  finally:
+   if preview is not None:
+    preview.terminate()
+    try:preview.wait(timeout=6)
+    except subprocess.TimeoutExpired:preview.kill()
   deploy('deploy/wrangler.drive-independent.jsonc',sha);changed_workers.append(APP)
   after_main=snapshot(client,APP)
   need(after_main['crons']==existing[APP]['crons'] and after_main['bindings']==existing[APP]['bindings'],'INDEPENDENT_APP_BINDINGS_CHANGED')
