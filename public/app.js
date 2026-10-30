@@ -342,7 +342,7 @@ function renderNotice() {
   const health = (status.health || []).find((h) => h.provider === "gsc");
   const technical =
     !!report.unavailable ||
-    (status.google_connected && health?.status === "failed");
+    (!report.snapshot && status.google_connected && health?.status === "failed");
   const complete =
     $("month").value !== currentMonth() &&
     data.coverage.complete &&
@@ -350,7 +350,9 @@ function renderNotice() {
     data.fresh &&
     status.google_connected &&
     !report.missing.length;
-  const label = technical
+  const label = report.snapshot
+    ? "Doğrulanmış arşiv"
+    : technical
     ? "Veri kontrolü gerekli"
     : !status.google_connected
       ? "Bağlantı gerekli"
@@ -388,6 +390,8 @@ function renderNotice() {
         : "Yalnız doğrulanmış GSC ölçümleri gösterilir. Eksik günler sıfır değildir; tamamlanmamış aylar tam ayla karşılaştırılmaz.",
     ),
   );
+  if(report.snapshot)explanation.append(node('p','Doğrulanmış arşiv · analiz: '+time(report.snapshot.validated_at)+' · kaynak verinin son güncellenmesi: '+time(report.snapshot.source_updated_at)+'. Bu tarih sonrasına ilişkin yeni sonuç çıkarılmaz.'));
+  if(report.snapshot?.refresh_pending)explanation.append(node('p','Yeni doğrulama uygun günlük bütçeyi bekliyor; son doğrulanmış aylık sonuçlar erişilebilir.'));
   if (report.missing.length) explanation.append(list(report.missing));
   if (status.sync_budget?.paused)
     explanation.append(

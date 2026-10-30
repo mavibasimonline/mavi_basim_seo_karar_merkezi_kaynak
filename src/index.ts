@@ -16,6 +16,8 @@ import {calendarMonth,periodSelection,rangeCount} from './periods';
 import {cachedRead} from './read-cache';
 import {withReadBudget,readBudgetStatus,D1BudgetError,originalDatabase} from './d1-read-budget';
 import {independentDriveRoute} from './drive-broker';
+import {monthlyRoute} from './monthly-route';
+export {MonthlyReportSource} from './monthly-source';
 export {DriveGoogleBroker} from './drive-broker';
 
 const RUNTIME_REVISION='gsc-catchup-v1';
@@ -65,6 +67,7 @@ async function route(request:Request,env:Env):Promise<Response>{
   if(!['GET','HEAD'].includes(request.method)&&!safeOrigin(request))return json({error:'Geçersiz istek kaynağı.'},403);
   if(request.method==='DELETE'&&path==='/api/session')return new Response(null,{status:204,headers:{'Set-Cookie':'mavi_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'}});
   if(path.startsWith('/api/drive-independent/')||path==='/api/drive/status'||path==='/api/oauth/google/start'&&url.searchParams.get('purpose')==='drive')return independentDriveRoute(request,env);
+  const saved=await monthlyRoute(request,env);if(saved)return saved;
   return withReadBudget(env,path,safe=>dataRoute(request,safe));
 }
 async function dataRoute(request:Request,env:Env):Promise<Response>{

@@ -127,6 +127,7 @@ export function answerView(answer) {
     list(answer.missing || []),
     list(answer.limitations || []),
   ];
+  if(answer.snapshot)parts.push(node('p','Doğrulanmış arşiv · son veri: '+time(answer.snapshot.source_updated_at)+' · analiz doğrulaması: '+time(answer.snapshot.validated_at)+'.'));
   if (answer.products)
     parts.push(
       list(

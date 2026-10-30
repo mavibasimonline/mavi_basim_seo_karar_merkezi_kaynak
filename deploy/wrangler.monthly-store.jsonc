@@ -1,0 +1,14 @@
+{
+ "$schema":"../node_modules/wrangler/config-schema.json",
+ "name":"mavi-basim-monthly-store",
+ "main":"../src/monthly-store.ts",
+ "compatibility_date":"2026-10-01",
+ "workers_dev":false,
+ "preview_urls":false,
+ "vars":{"STORE_ENABLED":"true"},
+ "services":[{"binding":"SOURCE","service":"mavi-basim-seo-prod","entrypoint":"MonthlyReportSource"}],
+ "durable_objects":{"bindings":[{"name":"MONTHLY_STORE","class_name":"MonthlySnapshotStore"}]},
+ "migrations":[{"tag":"monthly-snapshots-v1","new_sqlite_classes":["MonthlySnapshotStore"]}],
+ "observability":{"enabled":false},
+ "version_metadata":{"binding":"CF_VERSION_METADATA"}
+}
