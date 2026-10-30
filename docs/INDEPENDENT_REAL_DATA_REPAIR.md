@@ -61,3 +61,20 @@ paketi 189 testle geçti; servis koruma regresyonu eklenince ilgili 5 test
 ayrıca geçti. Tip kontrolü, paketleme, Sheets runtime kabulü ve npm audit
 (0 açık) başarılı. Tarayıcı ve son tam SHA CI/yayın sonuçları Actions'ta
 ayrıca izlenir; bu hazırlık belgesi canlı kabul yerine geçmez.
+
+## Uzak probe taşıma düzeltmesi — aynı oturum
+
+PR #50 main `7365a31f05d0c6600f0ab7a55ec3e108ca153e88` için CI
+**41137426754** başarılı: 807 test. Yayın **41137747883** içinde gerçek
+Sheets/SQLite DO kabulü de geçti: 1.542 kayıt / 1.354.853 bayt / 29 parça,
+SHA-256 `fa04d8f730f76c761d1d8f29bc86560572220c3f12bfedfbb2e661acf0dc9c21`.
+Ancak uzak preview geçerli kanıt döndürmedi; uygulama yayımlanmadı, arşiv
+Worker'ı eski sürüme geri alındı ve geri okuma denetimi geçti.
+
+Ayrıca gerçek HTTP kontrolünde varsayılan Python User-Agent ile sağlık
+endpoint'i 403, uygulamanın tanımlı yayın istemcisiyle 200 döndü. Bağımsız
+probe, çalışan login/monthly probe'larındaki User-Agent/Accept başlıklarını
+kullanmıyordu. Artık aynı tanımlı yayın istemcisini bildirir; Bearer
+kimlik doğrulaması ve tüm veri kapıları korunur. 400/401/403 ayrıştırılır,
+ham yanıt loglanmaz; başlatma denemeleri 120 saniye ile sınırlandırılır.
+Gerçek uzak kabul yeniden geçmeden SEO yayını yapılamaz.

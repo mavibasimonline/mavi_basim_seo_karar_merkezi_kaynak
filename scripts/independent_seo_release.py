@@ -7,15 +7,10 @@ from release_readiness import get_json,REPOSITORY
 ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
-TITLE='release: repair guarded D1-independent real data acceptance'
+TITLE='release: verify independent SEO probe transport'
 EXPECTED={
- 'src/independent-snapshot.ts','src/drive-independent.ts',
- 'scripts/independent-acceptance-probe.ts','scripts/independent_seo_release.py',
- 'scripts/independent_real_data_acceptance.py',
- 'tests/drive-independent/snapshot.test.ts','tests/independent-acceptance/real-source.test.ts',
+ 'scripts/independent_seo_release.py',
  'tests/test_independent_seo_release.py',
- 'tests/independent-acceptance-probe.test.ts',
- 'vitest.config.ts','vitest.independent-acceptance.config.ts',
  '.github/workflows/independent-seo-release.yml','docs/INDEPENDENT_REAL_DATA_REPAIR.md','TODO.md',
 }
 
@@ -59,6 +54,12 @@ def safe_probe_code(body):
   if isinstance(code,str) and re.fullmatch(r'(INDEPENDENT_|SOURCE_|SHEETS_|ARCHIVE_|VERIFIED_)[A-Z0-9_]{1,100}',code):return code
  except (ValueError,AttributeError,TypeError):pass
  return 'INDEPENDENT_REMOTE_PROBE_HTTP_ERROR'
+
+def probe_request(key):
+ # Same declared client as the existing working remote-release probes.
+ # Authentication stays mandatory; Python's default UA is rejected at the edge.
+ return urllib.request.Request('http://127.0.0.1:8801/',headers={
+  'Authorization':'Bearer '+key,'User-Agent':'MaviBasimReleaseCheck/1.0','Accept':'application/json'})
 
 def app_config(bindings):
  services={b['name']:b.get('service') for b in bindings if b.get('type')=='service'}
@@ -116,18 +117,21 @@ def run():
   try:
    with (folder/'runtime.log').open('w') as logs:
     preview=subprocess.Popen(['node','scripts/run.mjs','wrangler','dev','--remote','--config',str(probe_config),'--ip','127.0.0.1','--port','8801','--log-level','error'],cwd=ROOT,stdout=logs,stderr=logs)
-    proof=None
+    proof=None;deadline=time.monotonic()+120
     for attempt in range(40):
+     if time.monotonic()>=deadline:break
      need(preview.poll() is None,'INDEPENDENT_REMOTE_PROBE_CRASHED')
-     req=urllib.request.Request('http://127.0.0.1:8801/',headers={'Authorization':'Bearer '+key})
+     req=probe_request(key)
      try:
       with urllib.request.urlopen(req,timeout=30) as res:proof=json.loads(res.read(30000));break
      except urllib.error.HTTPError as error:
       code=safe_probe_code(error.read(32768))
       # Data/validation errors are terminal; only startup/transport errors retry.
       if code!='INDEPENDENT_REMOTE_PROBE_HTTP_ERROR':raise ValueError(code) from None
+      if error.code in (400,401,403):raise ValueError('INDEPENDENT_REMOTE_PROBE_HTTP_'+str(error.code)) from None
       time.sleep(1)
      except (urllib.error.URLError,TimeoutError):time.sleep(1)
+    need(proof is not None,'INDEPENDENT_REMOTE_PROBE_STARTUP_TIMEOUT')
     acceptance_proof(proof)
     print(json.dumps({'verified_private_archive':True,'month':proof['month'],'products':proof['products'],'d1_requests':0}),flush=True)
   finally:

@@ -1,3 +1,11 @@
+# 31 Ekim 2026 — bağımsız probe taşıma kontrolü
+
+- PR #50 main'e birleşti; main CI 41137426754: **807 test başarılı**, audit 0. Yayın 41137747883 içinde gerçek Sheets/SQLite DO kabulü de geçti (1.542 kayıt / 29 parça); uzak probe geçerli kanıt döndürmediği için SEO yayını yapılmadı. Arşiv eski sürüme geri alındı ve doğrulandı.
+- Varsayılan Python HTTP istemcisinin edge'de 403 aldığı, tanımlı yayın istemcisinin 200 aldığı gerçek kontrolle görüldü. Uzak probe, mevcut çalışan release probe'larıyla aynı User-Agent/Accept başlıklarını kullanacak şekilde düzeltildi. Bearer/CI/gerçek veri/binding/Cron/rollback kapıları korunur. Güncel uzak kabul tekrar doğrulanmalıdır.
+- Ayrıntılar [INDEPENDENT_REAL_DATA_REPAIR.md](docs/INDEPENDENT_REAL_DATA_REPAIR.md). Kullanıcıdan anahtar/onay istenmiyor; sorun kod/taşıma tarafında araştırılıyor. D1, Drive, özgün CSV ve mavibasim.com korunur.
+
+---
+
 # 31 Ekim 2026 — D1 bağımsız gerçek veri kabulü onarımı
 
 - Gerçek Sheets verisi tek DO değerinde 1.354.853 UTF-8 bayt tutuyor; 128 KiB sınırını aşan saklama yolu, hash doğrulamalı parçalara ve atomik etkin manifest değişimine çevrildi. Eski kayıtlar/arşivler silinmez.
