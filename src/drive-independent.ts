@@ -100,6 +100,16 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
   return this.exclusive(async()=>{
    try{
     const url=new URL(request.url),path=url.pathname;
+    if(path==='/api/independent/auth-limit'&&request.method==='POST'){
+      const body=await request.json() as {client?:unknown;valid?:unknown};
+      if(typeof body.client!=='string'||!/^[a-f0-9]{64}$/.test(body.client)||typeof body.valid!=='boolean')return json({code:'AUTH_LIMIT_INPUT_INVALID'},400);
+      const key='independent:auth:'+body.client,time=Date.now(),saved=await this.ctx.storage.get<{attempts:number;window:number}>(key);
+      const active=!!saved&&time-saved.window<15*60_000;
+      if(active&&saved!.attempts>=5)return json({allowed:false,locked:true,d1_requests:0});
+      if(body.valid){await this.ctx.storage.delete(key);return json({allowed:true,locked:false,d1_requests:0});}
+      await this.ctx.storage.put(key,{attempts:active?saved!.attempts+1:1,window:active?saved!.window:time});
+      return json({allowed:false,locked:false,d1_requests:0});
+    }
     if(path.startsWith('/api/independent/'))return this.independentRoute(request);
     if(request.method==='GET'&&path==='/api/drive-independent/health'){
      this.config();await this.ctx.storage.get('format');const info=await this.broker<any>('/config');
