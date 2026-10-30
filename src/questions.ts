@@ -63,7 +63,8 @@ export function queryCandidates(products:ProductReport[],kind:'ctr'|'ranking'){
     return kind==='ctr'?c.impressions>=100&&c.impressions>old.impressions&&c.clicks===0:!!c.position&&!!old.position&&c.impressions>=100&&old.impressions>=100&&old.position>10&&c.position>=8&&c.position<=12&&c.position<old.position;
   }).map(q=>({product_id:p.id,name:p.name,url:p.url,query:q.query,current:q.current,previous:q.previous,change:change(q.current||null,q.previous||null),protect:q.protect,is_brand:q.is_brand,evidence:p.evidence,risk:p.risk})));
 }
-export async function answerQuestion(env:Env,report:AnalysisReport,question:string,plan?:QuestionPlan):Promise<unknown>{
+export interface QuestionRepository {save:(row:{id:string;created_at:string;question:string;analysis_id:string;answer:Record<string,unknown>})=>Promise<void>}
+export async function answerQuestion(env:Env|null,report:AnalysisReport,question:string,plan?:QuestionPlan,repository?:QuestionRepository):Promise<unknown>{
   plan=plan||parseQuestion(question,report.products,report.month,undefined,new Date(report.created_at));
   const {intent,context}=plan,normalized=variantFamily(question);
   const product=report.products.find(p=>p.id===context.product_id);
@@ -75,7 +76,9 @@ export async function answerQuestion(env:Env,report:AnalysisReport,question:stri
     const region=report.region as {product_id:string|null;city:string;device:string}[]|null;
     const rows=region?.filter(r=>(!product||r.product_id===product.id)&&(!/istanbul/.test(normalized)||variantFamily(r.city)==='istanbul')&&(!context.device||r.device.toUpperCase()===context.device))??null;
     answer={...answer,text:rows?.length?'GA4 Organic Search şehir ve cihaz oturumları gösteriliyor. Şehir bazında GSC sorgusu veya tıklaması çıkarılamaz.':'Tamamlanmış, güncel ve doğrulanmış GA4 şehir verisi yok. Organik sorgu sonucu çıkarılamaz.',source:'GA4',rows,confidence:rows?.length?'gözlemsel':'yetersiz'};
-  }else if(intent==='outcomes'){
+  }else if(intent==='outcomes'&&!env){
+    answer={...answer,text:'Bu doğrulanmış aylık arşivde değişikliklerin önce/sonra sonuçları yok; etki veya başarı uydurulmadı.',source:'Kayıtlı aylık GSC kanıtları',confidence:'yetersiz',missing:[...(answer.missing as string[]||[]),'Değişiklik sonuçları bu arşivde doğrulanmadı.']};
+  }else if(intent==='outcomes'&&env){
     const results=await env.DB.prepare(`SELECT a.id,a.applied_at,a.recorded_at,a.old_json,a.new_json,p.name,p.canonical_url AS url,w.days,w.status,w.measured_at,w.result_json FROM applied_changes a JOIN recommendations r ON r.id=a.recommendation_id JOIN products p ON p.id=r.product_id JOIN outcome_windows w ON w.applied_change_id=a.id WHERE (? IS NULL OR r.product_id=?) ORDER BY a.applied_at DESC,w.days LIMIT 40`).bind(context.product_id,context.product_id).all();
     const history=await env.DB.prepare('SELECT url,observed_from,observed_to,published_at,diff_json FROM seo_change_events WHERE (? IS NULL OR url=?) ORDER BY observed_to DESC LIMIT 10').bind(product?.url||null,product?.url||null).all();
     answer={...answer,text:'Nedensellik doğrulanamadı. Tamamlanan önce/sonra ölçümleri gözlemseldir; bekleyen pencereler başarı olarak gösterilmez.',source:'GSC + SEO değişiklik hafızası',outcomes:results.results,history:history.results,confidence:'gözlemsel'};
@@ -105,6 +108,8 @@ export async function answerQuestion(env:Env,report:AnalysisReport,question:stri
   const explanations=['Mevsimsellik, talep, sorgu ve cihaz bileşimi olası etkenlerdir; bu veriler kesin nedeni kanıtlamaz.'];
   const question_id=crypto.randomUUID();
   answer={...answer,question_id,intent,context,device:context.device||'tüm cihazlar',period:report.period,comparison_period:report.previous_period,measured_at:report.created_at,analysis_id:report.id,sections:{what:answer.text,evidence:'URL, kaynak veri kümesi ve dönem ölçümleri yanıt ayrıntısındadır.',explanations,action:answer.confidence==='yetersiz'?'Eksik verileri tamamlayın; mevcut çalışmayı değiştirmeyin.':'Kanıtları inceleyin ve başarılı kelimeleri koruyun; canlı siteye otomatik işlem uygulanmaz.',confidence:answer.confidence},limitations:['Korelasyon nedensellik değildir.','Eksik sorgu sıfır değildir.','Keyword Planner varyant hacimleri toplanmaz; reklam rekabeti SEO zorluğu değildir.',...(context.window?['Son üç gün Google kesinleşme gecikmesi nedeniyle dışarıda; gösterilen pencere kesinleşmiş günlerdir.']:[])]};
-  await env.DB.prepare('INSERT INTO user_questions VALUES(?,?,?,?,?)').bind(question_id,nowISO(),question,report.id,JSON.stringify(answer)).run();
+  if(repository)await repository.save({id:question_id,created_at:nowISO(),question,analysis_id:report.id,answer});
+  else if(env)await env.DB.prepare('INSERT INTO user_questions VALUES(?,?,?,?,?)').bind(question_id,nowISO(),question,report.id,JSON.stringify(answer)).run();
+  else throw new Error('QUESTION_REPOSITORY_REQUIRED');
   return answer;
 }

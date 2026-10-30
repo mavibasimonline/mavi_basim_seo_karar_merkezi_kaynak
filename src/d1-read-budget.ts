@@ -27,6 +27,8 @@ const CACHE_WRITE='INSERT INTO api_read_cache VALUES(?,?,?,?) ON CONFLICT(cache_
 function interactiveProfile(kind:string){
  if(kind==='/api/session')return {reserve:64,bookkeeping:16,statements:2,allows:(sql:string)=>SESSION_SQL.has(sql.replace(/\s+/g,' ').trim())};
  const select=(sql:string)=>/^\s*SELECT\b/i.test(sql)&&!sql.includes(';');
+ // Two read-only statements: reserve/settle ledger + at most two growths + two cost inserts (at most 8 physical writes).
+ if(kind==='/internal/report-source-read'||kind==='/internal/report-source-background')return {reserve:64,bookkeeping:8,statements:2,allows:select};
  if(kind==='/api/status')return {reserve:128,bookkeeping:64,statements:12,allows:select};
  if(kind==='/api/performance'||kind==='/api/performance/queries')return {reserve:128,bookkeeping:80,statements:16,allows:(sql:string)=>select(sql)||sql===CACHE_WRITE};
  return null;
@@ -73,7 +75,7 @@ export async function withReadBudget<T>(env:Env,kind:string,work:(safe:Env)=>Pro
   let readReserve=20_000;
   const profile=interactiveProfile(kind);
   const writeReserve=profile?.reserve??(kind==='cron'?5_000:expensive?4_000:1_000);
-  const background=kind==='cron';
+  const background=kind==='cron'||kind==='/internal/report-source-background';
   const readLimit=Math.min(LOCAL_READ_STOP,ACCOUNT_READ_STOP-state.account_reads)-(background?INTERACTIVE_READ_HEADROOM:0),writeLimit=Math.min(LOCAL_WRITE_STOP,ACCOUNT_WRITE_STOP-state.account_writes)-(background?INTERACTIVE_WRITE_HEADROOM:0);
   async function reservationDenied(extraReads:number,extraWrites:number):Promise<never>{
     // One primary-key lookup only; no application rows, raw SQL or secrets in diagnostics.
