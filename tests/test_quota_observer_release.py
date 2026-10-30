@@ -2,6 +2,7 @@ import importlib
 import json
 import os
 import sys
+import subprocess
 import unittest
 import io
 from contextlib import redirect_stdout
@@ -94,9 +95,22 @@ class ObserverReleaseTests(unittest.TestCase):
   client.calls.clear()
   with patch.dict(os.environ, {'GITHUB_REF': 'refs/heads/main', 'CF_QUOTA_ANALYTICS_TOKEN': 'TEST_ANALYTICS_ONLY'}), \
        patch.object(release, 'observation', return_value={'ok': True, 'mode': 'open'}), \
-       patch.object(release, 'application_lock', return_value={'fixture': True}):
+       patch.object(release, 'application_lock', return_value={'fixture': True}), \
+       patch.object(release, 'APP_SOURCE', subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT).decode().strip()):
    self.assertTrue(release.preflight(client, SHA, ci)['free_plan_verified'])
   self.assertIn(('GET', '/accounts/' + client.account + '/subscriptions', None), client.calls)
+
+ def test_changed_guard_tree_still_fails_the_production_parity_gate(self):
+  client = Client()
+  def request(method, path, body=None):
+   if path.endswith('/subscriptions'):return {'ok': True, 'result': []}
+   if path.endswith('/workers/scripts'):return {'ok': True, 'result': []}
+   return {'ok': False}
+  client.request = request
+  with patch.dict(os.environ, {'GITHUB_REF': 'refs/heads/main', 'CF_QUOTA_ANALYTICS_TOKEN': 'TEST_ANALYTICS_ONLY'}), \
+       patch.object(release, 'observation', return_value={'ok': True, 'mode': 'open'}):
+   with self.assertRaisesRegex(ValueError, 'LIVE_GUARD_SOURCE_PARITY_REQUIRED'):
+    release.preflight(client, SHA, ci)
 
  def test_real_free_plan_is_required_and_unknown_workers_plans_are_held(self):
   self.assertTrue(release.free_plan([]))
