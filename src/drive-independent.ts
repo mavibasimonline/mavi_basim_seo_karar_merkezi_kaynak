@@ -4,6 +4,7 @@ import {encrypt,decrypt,cookie,equalSecret} from './security';
 import {hash,json} from './types';
 import {boundedText,ProviderError} from './google';
 import {DRIVE_SHEET,DRIVE_SECTIONS,gvizRows,verifiedDriveRecords} from './drive-records';
+import {independentReport,independentAnswer,SheetRecord} from './independent-seo-model';
 
 const SCOPE='https://www.googleapis.com/auth/drive.file',API='https://www.googleapis.com/drive/v3/';
 const XLSX='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -99,6 +100,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
   return this.exclusive(async()=>{
    try{
     const url=new URL(request.url),path=url.pathname;
+    if(path.startsWith('/api/independent/'))return this.independentRoute(request);
     if(request.method==='GET'&&path==='/api/drive-independent/health'){
      this.config();await this.ctx.storage.get('format');const info=await this.broker<any>('/config');
      return json({ok:!!info.client_id&&!!info.redirect_uri,storage:'durable-object-sqlite',d1_requests:0,separate_oauth:true});
@@ -109,6 +111,46 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     return json({error:'Bulunamadı.'},404);
    }catch(error){return json({error:'Drive bağlantısı tamamlanamadı.',code:error instanceof ProviderError?error.code:'DRIVE_UNAVAILABLE'},400);}
   });
+ }
+ private async independentSnapshot(){
+  type Snapshot={format:'independent-sheets-v1';captured_at:string;source:string;records:SheetRecord[];quarantined_records:number;source_hash:string};
+  const cached=await this.ctx.storage.get<Snapshot>('independent:snapshot');
+  if(cached&&cached.format==='independent-sheets-v1'&&Date.now()-Date.parse(cached.captured_at)<24*3600000)return {...cached,stale:false};
+  try{
+   const base=`https://docs.google.com/spreadsheets/d/${DRIVE_SHEET}/gviz/tq?tqx=out:json&headers=1&sheet=`;
+   const sheets=await Promise.all(DRIVE_SECTIONS.map(async name=>[name,gvizRows(new TextDecoder().decode(await publicSource(base+encodeURIComponent(name))))] as const));
+   const verified=await verifiedDriveRecords(Object.fromEntries(sheets));
+   requireValue(verified.record_count>0,'INDEPENDENT_VERIFIED_SOURCE_EMPTY');
+   const data=JSON.stringify(verified.records);
+   requireValue(data.length<=MAX,'INDEPENDENT_SNAPSHOT_TOO_LARGE');
+   const source_hash=await sha(new TextEncoder().encode(data));
+   const snapshot:Snapshot={format:'independent-sheets-v1',captured_at:new Date().toISOString(),source:DRIVE_SHEET,records:verified.records,quarantined_records:verified.quarantined_records,source_hash};
+   await this.ctx.storage.put('independent:snapshot',snapshot);
+   return {...snapshot,stale:false};
+  }catch(error){
+   if(cached&&cached.format==='independent-sheets-v1')return {...cached,stale:true};
+   throw error;
+  }
+ }
+ private async independentRoute(request:Request){
+  try{
+   const url=new URL(request.url),path=url.pathname;
+   const snapshot=await this.independentSnapshot();
+   const report=independentReport(snapshot.records,url.searchParams.get('month')||undefined,snapshot.captured_at,snapshot.quarantined_records);
+   if(request.method==='GET'&&path==='/api/independent/status')return json({ok:true,storage:'durable-object-sqlite',d1_requests:0,source:'verified Google Sheets',captured_at:snapshot.captured_at,source_hash:snapshot.source_hash,records:snapshot.records.length,stale:snapshot.stale,available_months:report.months});
+   if(request.method==='GET'&&path==='/api/independent/report')return json({...report,stale:snapshot.stale,source_hash:snapshot.source_hash});
+   if(request.method==='POST'&&path==='/api/independent/questions'){
+    const body=await request.json() as {question?:unknown;month?:unknown};
+    if(typeof body.question!=='string'||body.question.length>1000||body.month!==undefined&&typeof body.month!=='string')return json({code:'INVALID_QUESTION'},400);
+    const selected=independentReport(snapshot.records,body.month||undefined,snapshot.captured_at,snapshot.quarantined_records);
+    return json({...independentAnswer(selected,body.question),stale:snapshot.stale,source_hash:snapshot.source_hash,captured_at:snapshot.captured_at});
+   }
+   return json({code:'INDEPENDENT_ROUTE_UNSUPPORTED'},404);
+  }catch(error){
+   const reason=error instanceof Error?error.message:'INDEPENDENT_SOURCE_UNAVAILABLE';
+   const invalid=reason==='INVALID_MONTH'||reason==='INVALID_QUESTION';
+   return json({error:invalid?'İstek geçersiz.':'Doğrulanmış bağımsız Sheets kaynağı henüz okunamıyor. Geçmiş SEO kayıtları korunuyor.',code:invalid?reason:'INDEPENDENT_SOURCE_UNAVAILABLE'},invalid?400:503);
+  }
  }
  private async staged(pending:Pending,part:Part){
   const data=new Uint8Array(part.size);let offset=0;
