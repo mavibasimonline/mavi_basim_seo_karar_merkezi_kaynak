@@ -1151,6 +1151,13 @@ $("login").addEventListener("submit", async (e) => {
   e.preventDefault();
   const button = e.currentTarget.querySelector("button");
   button.disabled = true;
+  // A new login supersedes anonymous startup requests. A late 401 from that
+  // earlier epoch must never clear the newly established authenticated session.
+  sessionEpoch++;
+  controller?.abort();
+  queryController?.abort();
+  state.request++;
+  state.queryRequest++;
   notify();
   try {
     await api("/api/session", {

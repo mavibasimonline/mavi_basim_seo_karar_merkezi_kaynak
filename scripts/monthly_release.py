@@ -9,12 +9,12 @@ from independent_drive_release import assets
 from d1_quota_checkpoint import observation
 ROOT=Path(__file__).resolve().parents[1]
 BASE='585e338843778d06a5535b53f074cac548549ffb'
-SOURCE='4f8724a481a3fe9899ea1f4d1a7952b08ee29df2'
+SOURCE='f9c1ff1ba490b076e055d181af2ab96caadb347e'
 REVIEW='45cf43fae7bbc7f21ee2f5dbfedd133aa32ab6a2'
 OLD_VERSION='710e7a45-1db7-4130-8e8f-fee09a9671ae'
 APP='mavi-basim-seo-prod';STORE='mavi-basim-monthly-store';WARM='mavi-basim-monthly-source-warm'
 DATABASE='18f8c90d-4af1-430c-ac86-ddf184c75a0b'
-FILES={'src/analysis.ts','src/questions.ts','src/validation.ts','src/d1-read-budget.ts','src/index.ts','src/monthly-source.ts','src/monthly-model.ts','src/monthly-store.ts','src/monthly-route.ts','public/app.js','public/evidence.js','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.monthly-store.jsonc','vitest.config.ts','vitest.monthly.config.ts','tests/monthly-source.test.ts','tests/monthly-route.test.ts','tests/monthly-store/store.test.ts','.github/workflows/ci.yml'}
+FILES={'src/analysis.ts','src/questions.ts','src/validation.ts','src/d1-read-budget.ts','src/index.ts','src/monthly-source.ts','src/monthly-model.ts','src/monthly-store.ts','src/monthly-route.ts','public/app.js','public/evidence.js','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.monthly-store.jsonc','vitest.config.ts','vitest.monthly.config.ts','tests/browser/startup-session.spec.ts','tests/monthly-source.test.ts','tests/monthly-route.test.ts','tests/monthly-store/store.test.ts','.github/workflows/ci.yml'}
 def need(value,code):
  if not value:raise ValueError(code)
 def git(*args):return subprocess.check_output(['git',*args],cwd=ROOT,stderr=subprocess.DEVNULL)
@@ -23,7 +23,7 @@ def ci(sha,branch,event):
  need(any(r.get('head_sha')==sha and r.get('head_branch')==branch and r.get('event')==event and r.get('conclusion')=='success' and r.get('status')=='completed' for r in rows),'MONTHLY_EXACT_GREEN_CI_REQUIRED')
 def source_check():
  need(re.fullmatch('[a-f0-9]{40}',SOURCE),'MONTHLY_SOURCE_PIN_REQUIRED')
- need(git('rev-parse',SOURCE+'^').decode().strip()==BASE,'MONTHLY_ISOLATED_BASE_REQUIRED')
+ need(git('rev-parse',SOURCE+'^').decode().strip()=='4f8724a481a3fe9899ea1f4d1a7952b08ee29df2' and git('rev-parse',SOURCE+'^^').decode().strip()==BASE,'MONTHLY_ISOLATED_BASE_REQUIRED')
  need(set(git('diff','--name-only',BASE,SOURCE).decode().splitlines())==FILES,'MONTHLY_SOURCE_SCOPE_CHANGED')
  for path in FILES-{'src/index.ts','public/app.js'}:need(git('show',SOURCE+':'+path)==(ROOT/path).read_bytes(),'MONTHLY_APPROVED_FILE_MISMATCH')
  def edits(a,b,path):return [s for s in git('diff','--unified=0',a,b,'--',path).decode().splitlines() if s.startswith(('+','-')) and not s.startswith(('+++','---'))]
