@@ -1,7 +1,7 @@
-import {AnalysisReport,Metrics,validMetrics} from './analysis';
+import {AnalysisReport,AnalysisEvidence,Metrics,validMetrics} from './analysis';
 import {Env} from './types';
 import {isBrand} from './urls';
-interface SumRow extends Metrics {product_id:string|null;period:string;device?:string;query?:string;is_brand?:number}
+export interface SumRow extends Metrics {product_id:string|null;period:string;device?:string;query?:string;is_brand?:number}
 async function aggregate(env:Env,report:AnalysisReport,scope:'page'|'query',dimension:''|'device'|'query'|'is_brand'=''){
  const table=scope==='page'?'gsc_daily_by_page':'gsc_daily_by_query_device',extra=dimension?`,d.${dimension}`:'';
  const rows=await env.DB.prepare(`SELECT COALESCE(p.id,pg.product_id,pc.id) product_id,CASE WHEN d.date>=? THEN 'current' ELSE 'previous' END period${extra},
@@ -28,6 +28,10 @@ export async function validateAnalysis(env:Env,report:AnalysisReport):Promise<st
  const errors:string[]=[];
  const [rows,devices]=await Promise.all([aggregate(env,report,'page'),aggregate(env,report,'page','device')]);
  const [queries,brands]=await Promise.all([aggregate(env,report,'query','query'),aggregate(env,report,'query','is_brand')]);
+ return validateProjection(report,{rows,devices,queries,brands});
+}
+export function validateProjection(report:AnalysisReport,{rows,devices,queries,brands}:{rows:SumRow[];devices:SumRow[];queries:SumRow[];brands:SumRow[]}):string[]{
+ const errors:string[]=[];
  const key=(id:string|null,period:string,value:unknown)=>JSON.stringify([id,period,value]);
  const deviceMap=new Map(devices.map(r=>[key(r.product_id,r.period,r.device),r]));
  const queryMap=new Map(queries.map(r=>[key(r.product_id,r.period,r.query),r]));
@@ -56,4 +60,22 @@ export async function validateAnalysis(env:Env,report:AnalysisReport):Promise<st
   if(product.decision==='İyileştir')errors.push(`${product.id}:UNSUPPORTED_IMPROVEMENT`);
  }
  return errors;
+}
+
+// Independently recompute the report projections from the bounded, generation-
+// checked source bundle. No database call and no reliance on report calculations.
+export function validateEvidence(report:AnalysisReport,input:AnalysisEvidence){
+ const resolve=(url:string)=>input.products.find(p=>p.canonical_url===url)?.id||input.mappedPages.find(p=>p.url===url)?.product_id||input.products.find(p=>p.canonical_url===input.aliases.find(a=>a.alias_url===url)?.canonical_url)?.id||null;
+ const aggregate=(scope:'page'|'query',dimension:''|'device'|'query'|'is_brand'='')=>{
+  const groups=new Map<string,any>();
+  for(const row of scope==='page'?input.pages:input.queries){
+   const period=row.date>=report.period.start&&row.date<=report.period.end?'current':row.date>=report.previous_period.start&&row.date<=report.previous_period.end?'previous':null;
+   if(!period||report.filters?.device&&row.device!==report.filters.device)continue;
+   const product_id=resolve(row.page),value=dimension?(row as any)[dimension]:undefined,key=JSON.stringify([product_id,period,value]);
+   let g=groups.get(key);if(!g){g={product_id,period,clicks:0,impressions:0,weighted:0,...dimension?{[dimension]:value}:{}};groups.set(key,g);}
+   g.clicks+=row.clicks;g.impressions+=row.impressions;g.weighted+=row.position*row.impressions;
+  }
+  return [...groups.values()].map(g=>({...g,ctr:g.impressions?g.clicks/g.impressions:null,position:g.impressions?g.weighted/g.impressions:null})) as SumRow[];
+ };
+ return validateProjection(report,{rows:aggregate('page'),devices:aggregate('page','device'),queries:aggregate('query','query'),brands:aggregate('query','is_brand')});
 }
