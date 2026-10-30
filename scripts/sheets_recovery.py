@@ -15,6 +15,7 @@ from d1_quota_checkpoint import observation
 from d1_quota_control import DATABASE
 from release_readiness import APP, REPOSITORY, get_json
 from scoped_release import DRIVE_SOURCE
+from independent_drive_release import SOURCE as INDEPENDENT_DRIVE_SOURCE
 from sheets_recovery_plan import SPREADSHEET, MAX_SOURCE, read_xlsx, plan, canonical
 import hashlib
 
@@ -78,7 +79,7 @@ def locks(client):
         raw = schedules['result']
         crons = [s['cron'] for s in (raw.get('schedules', []) if isinstance(raw, dict) else raw)]
         found[worker] = {'version': versions[0]['version_id'], 'crons': crons}
-    if get_json(APP + '/api/health').get('deployment', {}).get('commit') not in (EXPECTED_APP, DRIVE_SOURCE):
+    if get_json(APP + '/api/health').get('deployment', {}).get('commit') not in (EXPECTED_APP, DRIVE_SOURCE, INDEPENDENT_DRIVE_SOURCE):
         raise ValueError('SOURCE_LIVE_COMMIT_CHANGED')
     return found
 

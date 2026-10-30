@@ -380,3 +380,6 @@ Güvenlik güncellemesi: 2026-10-23 CI'de yeni undici uyarıları görüldü; mi
 - Drive arşiv bağlantısı: `/drive.html` üzerinden hesap sahibinin bir defalık
   `drive.file` çevrimdışı onayı gerekiyor. Sonrasında gerçek yükleme/geri okuma
   sonucu `/api/drive/status` ekranında doğrulanmalı; onay öncesi arşiv yok.
+- Bağımsız Drive: `/drive-independent` üzerinden yeni Google onayı gerekiyor.
+  Yeni SQLite deposu eski D1 tokenlarını taşımaz/okumaz. Gerçek kayıt sayısı
+  onay sonrası otomatik arşivin geri okuma doğrulamasında belirlenir.
