@@ -1,3 +1,15 @@
+# 31 Ekim 2026 — bağımsız SEO canlı kabulü tamamlandı
+
+- PR #50/#51 main'e birleşti. Yayındaki kaynak: `4783b3dbaaa2a70a8c1af7e5803769296e4ebb98`; Worker `eca92ed1-ffbc-4a62-9eb0-98b2391c202e`. Uygulama: https://mavi-basim-seo-prod.mavibasimonline.workers.dev/independent-seo.html
+- Son kaynak main CI **41138548813 SUCCESS**: 570 Workers/probe + 191 Python + 7 Drive/DO + 4 aylık DO + 36 Chromium = **808 test**, audit 0. Tip/paketleme/Sheets runtime/kaynak koruma kontrolleri başarılı.
+- Yayın **41138857485 SUCCESS**: gerçek Sheets → gerçek SQLite DO kabulü, özel uzak DO rapor/Soru-Cevap/aynı kaynak hash'iyle geri okuma kabulü geçti. 1.542 kayıt / 1.354.853 bayt / 29 parça; Eylül 2026 / 30 ürün / 1.294 sorgu; D1 isteği 0. Canlı health tam SHA ile 200; panel 200; korumalı rapor/status/Drive uçları 401.
+- Önceki başarısız deneme 41137747883'te otomatik geri alma doğrulandı. Tanımlı istemci başlıkları eklenince uzak kabul geçti. Hiçbir güvenlik kapısı gevşetilmedi.
+- Günlük GSC toplayıcısı ve 15 dakikalık Cron, mevcut D1 geçmişi, Drive arşivleri/OAuth/alarmlar, 521 CSV ve mavibasim.com korundu; ücretli hizmet açılmadı. Yeni rapor/giriş/Soru-Cevap yolu D1 kullanmaz; eski toplayıcının D1 binding'i korunur.
+- Kalan kapsam: yalnız Eylül karşılaştırılabilir tamamlanmış dönemdir; önceki ay yoksa Veri bekle. 3.534 çelişkili kaynak kaydı karantinadadır. Son eski Sheets→D1 geçmiş aktarımı 41127567749 ACCOUNT_WRITE_RESERVATION_LIMIT ile bekledi; kota koruması kaldırılmadı. Bu çalışma yeni Drive yüklemesi/geri okumasını ve gerçek yönetici oturumunda uçtan uca panel kabulünü yeniden kanıtlamaz; mevcut otomasyon ve arşivler korunmuştur. Şu anda yeni secret/OAuth/onay gerektiğine dair doğrulanmış bir engel yok.
+- Bu son kayıt yalnız belgedir; çalışan uygulama yeniden yayımlanmaz. Ayrıntı: [INDEPENDENT_REAL_DATA_REPAIR.md](docs/INDEPENDENT_REAL_DATA_REPAIR.md).
+
+---
+
 # 31 Ekim 2026 — bağımsız probe taşıma kontrolü
 
 - PR #50 main'e birleşti; main CI 41137426754: **807 test başarılı**, audit 0. Yayın 41137747883 içinde gerçek Sheets/SQLite DO kabulü de geçti (1.542 kayıt / 29 parça); uzak probe geçerli kanıt döndürmediği için SEO yayını yapılmadı. Arşiv eski sürüme geri alındı ve doğrulandı.

@@ -78,3 +78,21 @@ kullanmıyordu. Artık aynı tanımlı yayın istemcisini bildirir; Bearer
 kimlik doğrulaması ve tüm veri kapıları korunur. 400/401/403 ayrıştırılır,
 ham yanıt loglanmaz; başlatma denemeleri 120 saniye ile sınırlandırılır.
 Gerçek uzak kabul yeniden geçmeden SEO yayını yapılamaz.
+
+## Sonuç — canlı kabul başarılı
+
+PR #51 sonrası main CI **41138548813 SUCCESS**, **808 test**, audit 0.
+Yayın **41138857485 SUCCESS**; gerçek kaynak kabulü ve özel uzak DO
+rapor/Soru-Cevap/geri okuma doğrulandı. Uzak kabul 30 ürün ve D1 isteği 0
+bildirdi. Kaynak SHA `4783b3dbaaa2a70a8c1af7e5803769296e4ebb98`;
+Worker sürümü `eca92ed1-ffbc-4a62-9eb0-98b2391c202e`.
+
+Bağımsız canlı HTTP kontrolü health/tam SHA=200, panel=200, bağımsız
+status/rapor ve Drive status=401 sonucunu doğruladı. Uygulama adresi:
+https://mavi-basim-seo-prod.mavibasimonline.workers.dev/independent-seo.html
+
+Kullanıcının gerçek yönetici oturumuyla panel uçtan uca kabulü ve yeni
+Drive yüklemesi/geri okuması bu oturumda tekrarlanmadı. Eski GSC geçmiş
+aktarımı kota güvenlik payıyla bekleyebilir; D1 kotası kaldırılmaz.
+Eksik aylar ve 3.534 karantinadaki çelişkili kayıt tam veri sayılmaz.
+Yeni secret/OAuth/onay gerektiren doğrulanmış bir engel bulunmadı.
