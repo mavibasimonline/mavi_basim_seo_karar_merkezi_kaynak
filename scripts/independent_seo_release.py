@@ -10,7 +10,7 @@ ARCHIVE='mavi-basim-drive-archive'
 TITLE='release: activate guarded D1-independent SEO layer'
 EXPECTED={
  'src/independent-seo-model.ts','src/independent-session.ts',
- 'src/drive-independent.ts','src/index.ts','public/index.html',
+ 'src/drive-independent.ts','src/index.ts','public/index.html','public/app.css',
  'public/independent-seo.html','public/independent-seo.js','public/independent-seo.css',
  'tests/independent-seo-model.test.ts','tests/independent-session.test.ts','scripts/independent-acceptance-probe.ts',
  '.github/workflows/independent-seo-release.yml','scripts/independent_seo_release.py',
