@@ -7,6 +7,7 @@ from release_readiness import get_json,REPOSITORY
 ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
+REVIEW_BASE='35fa64cd59cf77106f4bfac8ad69ec3b48941d92'
 TITLE='release: activate guarded D1-independent SEO layer'
 EXPECTED={
  'src/independent-seo-model.ts','src/independent-session.ts',
@@ -44,7 +45,7 @@ def run():
  need(re.fullmatch('[a-f0-9]{40}',sha) and git('rev-parse','HEAD')==sha,'INDEPENDENT_HEAD_MISMATCH')
  need(git('log','-1','--format=%s')==TITLE,'INDEPENDENT_ONE_TIME_TAG_REQUIRED')
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'INDEPENDENT_MAIN_SUPERSEDED')
- changed=set(git('diff','--name-only','HEAD^','HEAD').splitlines())
+ changed=set(git('diff','--name-only',REVIEW_BASE,'HEAD').splitlines())
  need(changed==EXPECTED,'INDEPENDENT_UNREVIEWED_FILES')
  rows=get_json('https://api.github.com/repos/'+REPOSITORY+'/actions/workflows/ci.yml/runs?head_sha='+sha+'&per_page=30',os.environ.get('GITHUB_TOKEN')).get('workflow_runs',[])
  need(any(r.get('head_sha')==sha and r.get('head_branch')=='main' and r.get('event')=='push' and r.get('conclusion')=='success' for r in rows),'INDEPENDENT_GREEN_MAIN_CI_REQUIRED')
@@ -89,7 +90,15 @@ def run():
      req=urllib.request.Request('http://127.0.0.1:8801/',headers={'Authorization':'Bearer '+key})
      try:
       with urllib.request.urlopen(req,timeout=30) as res:proof=json.loads(res.read(30000));break
-     except (urllib.error.HTTPError,urllib.error.URLError,TimeoutError):time.sleep(1)
+     except urllib.error.HTTPError as error:
+      try:
+       reply=json.loads(error.read(8000))
+       proof={'ok':False,'code':str(reply.get('code','INDEPENDENT_PROBE_HTTP_'+str(error.code)))[:100]}
+       break
+      except (ValueError,TypeError):time.sleep(1)
+     except (urllib.error.URLError,TimeoutError):time.sleep(1)
+    if proof and not proof.get('ok'):
+     print('INDEPENDENT_SAFE_PROBE_DIAGNOSTIC:'+str(proof.get('code','UNKNOWN'))[:100],flush=True)
     need(proof and proof.get('ok') is True and proof.get('d1_requests')==0 and proof.get('question_d1_requests')==0 and proof.get('products',0)>0,'INDEPENDENT_REAL_DATA_ACCEPTANCE_FAILED')
     print(json.dumps({'verified_private_archive':True,'month':proof['month'],'products':proof['products'],'d1_requests':0}),flush=True)
   finally:
