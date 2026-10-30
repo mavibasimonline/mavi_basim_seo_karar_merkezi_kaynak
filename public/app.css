@@ -3329,3 +3329,7 @@ dialog::backdrop {
     font-size: 11px;
   }
 }
+
+/* Accessible link to the D1-independent verified evidence screen. */
+.sidebar-bottom .independent-seo-link{display:block;margin-bottom:12px;padding:10px 12px;border:1px solid #6881a8;border-radius:9px;background:#203858;color:#f4f8ff;text-decoration:none;font-size:14px;font-weight:700;line-height:1.4}
+.sidebar-bottom .independent-seo-link:hover,.sidebar-bottom .independent-seo-link:focus-visible{color:#ffffff;background:#355783;outline-offset:2px}
