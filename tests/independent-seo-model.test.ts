@@ -32,6 +32,15 @@ describe('independent SEO report - no D1',()=>{
   expect(independentAnswer(r,'Broşür neden düştü?').decision).toBe('Veri bekle');
   expect(independentAnswer(independentReport(records,'2026-09','2026-10-30T12:00:00Z',0),'İstanbul nasıl?').decision).toBe('Veri bekle');
  });
+ it('never invents a previous month or evidence for an unmatched product',()=>{
+  const oneMonth=records.filter(r=>!r.start.startsWith('2026-08'));
+  const report=independentReport(oneMonth,'2026-09','2026-10-30T12:00:00Z',0);
+  expect(report.available).toBe(true);
+  if(!report.available)throw Error('fixture');
+  expect(report.previous_month).toBeNull();
+  expect(independentAnswer(report,'Broşür neden düştü?').decision).toBe('Veri bekle');
+  expect(independentAnswer(report,'Olmayan bir ürün neden düştü?').decision).toBe('Veri bekle');
+ });
  it('rejects corrupt records and invalid questions',()=>{
   expect(()=>independentReport([...records,fixture('URUNLER','brosur','2026-09-01','2026-09-30',30)],'2026-09','2026-10-30T12:00:00Z',0)).toThrow('INDEPENDENT_AMBIGUOUS_PERIOD');
   expect(()=>independentAnswer(independentReport(records,'2026-09','2026-10-30T12:00:00Z',0),'')).toThrow('INVALID_QUESTION');
