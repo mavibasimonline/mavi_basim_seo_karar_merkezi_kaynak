@@ -12,7 +12,7 @@ EXPECTED={
  'src/independent-seo-model.ts','src/independent-session.ts',
  'src/drive-independent.ts','src/index.ts','public/index.html',
  'public/independent-seo.html','public/independent-seo.js',
- 'tests/independent-seo-model.test.ts','scripts/independent-acceptance-probe.ts',
+ 'tests/independent-seo-model.test.ts','tests/independent-session.test.ts','scripts/independent-acceptance-probe.ts',
  '.github/workflows/independent-seo-release.yml','scripts/independent_seo_release.py',
 }
 def need(condition,code):
