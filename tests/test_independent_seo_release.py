@@ -31,6 +31,13 @@ class IndependentReleaseTests(unittest.TestCase):
                      b'{"code":123}', b'[]', b'{"code":"<script>"}'):
             self.assertEqual(release.safe_probe_code(body), 'INDEPENDENT_REMOTE_PROBE_HTTP_ERROR')
 
+    def test_remote_request_keeps_authentication_and_declares_the_release_client(self):
+        request = release.probe_request('fixture-private-key')
+        self.assertEqual(request.full_url, 'http://127.0.0.1:8801/')
+        self.assertEqual(request.get_header('Authorization'), 'Bearer fixture-private-key')
+        self.assertEqual(request.get_header('User-agent'), 'MaviBasimReleaseCheck/1.0')
+        self.assertEqual(request.get_header('Accept'), 'application/json')
+
     def test_wrong_branch_and_wrong_head_stop_before_any_cloudflare_operation(self):
         with patch.dict(release.os.environ, {'GITHUB_REF':'refs/heads/other'}), patch.object(release,'Cloudflare') as client:
             with self.assertRaisesRegex(ValueError, 'INDEPENDENT_MAIN_REQUIRED'):

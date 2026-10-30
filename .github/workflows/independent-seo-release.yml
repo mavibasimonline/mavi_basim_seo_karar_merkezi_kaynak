@@ -33,7 +33,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$VERIFIED_CI_SHA" != "$(git rev-parse HEAD)" ]; then exit 0; fi
-          if [ "$(git log -1 --format=%s)" != 'release: repair guarded D1-independent real data acceptance' ]; then exit 0; fi
+          if [ "$(git log -1 --format=%s)" != 'release: verify independent SEO probe transport' ]; then exit 0; fi
           echo 'ready=true' >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         if: steps.gate.outputs.ready == 'true'
