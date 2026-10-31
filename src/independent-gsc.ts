@@ -52,7 +52,7 @@ async function writePage(storage:GscStorage,j:Job,rows:GscRow[],secret:string):P
   restored.push(Uint8Array.from(atob(piece.chunk),c=>c.charCodeAt(0)));
  }
  const all=new Uint8Array(binary.length);let at=0;for(const part of restored){all.set(part,at);at+=part.length;}
- ensure(at===binary.length&&await digest(new TextDecoder('utf-8',{fatal:true}).decode(all))===hash,'GSC_READBACK_REJECTED');
+ ensure(at===binary.length&&await digest(new TextDecoder().decode(all))===hash,'GSC_READBACK_REJECTED');
  return {index,count:rows.length,bytes:binary.length,chunks,sha256:hash};
 }
 export function selectGscDay(time:Date,backfill=0,history=false){
