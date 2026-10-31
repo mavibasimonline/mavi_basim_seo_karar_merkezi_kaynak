@@ -7,6 +7,7 @@ import {DRIVE_SHEET,DRIVE_SECTIONS,gvizRows,verifiedDriveRecords} from './drive-
 import {independentReport,independentAnswer,SheetRecord} from './independent-seo-model';
 import {readIndependentSnapshot,saveIndependentSnapshot,IndependentSnapshot} from './independent-snapshot';
 import {IndependentGscCollector} from './independent-gsc';
+import {verifiedGscMonth} from './independent-gsc-report';
 
 const SCOPE='https://www.googleapis.com/auth/drive.file',API='https://www.googleapis.com/drive/v3/';
 const XLSX='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -145,6 +146,12 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
       });
       return json(await collector.tick());
     }
+    if(path==='/api/internal/gsc-month'&&request.method==='GET'){
+      this.config();
+      const month=url.searchParams.get('month');
+      if(!month)return json({code:'INVALID_MONTH'},400);
+      return json(await verifiedGscMonth(this.ctx.storage,this.key(),month));
+    }
     if(path==='/api/internal/gsc-coverage'&&request.method==='GET'){
       const collector=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
       return json({...await collector.status(),connected:!!await this.ctx.storage.get('gsc:oauth')});
@@ -196,6 +203,11 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     const gsc=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
     const coverage=await gsc.status();
     return json({ok:true,storage:'durable-object-sqlite',d1_requests:0,source:'verified Google Sheets',captured_at:snapshot.captured_at,source_hash:snapshot.source_hash,records:snapshot.records.length,stale:snapshot.stale,available_months:report.months,gsc:{...coverage,connected:!!await this.ctx.storage.get('gsc:oauth')}});
+   }
+   if(request.method==='GET'&&path==='/api/independent/gsc-month'){
+    const month=url.searchParams.get('month');
+    if(!month)return json({code:'INVALID_MONTH'},400);
+    return json(await verifiedGscMonth(this.ctx.storage,this.key(),month));
    }
    if(request.method==='GET'&&path==='/api/independent/report')return json({...report,stale:snapshot.stale,source_hash:snapshot.source_hash});
    if(request.method==='POST'&&path==='/api/independent/questions'){
