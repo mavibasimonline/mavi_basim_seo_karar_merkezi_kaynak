@@ -13,6 +13,7 @@ EXPECTED={
  'tests/test_independent_seo_release.py',
  '.github/workflows/independent-seo-release.yml',
  'scripts/independent-acceptance-probe.ts',
+  'tests/independent-acceptance-probe.test.ts',
 }
 
 def need(condition,code):
