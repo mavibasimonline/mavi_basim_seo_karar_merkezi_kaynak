@@ -23,6 +23,9 @@ import hashlib
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_APP = '8b56115f52ef2e7690927614365165ade4bfbdaa'
+# Exact, previously accepted production SHA (CI 41138548813, release 41138857485).
+# Keep this immutable pin: a later live version needs its own reviewed update.
+ACCEPTED_INDEPENDENT_APP = '4783b3dbaaa2a70a8c1af7e5803769296e4ebb98'
 WORKERS = ('mavi-basim-seo-prod', 'mavi-basim-quota-observer')
 PARITY = ('src/d1-read-budget.ts', 'src/sync-budget.ts', 'src/types.ts', 'src/google.ts', 'src/security.ts',
           'package.json', 'package-lock.json', 'deploy/wrangler.production.jsonc')
@@ -81,7 +84,7 @@ def locks(client):
         raw = schedules['result']
         crons = [s['cron'] for s in (raw.get('schedules', []) if isinstance(raw, dict) else raw)]
         found[worker] = {'version': versions[0]['version_id'], 'crons': crons}
-    if get_json(APP + '/api/health').get('deployment', {}).get('commit') not in (EXPECTED_APP, DRIVE_SOURCE, INDEPENDENT_DRIVE_SOURCE, LOGIN_SOURCE, MONTHLY_SOURCE):
+    if get_json(APP + '/api/health').get('deployment', {}).get('commit') not in (EXPECTED_APP, DRIVE_SOURCE, INDEPENDENT_DRIVE_SOURCE, LOGIN_SOURCE, MONTHLY_SOURCE, ACCEPTED_INDEPENDENT_APP):
         raise ValueError('SOURCE_LIVE_COMMIT_CHANGED')
     return found
 
