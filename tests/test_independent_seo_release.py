@@ -60,6 +60,7 @@ class IndependentReleaseTests(unittest.TestCase):
             'tests/test_independent_seo_release.py',
             '.github/workflows/independent-seo-release.yml',
             'scripts/independent-acceptance-probe.ts',
+             'tests/independent-acceptance-probe.test.ts',
         })
         source=(ROOT/'scripts/independent_seo_release.py').read_text()
         workflow=(ROOT/'.github/workflows/independent-seo-release.yml').read_text()
