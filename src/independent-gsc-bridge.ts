@@ -2,6 +2,7 @@
 // D1 is read ONLY for the initial migration; the new collector never reads D1.
 import type {Env} from './types';
 import {decrypt} from './security';
+import {withReadBudget} from './d1-read-budget';
 type E=Env&{DRIVE_ARCHIVE_SERVICE?:Fetcher};
 const GSC_READ='https://www.googleapis.com/auth/webmasters.readonly';
 const GSC_ALL='https://www.googleapis.com/auth/webmasters';
@@ -17,7 +18,7 @@ export async function independentGscCron(env:E,time=new Date()):Promise<'importe
   // Only attempt migration once per UTC day, not on every 15-minute Cron.
   if(time.getUTCHours()!==0||time.getUTCMinutes()!==15)return 'unavailable';
   if(!env.TOKEN_ENCRYPTION_KEY)return 'unavailable';
-  const record=await env.DB.prepare("SELECT encrypted_tokens,scopes FROM oauth_credentials WHERE provider='google' LIMIT 1").first<{encrypted_tokens:string;scopes:string}>();
+  const record=await withReadBudget(env,'cron',safe=>safe.DB.prepare("SELECT encrypted_tokens,scopes FROM oauth_credentials WHERE provider='google' LIMIT 1").first<{encrypted_tokens:string;scopes:string}>(),time);
   if(!record)return 'unavailable';
   const scopes=record.scopes.split(' ');
   if(!scopes.includes(GSC_READ)&&!scopes.includes(GSC_ALL))return 'unavailable';
