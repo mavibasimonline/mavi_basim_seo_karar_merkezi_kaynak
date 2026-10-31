@@ -202,7 +202,7 @@ export default {
       const time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
       if(independentRefreshDue(time)){
         // Keep the source refresh outside the quota-limited legacy D1 tick.
-        try{await refreshIndependentSheets(env,time);}
+        try{await refreshIndependentSheets(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);}
         catch{console.log(JSON.stringify({event:'independent-sheets-refresh',status:'held',code:'INDEPENDENT_REFRESH_UNAVAILABLE',d1_requests:0}));}
       }
       const result=await tick(env,fetch,time,'cron');
