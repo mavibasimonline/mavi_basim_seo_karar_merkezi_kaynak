@@ -111,6 +111,12 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
       await this.ctx.storage.put(key,{attempts:active?saved!.attempts+1:1,window:active?saved!.window:time});
       return json({allowed:false,locked:false,d1_requests:0});
     }
+    if(path==='/api/internal/independent-refresh'&&request.method==='POST'){
+      const snapshot=await this.independentSnapshot();
+      const report=independentReport(snapshot.records,undefined,snapshot.captured_at,snapshot.quarantined_records);
+      requireValue(report.available&&!snapshot.stale,'INDEPENDENT_REFRESH_SOURCE_STALE');
+      return json({ok:true,source_hash:snapshot.source_hash,captured_at:snapshot.captured_at,records:snapshot.records.length,stale:false,d1_requests:0});
+    }
     if(path.startsWith('/api/independent/'))return this.independentRoute(request);
     if(request.method==='GET'&&path==='/api/drive-independent/health'){
      this.config();await this.ctx.storage.get('format');const info=await this.broker<any>('/config');
