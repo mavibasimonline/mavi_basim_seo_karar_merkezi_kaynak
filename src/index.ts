@@ -19,6 +19,7 @@ import {withReadBudget,readBudgetStatus,D1BudgetError,originalDatabase} from './
 import {independentDriveRoute} from './drive-broker';
 import {monthlyRoute} from './monthly-route';
 import {independentSession} from './independent-session';
+import {independentRefreshDue,refreshIndependentSheets} from './independent-refresh';
 export {MonthlyReportSource} from './monthly-source';
 export {DriveGoogleBroker} from './drive-broker';
 
@@ -199,6 +200,11 @@ export default {
   async scheduled(_event:ScheduledController,env:Env,context:ExecutionContext){if(env.AUTOMATION_ENABLED!=='true')return;context.waitUntil((async()=>{
     try{
       const time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
+      if(independentRefreshDue(time)){
+        // Keep the source refresh outside the quota-limited legacy D1 tick.
+        try{await refreshIndependentSheets(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);}
+        catch{console.log(JSON.stringify({event:'independent-sheets-refresh',status:'held',code:'INDEPENDENT_REFRESH_UNAVAILABLE',d1_requests:0}));}
+      }
       const result=await tick(env,fetch,time,'cron');
       if(time.getUTCMinutes()%15!==0)return;
     }catch(error){

@@ -111,6 +111,12 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
       await this.ctx.storage.put(key,{attempts:active?saved!.attempts+1:1,window:active?saved!.window:time});
       return json({allowed:false,locked:false,d1_requests:0});
     }
+    if(path==='/api/internal/independent-refresh'&&request.method==='POST'){
+      const snapshot=await this.independentSnapshot(6*3600000);
+      const report=independentReport(snapshot.records,undefined,snapshot.captured_at,snapshot.quarantined_records);
+      requireValue(report.available&&!snapshot.stale,'INDEPENDENT_REFRESH_SOURCE_STALE');
+      return json({ok:true,source_hash:snapshot.source_hash,captured_at:snapshot.captured_at,records:snapshot.records.length,stale:false,d1_requests:0});
+    }
     if(path.startsWith('/api/independent/'))return this.independentRoute(request);
     if(request.method==='GET'&&path==='/api/drive-independent/health'){
      this.config();await this.ctx.storage.get('format');const info=await this.broker<any>('/config');
@@ -123,10 +129,10 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    }catch(error){return json({error:'Drive bağlantısı tamamlanamadı.',code:error instanceof ProviderError?error.code:'DRIVE_UNAVAILABLE'},400);}
   });
  }
- private async independentSnapshot(){
+ private async independentSnapshot(maxAgeMs=24*3600000){
   const cached=await readIndependentSnapshot(this.ctx.storage);
   const age=cached?Date.now()-Date.parse(cached.captured_at):Infinity;
-  if(cached&&cached.format==='independent-sheets-v1'&&age>=0&&age<24*3600000)return {...cached,stale:false};
+  if(cached&&cached.format==='independent-sheets-v1'&&age>=0&&age<maxAgeMs)return {...cached,stale:false};
   try{
    const base=`https://docs.google.com/spreadsheets/d/${DRIVE_SHEET}/gviz/tq?tqx=out:json&headers=1&sheet=`;
    const sheets=await Promise.all(DRIVE_SECTIONS.map(async name=>[name,gvizRows(new TextDecoder().decode(await publicSource(base+encodeURIComponent(name))))] as const));
