@@ -115,6 +115,29 @@ class SheetsRecoveryTests(unittest.TestCase):
                 sheets_recovery.run()
             process.assert_not_called()
 
+    def test_live_lock_accepts_only_attested_independent_release(self):
+        class Client:
+            account = 'a' * 32
+            def request(self, method, path):
+                if path.endswith('/deployments'):
+                    return {'ok': True, 'result': {'deployments': [
+                        {'created_on': '2026-10-31T00:00:00Z', 'versions': [
+                            {'percentage': 100, 'version_id': 'a' * 36}
+                        ]}
+                    ]}}
+                if path.endswith('/schedules'):
+                    return {'ok': True, 'result': {'schedules': []}}
+                raise AssertionError(path)
+
+        def health(commit):
+            return {'deployment': {'commit': commit}}
+
+        with patch.object(sheets_recovery, 'get_json', return_value=health(sheets_recovery.ACCEPTED_INDEPENDENT_APP)):
+            self.assertEqual(set(sheets_recovery.locks(Client())), set(sheets_recovery.WORKERS))
+        with patch.object(sheets_recovery, 'get_json', return_value=health('b' * 40)):
+            with self.assertRaisesRegex(ValueError, 'SOURCE_LIVE_COMMIT_CHANGED'):
+                sheets_recovery.locks(Client())
+
     def test_closed_quota_prevents_every_d1_and_source_request(self):
         with patch.object(sheets_recovery, 'source_ci', return_value=None), patch.object(sheets_recovery, 'source_parity'), patch.object(sheets_recovery, 'Cloudflare') as client, patch.object(sheets_recovery, 'observation', return_value={'ok': False}), patch.object(sheets_recovery, 'locks') as locks:
             self.assertEqual(sheets_recovery.run()['status'], 'held')
