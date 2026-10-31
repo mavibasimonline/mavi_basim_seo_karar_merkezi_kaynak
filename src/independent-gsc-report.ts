@@ -9,9 +9,9 @@ const dayKey=(day:string,scope:string)=>'gsc:daily:'+day+':'+scope;
 async function readProof(storage:GscStorage,secret:string,proof:DailyProof){
  fail(proof.source==='GSC Search Analytics API'&&proof.d1_requests===0,'GSC_MONTH_SOURCE_INVALID');
  fail(proof.pages===proof.page_proofs.length&&proof.pages>=1&&proof.pages<=250,'GSC_MONTH_MANIFEST_INVALID');
- const result:GscRow[]=[];
+ const result:GscRow[]=[];let expectedIndex=0;
  for(const part of proof.page_proofs){
-  fail(part.index===result.length/200||part.index>=0,'GSC_MONTH_PAGE_INDEX_INVALID');
+  fail(part.index===expectedIndex++,'GSC_MONTH_PAGE_INDEX_INVALID');
   fail(part.chunks>0&&part.chunks<=20&&part.count>=0&&part.count<=200,'GSC_MONTH_CHUNK_INVALID');
   const arrays:Uint8Array[]=[];let size=0;
   for(let i=0;i<part.chunks;i++){
