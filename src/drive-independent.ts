@@ -192,7 +192,11 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    const url=new URL(request.url),path=url.pathname;
    const snapshot=await this.independentSnapshot();
    const report=independentReport(snapshot.records,url.searchParams.get('month')||undefined,snapshot.captured_at,snapshot.quarantined_records);
-   if(request.method==='GET'&&path==='/api/independent/status')return json({ok:true,storage:'durable-object-sqlite',d1_requests:0,source:'verified Google Sheets',captured_at:snapshot.captured_at,source_hash:snapshot.source_hash,records:snapshot.records.length,stale:snapshot.stale,available_months:report.months});
+   if(request.method==='GET'&&path==='/api/independent/status'){
+    const gsc=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
+    const coverage=await gsc.status();
+    return json({ok:true,storage:'durable-object-sqlite',d1_requests:0,source:'verified Google Sheets',captured_at:snapshot.captured_at,source_hash:snapshot.source_hash,records:snapshot.records.length,stale:snapshot.stale,available_months:report.months,gsc:{...coverage,connected:!!await this.ctx.storage.get('gsc:oauth')}});
+   }
    if(request.method==='GET'&&path==='/api/independent/report')return json({...report,stale:snapshot.stale,source_hash:snapshot.source_hash});
    if(request.method==='POST'&&path==='/api/independent/questions'){
     const body=await request.json() as {question?:unknown;month?:unknown};
