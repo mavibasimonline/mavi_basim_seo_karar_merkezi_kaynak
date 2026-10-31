@@ -22,6 +22,38 @@ function sheets(){return {
  GSC_GUNLUK:[{...metric,Tarih:'2026-07-01'}],URUNLER:[{...metric,'Dönem Kodu':'previous','Ürün ID':'fixture-product'}],
  SORGULAR:[{...metric,'Dönem Kodu':'previous','Ürün ID':'fixture-product',Sorgu:'fixture-query',manuel_karar_notu:'fixture preserve'}],
 };}
+describe('independent GSC private OAuth migration and daily storage',()=>{
+ it('encrypts the transferred credential and records GSC daily data without any D1 binding',async()=>{
+  expect('DB' in cfg).toBe(false);
+  const consent=await stub().fetch('https://archive.private/api/internal/gsc-import',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({scope:'https://www.googleapis.com/auth/webmasters.readonly',refresh_token:'fixture-existing-google-refresh-token-for-gsc'})
+  });
+  expect(consent.status).toBe(200);
+  await runInDurableObject(stub(),async(_instance,state)=>{
+   const saved=await state.storage.get<string>('gsc:oauth');
+   expect(saved).toBeTruthy();expect(saved).not.toContain('fixture-existing-google-refresh-token');
+  });
+  const day=new Date(Date.UTC(new Date().getUTCFullYear(),new Date().getUTCMonth(),new Date().getUTCDate()-3)).toISOString().slice(0,10);
+  vi.spyOn(globalThis,'fetch').mockImplementation(async(url)=>{
+   expect(String(url)).toContain('webmasters/v3/sites/');
+   return Response.json({responseAggregationType:'byPage',rows:[{keys:[day,'https://mavibasim.com/brosur','tur','DESKTOP'],clicks:1,impressions:10,ctr:0.1,position:4}]});
+  });
+  const tick=await stub().fetch('https://archive.private/api/internal/gsc-tick',{method:'POST'});
+  expect(tick.status).toBe(200);
+  expect(await tick.json()).toMatchObject({status:'complete',scope:'page',day,rows:1,d1_requests:0});
+  const coverage=await stub().fetch('https://archive.private/api/internal/gsc-coverage');
+  expect(coverage.status).toBe(200);
+  const summary=await coverage.json() as any;
+  expect(summary.d1_requests).toBe(0);
+  expect(summary.coverage).toHaveLength(1);
+ });
+ it('rejects importing tokens without explicit GSC permission',async()=>{
+  const response=await stub().fetch('https://archive.private/api/internal/gsc-import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scope:'https://www.googleapis.com/auth/drive.file',refresh_token:'fixture-existing-google-refresh-token-for-gsc'})});
+  expect(response.status).toBe(400);
+  await runInDurableObject(stub(),async(_instance,state)=>expect(await state.storage.get('gsc:oauth')).toBeUndefined());
+ });
+});
 describe('independent Drive without a D1 binding',()=>{
  it('stores a new offline grant encrypted in SQLite DO, consumes state once and starts automatically',async()=>{
   expect('DB' in cfg).toBe(false);

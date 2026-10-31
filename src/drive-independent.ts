@@ -6,6 +6,8 @@ import {boundedText,ProviderError} from './google';
 import {DRIVE_SHEET,DRIVE_SECTIONS,gvizRows,verifiedDriveRecords} from './drive-records';
 import {independentReport,independentAnswer,SheetRecord} from './independent-seo-model';
 import {readIndependentSnapshot,saveIndependentSnapshot,IndependentSnapshot} from './independent-snapshot';
+import {IndependentGscCollector} from './independent-gsc';
+import {verifiedGscMonth} from './independent-gsc-report';
 
 const SCOPE='https://www.googleapis.com/auth/drive.file',API='https://www.googleapis.com/drive/v3/';
 const XLSX='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -111,6 +113,49 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
       await this.ctx.storage.put(key,{attempts:active?saved!.attempts+1:1,window:active?saved!.window:time});
       return json({allowed:false,locked:false,d1_requests:0});
     }
+    if(path==='/api/internal/gsc-status'&&request.method==='GET'){
+      return json({connected:!!await this.ctx.storage.get('gsc:oauth'),d1_requests:0});
+    }
+    if(path==='/api/internal/gsc-import'&&request.method==='POST'){
+      this.config();
+      const content=await boundedText(new Response(request.body),16384);
+      const input=JSON.parse(content) as {refresh_token?:unknown;scope?:unknown};
+      const scopes=typeof input.scope==='string'?input.scope.split(' '):[];
+      requireValue(scopes.includes('https://www.googleapis.com/auth/webmasters.readonly')||
+        scopes.includes('https://www.googleapis.com/auth/webmasters'),'GSC_SCOPE_REQUIRED');
+      requireValue(typeof input.refresh_token==='string'&&input.refresh_token.length>20&&input.refresh_token.length<=8192,'GSC_REFRESH_TOKEN_INVALID');
+      const reply=await this.broker<any>('/refresh-gsc',{refresh_token:input.refresh_token});
+      requireValue(typeof reply.access_token==='string'&&reply.access_token.length>10&&Number.isFinite(reply.expires_in)&&reply.expires_in>0,'GSC_REFRESH_UNVERIFIED');
+      // Do not overwrite an established credential with a possibly weaker import.
+      if(!await this.ctx.storage.get('gsc:oauth')){
+        await this.ctx.storage.put('gsc:oauth',await encrypt({refresh_token:input.refresh_token,scope:input.scope,access_token:reply.access_token,expires_at:Date.now()+reply.expires_in*1000},this.key()));
+      }
+      return json({ok:true,connected:true,d1_requests:0});
+    }
+    if(path==='/api/internal/gsc-tick'&&request.method==='POST'){
+      this.config();
+      const collector=new IndependentGscCollector(this.ctx.storage,this.key(),async(force)=>{
+        const sealed=await this.ctx.storage.get<string>('gsc:oauth');
+        requireValue(sealed,'GSC_CONSENT_REQUIRED');
+        const token=await decrypt<{refresh_token:string;scope:string;access_token:string;expires_at:number}>(sealed!,this.key());
+        if(!force&&token.access_token&&token.expires_at>Date.now()+60000)return token.access_token;
+        const updated=await this.broker<any>('/refresh-gsc',{refresh_token:token.refresh_token});
+        requireValue(typeof updated.access_token==='string'&&Number.isFinite(updated.expires_in)&&updated.expires_in>0,'GSC_TOKEN_REFRESH_UNAVAILABLE');
+        const next={...token,access_token:updated.access_token,expires_at:Date.now()+updated.expires_in*1000};
+        await this.ctx.storage.put('gsc:oauth',await encrypt(next,this.key()));return next.access_token;
+      });
+      return json(await collector.tick());
+    }
+    if(path==='/api/internal/gsc-month'&&request.method==='GET'){
+      this.config();
+      const month=url.searchParams.get('month');
+      if(!month)return json({code:'INVALID_MONTH'},400);
+      return json(await verifiedGscMonth(this.ctx.storage,this.key(),month));
+    }
+    if(path==='/api/internal/gsc-coverage'&&request.method==='GET'){
+      const collector=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
+      return json({...await collector.status(),connected:!!await this.ctx.storage.get('gsc:oauth')});
+    }
     if(path==='/api/internal/independent-refresh'&&request.method==='POST'){
       const snapshot=await this.independentSnapshot(6*3600000);
       const report=independentReport(snapshot.records,undefined,snapshot.captured_at,snapshot.quarantined_records);
@@ -154,7 +199,16 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    const url=new URL(request.url),path=url.pathname;
    const snapshot=await this.independentSnapshot();
    const report=independentReport(snapshot.records,url.searchParams.get('month')||undefined,snapshot.captured_at,snapshot.quarantined_records);
-   if(request.method==='GET'&&path==='/api/independent/status')return json({ok:true,storage:'durable-object-sqlite',d1_requests:0,source:'verified Google Sheets',captured_at:snapshot.captured_at,source_hash:snapshot.source_hash,records:snapshot.records.length,stale:snapshot.stale,available_months:report.months});
+   if(request.method==='GET'&&path==='/api/independent/status'){
+    const gsc=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
+    const coverage=await gsc.status();
+    return json({ok:true,storage:'durable-object-sqlite',d1_requests:0,source:'verified Google Sheets',captured_at:snapshot.captured_at,source_hash:snapshot.source_hash,records:snapshot.records.length,stale:snapshot.stale,available_months:report.months,gsc:{...coverage,connected:!!await this.ctx.storage.get('gsc:oauth')}});
+   }
+   if(request.method==='GET'&&path==='/api/independent/gsc-month'){
+    const month=url.searchParams.get('month');
+    if(!month)return json({code:'INVALID_MONTH'},400);
+    return json(await verifiedGscMonth(this.ctx.storage,this.key(),month));
+   }
    if(request.method==='GET'&&path==='/api/independent/report')return json({...report,stale:snapshot.stale,source_hash:snapshot.source_hash});
    if(request.method==='POST'&&path==='/api/independent/questions'){
     const body=await request.json() as {question?:unknown;month?:unknown};
