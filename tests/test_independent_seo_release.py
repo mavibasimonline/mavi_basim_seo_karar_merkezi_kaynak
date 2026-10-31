@@ -10,14 +10,15 @@ import independent_seo_release as release
 class IndependentReleaseTests(unittest.TestCase):
     def proof(self):
         return dict(ok=True, d1_requests=0, question_d1_requests=0, products=30,
-                    source_hash='a'*64, month='2026-09', stale=False)
+                    source_hash='a'*64, month='2026-09', stale=False,
+                    gsc_private_service=True, gsc_d1_requests=0)
 
     def test_only_fresh_real_report_and_question_proof_authorizes_release(self):
         self.assertEqual(release.acceptance_proof(self.proof()), self.proof())
         cases = [('ok', False), ('d1_requests', 1), ('d1_requests', False),
                  ('question_d1_requests', 1), ('products', 0), ('products', True),
                  ('source_hash', ''), ('source_hash', 123), ('month', '2026-13'),
-                 ('stale', True), ('stale', None)]
+                 ('stale', True), ('stale', None),('gsc_private_service',False),('gsc_d1_requests',1)]
         for key, value in cases:
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
                 release.acceptance_proof({**self.proof(), key: value})
@@ -53,16 +54,18 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertIn("rollback(config,existing[worker]['version'])", source)
 
     def test_reviewed_refresh_release_keeps_exact_source_and_one_time_gates(self):
-        self.assertEqual(release.TITLE, 'release: activate scheduled verified Sheets refresh')
+        self.assertEqual(release.TITLE, 'release: activate guarded private GSC durable collector')
         self.assertEqual(release.EXPECTED, {
             'scripts/independent_seo_release.py',
             'tests/test_independent_seo_release.py',
             '.github/workflows/independent-seo-release.yml',
+            'scripts/independent-acceptance-probe.ts',
         })
         source=(ROOT/'scripts/independent_seo_release.py').read_text()
         workflow=(ROOT/'.github/workflows/independent-seo-release.yml').read_text()
         self.assertIn('INDEPENDENT_UNREVIEWED_BASE',source)
         self.assertIn('INDEPENDENT_REFRESH_SOURCE_MISSING',source)
+        self.assertIn('INDEPENDENT_GSC_SOURCE_MISSING',source)
         self.assertIn(release.TITLE,workflow)
         self.assertIn("after_main['bindings']==existing[APP]['bindings']",source)
         self.assertIn("rollback(config,existing[worker]['version'])",source)
