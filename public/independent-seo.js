@@ -7,7 +7,7 @@ state.textContent=data.stale?'Arşiv eski — son doğrulanmış kayıt':'D1 ba�
 source.textContent='Kaynak: '+data.source+' · Kayıt: '+new Date(data.captured_at).toLocaleString('tr-TR')+' · Eksik kırılımlar hesaplanmaz';
 try {
  const status=await request('/api/independent/status'),gsc=status.gsc;
- if(gsc)source.textContent+=' · Günlük GSC: '+(gsc.connected?'Bağlı':'Yetki bekleniyor')+' · Doğrulanmış gün/kapsam: '+(gsc.coverage||[]).length+'/14 (son 7 gün; eksik gün sıfır değil)';
+ if(gsc)source.textContent+=' · Günlük GSC: '+((gsc.coverage||[]).length?'Veri doğrulandı':gsc.connected?'Yetki alındı; veri bekleniyor':'Yetki bekleniyor')+' · Doğrulanmış gün/kapsam: '+(gsc.coverage||[]).length+'/14 (son 7 gün; eksik gün sıfır değil)';
 } catch {source.textContent+=' · Günlük GSC kapsam durumu doğrulanamadı';}
 products.replaceChildren();
 if(!data.available){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=5;td.textContent=data.message;tr.appendChild(td);products.appendChild(tr);return;}
