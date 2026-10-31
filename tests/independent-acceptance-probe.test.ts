@@ -18,7 +18,7 @@ describe('private real data release probe',()=>{
  });
  it('requires a matching persisted report and a nonempty evidenced answer',async()=>{
   const r=report();let calls=0;
-  const fetch=async()=>++calls===2?Response.json({answer:'Önceki ay yok.',evidence:['source'],d1_requests:0,stale:false,source_hash:hash}):Response.json(r);
-  const response=await probe.fetch(request(),{ARCHIVE:{fetch} as any,PROBE_KEY:key});expect(response.status).toBe(200);expect((await response.json<any>()).ok).toBe(true);expect(calls).toBe(3);
+  const fetch=async()=>{calls++;if(calls===2)return Response.json({answer:'Önceki ay yok.',evidence:['source'],d1_requests:0,stale:false,source_hash:hash});if(calls===4)return Response.json({connected:false,d1_requests:0});return Response.json(r);};
+  const response=await probe.fetch(request(),{ARCHIVE:{fetch} as any,PROBE_KEY:key});expect(response.status).toBe(200);expect((await response.json<any>()).ok).toBe(true);expect(calls).toBe(4);
  });
 });
