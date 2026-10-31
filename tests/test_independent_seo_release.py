@@ -52,6 +52,21 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertIn("after_main['bindings']==existing[APP]['bindings']", source)
         self.assertIn("rollback(config,existing[worker]['version'])", source)
 
+    def test_reviewed_refresh_release_keeps_exact_source_and_one_time_gates(self):
+        self.assertEqual(release.TITLE, 'release: activate scheduled verified Sheets refresh')
+        self.assertEqual(release.EXPECTED, {
+            'scripts/independent_seo_release.py',
+            'tests/test_independent_seo_release.py',
+            '.github/workflows/independent-seo-release.yml',
+        })
+        source=(ROOT/'scripts/independent_seo_release.py').read_text()
+        workflow=(ROOT/'.github/workflows/independent-seo-release.yml').read_text()
+        self.assertIn('INDEPENDENT_UNREVIEWED_BASE',source)
+        self.assertIn('INDEPENDENT_REFRESH_SOURCE_MISSING',source)
+        self.assertIn(release.TITLE,workflow)
+        self.assertIn("after_main['bindings']==existing[APP]['bindings']",source)
+        self.assertIn("rollback(config,existing[worker]['version'])",source)
+
     def test_existing_optional_monthly_service_is_preserved_without_new_resources(self):
         drive = dict(name='DRIVE_ARCHIVE_SERVICE', type='service', service=release.ARCHIVE)
         monthly = dict(name='MONTHLY_ANALYSES', type='service', service='mavi-basim-monthly-store')

@@ -7,11 +7,11 @@ from release_readiness import get_json,REPOSITORY
 ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
-TITLE='release: verify independent SEO probe transport'
+TITLE='release: activate scheduled verified Sheets refresh'
 EXPECTED={
  'scripts/independent_seo_release.py',
  'tests/test_independent_seo_release.py',
- '.github/workflows/independent-seo-release.yml','docs/INDEPENDENT_REAL_DATA_REPAIR.md','TODO.md',
+ '.github/workflows/independent-seo-release.yml',
 }
 
 def need(condition,code):
@@ -76,6 +76,12 @@ def run():
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'INDEPENDENT_MAIN_SUPERSEDED')
  changed=set(git('diff','--name-only','HEAD^','HEAD').splitlines())
  need(changed==EXPECTED,'INDEPENDENT_UNREVIEWED_FILES')
+ need(git('rev-parse','HEAD^')=='e1ad0ff8d6002bde67d4eb19e7a0ed1bda593ac8','INDEPENDENT_UNREVIEWED_BASE')
+ # Preserve the reviewed Cron/DO source set exactly as merged and CI verified.
+ need("independentRefreshDue(time)" in (ROOT/'src/index.ts').read_text()
+      and "private async independentSnapshot(maxAgeMs=24*3600000)" in (ROOT/'src/drive-independent.ts').read_text()
+      and "/api/internal/independent-refresh" in (ROOT/'src/drive-independent.ts').read_text()
+      and (ROOT/'src/independent-refresh.ts').is_file(),'INDEPENDENT_REFRESH_SOURCE_MISSING')
  rows=get_json('https://api.github.com/repos/'+REPOSITORY+'/actions/workflows/ci.yml/runs?head_sha='+sha+'&per_page=30',os.environ.get('GITHUB_TOKEN')).get('workflow_runs',[])
  need(any(r.get('head_sha')==sha and r.get('head_branch')=='main' and r.get('event')=='push' and r.get('conclusion')=='success' for r in rows),'INDEPENDENT_GREEN_MAIN_CI_REQUIRED')
  client=Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID'))
