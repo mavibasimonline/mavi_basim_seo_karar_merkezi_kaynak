@@ -20,6 +20,7 @@ import {independentDriveRoute} from './drive-broker';
 import {monthlyRoute} from './monthly-route';
 import {independentSession} from './independent-session';
 import {independentRefreshDue,refreshIndependentSheets} from './independent-refresh';
+import {independentGscCron} from './independent-gsc-bridge';
 export {MonthlyReportSource} from './monthly-source';
 export {DriveGoogleBroker} from './drive-broker';
 
@@ -205,6 +206,9 @@ export default {
         try{await refreshIndependentSheets(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);}
         catch{console.log(JSON.stringify({event:'independent-sheets-refresh',status:'held',code:'INDEPENDENT_REFRESH_UNAVAILABLE',d1_requests:0}));}
       }
+      // Independent GSC collection is isolated from the legacy D1 read/write budget.
+      try{await independentGscCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);}
+      catch{console.log(JSON.stringify({event:'independent-gsc',status:'held',code:'GSC_PRIVATE_SYNC_UNAVAILABLE',d1_collection_writes:0}));}
       const result=await tick(env,fetch,time,'cron');
       if(time.getUTCMinutes()%15!==0)return;
     }catch(error){
