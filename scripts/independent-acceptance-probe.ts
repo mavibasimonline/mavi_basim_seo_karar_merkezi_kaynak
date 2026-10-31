@@ -14,6 +14,11 @@ export default {async fetch(request:Request,env:ProbeEnv){
   if(!question.ok||answer.stale!==false||answer.source_hash!==report.source_hash||answer.d1_requests!==0||!Array.isArray(answer.evidence)||answer.evidence.length===0||typeof answer.answer!=='string'||!answer.answer.trim())return Response.json({ok:false,code:'INDEPENDENT_QUESTION_PROOF_MISSING'},{status:503});
   const readback=await env.ARCHIVE.fetch('https://archive.private/api/independent/report?month='+report.month),saved=await readback.json<any>();
   if(!readback.ok||saved.source_hash!==report.source_hash||saved.captured_at!==report.captured_at||saved.products?.length!==report.products.length||saved.d1_requests!==0||saved.stale!==false)return Response.json({ok:false,code:'INDEPENDENT_READBACK_PROOF_MISSING'},{status:503});
-  return Response.json({ok:true,source_hash:report.source_hash,month:report.month,products:report.products.length,query_count:report.query_count,d1_requests:report.d1_requests,question_d1_requests:answer.d1_requests,stale:!!report.stale,question_decision:answer.decision});
+  // New private GSC collector interface must exist on the same account-only DO service.
+  // A credential may not yet have migrated; never pretend that means GSC data is complete.
+  const gsc=await env.ARCHIVE.fetch('https://archive.private/api/internal/gsc-status');
+  const gscStatus=await gsc.json<any>();
+  if(!gsc.ok||typeof gscStatus.connected!=='boolean'||gscStatus.d1_requests!==0)return Response.json({ok:false,code:'INDEPENDENT_GSC_SERVICE_MISSING'},{status:503});
+  return Response.json({ok:true,source_hash:report.source_hash,month:report.month,products:report.products.length,query_count:report.query_count,d1_requests:report.d1_requests,question_d1_requests:answer.d1_requests,stale:!!report.stale,question_decision:answer.decision,gsc_private_service:true,gsc_d1_requests:gscStatus.d1_requests});
  }catch{return Response.json({ok:false,code:'INDEPENDENT_PROBE_UNAVAILABLE'},{status:503});}
 }};
