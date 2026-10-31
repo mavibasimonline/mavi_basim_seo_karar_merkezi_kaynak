@@ -21,7 +21,7 @@ export class DriveGoogleBroker extends WorkerEntrypoint<BrokerEnv>{
    else if(path==='/refresh-gsc')Object.assign(parameters,{grant_type:'refresh_token',refresh_token:value});
    else Object.assign(parameters,{grant_type:'refresh_token',refresh_token:value,scope:SCOPE});
    const reply=await requestJSON<any>('https://oauth2.googleapis.com/token',{method:'POST',body:new URLSearchParams(parameters)});
-   if(typeof reply.access_token!=='string'||!Number.isFinite(reply.expires_in)||reply.expires_in<=0||reply.scope&&!reply.scope.split(' ').includes(path==='/refresh-gsc'?GSC_SCOPE:SCOPE))return json({code:'DRIVE_GRANT_SCOPE_INVALID'},400);
+   if(typeof reply.access_token!=='string'||!Number.isFinite(reply.expires_in)||reply.expires_in<=0||reply.scope&&!(path==='/refresh-gsc'?(reply.scope.split(' ').includes(GSC_SCOPE)||reply.scope.split(' ').includes('https://www.googleapis.com/auth/webmasters')):reply.scope.split(' ').includes(SCOPE)))return json({code:'DRIVE_GRANT_SCOPE_INVALID'},400);
    return json(reply);
   }catch{return json({code:'DRIVE_PROVIDER_TOKEN_UNAVAILABLE'},503);}
  }
