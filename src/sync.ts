@@ -74,6 +74,11 @@ export async function enqueueDaily(env: Env, time = new Date()): Promise<boolean
   // and exhausted retries need explicit operator recovery after the cause is
   // addressed. A new UTC day must not erase their cursor, generation or attempts.
   statements.push(env.DB.prepare("UPDATE sync_jobs SET status='pending',generation=lower(hex(randomblob(16))),cursor=0,quality_failed=0,next_attempt_at=?,updated_at=? WHERE status='done' AND provider IN ('gsc','ga4') AND NOT EXISTS(SELECT 1 FROM dataset_coverage c WHERE c.provider=sync_jobs.provider AND c.day=sync_jobs.day AND c.scope=sync_jobs.scope AND c.complete=1)").bind(stamp,stamp));
+  // One bounded recent-day recovery for old Google HTTP 400 failures after
+  // changing the Search Analytics request. Never remove saved rows or cursors.
+  // attempts=2 means a repeated 400 remains blocked, not endlessly recycled.
+  statements.push(env.DB.prepare("UPDATE sync_jobs SET status='retry',attempts=2,next_attempt_at=?,updated_at=? WHERE provider='gsc' AND status='blocked' AND error_code='GOOGLE_HTTP_400' AND attempts=1 AND cursor=0 AND day BETWEEN ? AND ?")
+    .bind(stamp,stamp,dateDaysAgo(18,time),dateDaysAgo(3,time)));
   statements.push(env.DB.prepare("INSERT OR IGNORE INTO health_checks VALUES('planner',?,?,?,?)").bind(day,stamp,connected?'queued':'blocked',connected?null:'GOOGLE_NOT_CONNECTED'));
   statements.push(env.DB.prepare("INSERT OR IGNORE INTO health_checks VALUES('scheduler',?,?,?,?)").bind(day,stamp,connected ? 'queued' : 'blocked',connected ? null : 'GOOGLE_NOT_CONNECTED'));
   await env.DB.batch(statements);
