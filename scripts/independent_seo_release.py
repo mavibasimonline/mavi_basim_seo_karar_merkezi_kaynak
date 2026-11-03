@@ -7,7 +7,7 @@ from release_readiness import get_json,REPOSITORY
 ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
-TITLE='release: d1-free GSC reconnect 20261104'
+TITLE='release: verify 6h Sheets and GSC auth 20261104'
 EXPECTED={
  'scripts/independent_seo_release.py',
  'tests/test_independent_seo_release.py',
@@ -78,10 +78,10 @@ def run():
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'INDEPENDENT_MAIN_SUPERSEDED')
  changed=set(git('diff','--name-only','HEAD^','HEAD').splitlines())
  need(changed==EXPECTED,'INDEPENDENT_UNREVIEWED_FILES')
- need(git('rev-parse','HEAD^')=='779d742b9d7d21402fcf9bd55e87d24e6b548a37','INDEPENDENT_UNREVIEWED_BASE')
+ need(git('rev-parse','HEAD^')=='55f63d5ef097bafa63160c8dbd53bf947ae47af4','INDEPENDENT_UNREVIEWED_BASE')
  # Preserve the reviewed Cron/DO source set exactly as merged and CI verified.
  need("independentRefreshDue(time)" in (ROOT/'src/index.ts').read_text()
-      and "private async independentSnapshot(maxAgeMs=24*3600000)" in (ROOT/'src/drive-independent.ts').read_text()
+      and "private async independentSnapshot(maxAgeMs=6*3600000)" in (ROOT/'src/drive-independent.ts').read_text()
       and "/api/internal/independent-refresh" in (ROOT/'src/drive-independent.ts').read_text()
       and (ROOT/'src/independent-refresh.ts').is_file(),'INDEPENDENT_REFRESH_SOURCE_MISSING')
  need('gsc:oauth' in (ROOT/'src/drive-independent.ts').read_text()
