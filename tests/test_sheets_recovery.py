@@ -134,6 +134,8 @@ class SheetsRecoveryTests(unittest.TestCase):
 
         with patch.object(sheets_recovery, 'get_json', return_value=health(sheets_recovery.ACCEPTED_INDEPENDENT_APP)):
             self.assertEqual(set(sheets_recovery.locks(Client())), set(sheets_recovery.WORKERS))
+        with patch.object(sheets_recovery, 'get_json', return_value=health(sheets_recovery.ACCEPTED_GSC_RELEASE)):
+            self.assertEqual(set(sheets_recovery.locks(Client())), set(sheets_recovery.WORKERS))
         with patch.object(sheets_recovery, 'get_json', return_value=health('b' * 40)):
             with self.assertRaisesRegex(ValueError, 'SOURCE_LIVE_COMMIT_CHANGED'):
                 sheets_recovery.locks(Client())
