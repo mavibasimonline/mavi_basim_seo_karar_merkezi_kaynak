@@ -85,6 +85,18 @@ describe('independent Drive without a D1 binding',()=>{
   expect(result.records.some((r:any)=>r.section==='URUNLER'&&r.start==='2026-09-01')).toBe(true);
   expect(result.records.some((r:any)=>r.start==='2026-10-01')).toBe(false);
  });
+ it('quarantines future Sheets summary and daily rows while retaining completed history',async()=>{
+  const input=sheets();
+  input.OZET.push({...input.OZET[0],'Dönem Kodu':'future','Başlangıç Tarihi':'2026-11-01','Bitiş Tarihi':'2026-11-30'});
+  input.URUNLER.push({...input.URUNLER[0],'Dönem Kodu':'future'});
+  input.SORGULAR.push({...input.SORGULAR[0],'Dönem Kodu':'future'});
+  input.GSC_GUNLUK.push({...input.GSC_GUNLUK[0],Tarih:'2026-11-05'});
+  const result=await verifiedDriveRecords(input,new Date('2026-11-04T00:00:00Z'));
+  expect(result.record_count).toBe(4);
+  expect(result.quarantined_records).toBe(4);
+  expect(result.records.every((r:any)=>r.end<='2026-11-04')).toBe(true);
+  expect(result.records.some((r:any)=>r.section==='OZET'&&r.start==='2026-09-01')).toBe(true);
+ });
  it('writes both archives, verifies real readback, and recovers a lost upload reply without duplicates',async()=>{
   await consent();
   const files=new Map<string,{meta:any;data:Uint8Array}>(),input=sheets();let uploads=0,lost=true;
