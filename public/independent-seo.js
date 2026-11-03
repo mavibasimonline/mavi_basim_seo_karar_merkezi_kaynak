@@ -24,7 +24,7 @@ $('reload').addEventListener('click',load);
 $('reconnect').addEventListener('click',async()=>{
  const button=$('reconnect');button.disabled=true;
  try{
-  const data=await request('/api/oauth/google/start',{method:'POST'});
+  const data=await request('/api/independent/gsc-oauth/start',{method:'POST'});
   const destination=new URL(data.authorization_url);
   if(destination.origin!=='https://accounts.google.com')throw Error('Güvenli Google yetki adresi doğrulanamadı.');
   location.assign(destination.href);
