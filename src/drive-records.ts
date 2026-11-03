@@ -55,7 +55,7 @@ export async function verifiedDriveRecords(sheets:Record<string,Row[]>,time=new 
   if(!code||periods.has(code)&&stable(periods.get(code))!==stable(period))throw Error('SOURCE_PERIOD_AMBIGUOUS');
   // A future-dated, unpublished monthly summary is not verified data.
   // Preserve historical completed months without accepting the future row.
-  const start=Date.parse(period[0]+'T00:00:00Z'),end=Date.parse(period[1]+'T00:00:00Z');
+  const end=Date.parse(period[1]+'T00:00:00Z');
   const fullMonth=period[0].endsWith('-01')&&period[0].slice(0,7)===period[1].slice(0,7)&&new Date(end+86400000).getUTCDate()===1;
   // Do not validate or publish partial-month detail rows as a completed month.
   // Quarantine the summary; its product/query rows then remain orphaned.
