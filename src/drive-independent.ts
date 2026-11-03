@@ -4,7 +4,7 @@ import {encrypt,decrypt,cookie,equalSecret} from './security';
 import {hash,json} from './types';
 import {boundedText,ProviderError} from './google';
 import {DRIVE_SHEET,DRIVE_SECTIONS,gvizRows,verifiedDriveRecords} from './drive-records';
-import {independentReport,independentAnswer,SheetRecord} from './independent-seo-model';
+import {independentReport,independentAnswer,periodsOf,SheetRecord} from './independent-seo-model';
 import {readIndependentSnapshot,saveIndependentSnapshot,IndependentSnapshot} from './independent-snapshot';
 import {IndependentGscCollector} from './independent-gsc';
 import {verifiedGscMonth} from './independent-gsc-report';
@@ -96,6 +96,36 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
   const url=new URL('https://accounts.google.com/o/oauth2/v2/auth');url.search=new URLSearchParams({client_id:info.client_id,redirect_uri:info.redirect_uri,response_type:'code',scope:SCOPE,access_type:'offline',prompt:'consent',state}).toString();
   return new Response(JSON.stringify({authorization_url:url.href}),{headers:{'Content-Type':'application/json','Cache-Control':'no-store','Set-Cookie':`mavi_drive2_oauth=${state}; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google; Max-Age=600`}});
  }
+ private async startGsc(){
+  this.config();const info=await this.broker<{client_id:string;redirect_uri:string}>('/config');
+  const active=await this.ctx.storage.list<{expires:number}>({prefix:'state:',limit:16});
+  for(const [key,value] of active)if(value.expires<Date.now())await this.ctx.storage.delete(key);
+  requireValue([...active.values()].filter(v=>v.expires>=Date.now()).length<8,'DRIVE_CONSENT_RATE_LIMIT');
+  const state='gsc2.'+crypto.randomUUID()+crypto.randomUUID();
+  await this.ctx.storage.put('state:'+await hash(state),{expires:Date.now()+600000});
+  const url=new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  url.search=new URLSearchParams({client_id:info.client_id,redirect_uri:info.redirect_uri,response_type:'code',scope:'https://www.googleapis.com/auth/webmasters.readonly',access_type:'offline',prompt:'consent',state}).toString();
+  return new Response(JSON.stringify({authorization_url:url.href}),{headers:{'Content-Type':'application/json','Cache-Control':'no-store','Set-Cookie':`mavi_gsc2_oauth=${state}; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google; Max-Age=600`}});
+ }
+ private async callbackGsc(request:Request){
+  this.config();const url=new URL(request.url),state=url.searchParams.get('state')||'';
+  const key='state:'+await hash(state),record=await this.ctx.storage.get<{expires:number}>(key);
+  requireValue(state.startsWith('gsc2.')&&record&&record.expires>Date.now()&&await equalSecret(state,cookie(request,'mavi_gsc2_oauth')||''),'DRIVE_STATE_INVALID');
+  await this.ctx.storage.delete(key);
+  const code=url.searchParams.get('code');
+  requireValue(code&&!url.searchParams.has('error'),'DRIVE_CONSENT_DENIED');
+  const reply=await this.broker<any>('/exchange-gsc',{code});
+  const scopes=typeof reply.scope==='string'?reply.scope.split(' '):[];
+  requireValue(typeof reply.access_token==='string'&&reply.access_token.length>10
+    &&typeof reply.refresh_token==='string'&&reply.refresh_token.length>20
+    &&Number.isFinite(reply.expires_in)&&reply.expires_in>0
+    &&(scopes.includes('https://www.googleapis.com/auth/webmasters.readonly')
+        ||scopes.includes('https://www.googleapis.com/auth/webmasters')),'GSC_OFFLINE_CONSENT_REQUIRED');
+  await this.ctx.storage.put('gsc:oauth',await encrypt({refresh_token:reply.refresh_token,scope:reply.scope,access_token:reply.access_token,expires_at:Date.now()+reply.expires_in*1000},this.key()));
+  await this.ctx.storage.delete('gsc:oauth-reconnect');
+  await this.ctx.storage.delete('gsc:retry');
+  return new Response(null,{status:303,headers:{Location:'/independent-seo.html?google=connected','Cache-Control':'no-store','Set-Cookie':'mavi_gsc2_oauth=; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google; Max-Age=0'}});
+ }
  private async callback(request:Request){
   this.config();const url=new URL(request.url),state=url.searchParams.get('state')||'',key='state:'+await hash(state),record=await this.ctx.storage.get<{expires:number}>(key);
   requireValue(state.startsWith('drive2.')&&record&&record.expires>Date.now()&&await equalSecret(state,cookie(request,'mavi_drive2_oauth')||''),'DRIVE_STATE_INVALID');
@@ -173,11 +203,13 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
       requireValue(report.available&&!snapshot.stale,'INDEPENDENT_REFRESH_SOURCE_STALE');
       return json({ok:true,source_hash:snapshot.source_hash,captured_at:snapshot.captured_at,records:snapshot.records.length,stale:false,d1_requests:0});
     }
+    if(path==='/api/independent/gsc-oauth/start'&&request.method==='POST')return await this.startGsc();
     if(path.startsWith('/api/independent/'))return this.independentRoute(request);
     if(request.method==='GET'&&path==='/api/drive-independent/health'){
      this.config();await this.ctx.storage.get('format');const info=await this.broker<any>('/config');
      return json({ok:!!info.client_id&&!!info.redirect_uri,storage:'durable-object-sqlite',d1_requests:0,separate_oauth:true});
     }
+    if(request.method==='GET'&&path==='/api/oauth/google/callback'&&url.searchParams.get('state')?.startsWith('gsc2.'))return await this.callbackGsc(request);
     if(request.method==='GET'&&path==='/api/oauth/google/callback')return await this.callback(request);
     if(request.method==='POST'&&(path==='/api/drive-independent/start'||path==='/api/oauth/google/start'&&url.searchParams.get('purpose')==='drive'))return await this.start();
     if(request.method==='GET'&&(path==='/api/drive-independent/status'||path==='/api/drive/status'))return json({connected:!!await this.ctx.storage.get('oauth'),storage:'durable-object-sqlite',d1_requests:0,last_archive:await this.ctx.storage.get('last_archive')||null,last_error:await this.ctx.storage.get('last_error')||null,next_run:await this.ctx.storage.getAlarm(),scope:SCOPE});
@@ -185,7 +217,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    }catch(error){return json({error:'Drive bağlantısı tamamlanamadı.',code:error instanceof ProviderError?error.code:'DRIVE_UNAVAILABLE'},400);}
   });
  }
- private async independentSnapshot(maxAgeMs=24*3600000){
+ private async independentSnapshot(maxAgeMs=6*3600000){
   const cached=await readIndependentSnapshot(this.ctx.storage);
   const age=cached?Date.now()-Date.parse(cached.captured_at):Infinity;
   if(cached&&cached.format==='independent-sheets-v1'&&age>=0&&age<maxAgeMs)return {...cached,stale:false};
@@ -194,6 +226,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    const sheets=await Promise.all(DRIVE_SECTIONS.map(async name=>[name,gvizRows(new TextDecoder().decode(await publicSource(base+encodeURIComponent(name))))] as const));
    const verified=await verifiedDriveRecords(Object.fromEntries(sheets));
    requireValue(verified.record_count>0,'INDEPENDENT_VERIFIED_SOURCE_EMPTY');
+   requireValue(periodsOf(verified.records).length>0,'INDEPENDENT_NO_COMPLETE_PERIOD');
    const data=JSON.stringify(verified.records);
    requireValue(new TextEncoder().encode(data).length<=MAX,'INDEPENDENT_SNAPSHOT_TOO_LARGE');
    const source_hash=await sha(new TextEncoder().encode(data));
