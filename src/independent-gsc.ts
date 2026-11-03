@@ -125,6 +125,7 @@ export class IndependentGscCollector {
    return {status:'complete',day:j.day,scope:j.scope,rows:j.cursor,query_partial:final.query_partial,d1_requests:0};
   }catch(error){
    const code=error instanceof Error?error.message:'GSC_SYNC_UNAVAILABLE';
+   if(code==='GSC_OAUTH_RECONNECT_REQUIRED')await this.storage.put('gsc:oauth-reconnect',{at:time.toISOString()});
    const retryable=code==='GSC_HTTP_429'||/^GSC_HTTP_5\d\d$/.test(code)||code==='GSC_RESPONSE_BYTES_LIMIT';
    // A bad source day must not monopolize the private queue. Keep prior verified days.
    j.attempts++;
