@@ -54,7 +54,7 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertIn("rollback(config,existing[worker]['version'])", source)
 
     def test_reviewed_refresh_release_keeps_exact_source_and_one_time_gates(self):
-        self.assertEqual(release.TITLE, 'release: repair GSC auto aggregation once')
+        self.assertEqual(release.TITLE, 'release: repair GSC auto aggregation validated')
         self.assertEqual(release.EXPECTED, {
             'scripts/independent_seo_release.py',
             'tests/test_independent_seo_release.py',
@@ -66,6 +66,7 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertIn('INDEPENDENT_REFRESH_SOURCE_MISSING',source)
         self.assertIn('INDEPENDENT_GSC_SOURCE_MISSING',source)
         self.assertIn('GSC_REPAIR_SOURCE_MISSING',source)
+        self.assertIn('GOOGLE_HTTP_400',source)
         self.assertIn(release.TITLE,workflow)
         self.assertIn("after_main['bindings']==existing[APP]['bindings']",source)
         self.assertIn("rollback(config,existing[worker]['version'])",source)
