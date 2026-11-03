@@ -38,6 +38,7 @@ function validatedMetrics(row:Row){
 }
 export async function verifiedDriveRecords(sheets:Record<string,Row[]>,time=new Date()){
  const periods=new Map<string,[string,string]>(),groups=new Map<string,Map<string,any>>(),day=time.toISOString().slice(0,10);
+ let quarantined=0;
  for(const section of DRIVE_SECTIONS)if(!Array.isArray(sheets[section]))throw Error('SOURCE_SHEETS_REQUIRED');
  async function add(section:string,family:string,identity:unknown,start:string,end:string,row:Row){
   if(start>end||end>day)throw Error('SOURCE_PERIOD_INVALID');
@@ -52,13 +53,15 @@ export async function verifiedDriveRecords(sheets:Record<string,Row[]>,time=new 
  for(const row of sheets.OZET){
   const code=String(row['Dönem Kodu']||''),period:[string,string]=[sourceDate(row['Başlangıç Tarihi']),sourceDate(row['Bitiş Tarihi'])];
   if(!code||periods.has(code)&&stable(periods.get(code))!==stable(period))throw Error('SOURCE_PERIOD_AMBIGUOUS');
+  // A future-dated, unpublished monthly summary is not verified data.
+  // Preserve historical completed months without accepting the future row.
+  if(period[0]>day||period[1]>day){quarantined++;continue;}
   periods.set(code,period);await add('OZET','period_total',code,...period,row);
  }
- for(const row of sheets.GSC_GUNLUK){const date=sourceDate(row.Tarih);await add('GSC_GUNLUK','site_daily_total',date,date,date,row);}
+ for(const row of sheets.GSC_GUNLUK){const date=sourceDate(row.Tarih);if(date>day){quarantined++;continue;}await add('GSC_GUNLUK','site_daily_total',date,date,date,row);}
  // New/unpublished month product rows can arrive before their matching OZET
  // period. Do not invent the period or let unverified rows hide earlier good
  // months. Quarantine each orphan and preserve the verified historical archive.
- let quarantined=0;
  for(const section of ['URUNLER','SORGULAR'])for(const row of sheets[section]){
   const period=periods.get(String(row['Dönem Kodu']));
   if(!period||!row['Ürün ID']||section==='SORGULAR'&&!row.Sorgu){quarantined++;continue;}
