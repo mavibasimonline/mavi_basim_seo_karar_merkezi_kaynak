@@ -91,7 +91,8 @@ export class IndependentGscCollector {
   try{
    const dimensions=j.scope==='query'?['date','page','query','country','device']:['date','page','country','device'];
    const endpoint='https://www.googleapis.com/webmasters/v3/sites/'+encodeURIComponent(PROPERTY)+'/searchAnalytics/query';
-   const payload={startDate:j.day,endDate:j.day,dimensions,type:'web',dataState:'final',aggregationType:'byPage',rowLimit:PAGE,startRow:j.cursor};
+   // Use Google's recommended auto aggregation for page dimensions; reject non-byPage responses.
+   const payload={startDate:j.day,endDate:j.day,dimensions,type:'web',dataState:'final',aggregationType:'auto',rowLimit:PAGE,startRow:j.cursor};
    const send=async(force:boolean)=>this.fetcher(endpoint,{method:'POST',redirect:'manual',signal:AbortSignal.timeout(20000),
       headers:{Authorization:'Bearer '+await this.token(force),'Content-Type':'application/json'},body:JSON.stringify(payload)});
    let response=await send(false);
