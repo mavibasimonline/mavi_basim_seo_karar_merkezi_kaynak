@@ -39,3 +39,35 @@ export async function saveIndependentSnapshot(storage:DurableObjectStorage,snaps
  await storage.put(POINTER,manifest);
  return {bytes:manifest.bytes,chunks:manifest.chunks};
 }
+
+/** Restore at most one prior complete month from previously verified immutable manifests.
+ * Source hashes and chunk checks are verified by restore(); never infer missing months.
+ * Historical manifests are read-only, originals remain untouched. */
+export async function withVerifiedPreviousMonth(storage:DurableObjectStorage,current:IndependentSnapshot):Promise<IndependentSnapshot & {previous_source_hash?:string}>{
+ const months=[...new Set(current.records.filter(r=>r.section==='OZET'&&r.start.endsWith('-01')
+  &&r.start.slice(0,7)===r.end.slice(0,7)
+  &&new Date(Date.parse(r.end+'T00:00:00Z')+86400000).getUTCDate()===1).map(r=>r.start.slice(0,7)))].sort();
+ if(!months.length)return current;
+ const currentMonth=months.at(-1)!;
+ const previous=new Date(currentMonth+'-01T00:00:00Z');
+ previous.setUTCMonth(previous.getUTCMonth()-1);
+ const previousMonth=previous.toISOString().slice(0,7);
+ if(months.includes(previousMonth))return current;
+ const existing=await storage.list<Manifest>({prefix:'independent:history:',limit:32});
+ const manifests=[...existing.values()].filter(m=>m?.format==='independent-sheets-v2'
+  &&m.source_hash!==current.source_hash).sort((a,b)=>b.captured_at.localeCompare(a.captured_at));
+ for(const manifest of manifests){
+  let older:IndependentSnapshot;
+  try{older=await restore(storage,manifest);}catch{continue;}
+  const overview=older.records.filter(r=>r.section==='OZET'&&r.start.slice(0,7)===previousMonth
+    &&r.start===previousMonth+'-01'&&r.end.slice(0,7)===previousMonth
+    &&new Date(Date.parse(r.end+'T00:00:00Z')+86400000).getUTCDate()===1);
+  if(overview.length!==1)continue;
+  const productRows=older.records.filter(r=>r.section==='URUNLER'&&r.start.slice(0,7)===previousMonth);
+  if(!productRows.length)continue;
+  const historical=older.records.filter(r=>(r.section==='OZET'||r.section==='URUNLER'||r.section==='SORGULAR')
+    &&r.start.slice(0,7)===previousMonth);
+  return {...current,records:[...current.records,...historical],previous_source_hash:older.source_hash};
+ }
+ return current;
+}

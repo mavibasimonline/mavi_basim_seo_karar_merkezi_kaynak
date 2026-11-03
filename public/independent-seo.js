@@ -11,8 +11,12 @@ try {
  const reconnectRequired=gsc.reauthorization_required===true;
  const connected=gsc.connected===true;
  const count=Array.isArray(gsc.coverage)?gsc.coverage.length:0;
+ const attempt=gsc.last_attempt;
+ const issue=attempt?.status==='held'&&typeof attempt.code==='string'?attempt.code:null;
  source.textContent+=' · Günlük GSC: '+(reconnectRequired?'Google izni yenilenmeli':count?'Veri doğrulandı':connected?'Yetki alındı; veri bekleniyor':'Yetki bekleniyor')+' · Doğrulanmış gün/kapsam: '+count+'/14 (son 7 gün; eksik gün sıfır değil)';
+ if(issue)source.textContent+=' · Son GSC denemesi: '+issue+' ('+new Date(attempt.at).toLocaleString('tr-TR')+')';
  $('gsc-note').textContent=reconnectRequired?'Google erişimi artık doğrulanamıyor; yönetici olarak bağlantıyı yenileyin.':connected?'Google bağlantısı kaydedildi. Günlük veriler doğrulandıkça rapora yansır.':'Google Search Console bağlantısı gerekli.';
+ if(issue)$('gsc-note').textContent='Google yetkisi kayıtlı; günlük toplama denemesi '+issue+' nedeniyle durakladı. Eski kayıtlar korunuyor.';
  $('reconnect').hidden=connected&&!reconnectRequired;
 }
 } catch {source.textContent+=' · Günlük GSC kapsam durumu doğrulanamadı';$('gsc-note').textContent='GSC bağlantı durumu şu anda doğrulanamadı.';$('reconnect').hidden=true;}

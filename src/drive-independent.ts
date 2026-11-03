@@ -5,7 +5,7 @@ import {hash,json} from './types';
 import {boundedText,ProviderError} from './google';
 import {DRIVE_SHEET,DRIVE_SECTIONS,gvizRows,verifiedDriveRecords} from './drive-records';
 import {independentReport,independentAnswer,periodsOf,SheetRecord} from './independent-seo-model';
-import {readIndependentSnapshot,saveIndependentSnapshot,IndependentSnapshot} from './independent-snapshot';
+import {readIndependentSnapshot,saveIndependentSnapshot,withVerifiedPreviousMonth,IndependentSnapshot} from './independent-snapshot';
 import {IndependentGscCollector} from './independent-gsc';
 import {verifiedGscMonth} from './independent-gsc-report';
 
@@ -124,6 +124,13 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
   await this.ctx.storage.put('gsc:oauth',await encrypt({refresh_token:reply.refresh_token,scope:reply.scope,access_token:reply.access_token,expires_at:Date.now()+reply.expires_in*1000},this.key()));
   await this.ctx.storage.delete('gsc:oauth-reconnect');
   await this.ctx.storage.delete('gsc:retry');
+  // New Google grant must not inherit a stale 24-hour hold from the rejected grant.
+  // Remove only retry/hold markers for the recent window, not any verified GSC data.
+  for(let ago=3;ago<=9;ago++){
+   const day=new Date(Date.UTC(new Date().getUTCFullYear(),new Date().getUTCMonth(),new Date().getUTCDate()-ago)).toISOString().slice(0,10);
+   for(const scope of ['page','query'])await this.ctx.storage.delete('gsc:held:'+day+':'+scope);
+  }
+  await this.ctx.storage.delete('gsc:last-attempt');
   return new Response(null,{status:303,headers:{Location:'/independent-seo.html?google=connected','Cache-Control':'no-store','Set-Cookie':'mavi_gsc2_oauth=; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google; Max-Age=0'}});
  }
  private async callback(request:Request){
@@ -242,7 +249,8 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
   try{
    const url=new URL(request.url),path=url.pathname;
    const snapshot=await this.independentSnapshot();
-   const report=independentReport(snapshot.records,url.searchParams.get('month')||undefined,snapshot.captured_at,snapshot.quarantined_records);
+   const historical=await withVerifiedPreviousMonth(this.ctx.storage,snapshot);
+   const report=independentReport(historical.records,url.searchParams.get('month')||undefined,snapshot.captured_at,snapshot.quarantined_records);
    if(request.method==='GET'&&path==='/api/independent/status'){
     const gsc=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
     const coverage=await gsc.status();
@@ -253,12 +261,12 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     if(!month)return json({code:'INVALID_MONTH'},400);
     return json(await verifiedGscMonth(this.ctx.storage,this.key(),month));
    }
-   if(request.method==='GET'&&path==='/api/independent/report')return json({...report,stale:snapshot.stale,source_hash:snapshot.source_hash});
+   if(request.method==='GET'&&path==='/api/independent/report')return json({...report,stale:snapshot.stale,source_hash:snapshot.source_hash,previous_source_hash:historical.previous_source_hash||null});
    if(request.method==='POST'&&path==='/api/independent/questions'){
     const body=await request.json() as {question?:unknown;month?:unknown};
     if(typeof body.question!=='string'||body.question.length>1000||body.month!==undefined&&typeof body.month!=='string')return json({code:'INVALID_QUESTION'},400);
-    const selected=independentReport(snapshot.records,body.month||undefined,snapshot.captured_at,snapshot.quarantined_records);
-    return json({...independentAnswer(selected,body.question),stale:snapshot.stale,source_hash:snapshot.source_hash,captured_at:snapshot.captured_at});
+    const selected=independentReport(historical.records,body.month||undefined,snapshot.captured_at,snapshot.quarantined_records);
+    return json({...independentAnswer(selected,body.question),stale:snapshot.stale,source_hash:snapshot.source_hash,previous_source_hash:historical.previous_source_hash||null,captured_at:snapshot.captured_at});
    }
    return json({code:'INDEPENDENT_ROUTE_UNSUPPORTED'},404);
   }catch(error){

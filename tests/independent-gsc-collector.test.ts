@@ -21,6 +21,7 @@ describe('GSC durable pipeline remains D1-free',()=>{
   expect(JSON.stringify([...db.map.values()])).not.toContain('broşür baskı');
   expect(await collector.tick(time)).toMatchObject({status:'complete',scope:'query',rows:1,d1_requests:0});
   expect((await collector.status(time)).coverage).toHaveLength(2);
+  expect((await collector.status(time)).last_attempt).toMatchObject({status:'complete',day:'2026-10-28',scope:'query'});
   expect(fetcher).toHaveBeenCalledTimes(2);
  });
  it('never overwrites the last valid proof on invalid provider metrics',async()=>{
@@ -31,6 +32,7 @@ describe('GSC durable pipeline remains D1-free',()=>{
   // Invalid metrics quarantine only that day and free the queue for other dates.
   expect(await db.get('gsc:active')).toBeNull();
   expect(await db.get('gsc:held:2026-10-28:page')).toMatchObject({code:'GSC_ROW_REJECTED'});
+  expect((await collector.status(time)).last_attempt).toMatchObject({status:'held',code:'GSC_ROW_REJECTED',day:'2026-10-28'});
  });
  it('GSC cron refuses missing private service instead of touching legacy D1',async()=>{
   expect(await independentGscCron({AUTOMATION_ENABLED:'true'} as any,time)).toBe('unavailable');

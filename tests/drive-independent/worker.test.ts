@@ -80,6 +80,9 @@ describe('independent GSC private OAuth migration and daily storage',()=>{
     expect(grant.refresh_token).toBe('fixture-gsc-valid-refresh-token');
     expect(grant.scope).toContain('webmasters.readonly');
   });
+  await runInDurableObject(stub(),async(_instance,store)=>{
+    expect(await store.storage.get('gsc:retry')).toBeUndefined();
+  });
   expect((await stub().fetch(callback)).status).toBe(400);
  });
  it('rejects importing tokens without explicit GSC permission',async()=>{
