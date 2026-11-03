@@ -50,7 +50,14 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
  private config(){requireValue(typeof this.env.OAUTH_BROKER?.fetch==='function','DRIVE_OAUTH_CONFIG_REQUIRED');this.key();}
  private async broker<T>(path:string,body?:unknown){
   const response=await this.env.OAUTH_BROKER.fetch('https://drive-broker.internal'+path,{method:body===undefined?'GET':'POST',redirect:'manual',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
-  requireValue(response.ok,'DRIVE_OAUTH_BROKER_UNAVAILABLE');return response.json<T>();
+  if(!response.ok){
+   if(path==='/refresh-gsc'&&response.status===409){
+    const reply=await response.json<{code?:string}>().catch(()=>({code:''}));
+    if(reply.code==='GSC_OAUTH_RECONNECT_REQUIRED')throw new ProviderError('GSC_OAUTH_RECONNECT_REQUIRED');
+   }
+   throw new ProviderError('DRIVE_OAUTH_BROKER_UNAVAILABLE',true);
+  }
+  return response.json<T>();
  }
  private async token(refresh=false){
   this.config();const saved=await this.ctx.storage.get<string>('oauth');requireValue(saved,'DRIVE_CONSENT_REQUIRED');
