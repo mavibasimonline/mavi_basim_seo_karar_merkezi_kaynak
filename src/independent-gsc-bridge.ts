@@ -14,7 +14,7 @@ export async function independentGscCron(env:E,time=new Date()):Promise<'importe
  if(env.AUTOMATION_ENABLED!=='true'||typeof env.DRIVE_ARCHIVE_SERVICE?.fetch!=='function')return 'unavailable';
  const svc=env.DRIVE_ARCHIVE_SERVICE;
  let status=await read(await svc.fetch('https://archive.private/api/internal/gsc-status'));
- if(status.connected!==true){
+ if(status.connected!==true||status.reauthorization_required===true){
   // Once hourly until the old scoped consent is safely transferred; no D1 read on other ticks.
   if(time.getUTCMinutes()!==15)return 'unavailable';
   if(!env.TOKEN_ENCRYPTION_KEY)return 'unavailable';
