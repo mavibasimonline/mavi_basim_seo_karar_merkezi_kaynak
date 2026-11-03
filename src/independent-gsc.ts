@@ -132,7 +132,7 @@ export class IndependentGscCollector {
     await this.storage.put('gsc:held:'+j.day+':'+j.scope,{until:time.getTime()+24*3600000,code});
     await this.storage.put('gsc:active',null);
    }else await this.storage.put('gsc:active',j);
-   await this.storage.put('gsc:retry',{until:time.getTime()+(retryable?3600000:86400000)});
+   await this.storage.put('gsc:retry',{until:time.getTime()+(retryable?3600000:15*60000)});
    // Failed job remains staged, never overwriting an earlier verified complete day.
    return {status:'held',code:/^GSC_[A-Z0-9_]+$/.test(code)?code:'GSC_SYNC_UNAVAILABLE',d1_requests:0};
   }
