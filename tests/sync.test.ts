@@ -88,6 +88,13 @@ it('refreshes expired OAuth tokens and never exposes the provider error body',as
   await expect(requestJSON('https://oauth2.googleapis.com/token',{},fetcher(async()=>new Response('secret provider detail',{status:400})))).rejects.toThrow('GOOGLE_HTTP_400');
   const stored=await env.DB.prepare('SELECT encrypted_tokens FROM oauth_credentials').first<{encrypted_tokens:string}>();expect(stored?.encrypted_tokens).not.toContain('renewed');
 });
+it('distinguishes invalid refresh grants from Search Analytics HTTP 400 and preserves old rows',async()=>{
+ const cfg=await connected();
+ await saveTokens(cfg,{access_token:'expired',refresh_token:'old-grant',expires_at:0,scope:READ_SCOPES.join(' ')});
+ await expect(accessToken(cfg,fetcher(async(url)=>{expect(url).toBe('https://oauth2.googleapis.com/token');return new Response('secret invalid_grant',{status:400});}))).rejects.toThrow('GOOGLE_OAUTH_REFRESH_REJECTED');
+ await saveTokens(cfg,{access_token:'valid-token',refresh_token:'old-grant',expires_at:Date.now()+3600000,scope:READ_SCOPES.join(' ')});
+ await expect(fetchGsc(cfg,'2026-09-01','page',0,fetcher(async(url)=>{expect(url).toContain('/searchAnalytics/query');return new Response('sensitive query error',{status:400});}))).rejects.toThrow('GOOGLE_HTTP_400');
+});
 it('rejects duplicate rows spanning Google pages instead of publishing a truncated dataset',async()=>{
   const cfg=await connected();await enqueue();const job=(await claimJob(cfg))!;
   await processJob(cfg,job,fetcher(async()=>Response.json({responseAggregationType:'byPage',rows:Array.from({length:PAGE_SIZE},(_,i)=>rawRow(i))})));
