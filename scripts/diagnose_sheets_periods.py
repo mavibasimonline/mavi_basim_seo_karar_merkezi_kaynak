@@ -48,7 +48,7 @@ def main():
         start = date_value(row.get("Başlangıç Tarihi", ""))
         end = date_value(row.get("Bitiş Tarihi", ""))
         complete = bool(start and end and start.day == 1 and end + timedelta(days=1) == (date(end.year + 1, 1, 1) if end.month == 12 else date(end.year, end.month + 1, 1)) and (start.year, start.month) == (end.year, end.month))
-        periods.append({"period": row.get("Dönem Kodu"), "start": str(start), "end": str(end), "calendar_complete": complete, "today_closed": bool(complete and (date.today() - end).days > 3)})
+        periods.append({"period": row.get("Dönem Kodu"), "start": str(start), "end": str(end), "calendar_complete": complete, "today_closed": bool(complete and (date.today() - end).days > 3), "source_status": row.get("Durum", ""), "source_updated": row.get("Son Güncelleme", "")})
     print(json.dumps({"period_summaries": periods, "product_period_counts": dict(Counter(r.get("Dönem Kodu", "missing") for r in tables["URUNLER"])), "query_period_counts": dict(Counter(r.get("Dönem Kodu", "missing") for r in tables["SORGULAR"]))}, ensure_ascii=False))
 if __name__ == "__main__":
     main()
