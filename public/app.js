@@ -379,7 +379,8 @@ function renderNotice() {
     ? report.unavailable
       ? report.missing[0]
       : "Google veri kontrolü başarısız. " +
-        (health?.code || "Ayrıntılar veri durumu düğmesinde.")
+        (health?.code || "Ayrıntılar veri durumu düğmesinde.") +
+        (health?.code === "GOOGLE_OAUTH_REFRESH_REJECTED" ? " Google iznini yeniden vermek gerekiyor." : "")
     : "";
   $("status").className = "data-status" + (technical ? " technical-error" : "");
   const explanation = node("div");
@@ -410,7 +411,12 @@ function renderNotice() {
     : complete
       ? "Veri ayrıntıları"
       : "Neden eksik?";
-  $("google").hidden = !!status.google_connected;
+  // A stored OAuth record is not proof that the refresh grant still works.
+  // The existing Google connect action is also the safe reauthorization action.
+  const reconnectCodes = new Set(["GOOGLE_OAUTH_REFRESH_REJECTED","OAUTH_RECONNECT_REQUIRED","GOOGLE_HTTP_400","GOOGLE_HTTP_401","GOOGLE_HTTP_403"]);
+  const needsReconnect = !!status.google_connected && health?.status === "failed" && reconnectCodes.has(health?.code);
+  $("google").hidden = !!status.google_connected && !needsReconnect;
+  $("google").textContent = needsReconnect ? "Google bağlantısını yenile" : "Google'ı bağla";
   $("pilot").hidden = !!status.google_connected && !!status.automation_enabled;
 }
 function renderKpis() {

@@ -50,7 +50,14 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
  private config(){requireValue(typeof this.env.OAUTH_BROKER?.fetch==='function','DRIVE_OAUTH_CONFIG_REQUIRED');this.key();}
  private async broker<T>(path:string,body?:unknown){
   const response=await this.env.OAUTH_BROKER.fetch('https://drive-broker.internal'+path,{method:body===undefined?'GET':'POST',redirect:'manual',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
-  requireValue(response.ok,'DRIVE_OAUTH_BROKER_UNAVAILABLE');return response.json<T>();
+  if(!response.ok){
+   if(path==='/refresh-gsc'&&response.status===409){
+    const reply=await response.json<{code?:string}>().catch(()=>({code:''}));
+    if(reply.code==='GSC_OAUTH_RECONNECT_REQUIRED')throw new ProviderError('GSC_OAUTH_RECONNECT_REQUIRED');
+   }
+   throw new ProviderError('DRIVE_OAUTH_BROKER_UNAVAILABLE',true);
+  }
+  return response.json<T>();
  }
  private async token(refresh=false){
   this.config();const saved=await this.ctx.storage.get<string>('oauth');requireValue(saved,'DRIVE_CONSENT_REQUIRED');
@@ -114,7 +121,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
       return json({allowed:false,locked:false,d1_requests:0});
     }
     if(path==='/api/internal/gsc-status'&&request.method==='GET'){
-      return json({connected:!!await this.ctx.storage.get('gsc:oauth'),d1_requests:0});
+      return json({connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect'),d1_requests:0});
     }
     if(path==='/api/internal/gsc-import'&&request.method==='POST'){
       this.config();
@@ -126,9 +133,13 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
       requireValue(typeof input.refresh_token==='string'&&input.refresh_token.length>20&&input.refresh_token.length<=8192,'GSC_REFRESH_TOKEN_INVALID');
       const reply=await this.broker<any>('/refresh-gsc',{refresh_token:input.refresh_token});
       requireValue(typeof reply.access_token==='string'&&reply.access_token.length>10&&Number.isFinite(reply.expires_in)&&reply.expires_in>0,'GSC_REFRESH_UNVERIFIED');
-      // Do not overwrite an established credential with a possibly weaker import.
-      if(!await this.ctx.storage.get('gsc:oauth')){
-        await this.ctx.storage.put('gsc:oauth',await encrypt({refresh_token:input.refresh_token,scope:input.scope,access_token:reply.access_token,expires_at:Date.now()+reply.expires_in*1000},this.key()));
+      // Replace only a verified, previously rejected grant. Never downgrade a healthy credential.
+      const existing=await this.ctx.storage.get('gsc:oauth');
+      const reconnect=!!await this.ctx.storage.get('gsc:oauth-reconnect');
+      if(!existing||reconnect){
+       await this.ctx.storage.put('gsc:oauth',await encrypt({refresh_token:input.refresh_token,scope:input.scope,access_token:reply.access_token,expires_at:Date.now()+reply.expires_in*1000},this.key()));
+       await this.ctx.storage.put('gsc:oauth-reconnect',null);
+       await this.ctx.storage.put('gsc:retry',null);
       }
       return json({ok:true,connected:true,d1_requests:0});
     }
@@ -154,7 +165,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     }
     if(path==='/api/internal/gsc-coverage'&&request.method==='GET'){
       const collector=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
-      return json({...await collector.status(),connected:!!await this.ctx.storage.get('gsc:oauth')});
+      return json({...await collector.status(),connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')});
     }
     if(path==='/api/internal/independent-refresh'&&request.method==='POST'){
       const snapshot=await this.independentSnapshot(6*3600000);
@@ -202,7 +213,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    if(request.method==='GET'&&path==='/api/independent/status'){
     const gsc=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
     const coverage=await gsc.status();
-    return json({ok:true,storage:'durable-object-sqlite',d1_requests:0,source:'verified Google Sheets',captured_at:snapshot.captured_at,source_hash:snapshot.source_hash,records:snapshot.records.length,stale:snapshot.stale,available_months:report.months,gsc:{...coverage,connected:!!await this.ctx.storage.get('gsc:oauth')}});
+    return json({ok:true,storage:'durable-object-sqlite',d1_requests:0,source:'verified Google Sheets',captured_at:snapshot.captured_at,source_hash:snapshot.source_hash,records:snapshot.records.length,stale:snapshot.stale,available_months:report.months,gsc:{...coverage,connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')}});
    }
    if(request.method==='GET'&&path==='/api/independent/gsc-month'){
     const month=url.searchParams.get('month');

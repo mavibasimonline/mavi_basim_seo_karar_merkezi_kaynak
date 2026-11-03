@@ -2,7 +2,7 @@
 // Uses OAuth client configuration only; never reads tokens, D1 or GSC state.
 import {WorkerEntrypoint} from 'cloudflare:workers';
 import {json} from './types';
-import {requestJSON,boundedText} from './google';
+import {requestJSON,boundedText,ProviderError} from './google';
 interface BrokerEnv{GOOGLE_CLIENT_ID?:string;GOOGLE_CLIENT_SECRET?:string;GOOGLE_REDIRECT_URI?:string}
 const SCOPE='https://www.googleapis.com/auth/drive.file';
 const GSC_SCOPE='https://www.googleapis.com/auth/webmasters.readonly';
@@ -23,7 +23,13 @@ export class DriveGoogleBroker extends WorkerEntrypoint<BrokerEnv>{
    const reply=await requestJSON<any>('https://oauth2.googleapis.com/token',{method:'POST',body:new URLSearchParams(parameters)});
    if(typeof reply.access_token!=='string'||!Number.isFinite(reply.expires_in)||reply.expires_in<=0||reply.scope&&!(path==='/refresh-gsc'?(reply.scope.split(' ').includes(GSC_SCOPE)||reply.scope.split(' ').includes('https://www.googleapis.com/auth/webmasters')):reply.scope.split(' ').includes(SCOPE)))return json({code:'DRIVE_GRANT_SCOPE_INVALID'},400);
    return json(reply);
-  }catch{return json({code:'DRIVE_PROVIDER_TOKEN_UNAVAILABLE'},503);}
+  }catch(error){
+    // A rejected refresh grant requires an interactive Google reauthorization.
+    // Return only fixed diagnostic codes; never expose token endpoint response bodies.
+    if(path==='/refresh-gsc'&&error instanceof ProviderError&&error.code==='GOOGLE_HTTP_400')
+      return json({code:'GSC_OAUTH_RECONNECT_REQUIRED'},409);
+    return json({code:'DRIVE_PROVIDER_TOKEN_UNAVAILABLE'},503);
+  }
  }
 }
 export async function independentDriveRoute(request:Request,bindings:unknown){

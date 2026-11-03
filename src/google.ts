@@ -68,9 +68,18 @@ export async function accessToken(env: Env, fetcher: Fetch = fetch, forceRefresh
   if (provider === 'google-drive' && !tokens.scope.split(' ').includes(DRIVE_SCOPE)) throw new ProviderError('DRIVE_CONSENT_REQUIRED');
   if (!forceRefresh && tokens.expires_at > Date.now() + 60_000) return tokens.access_token;
   if (!tokens.refresh_token) throw new ProviderError('OAUTH_RECONNECT_REQUIRED');
-  const reply = await requestJSON<TokenReply>('https://oauth2.googleapis.com/token', {
-    method: 'POST', body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET }),
-  }, fetcher);
+  let reply: TokenReply;
+  try {
+    reply = await requestJSON<TokenReply>('https://oauth2.googleapis.com/token', {
+      method: 'POST', body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET }),
+    }, fetcher);
+  } catch (error) {
+    // Unlike Search Analytics HTTP 400, a token-endpoint HTTP 400 means the
+    // existing OAuth grant cannot be refreshed. Never log the provider body or token.
+    if (error instanceof ProviderError && error.code === 'GOOGLE_HTTP_400')
+      throw new ProviderError('GOOGLE_OAUTH_REFRESH_REJECTED');
+    throw error;
+  }
   if (typeof reply.access_token !== 'string' || !Number.isFinite(reply.expires_in) || reply.expires_in! <= 0) throw new ProviderError('INVALID_TOKEN_RESPONSE');
   tokens = { access_token: reply.access_token, refresh_token: reply.refresh_token || tokens.refresh_token, expires_at: Date.now() + reply.expires_in! * 1000, scope: reply.scope || tokens.scope };
   if (provider === 'google-drive' && !tokens.scope.split(' ').includes(DRIVE_SCOPE)) throw new ProviderError('DRIVE_CONSENT_REQUIRED');
@@ -132,6 +141,6 @@ export async function oauthCallback(request: Request, env: Env, fetcher: Fetch =
   await saveTokens(env, { access_token: reply.access_token, refresh_token: reply.refresh_token, expires_at: Date.now() + reply.expires_in! * 1000, scope: reply.scope! }, drive ? 'google-drive' : 'google');
   // Successful new consent can recover authorization failures. It does not
   // validate rejected datasets or renew an exhausted provider retry budget.
-  if (!drive) await env.DB.prepare("UPDATE sync_jobs SET status='pending', attempts=0, next_attempt_at=?, error_code=NULL WHERE status='blocked' AND provider IN ('gsc','ga4','ads') AND error_code IN ('GOOGLE_HTTP_401','GOOGLE_HTTP_403','OAUTH_RECONNECT_REQUIRED','GOOGLE_NOT_CONNECTED','TOKEN_DECRYPTION_FAILED')").bind(nowISO()).run();
+  if (!drive) await env.DB.prepare("UPDATE sync_jobs SET status='pending', attempts=0, next_attempt_at=?, error_code=NULL WHERE status='blocked' AND provider IN ('gsc','ga4','ads') AND error_code IN ('GOOGLE_HTTP_401','GOOGLE_HTTP_403','GOOGLE_OAUTH_REFRESH_REJECTED','OAUTH_RECONNECT_REQUIRED','GOOGLE_NOT_CONNECTED','TOKEN_DECRYPTION_FAILED')").bind(nowISO()).run();
   return new Response(null, { status: 303, headers: { Location: drive ? '/drive.html?connected=1' : '/', 'Set-Cookie': 'mavi_oauth=; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google; Max-Age=0', 'Cache-Control': 'no-store' } });
 }
