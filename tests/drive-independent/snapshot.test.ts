@@ -1,7 +1,7 @@
 import {beforeEach,describe,it,expect,vi} from 'vitest';
 import {env} from 'cloudflare:workers';
 import {reset,runInDurableObject} from 'cloudflare:test';
-import {readIndependentSnapshot,saveIndependentSnapshot,IndependentSnapshot} from '../../src/independent-snapshot';
+import {readIndependentSnapshot,saveIndependentSnapshot,withVerifiedPreviousMonth,IndependentSnapshot} from '../../src/independent-snapshot';
 import type {IndependentDriveEnv} from '../../src/drive-independent';
 const cfg=env as IndependentDriveEnv;
 const stub=()=>cfg.DRIVE_ARCHIVE_STORE.get(cfg.DRIVE_ARCHIVE_STORE.idFromName('snapshot-regression'));
@@ -12,6 +12,38 @@ async function snapshot(label='ilk'):Promise<IndependentSnapshot>{
 }
 beforeEach(async()=>reset());
 describe('large independent snapshots in real SQLite Durable Object storage',()=>{
+ it('joins only hash-verified previous month product records without modifying stored snapshots',async()=>{
+  const previousRows=[
+   {section:'OZET',identity:'gecen_ay',start:'2026-09-01',end:'2026-09-30'},
+   {section:'URUNLER',identity:'bro',start:'2026-09-01',end:'2026-09-30'},
+  ].map((r,i)=>({...r,source:'fixture',source_key:String(i),family:'period_total',
+    payload:{'Ürün ID':'bro','Ürün Adı':'Broşür',validated_metrics:{clicks:115,impressions:1000,ctr:0.115,position:2}},
+    daily_page_query_coverage:false as const,source_filters_verified:false as const}));
+  const octRows=[
+   {section:'OZET',identity:'gecen_ay',start:'2026-10-01',end:'2026-10-31'},
+   {section:'URUNLER',identity:'bro',start:'2026-10-01',end:'2026-10-31'},
+  ].map((r,i)=>({...r,source:'fixture',source_key:'oct'+i,family:'period_total',
+    payload:{'Ürün ID':'bro','Ürün Adı':'Broşür',validated_metrics:{clicks:71,impressions:900,ctr:71/900,position:3}},
+    daily_page_query_coverage:false as const,source_filters_verified:false as const}));
+  const pack=async(rows:any[]):Promise<IndependentSnapshot>=>({
+    format:'independent-sheets-v1',source:'fixture',captured_at:'2026-11-04T00:00:00Z',
+    records:rows,quarantined_records:0,
+    source_hash:[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(rows))))]
+      .map(x=>x.toString(16).padStart(2,'0')).join('')
+  });
+  const sep=await pack(previousRows),oct=await pack(octRows);
+  await runInDurableObject(stub(),async(_instance,state)=>{
+    await saveIndependentSnapshot(state.storage,sep);
+    await saveIndependentSnapshot(state.storage,oct);
+    const joined=await withVerifiedPreviousMonth(state.storage,oct);
+    expect(joined.records).toHaveLength(4);
+    expect(joined.records.filter(r=>r.start==='2026-09-01')).toHaveLength(2);
+    expect(await readIndependentSnapshot(state.storage)).toEqual(oct);
+    expect((await withVerifiedPreviousMonth(state.storage,joined)).records).toHaveLength(4);
+    await state.storage.put('independent:chunk:'+sep.source_hash+':0','corrupted');
+    expect((await withVerifiedPreviousMonth(state.storage,oct)).records).toHaveLength(2);
+  });
+ });
  it('round-trips multi-byte data above the single-value limit and retains previous history',async()=>{
   expect('DB' in cfg).toBe(false);
   const first=await snapshot(),second=await snapshot('ikinci');
