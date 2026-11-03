@@ -55,11 +55,16 @@ export async function verifiedDriveRecords(sheets:Record<string,Row[]>,time=new 
   periods.set(code,period);await add('OZET','period_total',code,...period,row);
  }
  for(const row of sheets.GSC_GUNLUK){const date=sourceDate(row.Tarih);await add('GSC_GUNLUK','site_daily_total',date,date,date,row);}
+ // New/unpublished month product rows can arrive before their matching OZET
+ // period. Do not invent the period or let unverified rows hide earlier good
+ // months. Quarantine each orphan and preserve the verified historical archive.
+ let quarantined=0;
  for(const section of ['URUNLER','SORGULAR'])for(const row of sheets[section]){
-  const period=periods.get(String(row['Dönem Kodu']));if(!period||!row['Ürün ID']||section==='SORGULAR'&&!row.Sorgu)throw Error('SOURCE_ENTITY_OR_PERIOD_REQUIRED');
+  const period=periods.get(String(row['Dönem Kodu']));
+  if(!period||!row['Ürün ID']||section==='SORGULAR'&&!row.Sorgu){quarantined++;continue;}
   await add(section,section==='URUNLER'?'product_period':'query_period',section==='URUNLER'?row['Ürün ID']:[row['Ürün ID'],row.Sorgu],...period,row);
  }
- const records:any[]=[];let quarantined=0;
+ const records:any[]=[];
  for(const group of groups.values()){
   if(group.size!==1){quarantined+=group.size;continue;}
   const record=group.values().next().value,end=Date.parse(record.end+'T00:00:00Z');
