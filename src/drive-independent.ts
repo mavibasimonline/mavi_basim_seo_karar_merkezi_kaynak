@@ -124,6 +124,13 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
   await this.ctx.storage.put('gsc:oauth',await encrypt({refresh_token:reply.refresh_token,scope:reply.scope,access_token:reply.access_token,expires_at:Date.now()+reply.expires_in*1000},this.key()));
   await this.ctx.storage.delete('gsc:oauth-reconnect');
   await this.ctx.storage.delete('gsc:retry');
+  // New Google grant must not inherit a stale 24-hour hold from the rejected grant.
+  // Remove only retry/hold markers for the recent window, not any verified GSC data.
+  for(let ago=3;ago<=9;ago++){
+   const day=new Date(Date.UTC(new Date().getUTCFullYear(),new Date().getUTCMonth(),new Date().getUTCDate()-ago)).toISOString().slice(0,10);
+   for(const scope of ['page','query'])await this.ctx.storage.delete('gsc:held:'+day+':'+scope);
+  }
+  await this.ctx.storage.delete('gsc:last-attempt');
   return new Response(null,{status:303,headers:{Location:'/independent-seo.html?google=connected','Cache-Control':'no-store','Set-Cookie':'mavi_gsc2_oauth=; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google; Max-Age=0'}});
  }
  private async callback(request:Request){
