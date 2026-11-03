@@ -4,7 +4,7 @@ import {encrypt,decrypt,cookie,equalSecret} from './security';
 import {hash,json} from './types';
 import {boundedText,ProviderError} from './google';
 import {DRIVE_SHEET,DRIVE_SECTIONS,gvizRows,verifiedDriveRecords} from './drive-records';
-import {independentReport,independentAnswer,SheetRecord} from './independent-seo-model';
+import {independentReport,independentAnswer,periodsOf,SheetRecord} from './independent-seo-model';
 import {readIndependentSnapshot,saveIndependentSnapshot,IndependentSnapshot} from './independent-snapshot';
 import {IndependentGscCollector} from './independent-gsc';
 import {verifiedGscMonth} from './independent-gsc-report';
@@ -217,7 +217,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    }catch(error){return json({error:'Drive bağlantısı tamamlanamadı.',code:error instanceof ProviderError?error.code:'DRIVE_UNAVAILABLE'},400);}
   });
  }
- private async independentSnapshot(maxAgeMs=24*3600000){
+ private async independentSnapshot(maxAgeMs=6*3600000){
   const cached=await readIndependentSnapshot(this.ctx.storage);
   const age=cached?Date.now()-Date.parse(cached.captured_at):Infinity;
   if(cached&&cached.format==='independent-sheets-v1'&&age>=0&&age<maxAgeMs)return {...cached,stale:false};
@@ -226,6 +226,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    const sheets=await Promise.all(DRIVE_SECTIONS.map(async name=>[name,gvizRows(new TextDecoder().decode(await publicSource(base+encodeURIComponent(name))))] as const));
    const verified=await verifiedDriveRecords(Object.fromEntries(sheets));
    requireValue(verified.record_count>0,'INDEPENDENT_VERIFIED_SOURCE_EMPTY');
+   requireValue(periodsOf(verified.records).length>0,'INDEPENDENT_NO_COMPLETE_PERIOD');
    const data=JSON.stringify(verified.records);
    requireValue(new TextEncoder().encode(data).length<=MAX,'INDEPENDENT_SNAPSHOT_TOO_LARGE');
    const source_hash=await sha(new TextEncoder().encode(data));
