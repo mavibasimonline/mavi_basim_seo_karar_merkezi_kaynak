@@ -87,9 +87,15 @@ export class IndependentGscCollector {
  }
  async tick(time=new Date()){
   const last=await this.storage.get<{until:number}>('gsc:retry');
-  if(last&&time.getTime()<last.until)return {status:'held',code:'GSC_RETRY_BACKOFF',d1_requests:0};
+  if(last&&time.getTime()<last.until){
+   await this.storage.put('gsc:last-attempt',{at:time.toISOString(),status:'held',code:'GSC_RETRY_BACKOFF'});
+   return {status:'held',code:'GSC_RETRY_BACKOFF',d1_requests:0};
+  }
   const j=await this.choose(time);
-  if(!j)return {status:'idle',d1_requests:0};
+  if(!j){
+   await this.storage.put('gsc:last-attempt',{at:time.toISOString(),status:'idle'});
+   return {status:'idle',d1_requests:0};
+  }
   try{
    const dimensions=j.scope==='query'?['date','page','query','country','device']:['date','page','country','device'];
    const endpoint='https://www.googleapis.com/webmasters/v3/sites/'+encodeURIComponent(PROPERTY)+'/searchAnalytics/query';
@@ -111,6 +117,7 @@ export class IndependentGscCollector {
    j.pages.push(proof);j.cursor+=page.rows.length;
    if(page.next!==null&&j.cursor<50000){
     await this.storage.put('gsc:active',j);
+    await this.storage.put('gsc:last-attempt',{at:time.toISOString(),status:'partial',day:j.day,scope:j.scope,cursor:j.cursor});
     return {status:'partial',day:j.day,scope:j.scope,cursor:j.cursor,d1_requests:0};
    }
    const final:DailyProof={day:j.day,scope:j.scope,generation:j.generation,captured_at:time.toISOString(),
@@ -122,6 +129,7 @@ export class IndependentGscCollector {
    await this.storage.put('gsc:active',null);
    if(j.day===selectGscDay(time,(await this.storage.get<number>('gsc:backfill-index'))||0,true)&&j.scope==='query')
     await this.storage.put('gsc:backfill-index',(((await this.storage.get<number>('gsc:backfill-index'))||0)+1)%391);
+   await this.storage.put('gsc:last-attempt',{at:time.toISOString(),status:'complete',day:j.day,scope:j.scope,rows:j.cursor});
    return {status:'complete',day:j.day,scope:j.scope,rows:j.cursor,query_partial:final.query_partial,d1_requests:0};
   }catch(error){
    const code=error instanceof Error?error.message:'GSC_SYNC_UNAVAILABLE';
@@ -135,17 +143,20 @@ export class IndependentGscCollector {
    }else await this.storage.put('gsc:active',j);
    await this.storage.put('gsc:retry',{until:time.getTime()+(retryable?3600000:15*60000)});
    // Failed job remains staged, never overwriting an earlier verified complete day.
-   return {status:'held',code:/^GSC_[A-Z0-9_]+$/.test(code)?code:'GSC_SYNC_UNAVAILABLE',d1_requests:0};
+   const safeCode=/^GSC_[A-Z0-9_]+$/.test(code)?code:'GSC_SYNC_UNAVAILABLE';
+   await this.storage.put('gsc:last-attempt',{at:time.toISOString(),status:'held',day:j.day,scope:j.scope,code:safeCode});
+   return {status:'held',code:safeCode,d1_requests:0};
   }
  }
  async status(time=new Date()){
   const active=await this.storage.get<Job>('gsc:active');
+  const lastAttempt=await this.storage.get<{at:string;status:string;day?:string;scope?:Scope;code?:string}>('gsc:last-attempt');
   const rows=[] as Array<{day:string;scope:Scope;rows:number;query_partial:boolean;captured_at:string}>;
   for(let i=3;i<=9;i++)for(const scope of ['page','query'] as Scope[]){
    const proof=await this.storage.get<DailyProof>(key(dayAgo(i,time),scope));
    if(proof)rows.push({day:proof.day,scope,rows:proof.rows,query_partial:proof.query_partial,captured_at:proof.captured_at});
   }
-  return {source:'GSC Search Analytics API',d1_requests:0,connected:true,coverage:rows,
+  return {source:'GSC Search Analytics API',d1_requests:0,connected:true,coverage:rows,last_attempt:lastAttempt||null,
    pending:active?{day:active.day,scope:active.scope,cursor:active.cursor}:null,
    limitations:['GSC anonymous queries are not complete.','Uncollected days are not zero.']};
  }
