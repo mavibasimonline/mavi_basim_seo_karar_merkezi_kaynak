@@ -75,6 +75,16 @@ describe('independent Drive without a D1 binding',()=>{
   const result=await verifiedDriveRecords(input,new Date('2026-10-30'));expect(result.record_count).toBe(3);expect(result.quarantined_records).toBe(2);expect(result.daily_gsc_jobs_completed).toBe(0);
   input.GSC_GUNLUK[0]['TO (%)']='90';await expect(verifiedDriveRecords(input,new Date('2026-10-30'))).rejects.toThrow('SOURCE_METRIC_INVALID');
  });
+ it('quarantines an unverified future product period without hiding earlier proven monthly data',async()=>{
+  const input=sheets();
+  input.URUNLER.push({...input.URUNLER[0],'Dönem Kodu':'unpublished-next-month'});
+  input.SORGULAR.push({...input.SORGULAR[0],'Dönem Kodu':'unpublished-next-month'});
+  const result=await verifiedDriveRecords(input,new Date('2026-10-30'));
+  expect(result.record_count).toBe(4);
+  expect(result.quarantined_records).toBe(2);
+  expect(result.records.some((r:any)=>r.section==='URUNLER'&&r.start==='2026-09-01')).toBe(true);
+  expect(result.records.some((r:any)=>r.start==='2026-10-01')).toBe(false);
+ });
  it('writes both archives, verifies real readback, and recovers a lost upload reply without duplicates',async()=>{
   await consent();
   const files=new Map<string,{meta:any;data:Uint8Array}>(),input=sheets();let uploads=0,lost=true;
