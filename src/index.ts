@@ -65,6 +65,7 @@ async function route(request:Request,env:Env):Promise<Response>{
   if(request.method==='GET'&&path==='/api/drive-independent/health')return independentDriveRoute(request,env);
   if(request.method==='POST'&&path==='/api/session')return (env as Env&{DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE?independentSession(request,env):withReadBudget(env,path,safe=>login(request,safe));
   if(request.method==='GET'&&path==='/api/oauth/google/callback'&&(url.searchParams.get('state')||'').startsWith('drive2.'))return independentDriveRoute(request,env);
+  if(request.method==='GET'&&path==='/api/oauth/google/callback'&&(url.searchParams.get('state')||'').startsWith('gsc2.'))return independentDriveRoute(request,env);
   if(request.method==='GET'&&path==='/api/oauth/google/callback')return withReadBudget(env,path,safe=>oauthCallback(request,safe));
   if(!path.startsWith('/api/'))return env.ASSETS.fetch(request);
   if(!await authenticated(request,env))return json({error:'Giriş yapmanız gerekiyor.'},401);
