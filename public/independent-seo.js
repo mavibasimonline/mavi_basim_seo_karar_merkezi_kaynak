@@ -7,12 +7,28 @@ state.textContent=data.stale?'Arşiv eski — son doğrulanmış kayıt':'D1 ba�
 source.textContent='Kaynak: '+data.source+' · Kayıt: '+new Date(data.captured_at).toLocaleString('tr-TR')+' · Eksik kırılımlar hesaplanmaz';
 try {
  const status=await request('/api/independent/status'),gsc=status.gsc;
- if(gsc)source.textContent+=' · Günlük GSC: '+((gsc.coverage||[]).length?'Veri doğrulandı':gsc.connected?'Yetki alındı; veri bekleniyor':'Yetki bekleniyor')+' · Doğrulanmış gün/kapsam: '+(gsc.coverage||[]).length+'/14 (son 7 gün; eksik gün sıfır değil)';
-} catch {source.textContent+=' · Günlük GSC kapsam durumu doğrulanamadı';}
+ if(gsc){
+ const reconnectRequired=gsc.reauthorization_required===true;
+ const connected=gsc.connected===true;
+ const count=Array.isArray(gsc.coverage)?gsc.coverage.length:0;
+ source.textContent+=' · Günlük GSC: '+(reconnectRequired?'Google izni yenilenmeli':count?'Veri doğrulandı':connected?'Yetki alındı; veri bekleniyor':'Yetki bekleniyor')+' · Doğrulanmış gün/kapsam: '+count+'/14 (son 7 gün; eksik gün sıfır değil)';
+ $('gsc-note').textContent=reconnectRequired?'Google erişimi artık doğrulanamıyor; yönetici olarak bağlantıyı yenileyin.':connected?'Google bağlantısı kaydedildi. Günlük veriler doğrulandıkça rapora yansır.':'Google Search Console bağlantısı gerekli.';
+ $('reconnect').hidden=connected&&!reconnectRequired;
+}
+} catch {source.textContent+=' · Günlük GSC kapsam durumu doğrulanamadı';$('gsc-note').textContent='GSC bağlantı durumu şu anda doğrulanamadı.';$('reconnect').hidden=true;}
 products.replaceChildren();
 if(!data.available){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=5;td.textContent=data.message;tr.appendChild(td);products.appendChild(tr);return;}
 for(const p of data.products||[]){const tr=document.createElement('tr');for(const value of [p.title,String(p.metrics.clicks),p.previous?String(p.previous.clicks):'Yok',p.delta===null?'—':String(p.delta),p.decision]){const td=document.createElement('td');td.textContent=value;tr.appendChild(td);}products.appendChild(tr);}
 }catch(e){state.textContent='Kaynak kullanılamıyor';state.className='tag error';source.textContent=String(e.message||e);}}
 $('reload').addEventListener('click',load);
+$('reconnect').addEventListener('click',async()=>{
+ const button=$('reconnect');button.disabled=true;
+ try{
+  const data=await request('/api/oauth/google/start',{method:'POST'});
+  const destination=new URL(data.authorization_url);
+  if(destination.origin!=='https://accounts.google.com')throw Error('Güvenli Google yetki adresi doğrulanamadı.');
+  location.assign(destination.href);
+ }catch(error){$('gsc-note').textContent=String(error.message||error);button.disabled=false;}
+});
 $('ask').addEventListener('submit',async e=>{e.preventDefault();answer.textContent='Kanıtlar inceleniyor';try{const data=await request('/api/independent/questions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:$('question').value,month:month.value})});answer.textContent=data.answer+'\nKarar: '+data.decision+' · Kanıt: '+(data.evidence||[]).join(', ')+' · D1 istekleri: '+data.d1_requests;}catch(error){answer.textContent=String(error.message||error);}});
 load();
