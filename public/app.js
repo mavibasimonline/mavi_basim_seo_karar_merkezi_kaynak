@@ -416,7 +416,7 @@ function renderNotice() {
   const reconnectCodes = new Set(["GOOGLE_OAUTH_REFRESH_REJECTED","OAUTH_RECONNECT_REQUIRED","GOOGLE_HTTP_400","GOOGLE_HTTP_401","GOOGLE_HTTP_403"]);
   const needsReconnect = !!status.google_connected && health?.status === "failed" && reconnectCodes.has(health?.code);
   $("google").hidden = !!status.google_connected && !needsReconnect;
-  $("google").textContent = needsReconnect ? "Google bağlantısını yenile" : "Google hesabını bağla";
+  $("google").textContent = needsReconnect ? "Google bağlantısını yenile" : "Google'ı bağla";
   $("pilot").hidden = !!status.google_connected && !!status.automation_enabled;
 }
 function renderKpis() {
