@@ -5,7 +5,7 @@ import {hash,json} from './types';
 import {boundedText,ProviderError} from './google';
 import {DRIVE_SHEET,DRIVE_SECTIONS,gvizRows,verifiedDriveRecords} from './drive-records';
 import {independentReport,independentAnswer,periodsOf,SheetRecord} from './independent-seo-model';
-import {readIndependentSnapshot,saveIndependentSnapshot,IndependentSnapshot} from './independent-snapshot';
+import {readIndependentSnapshot,saveIndependentSnapshot,withVerifiedPreviousMonth,IndependentSnapshot} from './independent-snapshot';
 import {IndependentGscCollector} from './independent-gsc';
 import {verifiedGscMonth} from './independent-gsc-report';
 
@@ -242,7 +242,8 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
   try{
    const url=new URL(request.url),path=url.pathname;
    const snapshot=await this.independentSnapshot();
-   const report=independentReport(snapshot.records,url.searchParams.get('month')||undefined,snapshot.captured_at,snapshot.quarantined_records);
+   const historical=await withVerifiedPreviousMonth(this.ctx.storage,snapshot);
+   const report=independentReport(historical.records,url.searchParams.get('month')||undefined,snapshot.captured_at,snapshot.quarantined_records);
    if(request.method==='GET'&&path==='/api/independent/status'){
     const gsc=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
     const coverage=await gsc.status();
@@ -257,7 +258,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    if(request.method==='POST'&&path==='/api/independent/questions'){
     const body=await request.json() as {question?:unknown;month?:unknown};
     if(typeof body.question!=='string'||body.question.length>1000||body.month!==undefined&&typeof body.month!=='string')return json({code:'INVALID_QUESTION'},400);
-    const selected=independentReport(snapshot.records,body.month||undefined,snapshot.captured_at,snapshot.quarantined_records);
+    const selected=independentReport(historical.records,body.month||undefined,snapshot.captured_at,snapshot.quarantined_records);
     return json({...independentAnswer(selected,body.question),stale:snapshot.stale,source_hash:snapshot.source_hash,captured_at:snapshot.captured_at});
    }
    return json({code:'INDEPENDENT_ROUTE_UNSUPPORTED'},404);
