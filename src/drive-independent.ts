@@ -261,12 +261,12 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     if(!month)return json({code:'INVALID_MONTH'},400);
     return json(await verifiedGscMonth(this.ctx.storage,this.key(),month));
    }
-   if(request.method==='GET'&&path==='/api/independent/report')return json({...report,stale:snapshot.stale,source_hash:snapshot.source_hash});
+   if(request.method==='GET'&&path==='/api/independent/report')return json({...report,stale:snapshot.stale,source_hash:snapshot.source_hash,previous_source_hash:historical.previous_source_hash||null});
    if(request.method==='POST'&&path==='/api/independent/questions'){
     const body=await request.json() as {question?:unknown;month?:unknown};
     if(typeof body.question!=='string'||body.question.length>1000||body.month!==undefined&&typeof body.month!=='string')return json({code:'INVALID_QUESTION'},400);
     const selected=independentReport(historical.records,body.month||undefined,snapshot.captured_at,snapshot.quarantined_records);
-    return json({...independentAnswer(selected,body.question),stale:snapshot.stale,source_hash:snapshot.source_hash,captured_at:snapshot.captured_at});
+    return json({...independentAnswer(selected,body.question),stale:snapshot.stale,source_hash:snapshot.source_hash,previous_source_hash:historical.previous_source_hash||null,captured_at:snapshot.captured_at});
    }
    return json({code:'INDEPENDENT_ROUTE_UNSUPPORTED'},404);
   }catch(error){
