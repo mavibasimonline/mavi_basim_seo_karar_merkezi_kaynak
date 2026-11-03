@@ -55,7 +55,11 @@ export async function verifiedDriveRecords(sheets:Record<string,Row[]>,time=new 
   if(!code||periods.has(code)&&stable(periods.get(code))!==stable(period))throw Error('SOURCE_PERIOD_AMBIGUOUS');
   // A future-dated, unpublished monthly summary is not verified data.
   // Preserve historical completed months without accepting the future row.
-  if(period[0]>day||period[1]>day){quarantined++;continue;}
+  const end=Date.parse(period[1]+'T00:00:00Z');
+  const fullMonth=period[0].endsWith('-01')&&period[0].slice(0,7)===period[1].slice(0,7)&&new Date(end+86400000).getUTCDate()===1;
+  // Do not validate or publish partial-month detail rows as a completed month.
+  // Quarantine the summary; its product/query rows then remain orphaned.
+  if(period[0]>day||period[1]>day||!fullMonth||end+3*86400000>=Date.parse(day+'T00:00:00Z')){quarantined++;continue;}
   periods.set(code,period);await add('OZET','period_total',code,...period,row);
  }
  for(const row of sheets.GSC_GUNLUK){const date=sourceDate(row.Tarih);if(date>day){quarantined++;continue;}await add('GSC_GUNLUK','site_daily_total',date,date,date,row);}
