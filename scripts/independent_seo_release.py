@@ -7,7 +7,7 @@ from release_readiness import get_json,REPOSITORY
 ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
-TITLE='release: repair GSC auto aggregation validated'
+TITLE='release: recover rejected GSC OAuth grant'
 EXPECTED={
  'scripts/independent_seo_release.py',
  'tests/test_independent_seo_release.py',
@@ -78,7 +78,7 @@ def run():
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'INDEPENDENT_MAIN_SUPERSEDED')
  changed=set(git('diff','--name-only','HEAD^','HEAD').splitlines())
  need(changed==EXPECTED,'INDEPENDENT_UNREVIEWED_FILES')
- need(git('rev-parse','HEAD^')=='6b5d4bcbd523fad2bcf861308190f4fb38a5ebb1','INDEPENDENT_UNREVIEWED_BASE')
+ need(git('rev-parse','HEAD^')=='637143f5eb2e4699f98d49facad9b3ecfaf60031','INDEPENDENT_UNREVIEWED_BASE')
  # Preserve the reviewed Cron/DO source set exactly as merged and CI verified.
  need("independentRefreshDue(time)" in (ROOT/'src/index.ts').read_text()
       and "private async independentSnapshot(maxAgeMs=24*3600000)" in (ROOT/'src/drive-independent.ts').read_text()
@@ -96,6 +96,12 @@ def run():
       and "GOOGLE_HTTP_400" in (ROOT/'src/sync.ts').read_text()
       and "if(time.getUTCMinutes()!==15)" in (ROOT/'src/independent-gsc-bridge.ts').read_text(),
       'GSC_REPAIR_SOURCE_MISSING')
+ need("GOOGLE_OAUTH_REFRESH_REJECTED" in (ROOT/'src/google.ts').read_text()
+      and "GSC_OAUTH_RECONNECT_REQUIRED" in (ROOT/'src/drive-broker.ts').read_text()
+      and "gsc:oauth-reconnect" in (ROOT/'src/drive-independent.ts').read_text()
+      and "reauthorization_required" in (ROOT/'src/independent-gsc-bridge.ts').read_text()
+      and "Google bağlantısını yenile" in (ROOT/'public/app.js').read_text(),
+      'GSC_OAUTH_RECOVERY_SOURCE_MISSING')
  rows=get_json('https://api.github.com/repos/'+REPOSITORY+'/actions/workflows/ci.yml/runs?head_sha='+sha+'&per_page=30',os.environ.get('GITHUB_TOKEN')).get('workflow_runs',[])
  need(any(r.get('head_sha')==sha and r.get('head_branch')=='main' and r.get('event')=='push' and r.get('conclusion')=='success' for r in rows),'INDEPENDENT_GREEN_MAIN_CI_REQUIRED')
  client=Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID'))
