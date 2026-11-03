@@ -1,0 +1,16 @@
+name: Diagnose public Sheets period coverage
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/sheets-period-diagnosis.yml'
+      - 'scripts/diagnose_sheets_periods.py'
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Read public Sheets only, report grouped period counts
+        run: python3 scripts/diagnose_sheets_periods.py
