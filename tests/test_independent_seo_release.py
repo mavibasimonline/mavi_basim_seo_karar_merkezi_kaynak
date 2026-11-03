@@ -54,7 +54,7 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertIn("rollback(config,existing[worker]['version'])", source)
 
     def test_reviewed_refresh_release_keeps_exact_source_and_one_time_gates(self):
-        self.assertEqual(release.TITLE, 'release: restore verified Sheets and GSC OAuth 20261104')
+        self.assertEqual(release.TITLE, 'release: protect complete Sheets months 20261104')
         self.assertEqual(release.EXPECTED, {
             'scripts/independent_seo_release.py',
             'tests/test_independent_seo_release.py',
