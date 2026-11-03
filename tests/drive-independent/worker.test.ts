@@ -62,6 +62,26 @@ describe('independent GSC private OAuth migration and daily storage',()=>{
   expect(rejected.status).toBe(400);
   await runInDurableObject(stub(),async(_instance,state)=>expect(await state.storage.get('gsc:oauth')).toBeUndefined());
  });
+ it('stores a new GSC grant privately after a cookie-bound OAuth callback and rejects replay',async()=>{
+  const started=await stub().fetch('https://app.example/api/independent/gsc-oauth/start',{method:'POST'});
+  const data=await started.json() as {authorization_url:string};
+  const state=new URL(data.authorization_url).searchParams.get('state');
+  const callback=new Request('https://app.example/api/oauth/google/callback?code=fixture&state='+state,{
+    headers:{Cookie:started.headers.get('Set-Cookie')||''},redirect:'manual'
+  });
+  const first=await stub().fetch(callback);
+  expect(first.status).toBe(303);
+  expect(first.headers.get('Location')).toBe('/independent-seo.html?google=connected');
+  await runInDurableObject(stub(),async(_instance,store)=>{
+    const encrypted=await store.storage.get<string>('gsc:oauth');
+    expect(encrypted).toBeTruthy();
+    expect(encrypted).not.toContain('fixture-gsc-valid-refresh-token');
+    const grant=await decrypt<any>(encrypted!,cfg.ARCHIVE_ENCRYPTION_KEY!);
+    expect(grant.refresh_token).toBe('fixture-gsc-valid-refresh-token');
+    expect(grant.scope).toContain('webmasters.readonly');
+  });
+  expect((await stub().fetch(callback)).status).toBe(400);
+ });
  it('rejects importing tokens without explicit GSC permission',async()=>{
   const response=await stub().fetch('https://archive.private/api/internal/gsc-import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scope:'https://www.googleapis.com/auth/drive.file',refresh_token:'fixture-existing-google-refresh-token-for-gsc'})});
   expect(response.status).toBe(400);
