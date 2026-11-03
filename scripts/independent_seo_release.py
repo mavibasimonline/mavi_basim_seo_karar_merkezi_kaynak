@@ -7,7 +7,7 @@ from release_readiness import get_json,REPOSITORY
 ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
-TITLE='release: repair GSC auto aggregation once'
+TITLE='release: repair GSC auto aggregation validated'
 EXPECTED={
  'scripts/independent_seo_release.py',
  'tests/test_independent_seo_release.py',
@@ -78,7 +78,7 @@ def run():
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'INDEPENDENT_MAIN_SUPERSEDED')
  changed=set(git('diff','--name-only','HEAD^','HEAD').splitlines())
  need(changed==EXPECTED,'INDEPENDENT_UNREVIEWED_FILES')
- need(git('rev-parse','HEAD^')=='9fa70f7e32f8fb173d0d2f2d5fc931c2a4f76f26','INDEPENDENT_UNREVIEWED_BASE')
+ need(git('rev-parse','HEAD^')=='6b5d4bcbd523fad2bcf861308190f4fb38a5ebb1','INDEPENDENT_UNREVIEWED_BASE')
  # Preserve the reviewed Cron/DO source set exactly as merged and CI verified.
  need("independentRefreshDue(time)" in (ROOT/'src/index.ts').read_text()
       and "private async independentSnapshot(maxAgeMs=24*3600000)" in (ROOT/'src/drive-independent.ts').read_text()
@@ -93,7 +93,7 @@ def run():
  need("aggregationType: 'auto'" in (ROOT/'src/providers.ts').read_text()
       and "aggregationType:'auto'" in (ROOT/'src/independent-gsc.ts').read_text()
       and "'gsc:held:'" in (ROOT/'src/independent-gsc.ts').read_text()
-      and "GSC_HTTP_400" in (ROOT/'src/sync.ts').read_text()
+      and "GOOGLE_HTTP_400" in (ROOT/'src/sync.ts').read_text()
       and "if(time.getUTCMinutes()!==15)" in (ROOT/'src/independent-gsc-bridge.ts').read_text(),
       'GSC_REPAIR_SOURCE_MISSING')
  rows=get_json('https://api.github.com/repos/'+REPOSITORY+'/actions/workflows/ci.yml/runs?head_sha='+sha+'&per_page=30',os.environ.get('GITHUB_TOKEN')).get('workflow_runs',[])
