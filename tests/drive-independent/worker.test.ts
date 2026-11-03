@@ -107,6 +107,19 @@ describe('independent Drive without a D1 binding',()=>{
   expect(result.quarantined_records).toBe(3);
   expect(result.records.every((r:any)=>r.family==='site_daily_total'||r.start==='2026-09-01')).toBe(true);
  });
+ it('accepts source-confirmed October at the exact three-day UTC boundary without claiming November',async()=>{
+  const input=sheets();
+  input.OZET.push({...input.OZET[0],'Dönem Kodu':'gecen_ay','Başlangıç Tarihi':'2026-10-01','Bitiş Tarihi':'2026-10-31','Durum':'tam_ay'});
+  input.URUNLER.push({...input.URUNLER[0],'Dönem Kodu':'gecen_ay'});
+  input.SORGULAR.push({...input.SORGULAR[0],'Dönem Kodu':'gecen_ay'});
+  input.OZET.push({...input.OZET[0],'Dönem Kodu':'bu_ay','Başlangıç Tarihi':'2026-11-01','Bitiş Tarihi':'2026-11-01','Durum':'devam_ediyor'});
+  input.URUNLER.push({...input.URUNLER[0],'Dönem Kodu':'bu_ay'});
+  const result=await verifiedDriveRecords(input,new Date('2026-11-03T22:00:00Z'));
+  expect(result.record_count).toBe(7);
+  expect(result.quarantined_records).toBe(2);
+  expect(result.records.some((r:any)=>r.section==='OZET'&&r.start==='2026-10-01'&&r.end==='2026-10-31')).toBe(true);
+  expect(result.records.every((r:any)=>r.start!=='2026-11-01')).toBe(true);
+ });
  it('writes both archives, verifies real readback, and recovers a lost upload reply without duplicates',async()=>{
   await consent();
   const files=new Map<string,{meta:any;data:Uint8Array}>(),input=sheets();let uploads=0,lost=true;

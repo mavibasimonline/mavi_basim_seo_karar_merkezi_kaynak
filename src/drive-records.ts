@@ -59,7 +59,8 @@ export async function verifiedDriveRecords(sheets:Record<string,Row[]>,time=new 
   const fullMonth=period[0].endsWith('-01')&&period[0].slice(0,7)===period[1].slice(0,7)&&new Date(end+86400000).getUTCDate()===1;
   // Do not validate or publish partial-month detail rows as a completed month.
   // Quarantine the summary; its product/query rows then remain orphaned.
-  if(period[0]>day||period[1]>day||!fullMonth||end+3*86400000>=Date.parse(day+'T00:00:00Z')){quarantined++;continue;}
+  // Exactly three UTC calendar days after month end is the first eligible day.
+  if(period[0]>day||period[1]>day||!fullMonth||end+3*86400000>Date.parse(day+'T00:00:00Z')){quarantined++;continue;}
   periods.set(code,period);await add('OZET','period_total',code,...period,row);
  }
  for(const row of sheets.GSC_GUNLUK){const date=sourceDate(row.Tarih);if(date>day){quarantined++;continue;}await add('GSC_GUNLUK','site_daily_total',date,date,date,row);}
@@ -75,7 +76,7 @@ export async function verifiedDriveRecords(sheets:Record<string,Row[]>,time=new 
  for(const group of groups.values()){
   if(group.size!==1){quarantined+=group.size;continue;}
   const record=group.values().next().value,end=Date.parse(record.end+'T00:00:00Z');
-  const closed=record.start.endsWith('-01')&&record.start.slice(0,7)===record.end.slice(0,7)&&new Date(end+86400000).getUTCDate()===1&&end+3*86400000<Date.parse(day);
+  const closed=record.start.endsWith('-01')&&record.start.slice(0,7)===record.end.slice(0,7)&&new Date(end+86400000).getUTCDate()===1&&end+3*86400000<=Date.parse(day);
   if(record.family==='site_daily_total'||closed)records.push(record);
  }
  records.sort((a,b)=>stable([a.section,a.identity,a.start,a.end]).localeCompare(stable([b.section,b.identity,b.start,b.end]),'en'));
