@@ -28,7 +28,9 @@ describe('GSC durable pipeline remains D1-free',()=>{
   const collector=new IndependentGscCollector(db,'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',async()=> 'test-access',fetcher as unknown as typeof fetch);
   expect(await collector.tick(time)).toMatchObject({status:'held',d1_requests:0});
   expect(await db.get('gsc:daily:2026-10-28:page')).toBeUndefined();
-  expect(await db.get('gsc:active')).toBeTruthy();
+  // Invalid metrics quarantine only that day and free the queue for other dates.
+  expect(await db.get('gsc:active')).toBeNull();
+  expect(await db.get('gsc:held:2026-10-28:page')).toMatchObject({code:'GSC_ROW_REJECTED'});
  });
  it('GSC cron refuses missing private service instead of touching legacy D1',async()=>{
   expect(await independentGscCron({AUTOMATION_ENABLED:'true'} as any,time)).toBe('unavailable');

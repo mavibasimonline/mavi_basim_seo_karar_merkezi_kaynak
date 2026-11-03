@@ -77,6 +77,8 @@ export class IndependentGscCollector {
    const old=await this.storage.get<DailyProof>(key(c.day,c.scope));
    const maxAge=c.history?30*86400000:24*3600000;
    if(old&&time.getTime()-Date.parse(old.captured_at)<maxAge)continue;
+   const held=await this.storage.get<{until:number}>('gsc:held:'+c.day+':'+c.scope);
+   if(held&&Number.isFinite(held.until)&&held.until>time.getTime())continue;
    const job:Job={day:c.day,scope:c.scope,generation:crypto.randomUUID(),cursor:0,pages:[],started_at:time.toISOString(),attempts:0};
    await this.storage.put('gsc:active',job);return job;
   }
@@ -91,12 +93,18 @@ export class IndependentGscCollector {
   try{
    const dimensions=j.scope==='query'?['date','page','query','country','device']:['date','page','country','device'];
    const endpoint='https://www.googleapis.com/webmasters/v3/sites/'+encodeURIComponent(PROPERTY)+'/searchAnalytics/query';
-   const payload={startDate:j.day,endDate:j.day,dimensions,type:'web',dataState:'final',aggregationType:'byPage',rowLimit:PAGE,startRow:j.cursor};
+   // Use Google's recommended auto aggregation for page dimensions; reject non-byPage responses.
+   const payload={startDate:j.day,endDate:j.day,dimensions,type:'web',dataState:'final',aggregationType:'auto',rowLimit:PAGE,startRow:j.cursor};
    const send=async(force:boolean)=>this.fetcher(endpoint,{method:'POST',redirect:'manual',signal:AbortSignal.timeout(20000),
       headers:{Authorization:'Bearer '+await this.token(force),'Content-Type':'application/json'},body:JSON.stringify(payload)});
    let response=await send(false);
    if(response.status===401){await response.body?.cancel();response=await send(true);}
-   ensure(response.ok,'GSC_PROVIDER_UNAVAILABLE');
+   if(!response.ok){
+    const code='GSC_HTTP_'+response.status;
+    await response.body?.cancel();
+    // Status-only diagnostics: never persist Google's response body, queries or tokens.
+    throw Error(code);
+   }
    const raw=await response.text();ensure(bytes(raw).length<=1100000,'GSC_RESPONSE_BYTES_LIMIT');
    const page=validateGscPage(JSON.parse(raw),j.day,j.scope,j.cursor);
    const proof=await writePage(this.storage,j,page.rows,this.keySecret);
@@ -117,10 +125,16 @@ export class IndependentGscCollector {
    return {status:'complete',day:j.day,scope:j.scope,rows:j.cursor,query_partial:final.query_partial,d1_requests:0};
   }catch(error){
    const code=error instanceof Error?error.message:'GSC_SYNC_UNAVAILABLE';
-   const retryable=['GSC_PROVIDER_UNAVAILABLE','GSC_RESPONSE_BYTES_LIMIT'].includes(code);
-   await this.storage.put('gsc:retry',{until:time.getTime()+(retryable?3600000:86400000)});
+   const retryable=code==='GSC_HTTP_429'||/^GSC_HTTP_5\d\d$/.test(code)||code==='GSC_RESPONSE_BYTES_LIMIT';
+   // A bad source day must not monopolize the private queue. Keep prior verified days.
+   j.attempts++;
+   if(!retryable||j.attempts>=3){
+    await this.storage.put('gsc:held:'+j.day+':'+j.scope,{until:time.getTime()+24*3600000,code});
+    await this.storage.put('gsc:active',null);
+   }else await this.storage.put('gsc:active',j);
+   await this.storage.put('gsc:retry',{until:time.getTime()+(retryable?3600000:15*60000)});
    // Failed job remains staged, never overwriting an earlier verified complete day.
-   return {status:'held',code:/^GSC_[A-Z_]+$/.test(code)?code:'GSC_SYNC_UNAVAILABLE',d1_requests:0};
+   return {status:'held',code:/^GSC_[A-Z0-9_]+$/.test(code)?code:'GSC_SYNC_UNAVAILABLE',d1_requests:0};
   }
  }
  async status(time=new Date()){
