@@ -43,7 +43,7 @@ export async function saveIndependentSnapshot(storage:DurableObjectStorage,snaps
 /** Restore at most one prior complete month from previously verified immutable manifests.
  * Source hashes and chunk checks are verified by restore(); never infer missing months.
  * Historical manifests are read-only, originals remain untouched. */
-export async function withVerifiedPreviousMonth(storage:DurableObjectStorage,current:IndependentSnapshot){
+export async function withVerifiedPreviousMonth(storage:DurableObjectStorage,current:IndependentSnapshot):Promise<IndependentSnapshot & {previous_source_hash?:string}>{
  const months=[...new Set(current.records.filter(r=>r.section==='OZET'&&r.start.endsWith('-01')
   &&r.start.slice(0,7)===r.end.slice(0,7)
   &&new Date(Date.parse(r.end+'T00:00:00Z')+86400000).getUTCDate()===1).map(r=>r.start.slice(0,7)))].sort();
@@ -67,7 +67,7 @@ export async function withVerifiedPreviousMonth(storage:DurableObjectStorage,cur
   if(!productRows.length)continue;
   const historical=older.records.filter(r=>(r.section==='OZET'||r.section==='URUNLER'||r.section==='SORGULAR')
     &&r.start.slice(0,7)===previousMonth);
-  return {...current,records:[...current.records,...historical]};
+  return {...current,records:[...current.records,...historical],previous_source_hash:older.source_hash};
  }
  return current;
 }
