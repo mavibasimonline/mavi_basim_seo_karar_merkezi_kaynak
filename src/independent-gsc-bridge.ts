@@ -15,8 +15,8 @@ export async function independentGscCron(env:E,time=new Date()):Promise<'importe
  const svc=env.DRIVE_ARCHIVE_SERVICE;
  let status=await read(await svc.fetch('https://archive.private/api/internal/gsc-status'));
  if(status.connected!==true){
-  // Only attempt migration once per UTC day, not on every 15-minute Cron.
-  if(time.getUTCHours()!==0||time.getUTCMinutes()!==15)return 'unavailable';
+  // Once hourly until the old scoped consent is safely transferred; no D1 read on other ticks.
+  if(time.getUTCMinutes()!==15)return 'unavailable';
   if(!env.TOKEN_ENCRYPTION_KEY)return 'unavailable';
   const record=await withReadBudget(env,'cron',safe=>safe.DB.prepare("SELECT encrypted_tokens,scopes FROM oauth_credentials WHERE provider='google' LIMIT 1").first<{encrypted_tokens:string;scopes:string}>(),time);
   if(!record)return 'unavailable';
