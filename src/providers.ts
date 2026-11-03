@@ -29,8 +29,9 @@ export function validateGscRow(row: GscRow, day: string, property='sc-domain:mav
 export async function fetchGsc(env: Env, day: string, scope: string, cursor = 0, fetcher: Fetch = fetch): Promise<Page<GscRow>> {
   if (!env.GSC_PROPERTY || !['page','query'].includes(scope)) throw new ProviderError('GSC_CONFIGURATION_MISSING');
   const dimensions = scope === 'query' ? ['date','page','query','country','device'] : ['date','page','country','device'];
+  // Google recommends auto when grouping by page. Keep strict byPage response verification below.
   const reply = await googleJSON<GscReply>(env, `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(env.GSC_PROPERTY)}/searchAnalytics/query`, {
-    startDate: day, endDate: day, dimensions, type: 'web', dataState: 'final', aggregationType: 'byPage', rowLimit: PAGE_SIZE, startRow: cursor,
+    startDate: day, endDate: day, dimensions, type: 'web', dataState: 'final', aggregationType: 'auto', rowLimit: PAGE_SIZE, startRow: cursor,
   }, fetcher);
   if (!reply || (reply.rows !== undefined && !Array.isArray(reply.rows)) || reply.responseAggregationType !== 'byPage') throw new ProviderError('INVALID_GSC_RESPONSE');
   const keysSeen = new Set<string>();
