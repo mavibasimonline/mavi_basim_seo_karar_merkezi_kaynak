@@ -159,13 +159,8 @@ export class IndependentGscCollector {
   const historical=serial%4===3,backfill=(await this.storage.get<number>('gsc:backfill-index'))||0;
   const recent:{day:string;scope:Scope;history:boolean}[]=[];
   for(let ago=3;ago<=9;ago++)for(const scope of ['page','query'] as Scope[])recent.push({day:dayAgo(ago,time),scope,history:false});
-  const d=selectGscDay(time,backfill,true),older=[{day:d,scope:'page' as Scope,history:true},{day:d,scope:'query' as Scope,history:true}];
-  // A historical slot prefers its planned older date. If both scopes are fresh
-  // or held, use the slot for recent missing work instead of reporting idle.
-  for(const candidates of historical?[older,recent]:[recent]){
+  const pick=async(candidates:{day:string;scope:Scope;history:boolean}[])=>{
    const checked=await Promise.all(candidates.map(async c=>({...c,old:await this.storage.get<DailyProof>(key(c.day,c.scope))})));
-   // Within each priority group, missing dates precede another generation of a
-   // collected date. Historical cadence and recent scope fairness both survive.
    checked.sort((a,b)=>Number(!!a.old)-Number(!!b.old));
    for(const c of checked){
     const old=c.old,maxAge=c.history?30*86400000:24*3600000;
@@ -175,10 +170,28 @@ export class IndependentGscCollector {
     const job:Job={day:c.day,scope:c.scope,generation:crypto.randomUUID(),cursor:0,pages:[],started_at:time.toISOString(),attempts:0,incomplete:false};
     await this.storage.put('gsc:active',job);return job;
    }
-   if(historical&&candidates===older)await this.storage.put('gsc:backfill-index',(backfill+1)%391);
-  }
-  return null;
+   return null;
+  };
+  const historyJob=async()=>{
+   let index=backfill;
+   // The initial two-month plan may already have completed many older dates.
+   // Skip at most 64 fresh pairs; never refetch them just to advance a cursor.
+   for(let scan=0;scan<64;scan++){
+    const d=selectGscDay(time,index,true),pair=(['page','query'] as Scope[]).map(scope=>({day:d,scope,history:true}));
+    const proofs=await Promise.all(pair.map(c=>this.storage.get<DailyProof>(key(c.day,c.scope))));
+    const fresh=proofs.every(p=>p&&Number.isFinite(Date.parse(p.captured_at))&&time.getTime()-Date.parse(p.captured_at)>=0&&time.getTime()-Date.parse(p.captured_at)<30*86400000);
+    if(!fresh){const picked=await pick(pair);if(picked)return picked;}
+    index=(index+1)%391;await this.storage.put('gsc:backfill-index',index);
+    // A held source day yields to recent work; an actual account backoff is
+    // checked before choose() and is never bypassed by this scan.
+    if(!fresh)return null;
+   }
+   return null;
+  };
+  if(historical)return await historyJob()||await pick(recent);
+  return await pick(recent)||await historyJob();
  }
+
  async tick(time=new Date()){
   const last=await this.storage.get<{until:number}>('gsc:retry');
   if(last&&time.getTime()<last.until){

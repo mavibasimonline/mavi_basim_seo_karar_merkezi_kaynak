@@ -41,3 +41,23 @@ describe('GSC durable pipeline remains D1-free',()=>{
   expect(fetch).toHaveBeenCalledTimes(1);
  });
 });
+
+it('uses an idle recent slot for missing older evidence and skips already verified history without refetching',async()=>{
+ const db=storage(),stamp=time.toISOString();
+ const day=(ago:number)=>new Date(time.getTime()-ago*86400000).toISOString().slice(0,10);
+ for(let ago=3;ago<=60;ago++)for(const scope of ['page','query'])db.map.set('gsc:daily:'+day(ago)+':'+scope,{captured_at:stamp,fixture:'preserved immutable evidence'});
+ const before=structuredClone([...db.map]);
+ const fetcher=vi.fn(async(_url:RequestInfo|URL,init?:RequestInit)=>{const body=JSON.parse(String(init?.body));return Response.json({responseAggregationType:'byPage',rows:[{keys:[body.startDate,'https://mavibasim.com/brosur','tur','DESKTOP'],clicks:1,impressions:10,ctr:.1,position:4}]});});
+ const result=await new IndependentGscCollector(db,'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',async()=> 'fixture-token',fetcher as typeof fetch).tick(time);
+ expect(result).toMatchObject({status:'complete',day:day(61),scope:'page',rows:1});expect(fetcher).toHaveBeenCalledTimes(1);
+ for(const [key,value] of before)expect(db.map.get(key)).toEqual(value);
+ expect(db.map.get('gsc:backfill-index')).toBe(51);
+});
+it('bounds fresh-history scanning and respects source quota backoff before any work',async()=>{
+ const db=storage(),fetcher=vi.fn();
+ for(let ago=3;ago<=73;ago++)for(const scope of ['page','query'])db.map.set('gsc:daily:'+new Date(time.getTime()-ago*86400000).toISOString().slice(0,10)+':'+scope,{captured_at:time.toISOString()});
+ const collector=new IndependentGscCollector(db,'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',async()=> 'fixture',fetcher);
+ expect(await collector.tick(time)).toMatchObject({status:'idle'});expect(db.map.get('gsc:backfill-index')).toBe(64);expect(fetcher).not.toHaveBeenCalled();
+ db.map.set('gsc:retry',{until:time.getTime()+3600000});
+ expect(await collector.tick(time)).toMatchObject({status:'held'});expect(db.map.get('gsc:backfill-index')).toBe(64);expect(fetcher).not.toHaveBeenCalled();
+});
