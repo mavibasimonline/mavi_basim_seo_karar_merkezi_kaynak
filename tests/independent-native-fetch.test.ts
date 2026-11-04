@@ -3,7 +3,7 @@ import {IndependentGscCollector} from '../src/independent-gsc';
 
 it('uses the real Workers fetch receiver correctly before any network request',async()=>{
  const native=globalThis.fetch;
- await expect(native.call({},'ftp://fixture.invalid/path')).rejects.toThrow('Illegal invocation');
+ await expect(Promise.resolve().then(()=>native.call({},'ftp://fixture.invalid/path'))).rejects.toThrow('Illegal invocation');
  // An unsupported protocol exercises the real runtime receiver check with no
  // external request. Only its normal URL rejection unlocks the GSC fixture.
  const nativeCheckedTransport=async function(this:unknown){
