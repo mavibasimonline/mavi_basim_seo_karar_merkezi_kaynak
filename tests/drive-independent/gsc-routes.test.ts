@@ -146,6 +146,10 @@ it('GA4 consent/status/report and change evidence remain D1-free when unrelated 
  expect(await (await stub().fetch('https://archive.private/api/independent/ga4-status')).json()).toMatchObject({connected:false,property:null,d1_requests:0});
  expect(await (await stub().fetch('https://archive.private/api/independent/ga4-report?month='+closedMonth())).json()).toMatchObject({available:false,d1_requests:0});
  const start=await stub().fetch('https://archive.private/api/independent/ga4-oauth/start',{method:'POST'});expect(start.status).toBe(200);expect(new URL((await start.json<any>()).authorization_url).searchParams.get('scope')).toBe('https://www.googleapis.com/auth/analytics.readonly');
+ for(const questionText of ['İstanbul neden farklı?','İSTANBUL neden farklı?','ISTANBUL neden farklı?']){
+  const question=await stub().fetch('https://archive.private/api/independent/questions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:questionText,month:closedMonth()})});
+  expect(question.status).toBe(200);expect(await question.json()).toMatchObject({source:'Google Analytics 4 Data API',requires_ga4:true,d1_requests:0,decision:'Veri bekle'});
+ }
  const history=await stub().fetch('https://archive.private/api/independent/change-history?month='+closedMonth());expect(history.status).toBe(200);expect(await history.json()).toMatchObject({d1_requests:0,decision:'Veri bekle'});
  for(const path of ['/api/independent/ga4-status','/api/independent/ga4-report?month='+closedMonth(),'/api/internal/ga4-status','/api/internal/ga4-tick'])expect((await main.fetch(new Request('https://app.example'+path),{} as any,{} as any)).status).toBe(401);
  expect(fetcher).not.toHaveBeenCalled();

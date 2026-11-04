@@ -355,12 +355,14 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     const body=JSON.parse(await boundedText(new Response(request.body),8192)) as {question?:unknown;month?:unknown;source?:unknown};
     if(typeof body.question!=='string'||!body.question.trim()||body.question.length>1000||body.month!==undefined&&typeof body.month!=='string')return json({code:'INVALID_QUESTION'},400);
     questionBody={question:body.question,month:body.month as string|undefined,source:body.source};
-    if(body.source==='ga4'||body.source!=='archive'&&body.source!=='gsc'&&!path.endsWith('gsc-questions')&&/şehir|ilçe|bölge|istanbul|ankara|izmir|ziyaretçi|organik oturum/i.test(body.question)){
+    // Preserve Turkish dotted/dotless I and the existing ASCII uppercase routes.
+    const normalizedQuestion=body.question.toLocaleLowerCase('tr-TR')+' '+body.question.toLowerCase();
+    if(body.source==='ga4'||body.source!=='archive'&&body.source!=='gsc'&&!path.endsWith('gsc-questions')&&/şehir|ilçe|bölge|istanbul|ankara|izmir|ziyaretçi|organik oturum/i.test(normalizedQuestion)){
      const latest=new Date(Date.now()-3*86400000);latest.setUTCDate(1);latest.setUTCMonth(latest.getUTCMonth()-1);
      const month=questionBody.month||latest.toISOString().slice(0,7),ga4=this.ga4(),current=await ga4.report(month),p=new Date(month+'-01T00:00:00Z');p.setUTCMonth(p.getUTCMonth()-1);
      const previous=current.available?await ga4.report(p.toISOString().slice(0,7)):null;return json(answerGa4(current,previous,body.question));
     }
-    let useGsc=path.endsWith('gsc-questions')||body.source==='gsc'||body.source!=='archive'&&/cihaz|mobil|masaüstü|tablet|ülke|türkiye|anahtar|kelime|sorgu|sayfa|https?:|şehir|ilçe|istanbul|bölge|değiş|ne zaman|başlık|meta|yayın|kanonik|canonical|\bh1\b/i.test(body.question);
+    let useGsc=path.endsWith('gsc-questions')||body.source==='gsc'||body.source!=='archive'&&/cihaz|mobil|masaüstü|tablet|ülke|türkiye|anahtar|kelime|sorgu|sayfa|https?:|şehir|ilçe|istanbul|bölge|değiş|ne zaman|başlık|meta|yayın|kanonik|canonical|\bh1\b/i.test(normalizedQuestion);
     if(!useGsc&&body.source!=='archive'){
      const latest=new Date(Date.now()-3*86400000);latest.setUTCDate(1);latest.setUTCMonth(latest.getUTCMonth()-1);
      const month=questionBody.month||latest.toISOString().slice(0,7),context=await readIndependentContext(this.ctx.storage).catch(()=>null);
@@ -371,7 +373,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
      const latest=new Date(Date.now()-3*86400000);latest.setUTCDate(1);latest.setUTCMonth(latest.getUTCMonth()-1);
      const month=questionBody.month||latest.toISOString().slice(0,7);
      const context=await readIndependentContext(this.ctx.storage).catch(()=>null);
-     if(/değişiklik geçmiş|geçmiş değiş|içerik.*değiş|neleri değişt|ne zaman|başlık|meta|yayın|kanonik|canonical|\bh1\b/i.test(body.question))return json(answerContextQuestion(context,body.question,month));
+     if(/değişiklik geçmiş|geçmiş değiş|içerik.*değiş|neleri değişt|ne zaman|başlık|meta|yayın|kanonik|canonical|\bh1\b/i.test(normalizedQuestion))return json(answerContextQuestion(context,body.question,month));
      const current=await this.gscMonth(month);
      const previousDate=new Date(month+'-01T00:00:00Z');previousDate.setUTCMonth(previousDate.getUTCMonth()-1);
      const previous=current.available?await this.gscMonth(previousDate.toISOString().slice(0,7)):undefined;
