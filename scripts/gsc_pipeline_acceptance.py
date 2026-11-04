@@ -20,10 +20,11 @@ MODES={'status','diagnostic','recover','collect','readback'}
 def request(key,mode,ticks=0):
  need(mode in MODES,'GSC_PIPELINE_MODE_INVALID')
  if mode=='collect':need(type(ticks) is int and 1<=ticks<=4,'GSC_PIPELINE_TICK_LIMIT')
+ elif mode=='readback':need(type(ticks) is int and 0<=ticks<=13,'GSC_PIPELINE_TICK_LIMIT')
  else:need(ticks==0,'GSC_PIPELINE_TICK_LIMIT')
  return urllib.request.Request('http://127.0.0.1:8803/?mode='+mode,
   method='GET' if mode=='status' else 'POST',
-  data=None if mode=='status' else json.dumps({'ticks':ticks} if mode=='collect' else {}).encode(),
+  data=None if mode=='status' else json.dumps({'ticks':ticks} if mode=='collect' else {'index':ticks} if mode=='readback' else {}).encode(),
   headers={'Authorization':'Bearer '+key,'User-Agent':'MaviBasimReleaseCheck/1.0','Accept':'application/json','Content-Type':'application/json'})
 
 def sanitize_response(value,mode):
@@ -86,17 +87,26 @@ def acceptance(exchange,max_ticks=32):
      'recovery':None,'after':status,'attempts':[],'manual_ticks':0,'readback':None,'d1_requests':0,'missing_days_are_zero':False}
     print(json.dumps({'gsc_pipeline_acceptance':report},ensure_ascii=False),flush=True)
     return report
-   recovery=sanitize_response(exchange('recover',0),'recover');status=recovery['status']
+   recovery=[]
+   for _ in range(16):
+    step=sanitize_response(exchange('recover',0),'recover');status=step['status'];recovery.append(step)
+    if step['recovery_candidates']==0 or step['released_scopes']==0:break
+   else:raise ValueError('GSC_PIPELINE_RECOVERY_LIMIT')
   while status['covered_scopes']<14 and len(attempts)<max_ticks:
-   collected=sanitize_response(exchange('collect',min(4,max_ticks-len(attempts))),'collect')
-   need(1<=collected['manual_ticks']<=min(4,max_ticks-len(attempts)),'GSC_PIPELINE_NO_PROGRESS')
+   collected=sanitize_response(exchange('collect',min(1,max_ticks-len(attempts))),'collect')
+   need(1<=collected['manual_ticks']<=min(1,max_ticks-len(attempts)),'GSC_PIPELINE_NO_PROGRESS')
    attempts.extend(collected['attempts']);status=collected['status']
    print(json.dumps({'gsc_pipeline_collection':{'manual_ticks_total':len(attempts),'attempts':collected['attempts'],'status':status,'d1_requests':0}},ensure_ascii=False),flush=True)
    if any(r['status'] in ('held','idle') for r in collected['attempts']):break
   if status['covered_scopes']==14:
-   readback=sanitize_response(exchange('readback',0),'readback');status=readback['status']
-   scopes={r['scope'] for r in readback['readbacks'] if r['rows']>0}
-   if readback['content_verified_scopes']==14 and scopes=={'page','query'}:reason='GSC_PIPELINE_VERIFIED'
+   proofs=[]
+   for index in range(14):
+    step=sanitize_response(exchange('readback',index),'readback');status=step['status']
+    need(len(step['readbacks'])==1,'GSC_PIPELINE_READBACK_INVALID');proofs.extend(step['readbacks'])
+   readback={**step,'readbacks':proofs,'content_verified_scopes':len(proofs),'nonempty_content_scopes':sum(r['rows']>0 for r in proofs)}
+   sanitize_response(readback,'readback')
+   scopes={r['scope'] for r in proofs if r['rows']>0}
+   if len(proofs)==14 and scopes=={'page','query'}:reason='GSC_PIPELINE_VERIFIED'
  else:reason='GSC_PIPELINE_AUTHORIZATION_UNAVAILABLE'
  report={'passed':reason=='GSC_PIPELINE_VERIFIED','reason':reason,'before_recovery':before,
   'diagnostic':diagnostic,'recovery':recovery,'after':status,'attempts':attempts,'manual_ticks':len(attempts),
@@ -132,10 +142,11 @@ def runPipeline(max_ticks=32):
         old_collector=True;time.sleep(1);continue
        return value
      except urllib.error.HTTPError as error:
-      body=error.read(1024)
+      body=error.read(65537)
       try:code=json.loads(body).get('code')
       except (ValueError,AttributeError):code=None
-      if code is not None:raise ValueError(safe_code(code)) from None
+      if len(body)<=65536 and code is not None:raise ValueError(safe_code(code)) from None
+      print(json.dumps({'gsc_pipeline_transport_failure':{'mode':mode,'http_status':error.code,'body_limit_exceeded':len(body)>65536}}),flush=True)
       if error.code in (400,401,403):raise ValueError('GSC_PIPELINE_AUTH_OR_REQUEST_REJECTED') from None
       if mode!='status':raise ValueError('GSC_PIPELINE_MUTATION_UNCONFIRMED') from None
      except (urllib.error.URLError,TimeoutError):

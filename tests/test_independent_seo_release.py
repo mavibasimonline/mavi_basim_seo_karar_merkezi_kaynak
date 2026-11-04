@@ -50,14 +50,14 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertLess(source.index(' real_data_acceptance()'), source.index("deploy('deploy/wrangler.drive-archive.jsonc'"))
         self.assertLess(source.index('    acceptance_proof(proof)'), source.index('deploy(main_config,sha)'))
         self.assertLess(source.index("need(gsc_proof['passed']"),source.index('deploy(main_config,sha)'))
-        self.assertIn("7a028ace93d9e25583a5da77db78531df32cc0fc",source)
+        self.assertIn("ae06d79976ebda6d74e8cf54f5e748834ed0cb77",source)
         self.assertIn("changed==EXPECTED", source)
         self.assertIn("after_main['bindings']==existing[APP]['bindings']", source)
         self.assertIn("rollback(config,existing[worker]['version'])", source)
 
     def test_reviewed_refresh_release_keeps_exact_source_and_one_time_gates(self):
         self.assertEqual(release.TITLE, 'release: verified daily GSC pipeline 20261104')
-        self.assertEqual(release.EXPECTED,{'scripts/independent_seo_release.py','tests/test_independent_seo_release.py','scripts/gsc_pipeline_acceptance.py','tests/test_gsc_pipeline_acceptance.py','src/independent-gsc-diagnostic.ts','tests/independent-gsc-diagnostic.test.ts'})
+        self.assertEqual(release.EXPECTED,{'tests/gsc-pipeline-probe.test.ts', 'scripts/gsc_pipeline_acceptance.py', 'tests/test_gsc_pipeline_acceptance.py', 'scripts/independent_seo_release.py', 'scripts/gsc_pipeline_probe.ts', 'tests/test_independent_seo_release.py'})
         source=(ROOT/'scripts/independent_seo_release.py').read_text()
         workflow=(ROOT/'.github/workflows/independent-seo-release.yml').read_text()
         self.assertIn('INDEPENDENT_UNREVIEWED_BASE',source)

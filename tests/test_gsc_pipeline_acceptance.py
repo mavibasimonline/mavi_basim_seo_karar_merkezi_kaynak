@@ -32,11 +32,11 @@ class PipelineAcceptanceTests(unittest.TestCase):
    if mode=='status':return self.reply(mode)
    if mode=='diagnostic':return self.diagnostic()
    if mode=='recover':return self.recover()
-   if mode=='collect':return self.collect(14)
-   return self.readback()
+   if mode=='collect':return self.collect(14,ticks=1)
+   reply=self.readback();reply['readbacks']=[reply['readbacks'][ticks]];reply['content_verified_scopes']=reply['nonempty_content_scopes']=1;return reply
   result=self.accept(exchange)
-  self.assertTrue(result['passed']);self.assertEqual(result['manual_ticks'],4)
-  self.assertEqual(calls,[('status',0),('diagnostic',0),('recover',0),('collect',4),('readback',0)])
+  self.assertTrue(result['passed']);self.assertEqual(result['manual_ticks'],1)
+  self.assertEqual(calls,[('status',0),('diagnostic',0),('recover',0),('collect',1)]+[('readback',i) for i in range(14)])
   self.assertFalse(result['missing_days_are_zero'])
 
  def test_stops_on_held_without_inventing_missing_data(self):

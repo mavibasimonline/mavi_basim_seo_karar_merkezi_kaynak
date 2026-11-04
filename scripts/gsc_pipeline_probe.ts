@@ -31,6 +31,8 @@ async function input(request:Request,mode:Mode){
  const keys=Object.keys(value);
  if(mode==='collect'){
   if(keys.length!==1||keys[0]!=='ticks'||!count(value.ticks)||value.ticks<1||value.ticks>4)fail('GSC_PIPELINE_TICKS_INVALID',400);
+ }else if(mode==='readback'){
+  if(keys.length!==1||keys[0]!=='index'||!count(value.index)||value.index>13)fail('GSC_PIPELINE_BODY_INVALID',400);
  }else if(keys.length)fail('GSC_PIPELINE_BODY_INVALID',400);
  return value;
 }
@@ -75,10 +77,13 @@ export default {async fetch(request:Request,env:ProbeEnv){
    const candidates=held.filter(h=>h.active&&RETESTABLE.has(h.code)&&day(h.day)&&(today-Date.parse(h.day))/86400000>=3&&(today-Date.parse(h.day))/86400000<=9);
    if(candidates.length>16||new Set(candidates.map(h=>h.day+':'+h.scope)).size!==candidates.length||candidates.some(h=>!at(h.until)||Date.parse(h.until)<=now))fail('GSC_PIPELINE_RECOVERY_SOURCE_INVALID');
    const recoveries=[];
-   for(const h of candidates){
+   for(const h of candidates.slice(0,1)){
     const exact={day:h.day,scope:h.scope,code:h.code,until:h.until};
     const response=await env.ARCHIVE.fetch('https://archive.private/api/internal/gsc-retry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(exact)});
-    if(!response.ok){await response.body?.cancel();fail('GSC_PIPELINE_RECOVERY_UNAVAILABLE');}
+    if(!response.ok){
+     let failure:any;try{failure=await response.json();}catch{}
+     fail(object(failure)&&typeof failure.code==='string'&&/^GSC_RECOVERY_[A-Z0-9_]+$/.test(failure.code)?failure.code:'GSC_PIPELINE_RECOVERY_UNAVAILABLE');
+    }
     let r:any;try{r=await response.json();}catch{fail('GSC_PIPELINE_RECOVERY_INVALID');}
     if(!object(r)||r.d1_requests!==0||typeof r.released!=='boolean')fail('GSC_PIPELINE_RECOVERY_INVALID');
     if(r.released){
@@ -90,7 +95,7 @@ export default {async fetch(request:Request,env:ProbeEnv){
     }
    }
    status=await read();
-   return respond(true,{recovery_candidates:candidates.length,released_scopes:recoveries.filter(r=>r.released).length,recoveries});
+   return respond(true,{recovery_candidates:recoveries.length,released_scopes:recoveries.filter(r=>r.released).length,recoveries});
   }
   if(mode==='collect'){
    const attempts=[];
@@ -107,7 +112,9 @@ export default {async fetch(request:Request,env:ProbeEnv){
   }
   const readbacks=[];
   const seen=new Set<string>();
-  for(const item of status.coverage){
+  const selectedProof=status.coverage[body.index as number];
+  if(!selectedProof)fail('GSC_PIPELINE_PROOF_SOURCE_INVALID');
+  for(const item of [selectedProof]){
    if(!day(item.day)||seen.has(item.day+':'+item.scope))fail('GSC_PIPELINE_PROOF_SOURCE_INVALID');seen.add(item.day+':'+item.scope);
    const response=await env.ARCHIVE.fetch('https://archive.private/api/internal/gsc-proof?day='+item.day+'&scope='+item.scope);
    if(!response.ok){await response.body?.cancel();fail('GSC_PIPELINE_PROOF_UNAVAILABLE');}

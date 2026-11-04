@@ -23,7 +23,7 @@ describe('private bounded GSC pipeline probe',()=>{
  });
  it('rejects method, query, JSON, field and tick bounds before service calls',async()=>{
   const fetch=vi.fn();
-  const bad=[request('recover',undefined,'GET'),request('unknown'),request('status&mode=collect'),request('status&secret=x'),request('collect'),request('collect',{ticks:0}),request('collect',{ticks:5}),request('collect',{ticks:'1'}),request('collect',{ticks:true}),request('collect',{ticks:1.5}),request('collect',{ticks:1,source:'cloudflare-cron'}),request('recover',{day:'2026-11-01'}),request('status',[]),request('readback',null)];
+  const bad=[request('recover',undefined,'GET'),request('unknown'),request('status&mode=collect'),request('status&secret=x'),request('collect'),request('collect',{ticks:0}),request('collect',{ticks:5}),request('collect',{ticks:'1'}),request('collect',{ticks:true}),request('collect',{ticks:1.5}),request('collect',{ticks:1,source:'cloudflare-cron'}),request('recover',{day:'2026-11-01'}),request('status',[]),request('readback',null),request('readback',{index:14}),request('readback',{index:true}),request('readback',{index:0,raw:'x'})];
   bad.push(new Request('https://probe.private/?mode=status',{method:'POST',headers:{Authorization:'Bearer '+key},body:'{'}));
   bad.push(new Request('https://probe.private/?mode=status',{method:'POST',headers:{Authorization:'Bearer '+key},body:' '.repeat(4097)}));
   for(const r of bad)expect((await probe.fetch(r,env(fetch))).status).toBeGreaterThanOrEqual(400);
@@ -76,8 +76,8 @@ describe('private bounded GSC pipeline probe',()=>{
    return Response.json(status({held:holds}));
   });
   const r=await json(await probe.fetch(request('recover',{}),env(fetch)));
-  expect(r).toMatchObject({ok:true,recovery_candidates:2,released_scopes:2});expect(r.recoveries).toHaveLength(2);
-  expect(r.recoveries.map((h:any)=>h.day)).toEqual(['2026-11-01','2026-10-26']);expect(fetch).toHaveBeenCalledTimes(4);
+  expect(r).toMatchObject({ok:true,recovery_candidates:1,released_scopes:1});expect(r.recoveries).toHaveLength(1);
+  expect(r.recoveries.map((h:any)=>h.day)).toEqual(['2026-11-01']);expect(fetch).toHaveBeenCalledTimes(3);
   expect(JSON.stringify(r)).not.toContain(secret);
  });
  it('never retries more than 16, duplicate or expired candidate holds',async()=>{
@@ -100,7 +100,7 @@ describe('private bounded GSC pipeline probe',()=>{
    });
    const r=await json(await probe.fetch(request('recover'),env(fetch)));
    expect(r.ok).toBe(allowed);expect(JSON.stringify(r)).not.toContain(secret);
-   if(!allowed)expect(r.code).toBe('GSC_PIPELINE_RECOVERY_UNAVAILABLE');
+   if(!allowed)expect(r.code).toBe('GSC_RECOVERY_DIAGNOSTIC_REQUIRED');
   }
  });
  it('accepts already-retried receipts and rejects mismatched recovery metadata',async()=>{
@@ -142,15 +142,15 @@ describe('private bounded GSC pipeline probe',()=>{
     return Response.json({available:true,verified:true,day:item.day,scope:item.scope,rows:item.rows,pages:item.rows?1:0,d1_requests:0,data:[secret],refresh_token:secret});}
    return Response.json(status({coverage:items}));
   });
-  const r=await json(await probe.fetch(request('readback'),env(fetch)));
-  expect(r).toMatchObject({ok:true,content_verified_scopes:2,nonempty_content_scopes:1});expect(r.readbacks).toHaveLength(2);expect(fetch).toHaveBeenCalledTimes(3);
+  const r=await json(await probe.fetch(request('readback',{index:0}),env(fetch)));
+  expect(r).toMatchObject({ok:true,content_verified_scopes:1,nonempty_content_scopes:1});expect(r.readbacks).toHaveLength(1);expect(fetch).toHaveBeenCalledTimes(2);
   expect(Object.keys(r.readbacks[0]).sort()).toEqual(['available','d1_requests','day','pages','rows','scope','verified']);expect(JSON.stringify(r)).not.toContain(secret);
  });
  it('rejects unavailable or mismatched proof metadata rather than claiming verification',async()=>{
   const good={available:true,verified:true,day:'2026-11-01',scope:'page',rows:2,pages:1,d1_requests:0};
   for(const bad of [{available:false},{verified:false},{day:'2026-10-31'},{scope:'query'},{rows:3},{pages:0},{pages:'1'},{d1_requests:1}]){
    const fetch=vi.fn(async(url:string)=>Response.json(url.includes('gsc-proof?')?{...good,...bad}:status({coverage:[coverage()]})));
-   const r=await json(await probe.fetch(request('readback'),env(fetch)));
+   const r=await json(await probe.fetch(request('readback',{index:0}),env(fetch)));
    expect(r).toMatchObject({ok:false,code:'GSC_PIPELINE_PROOF_INVALID'});expect(r.content_verified_scopes).toBeUndefined();expect(r.readbacks).toBeUndefined();
   }
  });
