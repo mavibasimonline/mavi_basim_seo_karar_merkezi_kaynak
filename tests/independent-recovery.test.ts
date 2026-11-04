@@ -43,3 +43,18 @@ it('does not override API quota, server backoff, reconnect, or mismatched holds'
  await expect(retryGscHold(s,{day:'2026-11-01',scope:'page',code:'GSC_HTTP_400',until},time)).rejects.toThrow('GSC_RECOVERY_HOLD_CHANGED');
  expect([...s.map.keys()].filter(k=>k.startsWith('gsc:recovery:'))).toHaveLength(0);
 });
+
+it('reopens only the known baseline native receiver failure after real diagnostic proof',async()=>{
+ const s=storage(),time=new Date('2026-11-04T08:00:00Z'),until='2026-11-04T20:00:00.000Z';
+ let nativeMessage='';try{await globalThis.fetch.call({},'ftp://fixture.invalid/path');}catch(error){nativeMessage=(error as Error).message;}
+ expect(nativeMessage).toContain('Illegal invocation');
+ s.map.set('gsc:diagnostic:last',{ok:true,at:time.toISOString(),revision:'daily-proof-v2',rows:1,d1_requests:0});
+ const key='gsc:held:2026-11-01:page',request={day:'2026-11-01',scope:'page',code:'GSC_SYNC_UNAVAILABLE',until};
+ for(const code of ['unexpected storage failure','GSC_HTTP_429','GSC_OAUTH_RECONNECT_REQUIRED']){
+  s.map.set(key,{until:Date.parse(until),code});await expect(retryGscHold(s,request,time)).rejects.toThrow('GSC_RECOVERY_HOLD_CHANGED');
+ }
+ s.map.set(key,{until:Date.parse(until),code:nativeMessage});
+ expect(await retryGscHold(s,request,time)).toMatchObject({released:true,code:'GSC_SYNC_UNAVAILABLE'});
+ expect(s.map.get(key).code).toBe(nativeMessage);
+ expect(JSON.stringify(s.map.get('gsc:recovery:daily-proof-v2:2026-11-01:page'))).not.toContain(nativeMessage);
+});
