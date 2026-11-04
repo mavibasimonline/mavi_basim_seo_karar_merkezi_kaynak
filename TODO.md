@@ -1,13 +1,15 @@
-## 4 Kasım 2026 — doğrudan GSC geçmişi için kabul bekleyen işler
+## 4 Kasım 2026 — doğrulanmış canlı durum
 
-- [x] Günlük akış sürümü `6b2721806969c2697f592d38108cf2625ea317a8`, yayın çalışması `41839530502`: kontrol düzlemi ve HTTP sürümü eşleşti. Yeni geçmiş sürümü ayrıca kabul edilecek.
+- [x] Üretim kodu `3abea4a2075ebf7f68f4f94fb3046e4a0d72a098`, yayın `41893586396`: kontrol düzlemi ve HTTP sürümü eşleşti; tam CI 983 test başarılı.
 - [x] 26 Ekim–1 Kasım için 7 gün × sayfa/sorgu 14 kapsam, `41839530502` çalışmasında şifreli içerikten ayrı ayrı geri okundu (GSC koleksiyonu D1 istekleri: 0).
-- [ ] Eylül/Ekim doğrudan GSC planının 122 kapsamını ve iki aylık sorgu içerik kapsamını doğrula; Sheets arşivi ayrı korunur.
-- [ ] Doğal Cron'un ürün URL/tarama bağlamını gerçek D1 okuma bütçesiyle kopyaladığını doğrula; kota beklemesini eksik kayıt olarak raporla.
+- [x] Eylül 30/30, Ekim 31/31 sayfa ve görünür sorgu günü; 122 kapsam ve 19.954 kaynak satırı şifreli içerikten doğrulandı. Sheets ve eski günlük arşivler korundu.
+- [x] İlk metadata kopyası gerçek D1 bütçesinde üç sabit SELECT ile alındı: 29 ürün eşlemesi, 58 tarama, 98 değişiklik. Günlük arka plan payı değiştirilmedi; kaynak kayıtları ve ledger sıfırlanmadı.
+- [x] Doğal Cron 19:00:40 UTC / 22:00:40 TSİ: 31 Ağustos için 135 sayfa satırını topladı/kaydetti. Salt okunur denetim `41892050195`, manuel tick 0, GSC D1 istekleri 0.
+- [ ] Metadata kopyasının sonraki UTC günündeki 00:15 doğal yenilemesi ayrıca gözlenmeli.
 - [ ] Sonraki UTC gününün doğal Cron makbuzunu yeni günlük kapsamla doğrula. Aynı gün testini bu kanıt yerine kullanma.
 - [ ] GA4 şehir verisi ve geçmiş doğrulanmış yayın kayıtları yoksa bunları tamamlandı sayma.
 
-Ayrıntı: `docs/GSC_OTOMATIK_KANIT_20261104.md`. Bu kutular yalnız gerçek çalışma kanıtıyla kapatılır.
+Ayrıntı: `docs/GSC_OTOMATIK_KANIT_20261104.md`. Bu kutular yalnız gerçek çalışma kanıtıyla kapatılır. Ayrıntılı güncel kayıt: `docs/GSC_CANLI_SONUC_20261104.md`.
 
 ## 4 Kasım 2026 — günlük GSC hattı kabulü
 
