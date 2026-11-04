@@ -97,3 +97,11 @@ describe('verified GSC dimensions and conservative answers',()=>{
   expect(()=>answerVerifiedGsc(report,undefined,'')).toThrow('INVALID_QUESTION');
  });
 });
+it('keeps a product performance question distinct from an identically named observed query',()=>{
+ const current=period('2026-10',[row(100,1000)]),previous=period('2026-09',[row(200,1000)]);
+ current.queries=[{...row(1,10),query:'broşür'}];previous.queries=[{...row(5,50),query:'broşür'}];
+ const product=answerVerifiedGsc(current,previous,'Broşür neden düştü?',mapping);
+ expect(product.filters.query).toBeUndefined();expect(product.decision).toBe('İncele');expect(product.evidence.every(key=>key.includes(':page:'))).toBe(true);
+ const query=answerVerifiedGsc(current,previous,'“broşür” sorgusu neden düştü?',mapping);
+ expect(query.filters.query).toBe('broşür');expect(query.evidence.every(key=>key.includes(':query:'))).toBe(true);
+});

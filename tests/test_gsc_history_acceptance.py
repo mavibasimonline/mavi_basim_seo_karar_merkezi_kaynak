@@ -31,7 +31,7 @@ class HistoryTests(unittest.TestCase):
   with self.assertRaises(ValueError):history.sanitize(r,'tick')
  def test_read_only_live_analysis_audit_never_calls_a_collection_tick(self):
   calls=[]
-  q=dict(source='GSC Search Analytics API',decision='Veri bekle',evidence_refs=61,periods=['2026-09','2026-10'],requires_ga4=True)
+  q=dict(source='GSC Search Analytics API',decision='Veri bekle',evidence_refs=61,periods=['2026-09','2026-10'],scopes=['page'],requires_ga4=True)
   def exchange(mode,m):
    calls.append(mode)
    if mode=='status':return self.status(complete=True)

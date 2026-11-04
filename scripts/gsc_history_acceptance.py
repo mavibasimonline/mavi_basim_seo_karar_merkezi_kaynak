@@ -19,8 +19,12 @@ def sanitize(value,mode):
   need(all(type(n) is int and 0<=n<=100000 for n in value['facet_counts'].values()),'GSC_HISTORY_ANALYSIS_INVALID')
   questions=value.get('questions');need(isinstance(questions,dict) and set(questions)<={'performance','city','changes','query','product'} and {'performance','city','changes'}.issubset(questions),'GSC_HISTORY_QUESTION_INVALID')
   for q in questions.values():
-   need(isinstance(q,dict) and set(q)=={'source','decision','evidence_refs','periods','requires_ga4'} and q['source'] in ('GSC Search Analytics API','Doğrulanmış SEO tarama/değişiklik arşivi') and q['decision'] in ('Koru','İncele','Veri bekle') and type(q['evidence_refs']) is int and 0<=q['evidence_refs']<=124,'GSC_HISTORY_QUESTION_INVALID')
+   need(isinstance(q,dict) and set(q)=={'source','decision','evidence_refs','periods','scopes','requires_ga4'} and q['source'] in ('GSC Search Analytics API','Doğrulanmış SEO tarama/değişiklik arşivi') and q['decision'] in ('Koru','İncele','Veri bekle') and type(q['evidence_refs']) is int and 0<=q['evidence_refs']<=124,'GSC_HISTORY_QUESTION_INVALID')
    need(isinstance(q['periods'],list) and len(q['periods'])<=2 and all(isinstance(m,str) and re.fullmatch(r'20\d\d-(0[1-9]|1[0-2])',m) for m in q['periods']) and type(q['requires_ga4']) is bool,'GSC_HISTORY_QUESTION_INVALID')
+  for key,q in questions.items():
+   need(isinstance(q['scopes'],list) and len(q['scopes'])<=2 and all(scope in ('page','query') for scope in q['scopes']),'GSC_HISTORY_QUESTION_INVALID')
+   if value['available'] and key in ('performance','product'):need(q['scopes']==['page'],'GSC_HISTORY_QUESTION_SCOPE_MISMATCH')
+   if key=='query':need(q['scopes']==['query'],'GSC_HISTORY_QUESTION_SCOPE_MISMATCH')
   need(questions['city']['requires_ga4'] is True,'GSC_HISTORY_CITY_GUARD_FAILED')
  if mode=='month':
   m=value.get('month');need(isinstance(m,str) and re.fullmatch(r'20\d\d-(0[1-9]|1[0-2])',m),'GSC_HISTORY_MONTH_INVALID')

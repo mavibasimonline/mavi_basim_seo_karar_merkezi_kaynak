@@ -74,7 +74,11 @@ function requestedFilters(question:string,current:MonthlyGscAnalysisInput,previo
  filters.country=countries.find(country=>new RegExp('(^|\\s)'+country+'($|\\s|[?.,])','i').test(q));
  if(/türkiye/.test(q))filters.country='tur';
  const queries=[...new Set([...(current.queries||[]),...(previous?.queries||[])].map(r=>r.query))];
- filters.query=queries.sort((a,b)=>b.length-a.length).find(query=>query.length>=3&&q.includes(lower(query)));
+ const observed=queries.sort((a,b)=>b.length-a.length).find(query=>query.length>=3&&q.includes(lower(query)));
+ const explicitQuery=/sorgu|anahtar|kelime|[\"“”]/.test(q),sameProduct=product&&observed&&[lower(product.name),lower(product.id)].includes(lower(observed));
+ // A product name can also be a query. Preserve the user's selected product
+ // or exact page unless the question explicitly selects that query.
+ if(explicitQuery||!filters.page&&!sameProduct)filters.query=observed;
  return filters;
 }
 /** Answers use the exact observed filters and both period references. No causal claims. */
