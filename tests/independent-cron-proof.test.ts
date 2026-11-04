@@ -31,3 +31,15 @@ it('keeps the most recent natural slot when an older event arrives late',async()
  const proof=await gscCronProof(s,now);
  expect(proof.last?.scheduled_at).toBe(later);expect(proof.days[0]?.last_scheduled_at).toBe(later);expect(proof.days[0]?.attempts).toBe(2);
 });
+
+it('keeps daily and historical receipts immutable in the same real scheduled slot',async()=>{
+ const s=store(),now=new Date('2026-11-04T00:15:00Z'),slot=now.toISOString();
+ await recordGscCron(s,slot,{status:'idle',d1_requests:0},now);
+ await recordGscCron(s,slot,{status:'complete',day:'2026-10-01',scope:'page',rows:7,d1_requests:0},now,'history');
+ await recordGscCron(s,slot,{status:'held',d1_requests:0},now,'history');
+ const proof=await gscCronProof(s,now);
+ expect(proof.last).toMatchObject({status:'complete',rows:7,source:'Cloudflare Cron'});
+ expect(proof.days[0]).toMatchObject({attempts:2,completed:1,idle:1,held:0});
+ expect(s.values.get('gsc:cron:'+slot)).toMatchObject({status:'idle'});
+ expect(s.values.get('gsc:history-cron:'+slot)).toMatchObject({status:'complete'});
+});

@@ -104,3 +104,12 @@ describe('bounded context bridge independent of GSC collection',()=>{
   expect(await independentContextCron(absent.env,new Date('2026-11-04T06:15:00Z'))).toBe('updated');
  });
 });
+
+it('retries absent metadata on a natural quarter-hour and preserves daily freshness limits',async()=>{
+ const missing=bridgeEnv({available:false,d1_requests:0});
+ expect(await independentContextCron(missing.env,new Date('2026-11-04T14:07:33Z'))).toBe('idle');expect(missing.sqls).toEqual([]);
+ expect(await independentContextCron(missing.env,new Date('2026-11-04T14:30:00Z'))).toBe('updated');
+ const context=JSON.parse(String(missing.fetch.mock.calls.at(-1)![1]!.body));expect(context.captured_at).toBe('2026-11-04T14:30:00.000Z');
+ const existing=bridgeEnv({available:true,captured_at:'2026-11-03T00:15:00Z',d1_requests:0});
+ expect(await independentContextCron(existing.env,new Date('2026-11-04T14:30:00Z'))).toBe('idle');expect(existing.sqls).toEqual([]);
+});

@@ -13,6 +13,7 @@ import {cronTime,recordGscCron,gscCronProof} from './independent-cron-proof';
 import {validateIndependentContext,saveIndependentContext,readIndependentContext,independentContextStatus,answerContextQuestion} from './independent-context';
 import {retryGscHold} from './independent-recovery';
 import {runGscDiagnostic} from './independent-gsc-diagnostic';
+import {runGscBootstrapTick,gscBootstrapStatus} from './independent-gsc-bootstrap';
 
 const SCOPE='https://www.googleapis.com/auth/drive.file',API='https://www.googleapis.com/drive/v3/';
 const XLSX='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -188,7 +189,13 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     if(path==='/api/internal/gsc-status'&&request.method==='GET'){
       return json({connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect'),d1_requests:0});
     }
-    if(path==='/api/internal/evidence-context'&&request.method==='GET')return json(await independentContextStatus(this.ctx.storage));
+    if(path==='/api/internal/evidence-context'&&request.method==='GET'){
+      if(url.searchParams.get('details')==='1'){
+        const context=await readIndependentContext(this.ctx.storage);
+        return json(context?{available:true,source_hash:context.source_hash,captured_at:context.captured_at,products:context.products.length,snapshots:context.snapshots.length,changes:context.changes.length,coverage:context.coverage,d1_requests:0}:{available:false,d1_requests:0});
+      }
+      return json(await independentContextStatus(this.ctx.storage));
+    }
     if(path==='/api/internal/evidence-context'&&request.method==='POST'){
       const input=JSON.parse(await boundedText(new Response(request.body),1600000));
       const context=await validateIndependentContext(input);
@@ -231,6 +238,20 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     if(path==='/api/internal/gsc-diagnostic'&&request.method==='POST'){
       this.config();
       return json(await runGscDiagnostic(this.ctx.storage,this.key(),force=>this.gscToken(force)));
+    }
+    if(path==='/api/internal/gsc-bootstrap-status'&&request.method==='GET')return json(await gscBootstrapStatus(this.ctx.storage));
+    if(path==='/api/internal/gsc-bootstrap-tick'&&request.method==='POST'){
+      this.config();
+      const scheduled=request.body?cronTime(JSON.parse(await boundedText(new Response(request.body),1024))):null;
+      if(scheduled){const previous=await this.ctx.storage.get('gsc:history-cron:'+scheduled);if(previous)return json(previous);}
+      let result=await runGscBootstrapTick(this.ctx.storage,this.key(),force=>this.gscToken(force));
+      if(result.status==='held'&&result.code==='GSC_BOOTSTRAP_DIAGNOSTIC_REQUIRED'){
+        const diagnostic=await runGscDiagnostic(this.ctx.storage,this.key(),force=>this.gscToken(force));
+        if(diagnostic.ok&&(diagnostic.rows||diagnostic.cursor))result=await runGscBootstrapTick(this.ctx.storage,this.key(),force=>this.gscToken(force));
+      }
+      if(result.status==='complete')this.gscReports.clear();
+      if(scheduled)await recordGscCron(this.ctx.storage,scheduled,result,new Date(),'history');
+      return json(result);
     }
     if(path==='/api/internal/gsc-month'&&request.method==='GET'){
       this.config();
@@ -311,7 +332,13 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     const body=JSON.parse(await boundedText(new Response(request.body),8192)) as {question?:unknown;month?:unknown;source?:unknown};
     if(typeof body.question!=='string'||!body.question.trim()||body.question.length>1000||body.month!==undefined&&typeof body.month!=='string')return json({code:'INVALID_QUESTION'},400);
     questionBody={question:body.question,month:body.month as string|undefined,source:body.source};
-    const useGsc=path.endsWith('gsc-questions')||body.source==='gsc'||body.source!=='archive'&&/cihaz|mobil|masaüstü|tablet|ülke|türkiye|anahtar|kelime|sorgu|sayfa|https?:|şehir|ilçe|istanbul|bölge|değiş|ne zaman|başlık|meta|yayın|kanonik|canonical|\bh1\b/i.test(body.question);
+    let useGsc=path.endsWith('gsc-questions')||body.source==='gsc'||body.source!=='archive'&&/cihaz|mobil|masaüstü|tablet|ülke|türkiye|anahtar|kelime|sorgu|sayfa|https?:|şehir|ilçe|istanbul|bölge|değiş|ne zaman|başlık|meta|yayın|kanonik|canonical|\bh1\b/i.test(body.question);
+    if(!useGsc&&body.source!=='archive'){
+     const latest=new Date(Date.now()-3*86400000);latest.setUTCDate(1);latest.setUTCMonth(latest.getUTCMonth()-1);
+     const month=questionBody.month||latest.toISOString().slice(0,7),context=await readIndependentContext(this.ctx.storage).catch(()=>null);
+     const q=body.question.toLocaleLowerCase('tr-TR'),mapped=context?.products.some(p=>q.includes(p.name.toLocaleLowerCase('tr-TR'))||q.includes(p.id.toLocaleLowerCase('tr-TR')));
+     if(mapped&&/^20\d\d-(0[1-9]|1[0-2])$/.test(month)&&Date.parse(month+'-01T00:00:00Z')>Date.now()-400*86400000)useGsc=(await this.gscMonth(month)).available;
+    }
     if(useGsc){
      const latest=new Date(Date.now()-3*86400000);latest.setUTCDate(1);latest.setUTCMonth(latest.getUTCMonth()-1);
      const month=questionBody.month||latest.toISOString().slice(0,7);

@@ -20,7 +20,7 @@ import {independentDriveRoute} from './drive-broker';
 import {monthlyRoute} from './monthly-route';
 import {independentSession} from './independent-session';
 import {independentRefreshDue,refreshIndependentSheets} from './independent-refresh';
-import {independentGscCron} from './independent-gsc-bridge';
+import {independentGscCron,independentGscBootstrapCron} from './independent-gsc-bridge';
 import {independentContextCron} from './independent-context-bridge';
 export {MonthlyReportSource} from './monthly-source';
 export {DriveGoogleBroker} from './drive-broker';
@@ -211,6 +211,7 @@ export default {
       // Independent GSC collection is isolated from the legacy D1 read/write budget.
       try{await independentGscCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);}
       catch{console.log(JSON.stringify({event:'independent-gsc',status:'held',code:'GSC_PRIVATE_SYNC_UNAVAILABLE',d1_collection_writes:0}));}
+      await independentGscBootstrapCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);
       // Optional bounded metadata copy has its own budget. Its failure never
       // gates daily collection or reads from a user-facing GSC report.
       await independentContextCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);

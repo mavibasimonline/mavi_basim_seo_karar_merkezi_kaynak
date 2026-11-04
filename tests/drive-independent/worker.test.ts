@@ -187,3 +187,23 @@ describe('independent Drive without a D1 binding',()=>{
   await runInDurableObject(stub(),async(instance)=>{expect(await (instance as IndependentDriveStore).archive(new Date('2026-10-30'))).toMatchObject({already_archived:true});});expect(uploads).toBe(2);
  });
 });
+
+it('runs one private history step in actual SQLite without altering the daily queue or old archives',async()=>{
+ expect('DB' in cfg).toBe(false);
+ await stub().fetch('https://archive.private/api/internal/gsc-import',{method:'POST',body:JSON.stringify({scope:'https://www.googleapis.com/auth/webmasters.readonly',refresh_token:'fixture-existing-google-refresh-token-for-gsc'})});
+ await runInDurableObject(stub(),async(_instance,state)=>{
+  await state.storage.put('gsc:active',{fixture:'daily queue'});await state.storage.put('archive:2026-09-30',{fixture:'preserved history'});
+ });
+ vi.spyOn(globalThis,'fetch').mockImplementation(async(_url,init)=>{
+  const body=JSON.parse(String(init?.body));return Response.json({responseAggregationType:'byPage',rows:[{keys:[body.startDate,'https://mavibasim.com/brosur','tur','DESKTOP'],clicks:1,impressions:10,ctr:.1,position:3}]});
+ });
+ const slot=new Date();slot.setUTCMinutes(Math.floor(slot.getUTCMinutes()/15)*15,0,0);
+ const invoke=()=>stub().fetch('https://archive.private/api/internal/gsc-bootstrap-tick',{method:'POST',body:JSON.stringify({source:'cloudflare-cron',scheduled_at:slot.toISOString()})});
+ const result=await invoke();
+ expect(result.status).toBe(200);expect(await result.json()).toMatchObject({status:'complete',scope:'page',rows:1,d1_requests:0});
+ const status=await (await stub().fetch('https://archive.private/api/internal/gsc-bootstrap-status')).json<any>();
+ expect(await (await invoke()).json()).toMatchObject({source:'Cloudflare Cron',scheduled_at:slot.toISOString(),status:'complete',rows:1});
+ expect((await (await stub().fetch('https://archive.private/api/internal/gsc-coverage')).json<any>()).cron.days[0]).toMatchObject({attempts:1,completed:1});
+ expect(status).toMatchObject({initialized:true,completed_scopes:1,d1_requests:0});expect(status.months).toHaveLength(2);expect(status.total_scopes).toBeLessThanOrEqual(124);
+ await runInDurableObject(stub(),async(_instance,state)=>{expect(await state.storage.get('gsc:active')).toEqual({fixture:'daily queue'});expect(await state.storage.get('archive:2026-09-30')).toEqual({fixture:'preserved history'});});
+});

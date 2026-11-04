@@ -34,3 +34,15 @@ export async function independentGscCron(env:E,time=new Date()):Promise<'importe
  if(result.d1_requests!==0||!['partial','complete','idle','held'].includes(String(result.status)))throw Error('GSC_INDEPENDENT_TICK_UNVERIFIED');
  return 'collected';
 }
+export async function independentGscBootstrapCron(env:E,time=new Date()):Promise<'idle'|'collected'|'held'>{
+ if(env.AUTOMATION_ENABLED!=='true'||typeof env.DRIVE_ARCHIVE_SERVICE?.fetch!=='function')return 'idle';
+ try{
+  const service=env.DRIVE_ARCHIVE_SERVICE;
+  const status=await read(await service.fetch('https://archive.private/api/internal/gsc-coverage'));
+  // Daily scopes retain priority over the bounded initial history plan.
+  if(status.connected!==true||status.reauthorization_required===true||!Array.isArray(status.coverage)||status.coverage.length!==14)return 'idle';
+  const result=await read(await service.fetch('https://archive.private/api/internal/gsc-bootstrap-tick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'cloudflare-cron',scheduled_at:time.toISOString()})}));
+  if(result.d1_requests!==0)return 'held';
+  return result.status==='held'?'held':result.status==='idle'?'idle':'collected';
+ }catch{return 'held';}
+}

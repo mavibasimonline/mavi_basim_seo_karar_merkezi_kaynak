@@ -7,8 +7,8 @@ from release_readiness import get_json,REPOSITORY
 ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
-TITLE='release: verified daily GSC pipeline 20261104'
-EXPECTED={'scripts/independent_seo_release.py', 'tests/test_independent_seo_release.py', 'tests/independent-recovery.test.ts', 'src/independent-recovery.ts'}
+TITLE='release: verified GSC history bootstrap 20261104'
+EXPECTED={'src/independent-cron-proof.ts', 'scripts/independent_seo_release.py', 'tests/independent-cron-proof.test.ts', 'src/independent-context-bridge.ts', 'scripts/gsc_history_acceptance.py', '.github/workflows/independent-seo-release.yml', 'tests/gsc-history-probe.test.ts', 'docs/GSC_OTOMATIK_KANIT_20261104.md', 'scripts/gsc_runtime_audit.py', 'src/independent-gsc-bridge.ts', '.github/workflows/gsc-runtime-audit.yml', 'tests/test_gsc_history_acceptance.py', 'tests/independent-gsc-bootstrap.test.ts', 'TODO.md', 'tests/independent-context.test.ts', 'src/index.ts', 'tests/drive-independent/worker.test.ts', 'tests/test_independent_seo_release.py', 'src/independent-gsc-bootstrap.ts', 'scripts/gsc_history_probe.ts', 'tests/drive-independent/gsc-routes.test.ts', 'src/independent-gsc.ts', 'src/drive-independent.ts'}
 
 def need(condition,code):
  if not condition:raise ValueError(code)
@@ -86,7 +86,7 @@ def run():
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'INDEPENDENT_MAIN_SUPERSEDED')
  changed=set(git('diff','--name-only','HEAD^','HEAD').splitlines())
  need(changed==EXPECTED,'INDEPENDENT_UNREVIEWED_FILES')
- need(git('rev-parse','HEAD^')=='e17b3ca6b1d19da1de79764bd4f182067050a74b','INDEPENDENT_UNREVIEWED_BASE')
+ need(git('rev-parse','HEAD^')=='6b2721806969c2697f592d38108cf2625ea317a8','INDEPENDENT_UNREVIEWED_BASE')
  # Preserve the reviewed Cron/DO source set exactly as merged and CI verified.
  need("independentRefreshDue(time)" in (ROOT/'src/index.ts').read_text()
       and "private async independentSnapshot(maxAgeMs=6*3600000)" in (ROOT/'src/drive-independent.ts').read_text()
@@ -182,6 +182,15 @@ def run():
   from gsc_pipeline_acceptance import runPipeline
   gsc_proof=runPipeline()
   need(gsc_proof['passed'],'GSC_PIPELINE_ACCEPTANCE_FAILED')
+  from gsc_history_acceptance import runHistory
+  history_proof=runHistory()
+  if not history_proof['verified']:
+   last=history_proof['status'].get('tick') or {}
+   code=last.get('code','')
+   # Availability/backoff may leave a resumable plan, but an integrity failure
+   # must stop and roll back. No caller may turn missing scopes into zeros.
+   resumable=last.get('status') in ('partial','complete') or code in ('GSC_HTTP_429','GSC_OAUTH_RECONNECT_REQUIRED','GSC_STORAGE_DAILY_LIMIT','GSC_STORAGE_TOTAL_LIMIT','GSC_STORAGE_OBJECT_LIMIT','GSC_BOOTSTRAP_STORAGE_LIMIT','GSC_RETRY_BACKOFF','GSC_BOOTSTRAP_DIAGNOSTIC_REQUIRED','GSC_BOOTSTRAP_SOURCE_INCOMPLETE') or re.fullmatch(r'GSC_HTTP_5\d\d',code)
+   need(resumable,'GSC_HISTORY_INTEGRITY_ACCEPTANCE_FAILED')
   changed_workers.append(APP);deploy(main_config,sha)
   after_main=snapshot(client,APP)
   verify_active_source(client,APP,after_main['version'],sha)
@@ -201,7 +210,8 @@ def run():
    code,content=http(base+endpoint)
    need(code==401 and b'Giri' in content,'INDEPENDENT_PUBLIC_DATA_EXPOSED')
   need(snapshot(client,APP)['crons']==existing[APP]['crons'],'INDEPENDENT_CRON_CHANGED')
-  print(json.dumps({'deployed':True,'source':sha,'d1_data_mutated':False,'new_billed_resources':False,'backup_mutated':False,'new_layer':'D1-free GSC daily proofs and preserved Sheets archives','gsc_verified_scopes':gsc_proof['readback']['content_verified_scopes'],'gsc_manual_acceptance_ticks':gsc_proof['manual_ticks'],'gsc_natural_cron_verification':'separate runtime receipt required','login_uses_d1':False,'authenticated_data_acceptance':'requires existing admin session','public_endpoints_closed':True,'existing_site_changed':False}),flush=True)
+  context_proof=runHistory(context_only=True)
+  print(json.dumps({'deployed':True,'source':sha,'d1_data_mutated':False,'new_billed_resources':False,'backup_mutated':False,'new_layer':'D1-free GSC daily proofs and preserved Sheets archives','history_months_verified':2 if history_proof['verified'] else 0,'history_plan_complete':history_proof['status']['plan_complete'],'metadata_context_available':context_proof['available'],'gsc_verified_scopes':gsc_proof['readback']['content_verified_scopes'],'gsc_manual_acceptance_ticks':gsc_proof['manual_ticks'],'gsc_natural_cron_verification':'separate runtime receipt required','login_uses_d1':False,'authenticated_data_acceptance':'requires existing admin session','public_endpoints_closed':True,'existing_site_changed':False}),flush=True)
  except Exception:
   for worker,config in ((APP,main_config),(ARCHIVE,'deploy/wrangler.drive-archive.jsonc')):
    if worker in changed_workers:

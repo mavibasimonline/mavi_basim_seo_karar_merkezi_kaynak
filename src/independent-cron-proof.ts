@@ -11,12 +11,14 @@ export function cronTime(body:unknown,time=new Date()):string|null{
  if(!Number.isFinite(at.getTime())||at.toISOString()!==input.scheduled_at||at.getUTCMinutes()%15!==0||at.getUTCSeconds()!==0||at.getUTCMilliseconds()!==0||at.getTime()>time.getTime()+300000||at.getTime()<time.getTime()-86400000)throw Error('GSC_CRON_TIME_INVALID');
  return at.toISOString();
 }
+type CronKind='daily'|'history';
+const prefix=(kind:CronKind)=>kind==='daily'?'gsc:cron':'gsc:history-cron';
 type CronStorage=GscStorage&Partial<Pick<DurableObjectStorage,'transaction'>>;
-export async function recordGscCron(storage:CronStorage,scheduled:string,result:Result,time=new Date()){
- if(storage.transaction)return storage.transaction(tx=>writeReceipt(tx,scheduled,result,time));
- return writeReceipt(storage,scheduled,result,time);
+export async function recordGscCron(storage:CronStorage,scheduled:string,result:Result,time=new Date(),kind:CronKind='daily'){
+ if(storage.transaction)return storage.transaction(tx=>writeReceipt(tx,scheduled,result,time,kind));
+ return writeReceipt(storage,scheduled,result,time,kind);
 }
-async function writeReceipt(storage:GscStorage,scheduled:string,result:Result,time:Date){
+async function writeReceipt(storage:GscStorage,scheduled:string,result:Result,time:Date,kind:CronKind){
  if(result.d1_requests!==0||!['complete','partial','held','idle'].includes(result.status))throw Error('GSC_CRON_RESULT_INVALID');
  const receipt:Receipt={source:'Cloudflare Cron',scheduled_at:scheduled,finished_at:time.toISOString(),status:result.status,d1_requests:0};
  if(result.day&&/^20\d\d-\d\d-\d\d$/.test(result.day))receipt.day=result.day;
@@ -24,13 +26,13 @@ async function writeReceipt(storage:GscStorage,scheduled:string,result:Result,ti
  if(Number.isSafeInteger(result.rows)&&result.rows!>=0)receipt.rows=result.rows;
  if(Number.isSafeInteger(result.cursor)&&result.cursor!>=0)receipt.cursor=result.cursor;
  if(result.code&&/^GSC_[A-Z0-9_]{1,100}$/.test(result.code))receipt.code=result.code;
- const key='gsc:cron:'+scheduled,old=await storage.get<Receipt>(key);
+ const key=prefix(kind)+':'+scheduled,old=await storage.get<Receipt>(key);
  // Immutable execution receipt: repeated scheduler delivery cannot overwrite it.
  if(old)return;
  await storage.put(key,receipt);
- const previousLast=await storage.get<Receipt>('gsc:cron:last');
- if(!previousLast||previousLast.scheduled_at<scheduled)await storage.put('gsc:cron:last',receipt);
- const day=scheduled.slice(0,10),summaryKey='gsc:cron-summary:'+day;
+ const previousLast=await storage.get<Receipt>(prefix(kind)+':last');
+ if(!previousLast||previousLast.scheduled_at<scheduled)await storage.put(prefix(kind)+':last',receipt);
+ const day=scheduled.slice(0,10),summaryKey=prefix(kind)+'-summary:'+day;
  const prior=await storage.get<Summary>(summaryKey);
  const summary:Summary=prior||{day,attempts:0,completed:0,partial:0,held:0,idle:0,last_scheduled_at:scheduled};
  summary.attempts++;if(summary.last_scheduled_at<scheduled)summary.last_scheduled_at=scheduled;
@@ -39,7 +41,17 @@ async function writeReceipt(storage:GscStorage,scheduled:string,result:Result,ti
 }
 export async function gscCronProof(storage:GscStorage,time=new Date()){
  const today=time.toISOString().slice(0,10),yesterday=new Date(time.getTime()-86400000).toISOString().slice(0,10);
- return {last:await storage.get<Receipt>('gsc:cron:last')||null,
-  days:(await Promise.all([today,yesterday].map(d=>storage.get<Summary>('gsc:cron-summary:'+d)))).filter(Boolean),
+ const kinds:CronKind[]=['daily','history'];
+ const lasts=(await Promise.all(kinds.map(kind=>storage.get<Receipt>(prefix(kind)+':last')))).filter((r):r is Receipt=>!!r);
+ lasts.sort((a,b)=>b.scheduled_at.localeCompare(a.scheduled_at)||Number(['complete','partial'].includes(b.status))-Number(['complete','partial'].includes(a.status)));
+ const days:Summary[]=[];
+ for(const day of [today,yesterday]){
+  const receipts=(await Promise.all(kinds.map(kind=>storage.get<Summary>(prefix(kind)+'-summary:'+day)))).filter((r):r is Summary=>!!r);
+  if(!receipts.length)continue;
+  const sum:Summary={day,attempts:0,completed:0,partial:0,held:0,idle:0,last_scheduled_at:receipts[0].last_scheduled_at};
+  for(const r of receipts){for(const k of ['attempts','completed','partial','held','idle'] as const)sum[k]+=r[k];if(r.last_scheduled_at>sum.last_scheduled_at)sum.last_scheduled_at=r.last_scheduled_at;}
+  days.push(sum);
+ }
+ return {last:lasts[0]||null,days,
   scope:'Only receipts recorded after this runtime upgrade; absent earlier receipts are not failed jobs.'};
 }

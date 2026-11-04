@@ -20,9 +20,11 @@ const dayAgo=(n:number,time:Date)=>new Date(Date.UTC(time.getUTCFullYear(),time.
 function ensure(yes:unknown,code:string):asserts yes {if(!yes)throw Error(code);}
 function safeDay(day:string,time:Date){ensure(/^20\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(day)&&new Date(day+'T00:00:00Z').toISOString().slice(0,10)===day&&day<=dayAgo(3,time)&&day>=dayAgo(400,time),'GSC_DAY_OUT_OF_RANGE');}
 class RowFailure extends Error{constructor(public reason:string){super('GSC_ROW_REJECTED');}}
-type StorageBudget={version:1;measured_since:string;day:string;reserved_bytes:number;day_reserved_bytes:number};
+type StorageBudget={version:1;measured_since:string;day:string;reserved_bytes:number;day_reserved_bytes:number;bootstrap_reserved_bytes?:number};
 const STORAGE_TOTAL=128*1024*1024,STORAGE_DAY=8*1024*1024;
-async function reserveStorage(storage:GscStorage,planned:number,time:Date){
+export const GSC_BOOTSTRAP_STORAGE_LIMIT=16*1024*1024;
+type BudgetMode='daily'|'bootstrap';
+async function reserveStorage(storage:GscStorage,planned:number,time:Date,mode:BudgetMode='daily'){
  const saved=await storage.get<StorageBudget>('gsc:storage-budget:v1'),day=time.toISOString().slice(0,10);
  ensure(Number.isSafeInteger(planned)&&planned>0,'GSC_STORAGE_BUDGET_INVALID');
  if(saved)ensure(saved.version===1&&Number.isSafeInteger(saved.reserved_bytes)&&saved.reserved_bytes>=0&&Number.isSafeInteger(saved.day_reserved_bytes)&&saved.day_reserved_bytes>=0,'GSC_STORAGE_BUDGET_INVALID');
@@ -31,10 +33,14 @@ async function reserveStorage(storage:GscStorage,planned:number,time:Date){
  // size when the runtime exposes it; never pretend this measures other objects.
  if(storage.sql)ensure(Number.isFinite(storage.sql.databaseSize)&&storage.sql.databaseSize>=0&&storage.sql.databaseSize+planned<=256*1024*1024,'GSC_STORAGE_OBJECT_LIMIT');
  ensure(budget.reserved_bytes+planned<=STORAGE_TOTAL,'GSC_STORAGE_TOTAL_LIMIT');
- ensure(budget.day_reserved_bytes+planned<=STORAGE_DAY,'GSC_STORAGE_DAILY_LIMIT');
+ ensure(Number.isSafeInteger(budget.bootstrap_reserved_bytes??0)&&(budget.bootstrap_reserved_bytes??0)>=0,'GSC_STORAGE_BUDGET_INVALID');
+ if(mode==='bootstrap')ensure((budget.bootstrap_reserved_bytes??0)+planned<=GSC_BOOTSTRAP_STORAGE_LIMIT,'GSC_BOOTSTRAP_STORAGE_LIMIT');
+ else ensure(budget.day_reserved_bytes+planned<=STORAGE_DAY,'GSC_STORAGE_DAILY_LIMIT');
  // Reservation precedes chunks and is retained even after a failed write. It is
  // deliberately conservative; pre-upgrade/account-wide usage is not measured.
- budget.reserved_bytes+=planned;budget.day_reserved_bytes+=planned;
+ budget.reserved_bytes+=planned;
+ if(mode==='bootstrap')budget.bootstrap_reserved_bytes=(budget.bootstrap_reserved_bytes??0)+planned;
+ else budget.day_reserved_bytes+=planned;
  await storage.put('gsc:storage-budget:v1',budget);
 }
 const identities=(rows:GscRow[])=>Promise.all(rows.map(r=>digest(JSON.stringify([r.date,r.page,r.country,r.device,r.query]))));
@@ -74,14 +80,14 @@ export function validateGscPage(body:unknown,day:string,scope:Scope,cursor:numbe
  const incomplete=!!marker&&marker<=day;
  return {rows,next:rows.length===PAGE?cursor+PAGE:null,incomplete};
 }
-async function writePage(storage:GscStorage,j:Job,rows:GscRow[],secret:string,time:Date,hashes:string[]):Promise<PageProof>{
+async function writePage(storage:GscStorage,j:Job,rows:GscRow[],secret:string,time:Date,hashes:string[],mode:BudgetMode):Promise<PageProof>{
  const index=j.pages.length,serialized=JSON.stringify(rows),hash=await digest(serialized),binary=bytes(serialized);
  const chunks=Math.ceil(binary.length/CHUNK);
  ensure(chunks>=1&&chunks<=20&&binary.length<=PAGE*2300,'GSC_PAGE_BYTES_LIMIT');
  ensure(index<MAX_PAGES,'GSC_PAGE_LIMIT');
  // 2x serialized plaintext covers base64+encryption overhead; identity lists,
  // page manifests and active/final pointers receive an additional allowance.
- await reserveStorage(storage,binary.length*2+bytes(JSON.stringify(hashes)).length*2+4096,time);
+ await reserveStorage(storage,binary.length*2+bytes(JSON.stringify(hashes)).length*2+4096,time,mode);
  for(let i=0;i<chunks;i++){
   const slice=binary.subarray(i*CHUNK,(i+1)*CHUNK);
   await storage.put(pageKey(j,index,i),await encrypt({chunk:btoa(String.fromCharCode(...slice))},secret));
@@ -97,7 +103,7 @@ async function writePage(storage:GscStorage,j:Job,rows:GscRow[],secret:string,ti
  await storage.put(seenKey(j,index),hashes);
  return {index,count:rows.length,bytes:binary.length,chunks,sha256:hash};
 }
-async function previousIdentities(storage:GscStorage,j:Job,secret:string,time:Date){
+async function previousIdentities(storage:GscStorage,j:Job,secret:string,time:Date,mode:BudgetMode){
  const seen=new Set<string>();
  for(const p of j.pages){
   const saved=await storage.get<string[]>(seenKey(j,p.index));
@@ -117,7 +123,7 @@ async function previousIdentities(storage:GscStorage,j:Job,secret:string,time:Da
   const raw=new TextDecoder().decode(all);ensure(at===p.bytes&&await digest(raw)===p.sha256,'GSC_READBACK_REJECTED');
   const rows=JSON.parse(raw) as GscRow[];ensure(Array.isArray(rows)&&rows.length===p.count,'GSC_READBACK_REJECTED');
   const hashes=await identities(rows);
-  await reserveStorage(storage,bytes(JSON.stringify(hashes)).length*2+1024,time);
+  await reserveStorage(storage,bytes(JSON.stringify(hashes)).length*2+1024,time,mode);
   await storage.put(seenKey(j,p.index),hashes);
   return null;
  }
@@ -128,7 +134,7 @@ export function selectGscDay(time:Date,backfill=0,history=false){
  return dayAgo(history?10+index:3,time);
 }
 export class IndependentGscCollector {
- constructor(private storage:GscStorage,private keySecret:string,private token:(force:boolean)=>Promise<string>,private fetcher:typeof fetch=fetch){}
+ constructor(private storage:GscStorage,private keySecret:string,private token:(force:boolean)=>Promise<string>,private fetcher:typeof fetch=fetch,private budgetMode:BudgetMode='daily'){}
  private async finish(j:Job,time:Date){
   const final:DailyProof={day:j.day,scope:j.scope,generation:j.generation,captured_at:j.completed_at||time.toISOString(),
    rows:j.cursor,pages:j.pages.length,query_partial:j.scope==='query'||!!j.incomplete||!!j.truncated||j.cursor===0,
@@ -187,7 +193,7 @@ export class IndependentGscCollector {
   let phase:GscPhase='storage';
   try{
    if(j.ready){phase='publication';return await this.finish(j,time);}
-   const seen=await previousIdentities(this.storage,j,this.keySecret,time);
+   const seen=await previousIdentities(this.storage,j,this.keySecret,time,this.budgetMode);
    if(!seen){
     await this.storage.put('gsc:last-attempt',{at:time.toISOString(),status:'partial',day:j.day,scope:j.scope,cursor:j.cursor,code:'GSC_IDENTITY_INDEX_BUILDING'});
     return {status:'partial',day:j.day,scope:j.scope,cursor:j.cursor,code:'GSC_IDENTITY_INDEX_BUILDING',d1_requests:0};
@@ -221,7 +227,7 @@ export class IndependentGscCollector {
    const page=validateGscPage(body,j.day,j.scope,j.cursor),hashes=await identities(page.rows);
    for(const h of hashes)ensure(!seen.has(h),'GSC_DUPLICATE_ROW');
    phase='storage';
-   const proof=await writePage(this.storage,j,page.rows,this.keySecret,time,hashes);
+   const proof=await writePage(this.storage,j,page.rows,this.keySecret,time,hashes,this.budgetMode);
    phase='publication';
    j.pages.push(proof);j.cursor+=page.rows.length;
    j.incomplete=!!j.incomplete||page.incomplete;
@@ -240,7 +246,7 @@ export class IndependentGscCollector {
    const detail=error instanceof RowFailure&&/^(DATE|PAGE_PROPERTY_SCOPE|PAGE_ORIGIN|COUNTRY|DEVICE|METRIC_NUMBER|COUNTS|METRIC_RANGE|CTR_RATIO|QUERY)$/.test(error.reason)?error.reason:undefined;
    const failure={at:time.toISOString(),status:'held',day:j.day,scope:j.scope,code,phase,...(detail?{validation_reason:detail}:{}),cursor:j.cursor};
    await this.storage.put('gsc:last-failure',failure);
-   if(['GSC_STORAGE_DAILY_LIMIT','GSC_STORAGE_TOTAL_LIMIT','GSC_STORAGE_OBJECT_LIMIT'].includes(code)){
+   if(['GSC_STORAGE_DAILY_LIMIT','GSC_STORAGE_TOTAL_LIMIT','GSC_STORAGE_OBJECT_LIMIT','GSC_BOOTSTRAP_STORAGE_LIMIT'].includes(code)){
     const until=code==='GSC_STORAGE_DAILY_LIMIT'?Date.UTC(time.getUTCFullYear(),time.getUTCMonth(),time.getUTCDate()+1):time.getTime()+86400000;
     await this.storage.put('gsc:retry',{until});
     await this.storage.put('gsc:last-attempt',failure);

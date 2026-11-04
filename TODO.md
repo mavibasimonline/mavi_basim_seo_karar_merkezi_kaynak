@@ -1,3 +1,14 @@
+## 4 Kasım 2026 — doğrudan GSC geçmişi için kabul bekleyen işler
+
+- [x] Günlük akış sürümü `6b2721806969c2697f592d38108cf2625ea317a8`, yayın çalışması `41839530502`: kontrol düzlemi ve HTTP sürümü eşleşti. Yeni geçmiş sürümü ayrıca kabul edilecek.
+- [x] 26 Ekim–1 Kasım için 7 gün × sayfa/sorgu 14 kapsam, `41839530502` çalışmasında şifreli içerikten ayrı ayrı geri okundu (GSC koleksiyonu D1 istekleri: 0).
+- [ ] Eylül/Ekim doğrudan GSC planının 122 kapsamını ve iki aylık sorgu içerik kapsamını doğrula; Sheets arşivi ayrı korunur.
+- [ ] Doğal Cron'un ürün URL/tarama bağlamını gerçek D1 okuma bütçesiyle kopyaladığını doğrula; kota beklemesini eksik kayıt olarak raporla.
+- [ ] Sonraki UTC gününün doğal Cron makbuzunu yeni günlük kapsamla doğrula. Aynı gün testini bu kanıt yerine kullanma.
+- [ ] GA4 şehir verisi ve geçmiş doğrulanmış yayın kayıtları yoksa bunları tamamlandı sayma.
+
+Ayrıntı: `docs/GSC_OTOMATIK_KANIT_20261104.md`. Bu kutular yalnız gerçek çalışma kanıtıyla kapatılır.
+
 ## 4 Kasım 2026 — günlük GSC hattı kabulü
 
 - Başlangıç canlı ölçümü: 07:05 UTC, bağlı Google, 0/14 kapsam, `idle`. Kuyruk bekletme kodları eski durumda görünmüyordu.

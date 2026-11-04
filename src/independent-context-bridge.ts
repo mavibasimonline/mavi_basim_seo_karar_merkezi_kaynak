@@ -42,8 +42,8 @@ export async function loadIndependentContext(env:Env,time=new Date()):Promise<In
 export async function independentContextCron(env:E,time=new Date()):Promise<'updated'|'idle'|'unavailable'|'held'>{
  if(env.AUTOMATION_ENABLED!=='true'||typeof env.DRIVE_ARCHIVE_SERVICE?.fetch!=='function')return 'unavailable';
  // Existing contexts refresh only at 00:15 UTC. An absent context can retry
- // hourly at :15; status reads and every failure remain isolated from GSC.
- if(time.getUTCMinutes()!==15)return 'idle';
+ // at each natural quarter-hour; status reads and every failure remain isolated from GSC.
+ if(time.getUTCMinutes()%15!==0)return 'idle';
  try{
   const response=await env.DRIVE_ARCHIVE_SERVICE.fetch(ENDPOINT,{method:'GET'});
   if(!response.ok)return 'held';
@@ -51,7 +51,7 @@ export async function independentContextCron(env:E,time=new Date()):Promise<'upd
   if(status.d1_requests!==0||typeof status.available!=='boolean')return 'held';
   if(status.available){
    if(typeof status.captured_at!=='string'||!Number.isFinite(Date.parse(status.captured_at))||Date.parse(status.captured_at)>time.getTime()+300000)return 'held';
-   if(status.captured_at.slice(0,10)>=time.toISOString().slice(0,10)||time.getUTCHours()!==0)return 'idle';
+   if(status.captured_at.slice(0,10)>=time.toISOString().slice(0,10)||time.getUTCHours()!==0||time.getUTCMinutes()!==15)return 'idle';
   }
   const context=await loadIndependentContext(env,time);
   const saved=await env.DRIVE_ARCHIVE_SERVICE.fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(context)});

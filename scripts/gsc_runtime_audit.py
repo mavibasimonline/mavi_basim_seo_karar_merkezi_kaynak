@@ -18,7 +18,7 @@ ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
 TITLE='audit: daily GSC runtime evidence 20261104'
-RELEASE_TITLE='release: verified daily GSC pipeline 20261104'
+RELEASE_TITLE='release: verified GSC history bootstrap 20261104'
 
 def need(value, code):
  if not value:raise ValueError(code)

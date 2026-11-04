@@ -86,9 +86,32 @@ it('redelivery of a Cron slot returns its immutable receipt without another Goog
 it('public application paths never expose or forward private GSC endpoints without an authenticated session',async()=>{
  const archive={fetch:vi.fn(async()=>Response.json({TEST:'must not be reached'}))};
  const bindings={ADMIN_TOKEN:'TEST owner secret',DRIVE_ARCHIVE_SERVICE:archive,DB:{prepare(){throw Error('TEST unexpected D1 access');}}} as any;
- for(const [path,method] of [['/api/internal/gsc-status','GET'],['/api/internal/gsc-proof?day=2026-10-01&scope=page','GET'],['/api/internal/gsc-retry','POST'],['/api/independent/gsc-status','GET'],['/api/independent/gsc-questions','POST']]){
+ for(const [path,method] of [['/api/internal/gsc-bootstrap-status','GET'],['/api/internal/gsc-bootstrap-tick','POST'],['/api/internal/evidence-context?details=1','GET'],['/api/internal/gsc-status','GET'],['/api/internal/gsc-proof?day=2026-10-01&scope=page','GET'],['/api/internal/gsc-retry','POST'],['/api/independent/gsc-status','GET'],['/api/independent/gsc-questions','POST']]){
   const response=await main.fetch(new Request('https://app.example'+path,{method}),bindings);
   expect(response.status).toBe(401);
  }
  expect(archive.fetch).not.toHaveBeenCalled();
+});
+
+it('routes a verified product question to complete real GSC evidence before contacting Sheets',async()=>{
+ const {buildIndependentContext,saveIndependentContext}=await import('../../src/independent-context');
+ const month=closedMonth(),prior=new Date(month+'-01T00:00:00Z');prior.setUTCMonth(prior.getUTCMonth()-1);
+ const months=[month,prior.toISOString().slice(0,7)],captured_at=new Date().toISOString(),page='https://mavibasim.com/verified-brochure';
+ await runInDurableObject(stub(),async(_instance,state)=>{
+  const context=await buildIndependentContext({captured_at,products:[{id:'brosur',name:'Broşür',canonical_url:page,url_verified_at:captured_at}],snapshots:[],changes:[]});
+  await saveIndependentContext(state.storage,context);
+  for(const m of months){
+   const count=new Date(Number(m.slice(0,4)),Number(m.slice(5)),0).getDate();
+   for(let n=1;n<=count;n++){
+    const day=m+'-'+String(n).padStart(2,'0'),generation=crypto.randomUUID();
+    const raw=JSON.stringify([{date:day,page,country:'tur',device:'DESKTOP',clicks:1,impressions:10,ctr:.1,position:4}]),bytes=new TextEncoder().encode(raw);
+    await state.storage.put('gsc:part:'+day+':page:'+generation+':0:0',await encrypt({chunk:btoa(String.fromCharCode(...bytes))},cfg.ARCHIVE_ENCRYPTION_KEY!));
+    await state.storage.put('gsc:daily:'+day+':page',{day,scope:'page',generation,captured_at,rows:1,pages:1,query_partial:false,source:'GSC Search Analytics API',d1_requests:0,page_proofs:[{index:0,count:1,bytes:bytes.length,chunks:1,sha256:await hash(raw)}]});
+   }
+  }
+ });
+ const network=vi.spyOn(globalThis,'fetch').mockRejectedValue(Error('TEST Sheets must not be read'));
+ const response=await stub().fetch('https://archive.private/api/independent/questions',{method:'POST',body:JSON.stringify({question:'Broşür nasıl gidiyor?',month})});
+ const result=await response.json<any>();expect(response.status).toBe(200);expect(result.d1_requests).toBe(0);expect(result.mapping_evidence.source_hash).toMatch(/^[a-f0-9]{64}$/);
+ expect(new Set(result.evidence_refs.map((r:any)=>r.day.slice(0,7)))).toEqual(new Set(months));expect(network).not.toHaveBeenCalled();
 });
