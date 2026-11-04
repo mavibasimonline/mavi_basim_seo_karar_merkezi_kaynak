@@ -5,13 +5,13 @@ import {decrypt} from './security';
 export const GSC_DIAGNOSTIC_REVISION='daily-proof-v2';
 const PREFIX='gsc:diagnostic:'+GSC_DIAGNOSTIC_REVISION+':',LAST='gsc:diagnostic:last';
 const phases=new Set<GscPhase>(['authorization','provider','response','validation','storage','publication']);
-type Failure={at?:string;code?:string;phase?:GscPhase;validation_reason?:string;day?:string;scope?:'page'|'query';cursor?:number};
+type Failure={status:'held';at?:string;code?:string;phase?:GscPhase;validation_reason?:string;day?:string;scope?:'page'|'query';cursor?:number};
 export type GscDiagnostic={at:string;revision:typeof GSC_DIAGNOSTIC_REVISION;status:string;ok:boolean;readback_verified:boolean;day?:string;scope?:'page'|'query';rows?:number;cursor?:number;code?:string;phase?:GscPhase;last_failure:Failure|null;d1_requests:0};
 const code=(value:unknown)=>typeof value==='string'&&/^GSC_[A-Z0-9_]{1,80}$/.test(value)?value:undefined;
 const count=(value:unknown):value is number=>Number.isSafeInteger(value)&&Number(value)>=0&&Number(value)<=50000;
 function failure(value:unknown):Failure|null{
  if(!value||typeof value!=='object')return null;
- const raw=value as Record<string,unknown>,safe:Failure={};
+ const raw=value as Record<string,unknown>,safe:Failure={status:'held'};
  if(typeof raw.at==='string'&&Number.isFinite(Date.parse(raw.at)))safe.at=new Date(raw.at).toISOString();
  if(code(raw.code))safe.code=code(raw.code);
  if(phases.has(raw.phase as GscPhase))safe.phase=raw.phase as GscPhase;
@@ -56,7 +56,7 @@ export async function runGscDiagnostic(storage:GscStorage,keySecret:string,token
  const [globalRetry,globalFailure]=await Promise.all([storage.get<{until:number}>('gsc:retry'),storage.get<{code?:string}>('gsc:last-failure')]);
  if(globalRetry&&globalRetry.until>time.getTime()&&globalFailure?.code&&(/^(GSC_HTTP_429|GSC_HTTP_5\d\d)$/.test(globalFailure.code)||['GSC_STORAGE_DAILY_LIMIT','GSC_STORAGE_TOTAL_LIMIT','GSC_STORAGE_OBJECT_LIMIT','GSC_OAUTH_RECONNECT_REQUIRED'].includes(globalFailure.code)))raw={status:'held',code:globalFailure.code};
  else try{raw=await new IndependentGscCollector(scoped,keySecret,token,fetcher).tick(time);}
- catch{raw={status:'held',code:'GSC_STORAGE_UNAVAILABLE'};caught={at:time.toISOString(),phase:'storage',code:'GSC_STORAGE_UNAVAILABLE'};}
+ catch{raw={status:'held',code:'GSC_STORAGE_UNAVAILABLE'};caught={status:'held',at:time.toISOString(),phase:'storage',code:'GSC_STORAGE_UNAVAILABLE'};}
  let verified=false;
  if(raw.status==='complete'||raw.status==='partial')try{verified=await readback(scoped,keySecret,raw);}catch{/* No provider payload or native exception leaves this boundary. */}
  const lastFailure=caught||failure(await scoped.get('gsc:last-failure'));

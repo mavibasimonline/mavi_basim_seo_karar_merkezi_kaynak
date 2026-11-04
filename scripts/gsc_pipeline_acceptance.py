@@ -104,6 +104,11 @@ def acceptance(exchange,max_ticks=32):
  print(json.dumps({'gsc_pipeline_acceptance':report},ensure_ascii=False),flush=True)
  return report
 
+def collector_ready(value):
+ if not isinstance(value,dict) or not isinstance(value.get('status'),dict):return False
+ status=value['status']
+ return isinstance(status.get('held'),list) and type(status.get('tick_count')) is int and type(status.get('backfill_index')) is int and isinstance(status.get('storage_budget'),dict)
+
 def runPipeline(max_ticks=32):
  """Called only by the already guarded controlled release, after archive upload."""
  need(type(max_ticks) is int and 0<=max_ticks<=32,'GSC_PIPELINE_TOTAL_TICK_LIMIT')
@@ -117,12 +122,15 @@ def runPipeline(max_ticks=32):
   with (folder/'runtime.log').open('w') as logs:
    preview=subprocess.Popen(['node','scripts/run.mjs','wrangler','dev','--remote','--config',str(config_path),'--ip','127.0.0.1','--port','8803','--log-level','error'],cwd=ROOT,stdout=logs,stderr=logs)
    def exchange(mode,ticks):
-    deadline=time.monotonic()+100
+    deadline=time.monotonic()+100;old_collector=False
     while time.monotonic()<deadline:
      need(preview.poll() is None,'GSC_PIPELINE_PREVIEW_CRASHED')
      try:
       with urllib.request.urlopen(request(key,mode,ticks),timeout=60) as response:
-       body=response.read(65537);need(len(body)<=65536,'GSC_PIPELINE_RESPONSE_LIMIT');return json.loads(body)
+       body=response.read(65537);need(len(body)<=65536,'GSC_PIPELINE_RESPONSE_LIMIT');value=json.loads(body)
+       if mode=='status' and not collector_ready(value):
+        old_collector=True;time.sleep(1);continue
+       return value
      except urllib.error.HTTPError as error:
       body=error.read(1024)
       try:code=json.loads(body).get('code')
@@ -133,7 +141,7 @@ def runPipeline(max_ticks=32):
      except (urllib.error.URLError,TimeoutError):
       if mode!='status':raise ValueError('GSC_PIPELINE_MUTATION_UNCONFIRMED') from None
      time.sleep(1)
-    raise ValueError('GSC_PIPELINE_PREVIEW_TIMEOUT')
+    raise ValueError('GSC_PIPELINE_OLD_COLLECTOR_VERSION' if old_collector else 'GSC_PIPELINE_PREVIEW_TIMEOUT')
    report=acceptance(exchange,max_ticks)
    (folder/'evidence.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
    return report

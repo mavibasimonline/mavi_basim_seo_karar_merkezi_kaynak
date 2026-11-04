@@ -20,6 +20,11 @@ class PipelineAcceptanceTests(unittest.TestCase):
  def accept(self,exchange,max_ticks=32):
   with contextlib.redirect_stdout(io.StringIO()):return pipeline.acceptance(exchange,max_ticks)
 
+ def test_old_collector_response_cannot_start_runtime_mutations(self):
+  self.assertFalse(pipeline.collector_ready({'status':{'connected':True,'coverage':[]}}))
+  self.assertFalse(pipeline.collector_ready({'status':{'held':[],'tick_count':'old','backfill_index':0,'storage_budget':{}}}))
+  self.assertTrue(pipeline.collector_ready({'status':{'held':[],'tick_count':0,'backfill_index':0,'storage_budget':{}}}))
+
  def test_requires_all14_real_content_proofs_and_nonempty_page_and_query(self):
   calls=[]
   def exchange(mode,ticks):

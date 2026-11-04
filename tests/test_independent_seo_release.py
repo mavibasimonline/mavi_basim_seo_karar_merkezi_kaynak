@@ -50,14 +50,14 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertLess(source.index(' real_data_acceptance()'), source.index("deploy('deploy/wrangler.drive-archive.jsonc'"))
         self.assertLess(source.index('    acceptance_proof(proof)'), source.index('deploy(main_config,sha)'))
         self.assertLess(source.index("need(gsc_proof['passed']"),source.index('deploy(main_config,sha)'))
-        self.assertIn("3e2c1cd533403d496aae1f8e9c05b45676fbd173",source)
+        self.assertIn("7a028ace93d9e25583a5da77db78531df32cc0fc",source)
         self.assertIn("changed==EXPECTED", source)
         self.assertIn("after_main['bindings']==existing[APP]['bindings']", source)
         self.assertIn("rollback(config,existing[worker]['version'])", source)
 
     def test_reviewed_refresh_release_keeps_exact_source_and_one_time_gates(self):
         self.assertEqual(release.TITLE, 'release: verified daily GSC pipeline 20261104')
-        self.assertEqual(release.EXPECTED,{'scripts/independent_seo_release.py','tests/test_independent_seo_release.py','scripts/independent-acceptance-probe.ts','tests/independent-acceptance/real-source.test.ts','tests/independent-acceptance-probe.test.ts'})
+        self.assertEqual(release.EXPECTED,{'scripts/independent_seo_release.py','tests/test_independent_seo_release.py','scripts/gsc_pipeline_acceptance.py','tests/test_gsc_pipeline_acceptance.py','src/independent-gsc-diagnostic.ts','tests/independent-gsc-diagnostic.test.ts'})
         source=(ROOT/'scripts/independent_seo_release.py').read_text()
         workflow=(ROOT/'.github/workflows/independent-seo-release.yml').read_text()
         self.assertIn('INDEPENDENT_UNREVIEWED_BASE',source)
@@ -71,6 +71,24 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertTrue((ROOT/'tests/independent-native-fetch.test.ts').is_file())
         self.assertIn("after_main['bindings']==existing[APP]['bindings']",source)
         self.assertIn("rollback(config,existing[worker]['version'])",source)
+
+    def test_archive_immediate_code_update_is_explicit_and_app_configuration_stays_unchanged(self):
+        from types import SimpleNamespace
+        with patch.object(release.subprocess,'run',return_value=SimpleNamespace(returncode=0)) as run:
+            release.deploy('deploy/wrangler.drive-archive.jsonc','a'*40)
+            self.assertIn('--durable-objects-code-update-mode',run.call_args.args[0])
+            self.assertEqual(run.call_args.args[0][-1],'immediate')
+            release.deploy('deploy/wrangler.monthly-app.jsonc','a'*40)
+            self.assertNotIn('--durable-objects-code-update-mode',run.call_args.args[0])
+
+    def test_only_the_exact_active_source_annotation_is_accepted(self):
+        version='11111111-1111-1111-1111-111111111111'
+        with patch.object(release,'api',return_value={'annotations':{'workers/tag':'a'*40}}) as api, patch('builtins.print'):
+            release.verify_active_source(object(),release.ARCHIVE,version,'a'*40)
+            self.assertEqual(api.call_args.args[1],'GET')
+        with patch.object(release,'api',return_value={'annotations':{'workers/tag':'b'*40}}):
+            with self.assertRaisesRegex(ValueError,'INDEPENDENT_ACTIVE_SOURCE_MISMATCH'):
+                release.verify_active_source(object(),release.ARCHIVE,version,'a'*40)
 
     def test_live_html_acceptance_matches_the_exact_tested_asset(self):
         expected=(ROOT/'public/independent-seo.html').read_bytes()

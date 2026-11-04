@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
 TITLE='release: verified daily GSC pipeline 20261104'
-EXPECTED={'scripts/independent_seo_release.py','tests/test_independent_seo_release.py','scripts/independent-acceptance-probe.ts','tests/independent-acceptance/real-source.test.ts','tests/independent-acceptance-probe.test.ts'}
+EXPECTED={'scripts/independent_seo_release.py','tests/test_independent_seo_release.py','scripts/gsc_pipeline_acceptance.py','tests/test_gsc_pipeline_acceptance.py','src/independent-gsc-diagnostic.ts','tests/independent-gsc-diagnostic.test.ts'}
 
 def need(condition,code):
  if not condition:raise ValueError(code)
@@ -28,8 +28,17 @@ def snapshot(client,name):
   'bindings':sorted(api(client,'GET',script+'/settings').get('bindings',[]),key=lambda b:b['name'])
  }
 def deploy(config,sha):
- result=subprocess.run(['node','scripts/run.mjs','wrangler','deploy','--config',config,'--keep-vars','--tag',sha,'--message','Verified daily GSC proofs; existing archives preserved'],cwd=ROOT)
+ args=['node','scripts/run.mjs','wrangler','deploy','--config',config,'--keep-vars','--tag',sha,'--message','Verified daily GSC proofs; existing archives preserved']
+ # Wrangler 4.152 defaults to deferred DO code updates (300s). Runtime proof
+ # must execute the newly tested class, not an older still-running instance.
+ if config=='deploy/wrangler.drive-archive.jsonc':args+=['--durable-objects-code-update-mode','immediate']
+ result=subprocess.run(args,cwd=ROOT)
  need(result.returncode==0,'INDEPENDENT_WRANGLER_DEPLOY_FAILED')
+def verify_active_source(client,worker,version,sha):
+ need(isinstance(version,str) and re.fullmatch('[a-f0-9-]{36}',version),'INDEPENDENT_ACTIVE_VERSION_MISSING')
+ details=api(client,'GET','/workers/scripts/'+worker+'/versions/'+version)
+ need(details.get('annotations',{}).get('workers/tag')==sha,'INDEPENDENT_ACTIVE_SOURCE_MISMATCH')
+ print(json.dumps({'active_source_verified':True,'worker':worker,'version_id':version,'source':sha}),flush=True)
 def rollback(config,version):
  result=subprocess.run(['node','scripts/run.mjs','wrangler','rollback',version,'--config',config,'--message','D1-free SEO acceptance rollback','--yes'],cwd=ROOT)
  need(result.returncode==0,'INDEPENDENT_ROLLBACK_FAILED')
@@ -77,7 +86,7 @@ def run():
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'INDEPENDENT_MAIN_SUPERSEDED')
  changed=set(git('diff','--name-only','HEAD^','HEAD').splitlines())
  need(changed==EXPECTED,'INDEPENDENT_UNREVIEWED_FILES')
- need(git('rev-parse','HEAD^')=='3e2c1cd533403d496aae1f8e9c05b45676fbd173','INDEPENDENT_UNREVIEWED_BASE')
+ need(git('rev-parse','HEAD^')=='7a028ace93d9e25583a5da77db78531df32cc0fc','INDEPENDENT_UNREVIEWED_BASE')
  # Preserve the reviewed Cron/DO source set exactly as merged and CI verified.
  need("independentRefreshDue(time)" in (ROOT/'src/index.ts').read_text()
       and "private async independentSnapshot(maxAgeMs=6*3600000)" in (ROOT/'src/drive-independent.ts').read_text()
@@ -129,6 +138,7 @@ def run():
  try:
   changed_workers.append(ARCHIVE);deploy('deploy/wrangler.drive-archive.jsonc',sha)
   after_archive=snapshot(client,ARCHIVE)
+  verify_active_source(client,ARCHIVE,after_archive['version'],sha)
   need(after_archive['bindings']==existing[ARCHIVE]['bindings'] and after_archive['crons']==existing[ARCHIVE]['crons'],'INDEPENDENT_ARCHIVE_BINDINGS_CHANGED')
   need(api(client,'GET','/workers/scripts/'+ARCHIVE+'/subdomain').get('enabled') is False,'INDEPENDENT_ARCHIVE_PUBLIC_EXPOSURE')
   # Remote preview is private to the account and proves real Sheets + private DO
@@ -174,12 +184,13 @@ def run():
   need(gsc_proof['passed'],'GSC_PIPELINE_ACCEPTANCE_FAILED')
   changed_workers.append(APP);deploy(main_config,sha)
   after_main=snapshot(client,APP)
+  verify_active_source(client,APP,after_main['version'],sha)
   need(after_main['crons']==existing[APP]['crons'] and after_main['bindings']==existing[APP]['bindings'],'INDEPENDENT_APP_BINDINGS_CHANGED')
   # Do not add a new DB instance, replace existing OAuth secrets, or expose the private archive worker.
   for attempt in range(7):
    try:
     health=url_json('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/health')
-    if health.get('deployment',{}).get('commit')==sha:break
+    if health.get('deployment',{}).get('commit')==sha and health.get('deployment',{}).get('version_id')==after_main['version']:break
    except (ValueError,TimeoutError,urllib.error.URLError):pass
    time.sleep(2)
   else:raise ValueError('INDEPENDENT_RELEASE_NOT_CONVERGED')
