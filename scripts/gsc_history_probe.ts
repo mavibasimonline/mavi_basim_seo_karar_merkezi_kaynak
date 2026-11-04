@@ -15,8 +15,26 @@ export default {async fetch(request:Request,env:HistoryEnv){
  if(!env.PROBE_KEY||request.headers.get('Authorization')!=='Bearer '+env.PROBE_KEY)return Response.json({ok:false,code:'GSC_HISTORY_UNAUTHORIZED'},{status:401});
  try{
   const url=new URL(request.url),mode=url.searchParams.get('mode');
-  if(request.method!=='POST'||!['status','tick','month','context'].includes(mode||'')||[...url.searchParams.keys()].some(k=>!['mode','month'].includes(k)))throw Error('GSC_HISTORY_REQUEST_INVALID');
+  if(request.method!=='POST'||!['status','tick','month','context','analysis'].includes(mode||'')||[...url.searchParams.keys()].some(k=>!['mode','month'].includes(k)))throw Error('GSC_HISTORY_REQUEST_INVALID');
   const read=async(path:string,init?:RequestInit)=>{const r=await env.ARCHIVE.fetch('https://archive.private/api/internal/'+path,init);if(!r.ok)throw Error('GSC_HISTORY_PRIVATE_UNAVAILABLE');return r.json<any>();};
+  if(mode==='analysis'){
+   const m=url.searchParams.get('month');if(!month(m))throw Error('GSC_HISTORY_REQUEST_INVALID');
+   const app=async(path:string,init?:RequestInit)=>{const r=await env.ARCHIVE.fetch('https://archive.private/api/independent/'+path,init);if(!r.ok)throw Error('GSC_HISTORY_ANALYSIS_UNAVAILABLE');return r.json<any>();};
+   const a=await app('gsc-analysis?month='+m);
+   if(a.source!=='GSC Search Analytics API'||a.d1_requests!==0||typeof a.available!=='boolean'||!Array.isArray(a.evidence)||!Array.isArray(a.devices)||!Array.isArray(a.countries)||!Array.isArray(a.products)||!Array.isArray(a.queries))throw Error('GSC_HISTORY_ANALYSIS_INVALID');
+   const counts:Record<string,number>={};for(const k of ['pages','queries','products']){if(!integer(a.facet_counts?.[k]))throw Error('GSC_HISTORY_ANALYSIS_INVALID');counts[k]=a.facet_counts[k];}
+   const answer=async(question:string,route='gsc-questions',expected='GSC Search Analytics API')=>{
+    const r=await app(route,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question,month:m})});
+    if(r.d1_requests!==0||!['Koru','İncele','Veri bekle'].includes(r.decision)||typeof r.answer!=='string'||!r.answer||!Array.isArray(r.evidence_refs)||r.evidence_refs.length>124)throw Error('GSC_HISTORY_QUESTION_INVALID');
+    const periods=[...new Set(r.evidence_refs.flatMap((e:any)=>typeof e.day==='string'&&/^20\d\d-\d\d-\d\d$/.test(e.day)?[e.day.slice(0,7)]:[]))].sort();
+    if(r.source!==expected)throw Error('GSC_HISTORY_QUESTION_INVALID');
+    return {source:r.source,decision:r.decision,evidence_refs:r.evidence_refs.length,periods,requires_ga4:r.decision==='Veri bekle'&&r.answer.includes('GA4')};
+   };
+   const questions:Record<string,unknown>={performance:await answer('Site genelinde önceki aya göre neden düştü?'),city:await answer('İstanbul şehir performansı?'),changes:await answer('Site genel değişiklik geçmişi','questions','Doğrulanmış SEO tarama/değişiklik arşivi')};
+   if(a.queries[0]?.label)questions.query=await answer('“'+a.queries[0].label+'” sorgusu nasıl değişti?');
+   if(a.products[0]?.label)questions.product=await answer(a.products[0].label+' neden düştü?','questions');
+   return Response.json({ok:true,mode,month:m,available:a.available,facet_counts:counts,devices:a.devices.length,countries:a.countries.length,evidence_refs:a.evidence.length,mapping_available:!!a.mapping_evidence,questions,d1_requests:0});
+  }
   if(mode==='month'){
    const m=url.searchParams.get('month');if(!month(m))throw Error('GSC_HISTORY_REQUEST_INVALID');
    const r=await read('gsc-month?month='+m);

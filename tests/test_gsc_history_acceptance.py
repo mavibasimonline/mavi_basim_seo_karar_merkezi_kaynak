@@ -29,4 +29,16 @@ class HistoryTests(unittest.TestCase):
   with self.assertRaises(ValueError):history.sanitize(r,'status')
   r=self.status('tick',tick={'status':'held','raw':'private','d1_requests':0})
   with self.assertRaises(ValueError):history.sanitize(r,'tick')
+ def test_read_only_live_analysis_audit_never_calls_a_collection_tick(self):
+  calls=[]
+  q=dict(source='GSC Search Analytics API',decision='Veri bekle',evidence_refs=61,periods=['2026-09','2026-10'],requires_ga4=True)
+  def exchange(mode,m):
+   calls.append(mode)
+   if mode=='status':return self.status(complete=True)
+   if mode=='month':return self.month(m)
+   return dict(ok=True,mode='analysis',month=m,available=True,facet_counts=dict(pages=1,queries=2,products=1),devices=1,countries=1,evidence_refs=62,mapping_available=True,questions={k:dict(q) for k in ('performance','city','changes')},d1_requests=0)
+  with contextlib.redirect_stdout(io.StringIO()):r=history.acceptance(exchange,0,verify_analysis=True)
+  self.assertTrue(r['verified']);self.assertEqual(r['manual_ticks'],0);self.assertEqual(calls,['status','month','month','analysis','analysis'])
+  bad=exchange('analysis','2026-10');bad['questions']['performance']['answer']='private source text'
+  with self.assertRaises(ValueError):history.sanitize(bad,'analysis')
 if __name__=='__main__':unittest.main()

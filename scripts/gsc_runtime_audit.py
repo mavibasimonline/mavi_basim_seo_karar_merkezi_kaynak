@@ -185,11 +185,15 @@ def run(ticks=0):
  before={name:snapshot(client,name) for name in (APP,ARCHIVE)}
  need(before[APP]['crons']==['*/15 * * * *'],'GSC_AUDIT_CRON_DRIFT')
  evidence=probe(ticks)
+ from gsc_history_acceptance import runHistory
+ history=runHistory(max_ticks=0,verify_analysis=True)
+ context=runHistory(context_only=True)
+ need(history['manual_ticks']==0,'GSC_AUDIT_MUTATION_REJECTED')
  after={name:snapshot(client,name) for name in (APP,ARCHIVE)}
  need(before==after,'GSC_AUDIT_PRODUCTION_DRIFT')
  report={'audit_source':sha,'observed_at':datetime.now(timezone.utc).isoformat(),
          'production':before,'production_unchanged':True,'free_plan_verified':True,
-         'evidence':evidence,'cron_acceptance':cron_acceptance(evidence),'d1_requests':0,'site_changed':False,'deployed':False}
+         'evidence':evidence,'history':history,'metadata_context':context,'cron_acceptance':cron_acceptance(evidence),'d1_requests':0,'site_changed':False,'deployed':False}
  output=ROOT/'.local/gsc-runtime-audit/evidence.json';output.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
  print(json.dumps(report,ensure_ascii=False),flush=True)
  if os.environ.get('GITHUB_EVENT_NAME')=='schedule':need(report['cron_acceptance']['two_utc_days_verified'],'GSC_AUDIT_NEXT_DAY_UNVERIFIED')

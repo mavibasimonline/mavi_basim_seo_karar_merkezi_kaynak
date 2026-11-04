@@ -26,3 +26,13 @@ it('reads context proof without D1 or warmup calls and never echoes private erro
  const failed=await (await probe.fetch(request('tick'),{...env,ARCHIVE:{fetch:async()=>{throw Error(privateText);}} as any})).text();
  expect(failed).not.toContain(privateText);
 });
+it('verifies live-shaped analysis and questions without exporting source text or writing collection ticks',async()=>{
+ const fetch=vi.fn(async(url:string,init?:RequestInit)=>{
+  if(url.includes('gsc-analysis'))return Response.json({available:true,source:'GSC Search Analytics API',d1_requests:0,evidence:[{}],devices:[{}],countries:[{}],products:[{label:'Broşür'}],queries:[{label:privateText}],facet_counts:{pages:2,queries:3,products:1},mapping_evidence:{}});
+  const q=JSON.parse(String(init?.body)).question;
+  return Response.json({source:q.includes('geçmişi')?'Doğrulanmış SEO tarama/değişiklik arşivi':'GSC Search Analytics API',decision:'Veri bekle',answer:q.includes('şehir')?'GA4 verisi bekle':privateText,evidence_refs:[{day:'2026-10-01'},{day:'2026-09-01'}],d1_requests:0});
+ });
+ const r=await (await probe.fetch(request('analysis&month=2026-10'),{ARCHIVE:{fetch} as any,PROBE_KEY:key})).json<any>();
+ expect(r).toMatchObject({ok:true,facet_counts:{pages:2,queries:3,products:1},mapping_available:true,questions:{query:{periods:['2026-09','2026-10']},city:{requires_ga4:true}}});
+ expect(JSON.stringify(r)).not.toContain(privateText);expect(fetch.mock.calls.every(([url])=>!url.includes('tick'))).toBe(true);
+});
