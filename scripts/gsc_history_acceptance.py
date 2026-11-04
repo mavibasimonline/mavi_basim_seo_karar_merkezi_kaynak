@@ -7,8 +7,11 @@ def sanitize(value,mode):
  need(isinstance(value,dict) and value.get('ok') is True and value.get('mode')==mode,'GSC_HISTORY_RESPONSE_INVALID')
  allowed={'month':{'ok','mode','month','available','days_verified','expected_days','query_days_verified','evidence_refs','content_rows','chunk_reads','budget_limited','query_partial','source','d1_requests'},
  'analysis':{'ok','mode','month','available','facet_counts','devices','countries','evidence_refs','mapping_available','questions','d1_requests'},
+ 'warm_context':{'ok','mode','status','source_read_query_limit','source_data_mutations','read_budget_enforced'},
  'context':{'ok','mode','available','source_hash','captured_at','products','snapshots','changes','d1_requests'}}.get(mode,{'ok','mode','months','completed_scopes','total_scopes','plan_complete','storage_reserved_bytes','storage_limit_bytes','tick','d1_requests','manual_csv_required'})
  need(set(value)<=allowed,'GSC_HISTORY_PRIVATE_FIELD_REJECTED')
+ if mode=='warm_context':
+  need(value.get('status') in ('updated','idle','held','unavailable') and value.get('source_read_query_limit')==3 and value.get('source_data_mutations')==0 and value.get('read_budget_enforced') is True,'GSC_HISTORY_CONTEXT_WARMUP_INVALID');return value
  if mode=='context':need(type(value.get('d1_requests')) is int and value.get('d1_requests')==0 and type(value.get('available')) is bool,'GSC_HISTORY_CONTEXT_INVALID')
  else:need(type(value.get('d1_requests')) is int and value['d1_requests']==0,'GSC_HISTORY_D1_REJECTED')
  if mode=='analysis':
@@ -48,9 +51,10 @@ def acceptance(exchange,max_ticks=200,context_only=False,verify_analysis=False):
  if verify_analysis:result['analyses']=[sanitize(exchange('analysis',m),'analysis') for m in status['months']]
  print(json.dumps({'gsc_history_acceptance':result}),flush=True);return result
 
-def runHistory(max_ticks=200,context_only=False,verify_analysis=False):
+def runHistory(max_ticks=200,context_only=False,verify_analysis=False,warm_context=False):
  folder=ROOT/'.local/gsc-history-acceptance';folder.mkdir(parents=True,exist_ok=True);key=secrets.token_hex(32)
  config={'name':APP,'main':str(ROOT/'scripts/gsc_history_probe.ts'),'compatibility_date':'2026-10-01','workers_dev':False,'preview_urls':False,'vars':{'PROBE_KEY':key},'services':[{'binding':'ARCHIVE','service':ARCHIVE}]}
+ if warm_context:config['services'].append({'binding':'SOURCE','service':APP,'entrypoint':'MonthlyReportSource','environment':'production'})
  path=folder/'wrangler.jsonc';path.write_text(json.dumps(config));path.chmod(0o600);preview=None
  try:
   with (folder/'runtime.log').open('w') as logs:
@@ -68,18 +72,21 @@ def runHistory(max_ticks=200,context_only=False,verify_analysis=False):
       body=error.read(65537)
       try:code=json.loads(body).get('code')
       except (ValueError,AttributeError):code=None
+      if mode=='warm_context' and code=='GSC_HISTORY_SOURCE_VERSION_PENDING':time.sleep(1);continue
       if code:raise ValueError(safe_code(code)) from None
       # Never repeat an unconfirmed collection or metadata write.
-      if mode in ('tick','context'):raise ValueError('GSC_HISTORY_MUTATION_UNCONFIRMED') from None
+      if mode in ('tick','warm_context'):raise ValueError('GSC_HISTORY_MUTATION_UNCONFIRMED') from None
       if error.code in (400,401,403):raise ValueError('GSC_HISTORY_AUTH_REJECTED') from None
      except (urllib.error.URLError,TimeoutError):
-      if mode in ('tick','context') and preview.poll() is None:
+      if mode in ('tick','warm_context') and preview.poll() is None:
        # Startup may have no HTTP listener yet; only status is allowed to wait.
        raise ValueError('GSC_HISTORY_MUTATION_UNCONFIRMED') from None
      time.sleep(1)
     raise ValueError('GSC_HISTORY_PREVIEW_TIMEOUT')
    # Warm the preview with a read-only request before any mutation.
    sanitize(exchange('status',None),'status')
+   if warm_context:
+    warm=sanitize(exchange('warm_context',None),'warm_context');print(json.dumps({'metadata_context_initial_copy':warm}),flush=True)
    report=acceptance(exchange,max_ticks,context_only,verify_analysis);(folder/('context.json' if context_only else 'evidence.json')).write_text(json.dumps(report,indent=2)+'\n');return report
  finally:
   if preview is not None:

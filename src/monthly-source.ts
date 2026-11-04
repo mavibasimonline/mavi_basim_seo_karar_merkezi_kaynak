@@ -4,6 +4,7 @@ import {Env,json} from './types';
 import {withReadBudget,D1BudgetError} from './d1-read-budget';
 import {monthPeriod} from './analysis';
 import {calendarMonth} from './periods';
+import {independentContextCron} from './independent-context-bridge';
 import {GSC_PAGE_SQL_VALID} from './urls';
 export function snapshotWindow(time=new Date()){
  const current=calendarMonth(time),last=monthPeriod(current,-1).label,first=monthPeriod(last,-2).label;
@@ -11,6 +12,14 @@ export function snapshotWindow(time=new Date()){
 }
 export async function monthlySource(request:Request,env:Env){
  const url=new URL(request.url),part=url.searchParams.get('part')||'meta',window=snapshotWindow();
+ // Account-only initial metadata copy. Real clock and the interactive read
+ // allowance apply; a filled cache is never forced or refreshed by this path.
+ if(part==='evidence-context-status')return json({supported:true,source_read_query_limit:3,read_budget_enforced:true});
+ if(part==='evidence-context'){
+  if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
+  const status=await independentContextCron(env,new Date(),true);
+  return json({status,source_read_query_limit:3,source_data_mutations:0,read_budget_enforced:true});
+ }
  if(part==='health')return json({ok:true,read_only:true});
  try{return await withReadBudget(env,request.headers.get('X-Snapshot-Background')==='true'?'/internal/report-source-background':'/internal/report-source-read',async safe=>{
   let reads=0,statements=0;

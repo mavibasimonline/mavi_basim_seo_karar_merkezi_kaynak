@@ -117,3 +117,16 @@ it('routes a verified product question to complete real GSC evidence before cont
  const keyword=await stub().fetch('https://archive.private/api/independent/questions',{method:'POST',body:JSON.stringify({question:'Broşür “broşür baskı” sorgusu nasıl değişti?',month})});
  expect(await keyword.json()).toMatchObject({source:'GSC Search Analytics API',decision:'Veri bekle',d1_requests:0});expect(network).not.toHaveBeenCalled();
 });
+
+it('accepts the real Cloudflare timestamp shape through the Cron bridge and persists verified data',async()=>{
+ const {independentGscCron}=await import('../../src/independent-gsc-bridge');
+ await stub().fetch('https://archive.private/api/internal/gsc-import',{method:'POST',body:JSON.stringify({scope:'https://www.googleapis.com/auth/webmasters.readonly',refresh_token:'fixture-existing-google-refresh-token-for-gsc'})});
+ const time=new Date();time.setUTCMinutes(Math.floor(time.getUTCMinutes()/15)*15,40,27);
+ const day=new Date(time.getTime()-3*86400000).toISOString().slice(0,10);
+ vi.spyOn(globalThis,'fetch').mockImplementation(async()=>Response.json({responseAggregationType:'byPage',rows:[{keys:[day,'https://mavibasim.com/brosur','tur','DESKTOP'],clicks:1,impressions:10,ctr:.1,position:4}]}));
+ const bindings={AUTOMATION_ENABLED:'true',DRIVE_ARCHIVE_SERVICE:stub(),DB:{prepare(){throw Error('Cron must not use D1');}}} as any;
+ expect(await independentGscCron(bindings,time)).toBe('collected');
+ const result=await (await stub().fetch('https://archive.private/api/internal/gsc-coverage')).json<any>();
+ expect(result.cron.last).toMatchObject({source:'Cloudflare Cron',scheduled_at:time.toISOString(),status:'complete',rows:1,d1_requests:0});
+ const saved=await (await stub().fetch('https://archive.private/api/internal/gsc-proof?day='+day+'&scope=page')).json<any>();expect(saved).toMatchObject({verified:true,rows:1});
+});

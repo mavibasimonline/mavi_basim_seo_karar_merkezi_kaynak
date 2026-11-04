@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'tests/drive-independent/gsc-routes.test.ts', 'src/drive-independent.ts', 'scripts/independent_seo_release.py', 'tests/test_independent_seo_release.py'}
+EXPECTED={'tests/gsc-history-probe.test.ts', 'tests/independent-cron-proof.test.ts', 'src/independent-context-bridge.ts', 'docs/GSC_OTOMATIK_KANIT_20261104.md', 'scripts/gsc_history_acceptance.py', 'src/independent-cron-proof.ts', 'src/monthly-source.ts', 'scripts/independent_seo_release.py', 'src/d1-read-budget.ts', 'scripts/gsc_history_probe.ts', 'tests/d1-read-budget.test.ts', 'tests/test_independent_seo_release.py', 'tests/drive-independent/gsc-routes.test.ts'}
 
 def need(condition,code):
  if not condition:raise ValueError(code)
@@ -86,7 +86,7 @@ def run():
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'INDEPENDENT_MAIN_SUPERSEDED')
  changed=set(git('diff','--name-only','HEAD^','HEAD').splitlines())
  need(changed==EXPECTED,'INDEPENDENT_UNREVIEWED_FILES')
- need(git('rev-parse','HEAD^')=='9b69bc47f48aa503bcb9e20775b8a1166e99ff98','INDEPENDENT_UNREVIEWED_BASE')
+ need(git('rev-parse','HEAD^')=='02273bab4e6e175bfc97173cddbcdbf191d0d2b2','INDEPENDENT_UNREVIEWED_BASE')
  # Preserve the reviewed Cron/DO source set exactly as merged and CI verified.
  need("independentRefreshDue(time)" in (ROOT/'src/index.ts').read_text()
       and "private async independentSnapshot(maxAgeMs=6*3600000)" in (ROOT/'src/drive-independent.ts').read_text()
@@ -210,7 +210,7 @@ def run():
    code,content=http(base+endpoint)
    need(code==401 and b'Giri' in content,'INDEPENDENT_PUBLIC_DATA_EXPOSED')
   need(snapshot(client,APP)['crons']==existing[APP]['crons'],'INDEPENDENT_CRON_CHANGED')
-  context_proof=runHistory(context_only=True)
+  context_proof=runHistory(context_only=True,warm_context=True)
   print(json.dumps({'deployed':True,'source':sha,'d1_data_mutated':False,'new_billed_resources':False,'backup_mutated':False,'new_layer':'D1-free GSC daily proofs and preserved Sheets archives','history_months_verified':2 if history_proof['verified'] else 0,'history_plan_complete':history_proof['status']['plan_complete'],'metadata_context_available':context_proof['available'],'gsc_verified_scopes':gsc_proof['readback']['content_verified_scopes'],'gsc_manual_acceptance_ticks':gsc_proof['manual_ticks'],'gsc_natural_cron_verification':'separate runtime receipt required','login_uses_d1':False,'authenticated_data_acceptance':'requires existing admin session','public_endpoints_closed':True,'existing_site_changed':False}),flush=True)
  except Exception:
   for worker,config in ((APP,main_config),(ARCHIVE,'deploy/wrangler.drive-archive.jsonc')):

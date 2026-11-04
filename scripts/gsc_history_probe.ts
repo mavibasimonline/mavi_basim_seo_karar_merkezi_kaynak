@@ -1,5 +1,5 @@
 // Ephemeral account-only preview. No credentials, D1 binding or source rows.
-interface HistoryEnv {ARCHIVE:Fetcher;PROBE_KEY:string}
+interface HistoryEnv {ARCHIVE:Fetcher;SOURCE?:Fetcher;PROBE_KEY:string}
 const integer=(v:unknown,max=100000000)=>Number.isSafeInteger(v)&&Number(v)>=0&&Number(v)<=max;
 const month=(v:unknown)=>typeof v==='string'&&/^20\d\d-(0[1-9]|1[0-2])$/.test(v);
 const event=(v:any)=>{
@@ -15,8 +15,18 @@ export default {async fetch(request:Request,env:HistoryEnv){
  if(!env.PROBE_KEY||request.headers.get('Authorization')!=='Bearer '+env.PROBE_KEY)return Response.json({ok:false,code:'GSC_HISTORY_UNAUTHORIZED'},{status:401});
  try{
   const url=new URL(request.url),mode=url.searchParams.get('mode');
-  if(request.method!=='POST'||!['status','tick','month','context','analysis'].includes(mode||'')||[...url.searchParams.keys()].some(k=>!['mode','month'].includes(k)))throw Error('GSC_HISTORY_REQUEST_INVALID');
+  if(request.method!=='POST'||!['status','tick','month','context','analysis','warm_context'].includes(mode||'')||[...url.searchParams.keys()].some(k=>!['mode','month'].includes(k)))throw Error('GSC_HISTORY_REQUEST_INVALID');
   const read=async(path:string,init?:RequestInit)=>{const r=await env.ARCHIVE.fetch('https://archive.private/api/internal/'+path,init);if(!r.ok)throw Error('GSC_HISTORY_PRIVATE_UNAVAILABLE');return r.json<any>();};
+  if(mode==='warm_context'){
+   if(!env.SOURCE)throw Error('GSC_HISTORY_SOURCE_UNAVAILABLE');
+   const capability=await env.SOURCE.fetch('https://source.private/?part=evidence-context-status');
+   if(!capability.ok){await capability.body?.cancel();throw Error('GSC_HISTORY_SOURCE_VERSION_PENDING');}
+   const ready=await capability.json<any>();if(ready.supported!==true||ready.source_read_query_limit!==3||ready.read_budget_enforced!==true)throw Error('GSC_HISTORY_SOURCE_VERSION_PENDING');
+   const response=await env.SOURCE.fetch('https://source.private/?part=evidence-context',{method:'POST'});
+   if(!response.ok)throw Error('GSC_HISTORY_CONTEXT_WARMUP_UNAVAILABLE');const r=await response.json<any>();
+   if(!['updated','idle','held','unavailable'].includes(r.status)||r.source_read_query_limit!==3||r.source_data_mutations!==0||r.read_budget_enforced!==true)throw Error('GSC_HISTORY_CONTEXT_WARMUP_INVALID');
+   return Response.json({ok:true,mode,status:r.status,source_read_query_limit:3,source_data_mutations:0,read_budget_enforced:true});
+  }
   if(mode==='analysis'){
    const m=url.searchParams.get('month');if(!month(m))throw Error('GSC_HISTORY_REQUEST_INVALID');
    const app=async(path:string,init?:RequestInit)=>{const r=await env.ARCHIVE.fetch('https://archive.private/api/independent/'+path,init);if(!r.ok)throw Error('GSC_HISTORY_ANALYSIS_UNAVAILABLE');return r.json<any>();};

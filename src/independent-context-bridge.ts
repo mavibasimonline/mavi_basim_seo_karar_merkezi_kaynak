@@ -28,8 +28,8 @@ export const CONTEXT_CHANGES_SQL=`SELECT e.id,e.url,e.previous_snapshot_id,e.nex
  WHERE e.rowid IN (SELECT rowid FROM seo_change_events ORDER BY rowid DESC LIMIT 101)
  ORDER BY e.rowid DESC LIMIT 101`;
 
-export async function loadIndependentContext(env:Env,time=new Date()):Promise<IndependentContext>{
- return withReadBudget(env,'cron',async safe=>{
+export async function loadIndependentContext(env:Env,time=new Date(),kind:'cron'|'/internal/context-source-read'='cron'):Promise<IndependentContext>{
+ return withReadBudget(env,kind,async safe=>{
   const products=(await safe.DB.prepare(CONTEXT_PRODUCTS_SQL).all<Record<string,unknown>>()).results;
   const urls=products.slice(0,100).filter(p=>typeof p.canonical_url==='string'&&typeof p.url_verified_at==='string').map(p=>p.canonical_url);
   const [snapshots,changes]=await Promise.all([
@@ -39,21 +39,22 @@ export async function loadIndependentContext(env:Env,time=new Date()):Promise<In
   return buildIndependentContext({captured_at:time.toISOString(),products,snapshots:snapshots.results,changes:changes.results},time);
  },time);
 }
-export async function independentContextCron(env:E,time=new Date()):Promise<'updated'|'idle'|'unavailable'|'held'>{
+export async function independentContextCron(env:E,time=new Date(),initial=false):Promise<'updated'|'idle'|'unavailable'|'held'>{
  if(env.AUTOMATION_ENABLED!=='true'||typeof env.DRIVE_ARCHIVE_SERVICE?.fetch!=='function')return 'unavailable';
  // Existing contexts refresh only at 00:15 UTC. An absent context can retry
  // at each natural quarter-hour; status reads and every failure remain isolated from GSC.
- if(time.getUTCMinutes()%15!==0)return 'idle';
+ if(time.getUTCMinutes()%15!==0&&!initial)return 'idle';
  try{
   const response=await env.DRIVE_ARCHIVE_SERVICE.fetch(ENDPOINT,{method:'GET'});
   if(!response.ok)return 'held';
   const status=await response.json<{available?:unknown;captured_at?:unknown;d1_requests?:unknown}>();
   if(status.d1_requests!==0||typeof status.available!=='boolean')return 'held';
   if(status.available){
+   if(initial)return 'idle';
    if(typeof status.captured_at!=='string'||!Number.isFinite(Date.parse(status.captured_at))||Date.parse(status.captured_at)>time.getTime()+300000)return 'held';
    if(status.captured_at.slice(0,10)>=time.toISOString().slice(0,10)||time.getUTCHours()!==0||time.getUTCMinutes()!==15)return 'idle';
   }
-  const context=await loadIndependentContext(env,time);
+  const context=await loadIndependentContext(env,time,initial?'/internal/context-source-read':'cron');
   const saved=await env.DRIVE_ARCHIVE_SERVICE.fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(context)});
   if(!saved.ok)return 'held';
   const proof=await saved.json<{ok?:unknown;source_hash?:unknown;captured_at?:unknown;d1_requests?:unknown}>();

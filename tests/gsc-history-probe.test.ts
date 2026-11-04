@@ -36,3 +36,16 @@ it('verifies live-shaped analysis and questions without exporting source text or
  expect(r).toMatchObject({ok:true,facet_counts:{pages:2,queries:3,products:1},mapping_available:true,questions:{query:{periods:['2026-09','2026-10']},city:{requires_ga4:true}}});
  expect(JSON.stringify(r)).not.toContain(privateText);expect(fetch.mock.calls.every(([url])=>!url.includes('tick'))).toBe(true);
 });
+it('warms metadata only through the private metered source and reports no source mutations',async()=>{
+ const source=vi.fn(async(url:string)=>Response.json(url.includes('evidence-context-status')?{supported:true,source_read_query_limit:3,read_budget_enforced:true}:{status:'updated',source_read_query_limit:3,source_data_mutations:0,read_budget_enforced:true,raw:privateText}));
+ const archive=vi.fn();
+ const r=await (await probe.fetch(request('warm_context'),{ARCHIVE:{fetch:archive} as any,SOURCE:{fetch:source} as any,PROBE_KEY:key})).json<any>();
+ expect(r).toEqual({ok:true,mode:'warm_context',status:'updated',source_read_query_limit:3,source_data_mutations:0,read_budget_enforced:true});expect(archive).not.toHaveBeenCalled();expect(JSON.stringify(r)).not.toContain(privateText);
+});
+
+it('waits for new named source code using a read-only capability request before warming',async()=>{
+ const source=vi.fn(async()=>new Response(null,{status:503}));
+ const response=await probe.fetch(request('warm_context'),{ARCHIVE:{} as any,SOURCE:{fetch:source} as any,PROBE_KEY:key});
+ expect(await response.json()).toMatchObject({ok:false,code:'GSC_HISTORY_SOURCE_VERSION_PENDING'});
+ expect(source).toHaveBeenCalledTimes(1);expect(source.mock.calls[0]).toHaveLength(1);
+});

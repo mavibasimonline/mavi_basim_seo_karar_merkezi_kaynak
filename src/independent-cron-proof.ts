@@ -7,8 +7,10 @@ export function cronTime(body:unknown,time=new Date()):string|null{
  const input=body as {source?:unknown;scheduled_at?:unknown};
  if(input.source!=='cloudflare-cron')return null;
  if(typeof input.scheduled_at!=='string')throw Error('GSC_CRON_TIME_INVALID');
+ // Cloudflare scheduledTime can carry an offset within the cron minute.
+ // Preserve the actual event identity for immutable redelivery protection.
  const at=new Date(input.scheduled_at);
- if(!Number.isFinite(at.getTime())||at.toISOString()!==input.scheduled_at||at.getUTCMinutes()%15!==0||at.getUTCSeconds()!==0||at.getUTCMilliseconds()!==0||at.getTime()>time.getTime()+300000||at.getTime()<time.getTime()-86400000)throw Error('GSC_CRON_TIME_INVALID');
+ if(!Number.isFinite(at.getTime())||at.toISOString()!==input.scheduled_at||at.getUTCMinutes()%15!==0||at.getTime()>time.getTime()+300000||at.getTime()<time.getTime()-86400000)throw Error('GSC_CRON_TIME_INVALID');
  return at.toISOString();
 }
 type CronKind='daily'|'history';

@@ -43,3 +43,7 @@ it('keeps daily and historical receipts immutable in the same real scheduled slo
  expect(s.values.get('gsc:cron:'+slot)).toMatchObject({status:'idle'});
  expect(s.values.get('gsc:history-cron:'+slot)).toMatchObject({status:'complete'});
 });
+it('preserves the real Cloudflare scheduled timestamp including its second and millisecond offset',()=>{
+ const scheduled_at='2026-11-04T12:15:40.027Z';
+ expect(cronTime({source:'cloudflare-cron',scheduled_at},new Date('2026-11-04T12:15:42Z'))).toBe(scheduled_at);
+});

@@ -13,3 +13,9 @@ Günlük toplama 8 MiB/gün, ilk iki ayın toplaması toplam bir kez 16 MiB muha
 Canlı kabul için günlük 14 şifreli içerik geri okuması, iki ayın ayrı kapsamları, ürün/tarama bağlamının gerçek durumu, Worker kontrol düzlemi ve HTTP sürüm eşleşmesi birlikte kaydedilir. Ertesi gün Cron kanıtı ancak ertesi UTC günündeki doğal kayıttan sonra doğrulanabilir. Günlük salt okunur audit 00:35 UTC'de çalışır; önceki ve yeni UTC gününün ayrı doğal Cron makbuzlarını kontrol eder. Testte saat ilerletmek canlı ertesi gün kanıtı değildir.
 
 Bu belge tasarım ve kabul koşullarını açıklar. Gerçek yayın ve kapsam durumu ilgili GitHub Actions kabul kaydı ve oturum raporuyla belirlenir; belge tek başına tamamlanma kanıtı değildir.
+
+## Doğal zaman damgası ve ilk metadata aktarımı
+
+Cloudflare çalışma kayıtlarındaki `12:15:40.027Z` gibi zamanlarda saniye/milisaniye ofseti korunur; bunları sıfıra zorlama gerçek Cron çağrısını reddeder. Çeyrek saat, ISO biçimi, geçmiş/gelecek sınırları ve tekrar teslim koruması geçerlidir.
+
+Arka plan D1 payı dolduğunda başlangıç ürün bağlamı, hesaba özel `MonthlyReportSource` giriş noktasından bir kez aktarılabilir. En fazla üç sabit SELECT, güncel gerçek hesap gözlemi ve aynı 2 milyon yerel / 3,5 milyon hesap okuma sınırı uygulanır; ledger sıfırlanmaz. 64 yazım rezervi yalnız korumanın muhasebesidir; ürün/tarama kaynakları değiştirilmez. Kopya varsa bu yol tekrar D1 okumaz veya eski kopyayı zorla yenilemez. Yeni giriş noktası kodunun hazır olduğu salt okunur yetenek yanıtıyla doğrulanmadan ilk aktarım başlatılmaz. GSC toplama ve önbellekten analiz okuması D1 kullanmaz; bu bir defalık metadata kopyası ayrıca kota içinde ölçülür.

@@ -133,3 +133,30 @@ it('default filters and URL ordering cannot multiply identical GSC cache scans',
  expect(await cachedRead(env,'/api/performance?month=2026-10',compute)).toEqual(await cachedRead(env,'/api/performance?device=ALL&rangeMonths=1&month=2026-10',compute));
  expect(calls).toBe(1);
 });
+it('copies initial verified context inside remaining interactive allowance while background remains held',async()=>{
+ const {independentContextCron}=await import('../src/independent-context-bridge');
+ const cfg=await guarded({AUTOMATION_ENABLED:'true'}),day=TIME.toISOString().slice(0,10),initial=1868545;
+ await env.DB.prepare('UPDATE products SET url_verified_at=?').bind(TIME.toISOString()).run();
+ await env.DB.prepare('INSERT INTO d1_quota_ledger VALUES(?,?,?,?)').bind(day,initial,32821,TIME.toISOString()).run();
+ let saved:any=null;
+ const fetch=vi.fn(async(_url:string,init?:RequestInit)=>{
+  if(init?.method==='GET')return Response.json({available:!!saved,d1_requests:0});
+  saved=JSON.parse(String(init?.body));return Response.json({ok:true,source_hash:saved.source_hash,captured_at:saved.captured_at,d1_requests:0});
+ });
+ const bound={...cfg,DRIVE_ARCHIVE_SERVICE:{fetch} as any};
+ expect(await independentContextCron(bound,TIME)).toBe('held');expect(saved).toBeNull();
+ expect(await independentContextCron(bound,TIME,true)).toBe('updated');expect(saved.products).toHaveLength(2);
+ const after=await ledger();expect(after!.reads).toBeGreaterThan(initial);expect(after!.reads).toBeLessThan(2000000);expect(after!.writes).toBeLessThan(65000);
+ fetch.mockClear();expect(await independentContextCron(bound,TIME,true)).toBe('idle');expect(fetch).toHaveBeenCalledTimes(1);
+ expect((await env.DB.prepare('SELECT count(*) n FROM products').first<any>()).n).toBe(2);
+});
+it('initial context cannot exceed the same total ledger or execute a fourth SELECT or application write',async()=>{
+ const cfg=await guarded();
+ for(const sqls of [['SELECT 1','SELECT 2','SELECT 3','SELECT 4'],["UPDATE products SET name='changed'"]]){
+  await expect(withReadBudget(cfg,'/internal/context-source-read',async safe=>{for(const sql of sqls)await safe.DB.prepare(sql).all();},TIME)).rejects.toThrow('D1_OPERATION_BUDGET_WAIT');
+ }
+ await env.DB.prepare('UPDATE d1_quota_ledger SET reads=2000000').run();
+ await expect(withReadBudget(cfg,'/internal/context-source-read',async()=>7,TIME)).rejects.toMatchObject({reason:'LOCAL_READ_LIMIT'});
+ expect((await ledger())!.reads).toBe(2000000);
+ expect(await env.DB.prepare("SELECT name FROM products WHERE id='brosur'").first('name')).toBe('Broşür');
+});

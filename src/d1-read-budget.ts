@@ -25,6 +25,7 @@ const SESSION_SQL=new Set([
 ]);
 const CACHE_WRITE='INSERT INTO api_read_cache VALUES(?,?,?,?) ON CONFLICT(cache_key) DO UPDATE SET revision=excluded.revision,created_at=excluded.created_at,result_json=excluded.result_json';
 function interactiveProfile(kind:string){
+ if(kind==='/internal/context-source-read')return {reserve:64,bookkeeping:12,statements:3,allows:(sql:string)=>/^\s*SELECT\b/i.test(sql)&&!sql.includes(';')};
  if(kind==='/api/session')return {reserve:64,bookkeeping:16,statements:2,allows:(sql:string)=>SESSION_SQL.has(sql.replace(/\s+/g,' ').trim())};
  const select=(sql:string)=>/^\s*SELECT\b/i.test(sql)&&!sql.includes(';');
  // Two read-only statements: reserve/settle ledger + at most two growths + two cost inserts (at most 8 physical writes).

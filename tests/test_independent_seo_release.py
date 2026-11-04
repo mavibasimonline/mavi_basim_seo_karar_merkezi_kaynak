@@ -50,14 +50,14 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertLess(source.index(' real_data_acceptance()'), source.index("deploy('deploy/wrangler.drive-archive.jsonc'"))
         self.assertLess(source.index('    acceptance_proof(proof)'), source.index('deploy(main_config,sha)'))
         self.assertLess(source.index("need(gsc_proof['passed']"),source.index('deploy(main_config,sha)'))
-        self.assertIn("9b69bc47f48aa503bcb9e20775b8a1166e99ff98",source)
+        self.assertIn("02273bab4e6e175bfc97173cddbcdbf191d0d2b2",source)
         self.assertIn("changed==EXPECTED", source)
         self.assertIn("after_main['bindings']==existing[APP]['bindings']", source)
         self.assertIn("rollback(config,existing[worker]['version'])", source)
 
     def test_reviewed_refresh_release_keeps_exact_source_and_one_time_gates(self):
         self.assertEqual(release.TITLE, 'release: verified GSC history bootstrap 20261104')
-        self.assertEqual(release.EXPECTED,{'tests/drive-independent/gsc-routes.test.ts', 'src/drive-independent.ts', 'scripts/independent_seo_release.py', 'tests/test_independent_seo_release.py'})
+        self.assertEqual(release.EXPECTED,{'tests/gsc-history-probe.test.ts', 'tests/independent-cron-proof.test.ts', 'src/independent-context-bridge.ts', 'docs/GSC_OTOMATIK_KANIT_20261104.md', 'scripts/gsc_history_acceptance.py', 'src/independent-cron-proof.ts', 'src/monthly-source.ts', 'scripts/independent_seo_release.py', 'src/d1-read-budget.ts', 'scripts/gsc_history_probe.ts', 'tests/d1-read-budget.test.ts', 'tests/test_independent_seo_release.py', 'tests/drive-independent/gsc-routes.test.ts'})
         source=(ROOT/'scripts/independent_seo_release.py').read_text()
         workflow=(ROOT/'.github/workflows/independent-seo-release.yml').read_text()
         self.assertIn('INDEPENDENT_UNREVIEWED_BASE',source)
