@@ -30,7 +30,7 @@ export async function independentGscCron(env:E,time=new Date()):Promise<'importe
   status=imported;
  }
  if(status.connected!==true)return 'unavailable';
- const result=await read(await svc.fetch('https://archive.private/api/internal/gsc-tick',{method:'POST'}));
+ const result=await read(await svc.fetch('https://archive.private/api/internal/gsc-tick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'cloudflare-cron',scheduled_at:time.toISOString()})}));
  if(result.d1_requests!==0||!['partial','complete','idle','held'].includes(String(result.status)))throw Error('GSC_INDEPENDENT_TICK_UNVERIFIED');
  return 'collected';
 }

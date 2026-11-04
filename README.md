@@ -199,3 +199,6 @@ diğer sekmeleri ve kullanıcı alanlarını da kayıpsız saklar. Kimlikler yü
 önce atomik ayrılır; kayıp yanıt tekrar dosya oluşturmaz. SHA-256 ve gerçek geri
 okuma başarılı olmadan kayıt sayısı başarılı sayılmaz. 52 GSC işi tamamlandı
 olarak işaretlenmez. D1 aktarımı kendi kota korumalarıyla ayrı sürer.
+
+
+Günlük bağımsız GSC hattının kanıt, kota ve kontrollü yayın ölçütleri: [docs/DAILY_GSC_PIPELINE.md](docs/DAILY_GSC_PIPELINE.md). Eksik günler sıfır trafik olarak raporlanmaz; şehir analizi GSC ülke verisinden türetilmez.

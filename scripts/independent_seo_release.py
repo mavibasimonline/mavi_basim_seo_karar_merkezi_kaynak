@@ -7,11 +7,52 @@ from release_readiness import get_json,REPOSITORY
 ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
-TITLE='release: verified history GSC diagnostics 20261104'
+TITLE='release: verified daily GSC pipeline 20261104'
 EXPECTED={
- 'scripts/independent_seo_release.py',
- 'tests/test_independent_seo_release.py',
+ '.github/workflows/gsc-runtime-audit.yml',
  '.github/workflows/independent-seo-release.yml',
+ 'README.md',
+ 'TODO.md',
+ 'docs/DAILY_GSC_PIPELINE.md',
+ 'public/independent-seo.css',
+ 'public/independent-seo.html',
+ 'public/independent-seo.js',
+ 'scripts/gsc_pipeline_acceptance.py',
+ 'scripts/gsc_pipeline_probe.ts',
+ 'scripts/gsc_runtime_audit.py',
+ 'scripts/gsc_runtime_probe.ts',
+ 'scripts/independent_seo_release.py',
+ 'src/drive-independent.ts',
+ 'src/independent-context-bridge.ts',
+ 'src/independent-context.ts',
+ 'src/independent-cron-proof.ts',
+ 'src/independent-gsc-analysis.ts',
+ 'src/independent-gsc-bridge.ts',
+ 'src/independent-gsc-diagnostic.ts',
+ 'src/independent-gsc-report.ts',
+ 'src/independent-gsc.ts',
+ 'src/independent-recovery.ts',
+ 'src/independent-seo-model.ts',
+ 'src/independent-snapshot.ts',
+ 'src/index.ts',
+ 'tests/browser/independent-seo.spec.ts',
+ 'tests/drive-independent/gsc-routes.test.ts',
+ 'tests/gsc-pipeline-probe.test.ts',
+ 'tests/gsc-runtime-probe.test.ts',
+ 'tests/independent-context.test.ts',
+ 'tests/independent-cron-proof.test.ts',
+ 'tests/independent-gsc-analysis.test.ts',
+ 'tests/independent-gsc-collector.test.ts',
+ 'tests/independent-gsc-diagnostic.test.ts',
+ 'tests/independent-gsc-month.test.ts',
+ 'tests/independent-gsc-reliability.test.ts',
+ 'tests/independent-history.test.ts',
+ 'tests/independent-recovery.test.ts',
+ 'tests/independent-seo-model.test.ts',
+ 'tests/test_gsc_pipeline_acceptance.py',
+ 'tests/test_gsc_runtime_audit.py',
+ 'tests/test_independent_context_sql.py',
+ 'tests/test_independent_seo_release.py',
 }
 
 def need(condition,code):
@@ -32,7 +73,7 @@ def snapshot(client,name):
   'bindings':sorted(api(client,'GET',script+'/settings').get('bindings',[]),key=lambda b:b['name'])
  }
 def deploy(config,sha):
- result=subprocess.run(['node','scripts/run.mjs','wrangler','deploy','--config',config,'--keep-vars','--tag',sha,'--message','D1-free verified Sheets SEO panel; original databases retained'],cwd=ROOT)
+ result=subprocess.run(['node','scripts/run.mjs','wrangler','deploy','--config',config,'--keep-vars','--tag',sha,'--message','Verified daily GSC proofs; existing archives preserved'],cwd=ROOT)
  need(result.returncode==0,'INDEPENDENT_WRANGLER_DEPLOY_FAILED')
 def rollback(config,version):
  result=subprocess.run(['node','scripts/run.mjs','wrangler','rollback',version,'--config',config,'--message','D1-free SEO acceptance rollback','--yes'],cwd=ROOT)
@@ -78,7 +119,7 @@ def run():
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'INDEPENDENT_MAIN_SUPERSEDED')
  changed=set(git('diff','--name-only','HEAD^','HEAD').splitlines())
  need(changed==EXPECTED,'INDEPENDENT_UNREVIEWED_FILES')
- need(git('rev-parse','HEAD^')=='f1a3b37f6ebdc544b420fde802c857bb907214fa','INDEPENDENT_UNREVIEWED_BASE')
+ need(git('rev-parse','HEAD^')=='0c7dc869b14bace8c475032b51b5aa8d93c38c11','INDEPENDENT_UNREVIEWED_BASE')
  # Preserve the reviewed Cron/DO source set exactly as merged and CI verified.
  need("independentRefreshDue(time)" in (ROOT/'src/index.ts').read_text()
       and "private async independentSnapshot(maxAgeMs=6*3600000)" in (ROOT/'src/drive-independent.ts').read_text()
@@ -168,6 +209,11 @@ def run():
     preview.terminate()
     try:preview.wait(timeout=6)
     except subprocess.TimeoutExpired:preview.kill()
+  # Real GSC API collection and encrypted content readback must pass before
+  # publishing the application. Diagnostics precede any bounded hold retry.
+  from gsc_pipeline_acceptance import runPipeline
+  gsc_proof=runPipeline()
+  need(gsc_proof['passed'],'GSC_PIPELINE_ACCEPTANCE_FAILED')
   changed_workers.append(APP);deploy(main_config,sha)
   after_main=snapshot(client,APP)
   need(after_main['crons']==existing[APP]['crons'] and after_main['bindings']==existing[APP]['bindings'],'INDEPENDENT_APP_BINDINGS_CHANGED')
@@ -186,7 +232,7 @@ def run():
    code,content=http(base+endpoint)
    need(code==401 and b'Giri' in content,'INDEPENDENT_PUBLIC_DATA_EXPOSED')
   need(snapshot(client,APP)['crons']==existing[APP]['crons'],'INDEPENDENT_CRON_CHANGED')
-  print(json.dumps({'deployed':True,'source':sha,'d1_data_mutated':False,'new_billed_resources':False,'backup_mutated':False,'new_layer':'D1-free Sheets/DO','login_uses_d1':False,'authenticated_data_acceptance':'requires existing admin session','public_endpoints_closed':True,'existing_site_changed':False}),flush=True)
+  print(json.dumps({'deployed':True,'source':sha,'d1_data_mutated':False,'new_billed_resources':False,'backup_mutated':False,'new_layer':'D1-free GSC daily proofs and preserved Sheets archives','gsc_verified_scopes':gsc_proof['readback']['content_verified_scopes'],'gsc_manual_acceptance_ticks':gsc_proof['manual_ticks'],'gsc_natural_cron_verification':'separate runtime receipt required','login_uses_d1':False,'authenticated_data_acceptance':'requires existing admin session','public_endpoints_closed':True,'existing_site_changed':False}),flush=True)
  except Exception:
   for worker,config in ((APP,main_config),(ARCHIVE,'deploy/wrangler.drive-archive.jsonc')):
    if worker in changed_workers:

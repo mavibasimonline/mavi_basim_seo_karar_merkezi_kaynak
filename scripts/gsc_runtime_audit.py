@@ -41,7 +41,7 @@ def sanitize(proof):
   need(isinstance(value,dict) and set(value)<=allowed,'GSC_AUDIT_PRIVATE_FIELD_REJECTED')
  def dates(value):
   for k,v in value.items():
-   if k in ('at','captured_at','observed_at'):
+   if k in ('at','captured_at','observed_at','until','scheduled_at','finished_at','last_scheduled_at'):
     need(isinstance(v,str) and len(v)<=40,'GSC_AUDIT_TIMESTAMP_INVALID')
     try:datetime.fromisoformat(v.replace('Z','+00:00'))
     except (ValueError,TypeError):raise ValueError('GSC_AUDIT_TIMESTAMP_INVALID') from None
@@ -49,11 +49,15 @@ def sanitize(proof):
    elif k=='scope':need(v in ('page','query'),'GSC_AUDIT_SCOPE_INVALID')
    elif k=='status':need(v in ('complete','partial','idle','held'),'GSC_AUDIT_STATUS_INVALID')
    elif k=='code':need(safe_code(v)==v,'GSC_AUDIT_CODE_INVALID')
+   elif k=='validation_reason':need(v in ('DATE','PAGE_PROPERTY_SCOPE','PAGE_ORIGIN','COUNTRY','DEVICE','METRIC_NUMBER','COUNTS','METRIC_RANGE','CTR_RATIO','QUERY'),'GSC_AUDIT_REASON_INVALID')
+   elif k=='phase':need(v in ('authorization','provider','response','validation','storage','publication'),'GSC_AUDIT_PHASE_INVALID')
+   elif k=='generation':need(isinstance(v,str) and re.fullmatch(r'[a-zA-Z0-9_-]{1,80}',v),'GSC_AUDIT_GENERATION_INVALID')
    elif k in ('rows','pages','cursor','covered_scopes','expected_scopes','d1_requests'):need(type(v) is int and 0<=v<=1000000,'GSC_AUDIT_COUNT_INVALID')
  dates(proof)
  for phase in ('before','after'):
   status=proof.get(phase)
-  validate(status,{'connected','reauthorization_required','coverage','covered_scopes','expected_scopes','last_attempt','pending','d1_requests'})
+  validate(status,{'connected','reauthorization_required','coverage','covered_scopes','expected_scopes','last_attempt','pending','d1_requests',
+                   'held','tick_count','backfill_index','retry_until','last_failure','last_complete','storage_budget','cron','incomplete_coverage','invalid_manifests'})
   need(type(status.get('connected')) is bool and type(status.get('reauthorization_required')) is bool and status.get('d1_requests')==0,'GSC_AUDIT_PROOF_INVALID')
   coverage=status.get('coverage');need(isinstance(coverage,list) and len(coverage)<=14 and status.get('covered_scopes')==len(coverage) and status.get('expected_scopes')==14,'GSC_AUDIT_COVERAGE_INVALID')
   dates(status)
@@ -62,8 +66,40 @@ def sanitize(proof):
    validate(row,{'day','scope','rows','captured_at','query_partial'});dates(row)
    need(set(row)=={'day','scope','rows','captured_at','query_partial'} and type(row['query_partial']) is bool,'GSC_AUDIT_COVERAGE_INVALID')
    identity=(row['day'],row['scope']);need(identity not in identities,'GSC_AUDIT_DUPLICATE_COVERAGE');identities.add(identity)
-  for field,allowed in [('last_attempt',{'at','status','day','scope','code'}),('pending',{'day','scope','cursor'})]:
+  event_fields={'at','status','day','scope','code','rows','cursor','validation_reason','generation','phase'}
+  for field,allowed in [('last_attempt',event_fields),('last_failure',event_fields),('last_complete',event_fields),('pending',{'day','scope','cursor'})]:
    if status.get(field) is not None:validate(status[field],allowed);dates(status[field])
+  for field in ('tick_count','backfill_index'):
+   if field in status:need(type(status[field]) is int and 0<=status[field]<=1000000,'GSC_AUDIT_COUNTER_INVALID')
+  if status.get('retry_until') is not None:dates({'until':status['retry_until']})
+  if 'held' in status:
+   need(isinstance(status['held'],list) and len(status['held'])<=20,'GSC_AUDIT_HELD_INVALID')
+   for held in status['held']:
+    validate(held,{'day','scope','until','code','active'});dates(held)
+    need(set(held)=={'day','scope','until','code','active'} and type(held['active']) is bool,'GSC_AUDIT_HELD_INVALID')
+  for field in ('incomplete_coverage','invalid_manifests'):
+   if field in status:
+    need(isinstance(status[field],list) and len(status[field])<=14,'GSC_AUDIT_COVERAGE_INVALID')
+    for row in status[field]:validate(row,{'day','scope'});dates(row);need(set(row)=={'day','scope'},'GSC_AUDIT_COVERAGE_INVALID')
+  if 'storage_budget' in status:
+   b=status['storage_budget'];names={'reserved_bytes','daily_reserved_bytes','total_limit_bytes','daily_limit_bytes','object_limit_bytes'}
+   validate(b,names|{'measured_since','object_database_bytes','account_usage_measured','prior_usage_included'})
+   need(names.issubset(b) and b.get('account_usage_measured') is False and b.get('prior_usage_included') is False,'GSC_AUDIT_BUDGET_INVALID')
+   for field in names:need(type(b[field]) is int and 0<=b[field]<=2**40,'GSC_AUDIT_BUDGET_INVALID')
+   if b.get('object_database_bytes') is not None:need(type(b['object_database_bytes']) is int and 0<=b['object_database_bytes']<=2**40,'GSC_AUDIT_BUDGET_INVALID')
+   if b.get('measured_since') is not None:dates({'at':b['measured_since']})
+  if 'cron' in status:
+   cron=status['cron'];validate(cron,{'last','days','scope'})
+   need(cron.get('scope')=='Only receipts recorded after this runtime upgrade; absent earlier receipts are not failed jobs.','GSC_AUDIT_CRON_INVALID')
+   if cron.get('last') is not None:
+    last=cron['last'];validate(last,{'source','scheduled_at','finished_at','status','day','scope','rows','cursor','code','d1_requests'});dates(last)
+    need(last.get('source')=='Cloudflare Cron' and last.get('d1_requests')==0 and {'scheduled_at','finished_at','status'}.issubset(last),'GSC_AUDIT_CRON_INVALID')
+   need(isinstance(cron.get('days'),list) and len(cron['days'])<=2,'GSC_AUDIT_CRON_INVALID')
+   for summary in cron['days']:
+    names={'attempts','completed','partial','held','idle'};validate(summary,names|{'day','last_scheduled_at'});dates(summary)
+    need(set(summary)==names|{'day','last_scheduled_at'},'GSC_AUDIT_CRON_INVALID')
+    for field in names:need(type(summary[field]) is int and 0<=summary[field]<=1000000,'GSC_AUDIT_CRON_INVALID')
+    need(summary['attempts']==sum(summary[n] for n in ('completed','partial','held','idle')),'GSC_AUDIT_CRON_INVALID')
  attempts=proof.get('attempts');need(isinstance(attempts,list) and len(attempts)==proof['manual_ticks'],'GSC_AUDIT_PROOF_INVALID')
  for attempt in attempts:
   validate(attempt,{'status','day','scope','rows','cursor','code','d1_requests'});dates(attempt)

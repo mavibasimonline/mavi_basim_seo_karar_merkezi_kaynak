@@ -30,4 +30,20 @@ describe('private GSC runtime metadata probe',()=>{
   const response=await probe.fetch(req(),{ARCHIVE:{fetch} as any,PROBE_KEY:key});
   expect(response.status).toBe(503);expect(await response.json()).toEqual({ok:false,code:'GSC_AUDIT_UNAVAILABLE'});
  });
+ it('selects safe hold, failure, budget and Cron evidence without source bodies',async()=>{
+  const data={...status(),held:[{day:'2026-10-31',scope:'page',until:'2026-11-04T23:30:00Z',code:'GSC_HTTP_400',active:true,body:'private-source'}],tick_count:52,backfill_index:2,retry_until:null,
+   last_failure:{at:'2026-11-04T07:00:00Z',status:'held',day:'2026-10-31',scope:'page',code:'GSC_ROW_REJECTED',cursor:0,validation_reason:'COUNTRY',body:'private-source'},last_complete:null,
+   storage_budget:{measured_since:null,reserved_bytes:10,daily_reserved_bytes:10,total_limit_bytes:134217728,daily_limit_bytes:8388608,object_limit_bytes:268435456,object_database_bytes:8192,account_usage_measured:false,prior_usage_included:false,body:'private-source'},
+   cron:{last:{source:'Cloudflare Cron',scheduled_at:'2026-11-04T07:15:00Z',finished_at:'2026-11-04T07:15:41Z',status:'held',code:'GSC_HTTP_400',d1_requests:0,body:'private-source'},days:[{day:'2026-11-04',attempts:1,completed:0,partial:0,held:1,idle:0,last_scheduled_at:'2026-11-04T07:15:00Z'}],scope:'untrusted-source'}};
+  const response=await probe.fetch(req(),{ARCHIVE:{fetch:async()=>Response.json(data)} as any,PROBE_KEY:key});
+  expect(response.status).toBe(200);const result=await response.json<any>();
+  expect(result.after.held[0].code).toBe('GSC_HTTP_400');expect(result.after.last_failure.validation_reason).toBe('COUNTRY');
+  expect(result.after.cron.last.source).toBe('Cloudflare Cron');expect(JSON.stringify(result)).not.toContain('private-source');expect(JSON.stringify(result)).not.toContain('untrusted-source');
+ });
+ it('rejects malformed optional metadata rather than inventing counts',async()=>{
+  for(const bad of [{held:[{body:'private'}]},{tick_count:-1},{storage_budget:{account_usage_measured:true}},{cron:{days:[],last:{source:'manual probe'}}}]){
+   const response=await probe.fetch(req(),{ARCHIVE:{fetch:async()=>Response.json({...status(),...bad})} as any,PROBE_KEY:key});
+   expect(response.status).toBe(503);
+  }
+ });
 });

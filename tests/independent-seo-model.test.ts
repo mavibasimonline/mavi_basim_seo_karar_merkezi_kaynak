@@ -24,7 +24,21 @@ describe('independent SEO report - no D1',()=>{
   const a=independentAnswer(r,'Broşür neden düştü?');
   expect(a.decision).toBe('Koru');
   expect(a.answer).toContain('nedeni');
-  expect(a.evidence).toHaveLength(1);
+  expect(a.evidence).toEqual(['URUNLER2026-09-01brosur','URUNLER2026-08-01brosur']);
+  expect(r.products[0].previous_source_key).toBe('URUNLER2026-08-01brosur');
+  expect(a.evidence_details).toEqual([
+   {source_key:'URUNLER2026-09-01brosur',source:'verified-sheet',section:'URUNLER',period:{start:'2026-09-01',end:'2026-09-30'}},
+   {source_key:'URUNLER2026-08-01brosur',source:'verified-sheet',section:'URUNLER',period:{start:'2026-08-01',end:'2026-08-31'}}
+  ]);
+ });
+ it('keeps an absent baseline unknown and cites only the observed month',()=>{
+  const r=independentReport(records.filter(r=>r.section!=='URUNLER'||!r.start.startsWith('2026-08')),'2026-09','2026-10-30T12:00:00Z',0);
+  if(!r.available)throw Error('fixture');
+  expect(r.products[0]).toMatchObject({previous:null,previous_source_key:null,previous_evidence:null,delta:null,rate:null,decision:'Veri bekle'});
+  const a=independentAnswer(r,'Broşür neden düştü?');
+  expect(a.decision).toBe('Veri bekle');
+  expect(a.evidence).toEqual(['URUNLER2026-09-01brosur']);
+  expect(a.answer).toContain('Düşüş veya yükseliş iddiasında bulunmuyorum');
  });
  it('never invents missing periods or city/device evidence',()=>{
   const r=independentReport(records,'2026-07','2026-10-30T12:00:00Z',0);
