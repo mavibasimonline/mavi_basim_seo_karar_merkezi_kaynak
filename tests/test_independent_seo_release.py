@@ -72,6 +72,7 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertIn('SHEETS_ORPHAN_QUARANTINE_SOURCE_MISSING',source)
         self.assertIn('GOOGLE_HTTP_400',source)
         self.assertIn(release.TITLE,workflow)
+        self.assertIn('tests/independent-native-fetch.test.ts',release.EXPECTED)
         self.assertIn("after_main['bindings']==existing[APP]['bindings']",source)
         self.assertIn("rollback(config,existing[worker]['version'])",source)
 

@@ -2,6 +2,10 @@
 
 Başlangıç kanıtı: üretim `f305dfe7bdebfd78a017a920b6d9e545aff12164`, yayın #95. Salt okunur çalışma denetimi `41789797230`, 07:05 UTC: Google bağlı, yeniden yetki gerekmiyor, günlük kapsam 0/14, son deneme `idle`, manuel tick 0. Bu kayıt sıfır trafik veya OAuth hatası kanıtı değildir. İlk durum API'si bekletilmiş işlerin nedenlerini göstermiyordu.
 
+## Yeniden üretilen kök neden
+
+Toplayıcı `this.fetcher(...)` ile Workers yerel `fetch` fonksiyonuna yanlış nesneyi `this` olarak veriyordu. Gerçek Workers çalışma zamanı `Illegal invocation` hatası üretiyor; eski kod bunu `GSC_SYNC_UNAVAILABLE` olarak gizleyip aday gün/kapsamı 24 saat bekletiyordu. Geçmiş dalındaki `idle` çıktısı da asıl hatayı örtebiliyordu. Yerel fonksiyonun receiver kontrolünü ağa çıkmadan kullanan regresyon testi bu davranışı yeniden üretir; taşımayı bağımsız fonksiyon çağrısı yapmak hatayı düzeltir. Gerçek canlı düzelme ayrıca GSC içerik readback kabulüyle doğrulanmalıdır.
+
 ## Veri akışı
 
 Mevcut Cloudflare Cron → özel hesap hizmeti → aynı SQLite Durable Object → GSC Search Analytics API. Günlük toplayıcı ve kullanıcı raporları D1 kullanmaz. Google günleri Pasifik saat dilimindedir; güvenlik gecikmesi en az üç takvim günüdür. Son yedi uygun gün için iki kapsam bulunur: sayfa/ülke/cihaz ve görünür sorgu/sayfa/ülke/cihaz. 14 kapsam kaydı, bütün sorguların görünür olduğu anlamına gelmez.

@@ -200,7 +200,10 @@ export class IndependentGscCollector {
     phase='authorization';
     const access=await this.token(force);
     phase='provider';
-    try{return await this.fetcher(endpoint,{method:'POST',redirect:'manual',signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+access,'Content-Type':'application/json'},body:JSON.stringify(payload)});}
+    // Workers' native fetch rejects a collector instance as its receiver.
+    // Call the captured transport as a function, as the global API requires.
+    const transport=this.fetcher;
+    try{return await transport(endpoint,{method:'POST',redirect:'manual',signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+access,'Content-Type':'application/json'},body:JSON.stringify(payload)});}
     catch(error){throw Error(error instanceof Error&&['TimeoutError','AbortError'].includes(error.name)?'GSC_NETWORK_TIMEOUT':'GSC_NETWORK_UNAVAILABLE');}
    };
    let response=await send(false);

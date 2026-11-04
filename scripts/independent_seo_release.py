@@ -45,6 +45,7 @@ EXPECTED={
  'tests/independent-gsc-collector.test.ts',
  'tests/independent-gsc-diagnostic.test.ts',
  'tests/independent-gsc-month.test.ts',
+ 'tests/independent-native-fetch.test.ts',
  'tests/independent-gsc-reliability.test.ts',
  'tests/independent-history.test.ts',
  'tests/independent-recovery.test.ts',

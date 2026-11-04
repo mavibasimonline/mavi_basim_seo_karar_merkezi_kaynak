@@ -1,6 +1,7 @@
 ## 4 Kasım 2026 — günlük GSC hattı kabulü
 
 - Başlangıç canlı ölçümü: 07:05 UTC, bağlı Google, 0/14 kapsam, `idle`. Kuyruk bekletme kodları eski durumda görünmüyordu.
+- Gerçek Workers çalışma zamanında `this.fetcher` → `Illegal invocation` → gizlenmiş `GSC_SYNC_UNAVAILABLE` zinciri yeniden üretildi; bağımsız fonksiyon çağrısı ve yerel fonksiyon regresyonu eklendi. Canlı sonuç hâlâ kabul kapısına bağlıdır.
 - Yeni kuyruk tanılaması, içerik readback, kota sınırları, dönem koruması ve kanıtlı analiz testleri eklendi; yayın başarısı henüz bu satırlarda iddia edilmiyor.
 - Canlı yayın/kapsam kabulü ancak tam main CI ve özel gerçek veri readback sonucuyla geçer.
 - Yeni sürümün gerçek ertesi gün Cron makbuzu, o gün gelmeden doğrulanmış sayılamaz.
