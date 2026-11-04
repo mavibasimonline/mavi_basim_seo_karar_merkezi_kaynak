@@ -1,3 +1,13 @@
+## 4 Kasım 2026 — günlük GSC hattı kabulü
+
+- Başlangıç canlı ölçümü: 07:05 UTC, bağlı Google, 0/14 kapsam, `idle`. Kuyruk bekletme kodları eski durumda görünmüyordu.
+- Gerçek Workers çalışma zamanında `this.fetcher` → `Illegal invocation` → gizlenmiş `GSC_SYNC_UNAVAILABLE` zinciri yeniden üretildi; bağımsız fonksiyon çağrısı ve yerel fonksiyon regresyonu eklendi. Canlı sonuç hâlâ kabul kapısına bağlıdır.
+- Yeni kuyruk tanılaması, içerik readback, kota sınırları, dönem koruması ve kanıtlı analiz testleri eklendi; yayın başarısı henüz bu satırlarda iddia edilmiyor.
+- Canlı yayın/kapsam kabulü ancak tam main CI ve özel gerçek veri readback sonucuyla geçer.
+- Yeni sürümün gerçek ertesi gün Cron makbuzu, o gün gelmeden doğrulanmış sayılamaz.
+- GA4 şehir yetkisi/verisi mevcut değilse şehir analizi eksik kalır; sorgu anonimleştirmesi hiçbir zaman tamamlanmış kabul edilmez.
+- Hesap genelindeki diğer Durable Object kullanımı, yerel nesne boyutu/günlük rezervasyon korumasından ayrı izlenmelidir.
+
 # 31 Ekim 2026 — bağımsız SEO canlı kabulü tamamlandı
 
 - PR #50/#51 main'e birleşti. Yayındaki kaynak: `4783b3dbaaa2a70a8c1af7e5803769296e4ebb98`; Worker `eca92ed1-ffbc-4a62-9eb0-98b2391c202e`. Uygulama: https://mavi-basim-seo-prod.mavibasimonline.workers.dev/independent-seo.html

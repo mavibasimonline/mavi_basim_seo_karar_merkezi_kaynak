@@ -1,7 +1,9 @@
 name: Özel günlük GSC çalışma kanıtı
 on:
+  schedule:
+    - cron: '35 0 * * *'
   workflow_run:
-    workflows: [Test ve kabul denetimi]
+    workflows: [Test ve kabul denetimi, Kontrollü D1 bağımsız SEO yayını]
     types: [completed]
     branches: [main]
 permissions:
@@ -12,7 +14,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   audit:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
+    if: >-
+      (github.event_name == 'schedule' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' &&
+       (github.event.workflow_run.event == 'push' || github.event.workflow_run.name == 'Kontrollü D1 bağımsız SEO yayını'))
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -23,11 +28,16 @@ jobs:
       - name: Tam başarılı main CI ve tek seferlik tanılama kaydı
         id: guard
         env:
-          VERIFIED_CI_SHA: ${{ github.event.workflow_run.head_sha }}
+          VERIFIED_CI_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          TRIGGER_WORKFLOW: ${{ github.event.workflow_run.name }}
         run: |
           set -euo pipefail
           if [ "$VERIFIED_CI_SHA" != "$(git rev-parse HEAD)" ]; then exit 0; fi
-          if [ "$(git log -1 --format=%s)" != 'audit: daily GSC runtime evidence 20261104' ]; then exit 0; fi
+          subject="$(git log -1 --format=%s)"
+          if [ "$subject" = 'release: verified daily GSC pipeline 20261104' ]; then
+            if [ "$EVENT_NAME" != 'schedule' ] && [ "$TRIGGER_WORKFLOW" != 'Kontrollü D1 bağımsız SEO yayını' ]; then exit 0; fi
+          elif [ "$subject" != 'audit: daily GSC runtime evidence 20261104' ]; then exit 0; fi
           echo 'ready=true' >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         if: steps.guard.outputs.ready == 'true'
@@ -41,12 +51,12 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERIFIED_CI_SHA: ${{ github.event.workflow_run.head_sha }}
+          VERIFIED_CI_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: python3 scripts/gsc_runtime_audit.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: steps.guard.outputs.ready == 'true'
+        if: always() && steps.guard.outputs.ready == 'true'
         with:
-          name: gsc-runtime-evidence-${{ github.run_id }}
+          name: gsc-runtime-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: .local/gsc-runtime-audit/evidence.json
           retention-days: 7
           if-no-files-found: error

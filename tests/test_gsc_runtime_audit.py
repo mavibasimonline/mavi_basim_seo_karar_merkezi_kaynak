@@ -72,5 +72,47 @@ class RuntimeAuditTests(unittest.TestCase):
   self.assertNotIn('pull_request:',source)
   self.assertNotIn('wrangler deploy',source)
   self.assertIn('python3 scripts/gsc_runtime_audit.py\n',source)
+  self.assertIn('github.run_attempt',source)
+
+ def diagnostics(self):
+  return dict(tick_count=52,backfill_index=3,retry_until='2026-11-04T07:30:00Z',
+   held=[dict(day='2026-10-31',scope='page',until='2026-11-04T23:30:00Z',code='GSC_HTTP_400',active=True)],
+   last_failure=dict(at='2026-11-04T07:00:00Z',status='held',day='2026-10-31',scope='page',cursor=0,code='GSC_ROW_REJECTED',validation_reason='COUNTRY',phase='validation'),
+   last_complete=dict(at='2026-11-04T07:15:00Z',status='complete',day='2026-10-30',scope='page',rows=50,generation='fixture-generation'),
+   incomplete_coverage=[],invalid_manifests=[],
+   storage_budget=dict(measured_since=None,reserved_bytes=4096,daily_reserved_bytes=2048,total_limit_bytes=134217728,daily_limit_bytes=8388608,object_limit_bytes=268435456,object_database_bytes=8192,account_usage_measured=False,prior_usage_included=False),
+   cron=dict(last=dict(source='Cloudflare Cron',scheduled_at='2026-11-04T07:15:00Z',finished_at='2026-11-04T07:15:41Z',status='complete',day='2026-10-30',scope='page',rows=50,d1_requests=0),
+    days=[dict(day='2026-11-04',attempts=2,completed=1,partial=0,held=1,idle=0,last_scheduled_at='2026-11-04T07:15:00Z')],
+    scope='Only receipts recorded after this runtime upgrade; absent earlier receipts are not failed jobs.'))
+
+ def test_new_safe_diagnostics_and_real_cron_receipts_are_accepted(self):
+  proof=self.fixture();proof['after'].update(self.diagnostics())
+  self.assertEqual(audit.sanitize(proof),proof)
+
+ def test_rollover_needs_successful_natural_receipts_on_both_real_utc_days(self):
+  from datetime import datetime,timezone
+  proof=self.fixture();proof['after'].update(self.diagnostics())
+  now=datetime(2026,11,4,8,tzinfo=timezone.utc)
+  first=audit.cron_acceptance(proof,now)
+  self.assertTrue(first['natural_collection_today']);self.assertFalse(first['two_utc_days_verified'])
+  proof['after']['cron']['days'].append(dict(day='2026-11-03',attempts=1,completed=0,partial=1,held=0,idle=0,last_scheduled_at='2026-11-03T23:45:00Z'))
+  self.assertTrue(audit.cron_acceptance(proof,now)['two_utc_days_verified'])
+  proof['after']['cron']['days'][1]['partial']=0;proof['after']['cron']['days'][1]['held']=1
+  self.assertFalse(audit.cron_acceptance(proof,now)['two_utc_days_verified'])
+
+ def test_optional_diagnostics_reject_private_fields_invalid_reasons_and_fake_cron(self):
+  for mode in ('held_secret','reason','phase','budget_private','claimed_account','cron_body','fake_source','counter','summary'):
+   with self.subTest(mode=mode):
+    proof=self.fixture();proof['after'].update(self.diagnostics());status=proof['after']
+    if mode=='held_secret':status['held'][0]['body']='private'
+    if mode=='reason':status['last_failure']['validation_reason']='token=private'
+    if mode=='phase':status['last_failure']['phase']='token=private'
+    if mode=='budget_private':status['storage_budget']['raw']='private'
+    if mode=='claimed_account':status['storage_budget']['account_usage_measured']=True
+    if mode=='cron_body':status['cron']['last']['body']='private'
+    if mode=='fake_source':status['cron']['last']['source']='manual probe'
+    if mode=='counter':status['tick_count']='private'
+    if mode=='summary':status['cron']['days'][0]['attempts']=5
+    with self.assertRaises(ValueError):audit.sanitize(proof)
 
 if __name__=='__main__':unittest.main()

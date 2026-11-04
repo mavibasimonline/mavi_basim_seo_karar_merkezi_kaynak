@@ -36,7 +36,9 @@ export function independentReport(records:SheetRecord[],requested:string|undefin
  const pastProducts=months.includes(prevMonth)?values(records,'URUNLER',prevMonth):[],previousMap=new Map(pastProducts.map(x=>[x.id,x]));
  const productComparisons=products.map(product=>{
   const old=previousMap.get(product.id),delta=old?product.metrics.clicks-old.metrics.clicks:null,rate=old&&old.metrics.clicks>0?delta!/old.metrics.clicks:null;
-  return {...product,previous:old?.metrics||null,delta,rate,decision:!old?'Veri bekle':rate!==null&&rate>=-0.1?'Koru':rate!==null&&rate<-0.2&&delta!==null&&delta<=-30?'İncele':'Koru'};
+  return {...product,previous:old?.metrics||null,previous_source_key:old?.source_key||null,
+   previous_evidence:old?{source_key:old.source_key,source:old.source,section:old.section,period:old.period}:null,
+   delta,rate,decision:!old?'Veri bekle':rate!==null&&rate>=-0.1?'Koru':rate!==null&&rate<-0.2&&delta!==null&&delta<=-30?'İncele':'Koru'};
  });
  return {available:true as const,month,months,previous_month:months.includes(prevMonth)?prevMonth:null,overview,products:productComparisons,queries:queries.slice(0,150),query_count:queries.length,quarantined_records:quarantined,captured_at:capturedAt,source:'Google Sheets',source_scope:'Eski doğrulanmış Sheets dönem özetleri; anlık GSC veya günlük sayfa/sorgu kanıtı değildir.',limitations:['Şehir/cihaz kırılımı kaynağın doğrulanmış alanlarında yoksa gösterilmez.','Eksik dönemler ve sorgular sıfır kabul edilmez.','Bu panel tek başına Google Search Console canlı bağlantısını kanıtlamaz.'],d1_requests:0};
 }
@@ -52,5 +54,7 @@ export function independentAnswer(report:ReturnType<typeof independentReport>,qu
  const delta=selected.delta!,pct=selected.rate===null?'önceki ay sıfır tıklama olduğundan yüzde karşılaştırılamıyor':(selected.rate!*100).toFixed(1)+'%';
  const trend=delta<0?'azaldı':delta>0?'arttı':'değişmedi';
  const answer=selected.title+' için '+r.previous_month+' → '+r.month+' dönemlerinde tıklama '+base.clicks+' → '+selected.metrics.clicks+' ('+Math.abs(delta)+' '+(delta<0?'düşüş':delta>0?'artış':'fark yok')+', '+pct+'). '+(selected.decision==='Koru'?'Küçük dalgalanma veya güçlü olumsuz kanıt bulunmadığından değişiklik önerilmez.':'Kayda değer düşüş işareti var; neden için günlük GSC ve değişiklik geçmişi kanıtı gerekir.')+' Bu yalnızca tarihsel Sheets karşılaştırmasıdır; nedeni kanıtlamaz.';
- return {answer,trend,evidence:[selected.source_key],decision:selected.decision,d1_requests:0,source:'Google Sheets',month:r.month};
+ return {answer,trend,evidence:[selected.source_key,selected.previous_source_key!],
+  evidence_details:[{source_key:selected.source_key,source:selected.source,section:selected.section,period:selected.period},selected.previous_evidence!],
+  decision:selected.decision,d1_requests:0,source:'Google Sheets',month:r.month};
 }

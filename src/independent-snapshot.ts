@@ -35,7 +35,14 @@ export async function saveIndependentSnapshot(storage:DurableObjectStorage,snaps
  const manifest:Manifest={...meta,format:'independent-sheets-v2',bytes:bytes.length,chunks:Math.ceil(bytes.length/CHUNK),record_count:records.length};
  for(let i=0;i<manifest.chunks;i++)await storage.put(key(manifest.source_hash,i),btoa(String.fromCharCode(...bytes.subarray(i*CHUNK,(i+1)*CHUNK))));
  await restore(storage,manifest);
- await storage.put('independent:history:'+snapshot.source_hash,manifest);
+ const historyKey='independent:history:'+snapshot.source_hash;
+ const original=await storage.get<Manifest>(historyKey);
+ if(original){
+  // An unchanged source refresh may advance the active freshness timestamp,
+  // while the first verified historical capture stays immutable.
+  const verified=await restore(storage,original);
+  if(verified.source_hash!==snapshot.source_hash)throw Error('INDEPENDENT_SNAPSHOT_HASH_MISMATCH');
+ }else await storage.put(historyKey,manifest);
  await storage.put(POINTER,manifest);
  return {bytes:manifest.bytes,chunks:manifest.chunks};
 }
@@ -53,9 +60,18 @@ export async function withVerifiedPreviousMonth(storage:DurableObjectStorage,cur
  previous.setUTCMonth(previous.getUTCMonth()-1);
  const previousMonth=previous.toISOString().slice(0,7);
  if(months.includes(previousMonth))return current;
- const existing=await storage.list<Manifest>({prefix:'independent:history:',limit:32});
- const manifests=[...existing.values()].filter(m=>m?.format==='independent-sheets-v2'
-  &&m.source_hash!==current.source_hash).sort((a,b)=>b.captured_at.localeCompare(a.captured_at));
+ // History keys are content hashes, so the first page is unrelated to capture
+ // time or reporting month. Discover every metadata page before choosing the
+ // newest verified source. This read-only scan never changes old manifests.
+ const manifests:Manifest[]=[];let startAfter:string|undefined;
+ for(;;){
+  const page=await storage.list<Manifest>({prefix:'independent:history:',limit:32,...startAfter?{startAfter}:{}});
+  for(const m of page.values())if(m?.format==='independent-sheets-v2'
+   &&m.source_hash!==current.source_hash&&typeof m.captured_at==='string')manifests.push(m);
+  if(page.size<32)break;
+  startAfter=[...page.keys()].at(-1)!;
+ }
+ manifests.sort((a,b)=>b.captured_at.localeCompare(a.captured_at));
  for(const manifest of manifests){
   let older:IndependentSnapshot;
   try{older=await restore(storage,manifest);}catch{continue;}

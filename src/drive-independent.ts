@@ -7,7 +7,12 @@ import {DRIVE_SHEET,DRIVE_SECTIONS,gvizRows,verifiedDriveRecords} from './drive-
 import {independentReport,independentAnswer,periodsOf,SheetRecord} from './independent-seo-model';
 import {readIndependentSnapshot,saveIndependentSnapshot,withVerifiedPreviousMonth,IndependentSnapshot} from './independent-snapshot';
 import {IndependentGscCollector} from './independent-gsc';
-import {verifiedGscMonth} from './independent-gsc-report';
+import {verifiedGscMonth,readVerifiedGscDay} from './independent-gsc-report';
+import {analyzeVerifiedGsc,answerVerifiedGsc} from './independent-gsc-analysis';
+import {cronTime,recordGscCron,gscCronProof} from './independent-cron-proof';
+import {validateIndependentContext,saveIndependentContext,readIndependentContext,independentContextStatus,answerContextQuestion} from './independent-context';
+import {retryGscHold} from './independent-recovery';
+import {runGscDiagnostic} from './independent-gsc-diagnostic';
 
 const SCOPE='https://www.googleapis.com/auth/drive.file',API='https://www.googleapis.com/drive/v3/';
 const XLSX='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -45,15 +50,38 @@ async function publicSource(url:string){
 
 export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
  private serial:Promise<unknown>=Promise.resolve();
+ private gscReports=new Map<string,{at:number;report:Awaited<ReturnType<typeof verifiedGscMonth>>}>();
+ private async gscMonth(month:string){
+  const saved=this.gscReports.get(month);
+  if(saved&&Date.now()-saved.at<5*60000)return saved.report;
+  const report=await verifiedGscMonth(this.ctx.storage,this.key(),month,new Date(),{maxChunkReads:256,maxRows:20000});
+  if(this.gscReports.size>=3)this.gscReports.delete(this.gscReports.keys().next().value!);
+  this.gscReports.set(month,{at:Date.now(),report});return report;
+ }
  private exclusive<T>(task:()=>Promise<T>){const next=this.serial.then(task);this.serial=next.catch(()=>{});return next;}
  private key(){requireValue(this.env.ARCHIVE_ENCRYPTION_KEY,'DRIVE_ENCRYPTION_KEY_REQUIRED');return this.env.ARCHIVE_ENCRYPTION_KEY!;}
  private config(){requireValue(typeof this.env.OAUTH_BROKER?.fetch==='function','DRIVE_OAUTH_CONFIG_REQUIRED');this.key();}
+ private async gscToken(force=false){
+  const sealed=await this.ctx.storage.get<string>('gsc:oauth');requireValue(sealed,'GSC_CONSENT_REQUIRED');
+  let token:{refresh_token:string;scope:string;access_token:string;expires_at:number};
+  try{token=await decrypt(sealed!,this.key());}catch{throw new ProviderError('GSC_TOKEN_STORAGE_UNREADABLE');}
+  if(!force&&token.access_token&&token.expires_at>Date.now()+60000)return token.access_token;
+  let updated:any;
+  try{updated=await this.broker('/refresh-gsc',{refresh_token:token.refresh_token});}
+  catch(error){if(error instanceof ProviderError&&/^GSC_[A-Z0-9_]+$/.test(error.code))throw error;throw new ProviderError('GSC_TOKEN_BROKER_UNAVAILABLE',true);}
+  requireValue(typeof updated.access_token==='string'&&Number.isFinite(updated.expires_in)&&updated.expires_in>0,'GSC_TOKEN_REFRESH_UNAVAILABLE');
+  const next={...token,access_token:updated.access_token,expires_at:Date.now()+updated.expires_in*1000};
+  await this.ctx.storage.put('gsc:oauth',await encrypt(next,this.key()));return next.access_token;
+ }
  private async broker<T>(path:string,body?:unknown){
   const response=await this.env.OAUTH_BROKER.fetch('https://drive-broker.internal'+path,{method:body===undefined?'GET':'POST',redirect:'manual',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
   if(!response.ok){
-   if(path==='/refresh-gsc'&&response.status===409){
+   if(path==='/refresh-gsc'){
     const reply=await response.json<{code?:string}>().catch(()=>({code:''}));
     if(reply.code==='GSC_OAUTH_RECONNECT_REQUIRED')throw new ProviderError('GSC_OAUTH_RECONNECT_REQUIRED');
+    if(reply.code==='DRIVE_GRANT_SCOPE_INVALID')throw new ProviderError('GSC_TOKEN_SCOPE_INVALID');
+    if(reply.code==='DRIVE_OAUTH_CONFIG_REQUIRED')throw new ProviderError('GSC_TOKEN_CONFIG_UNAVAILABLE');
+    if(reply.code==='DRIVE_PROVIDER_TOKEN_UNAVAILABLE')throw new ProviderError('GSC_TOKEN_REFRESH_UNAVAILABLE',true);
    }
    throw new ProviderError('DRIVE_OAUTH_BROKER_UNAVAILABLE',true);
   }
@@ -160,6 +188,12 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     if(path==='/api/internal/gsc-status'&&request.method==='GET'){
       return json({connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect'),d1_requests:0});
     }
+    if(path==='/api/internal/evidence-context'&&request.method==='GET')return json(await independentContextStatus(this.ctx.storage));
+    if(path==='/api/internal/evidence-context'&&request.method==='POST'){
+      const input=JSON.parse(await boundedText(new Response(request.body),1600000));
+      const context=await validateIndependentContext(input);
+      return json(await saveIndependentContext(this.ctx.storage,context));
+    }
     if(path==='/api/internal/gsc-import'&&request.method==='POST'){
       this.config();
       const content=await boundedText(new Response(request.body),16384);
@@ -182,27 +216,38 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     }
     if(path==='/api/internal/gsc-tick'&&request.method==='POST'){
       this.config();
-      const collector=new IndependentGscCollector(this.ctx.storage,this.key(),async(force)=>{
-        const sealed=await this.ctx.storage.get<string>('gsc:oauth');
-        requireValue(sealed,'GSC_CONSENT_REQUIRED');
-        const token=await decrypt<{refresh_token:string;scope:string;access_token:string;expires_at:number}>(sealed!,this.key());
-        if(!force&&token.access_token&&token.expires_at>Date.now()+60000)return token.access_token;
-        const updated=await this.broker<any>('/refresh-gsc',{refresh_token:token.refresh_token});
-        requireValue(typeof updated.access_token==='string'&&Number.isFinite(updated.expires_in)&&updated.expires_in>0,'GSC_TOKEN_REFRESH_UNAVAILABLE');
-        const next={...token,access_token:updated.access_token,expires_at:Date.now()+updated.expires_in*1000};
-        await this.ctx.storage.put('gsc:oauth',await encrypt(next,this.key()));return next.access_token;
-      });
-      return json(await collector.tick());
+      const scheduled=request.body?cronTime(JSON.parse(await boundedText(new Response(request.body),1024))):null;
+      if(scheduled){
+       const previous=await this.ctx.storage.get('gsc:cron:'+scheduled);
+       if(previous)return json(previous);
+      }
+      const collector=new IndependentGscCollector(this.ctx.storage,this.key(),force=>this.gscToken(force));
+      const result=await collector.tick();
+      if(scheduled)await recordGscCron(this.ctx.storage,scheduled,result);
+      if(result.status==='complete')this.gscReports.clear();
+      return json(result);
+    }
+    if(path==='/api/internal/gsc-retry'&&request.method==='POST')return json(await retryGscHold(this.ctx.storage,JSON.parse(await boundedText(new Response(request.body),2048))));
+    if(path==='/api/internal/gsc-diagnostic'&&request.method==='POST'){
+      this.config();
+      return json(await runGscDiagnostic(this.ctx.storage,this.key(),force=>this.gscToken(force)));
     }
     if(path==='/api/internal/gsc-month'&&request.method==='GET'){
       this.config();
       const month=url.searchParams.get('month');
       if(!month)return json({code:'INVALID_MONTH'},400);
-      return json(await verifiedGscMonth(this.ctx.storage,this.key(),month));
+      return json(await this.gscMonth(month));
+    }
+    if(path==='/api/internal/gsc-proof'&&request.method==='GET'){
+      const day=url.searchParams.get('day')||'',scope=url.searchParams.get('scope');
+      if(scope!=='page'&&scope!=='query')return json({code:'INVALID_SCOPE'},400);
+      const proof=await readVerifiedGscDay(this.ctx.storage,this.key(),day,scope);
+      return json(proof.verified?{available:true,verified:true,day,scope,rows:proof.rows_count,pages:proof.evidence.page_hashes.length,d1_requests:0}:
+        {available:false,verified:false,day,scope,code:proof.code,d1_requests:0});
     }
     if(path==='/api/internal/gsc-coverage'&&request.method==='GET'){
       const collector=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
-      return json({...await collector.status(),connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')});
+      return json({...await collector.status(),cron:await gscCronProof(this.ctx.storage),connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')});
     }
     if(path==='/api/internal/independent-refresh'&&request.method==='POST'){
       const snapshot=await this.independentSnapshot(6*3600000);
@@ -221,7 +266,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     if(request.method==='POST'&&(path==='/api/drive-independent/start'||path==='/api/oauth/google/start'&&url.searchParams.get('purpose')==='drive'))return await this.start();
     if(request.method==='GET'&&(path==='/api/drive-independent/status'||path==='/api/drive/status'))return json({connected:!!await this.ctx.storage.get('oauth'),storage:'durable-object-sqlite',d1_requests:0,last_archive:await this.ctx.storage.get('last_archive')||null,last_error:await this.ctx.storage.get('last_error')||null,next_run:await this.ctx.storage.getAlarm(),scope:SCOPE});
     return json({error:'Bulunamadı.'},404);
-   }catch(error){return json({error:'Drive bağlantısı tamamlanamadı.',code:error instanceof ProviderError?error.code:'DRIVE_UNAVAILABLE'},400);}
+   }catch(error){return json({error:'Kaynak işlemi tamamlanamadı.',code:error instanceof ProviderError?error.code:error instanceof Error&&/^(GSC_|INDEPENDENT_CONTEXT_)[A-Z0-9_]+$/.test(error.message)?error.message:'DRIVE_UNAVAILABLE'},400);}
   });
  }
  private async independentSnapshot(maxAgeMs=6*3600000){
@@ -248,6 +293,37 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
  private async independentRoute(request:Request){
   try{
    const url=new URL(request.url),path=url.pathname;
+   // Stored GSC evidence remains readable even if the unrelated Sheets source fails.
+   if(request.method==='GET'&&(path==='/api/independent/gsc-month'||path==='/api/independent/gsc-analysis')){
+    const month=url.searchParams.get('month');
+    if(!month)return json({code:'INVALID_MONTH'},400);
+    const gsc=await this.gscMonth(month);
+    const context=await readIndependentContext(this.ctx.storage).catch(()=>null);
+    const mappings=context?.products.map(p=>({id:p.id,name:p.name,pages:[p.canonical_url]}))||[];
+    return json(path.endsWith('gsc-analysis')?{...analyzeVerifiedGsc(gsc,mappings),mapping_evidence:context?{source_hash:context.source_hash,captured_at:context.captured_at,coverage:context.coverage}:null}:gsc);
+   }
+   if(request.method==='GET'&&path==='/api/independent/gsc-status'){
+    const collector=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
+    return json({...await collector.status(),cron:await gscCronProof(this.ctx.storage),connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')});
+   }
+   let questionBody:{question:string;month?:string;source?:unknown}|undefined;
+   if(request.method==='POST'&&(path==='/api/independent/questions'||path==='/api/independent/gsc-questions')){
+    const body=JSON.parse(await boundedText(new Response(request.body),8192)) as {question?:unknown;month?:unknown;source?:unknown};
+    if(typeof body.question!=='string'||!body.question.trim()||body.question.length>1000||body.month!==undefined&&typeof body.month!=='string')return json({code:'INVALID_QUESTION'},400);
+    questionBody={question:body.question,month:body.month as string|undefined,source:body.source};
+    const useGsc=path.endsWith('gsc-questions')||body.source==='gsc'||body.source!=='archive'&&/cihaz|mobil|masaüstü|tablet|ülke|türkiye|anahtar|kelime|sorgu|sayfa|https?:|şehir|ilçe|istanbul|bölge|değiş|ne zaman|başlık|meta|yayın|kanonik|canonical|\bh1\b/i.test(body.question);
+    if(useGsc){
+     const latest=new Date(Date.now()-3*86400000);latest.setUTCDate(1);latest.setUTCMonth(latest.getUTCMonth()-1);
+     const month=questionBody.month||latest.toISOString().slice(0,7);
+     const context=await readIndependentContext(this.ctx.storage).catch(()=>null);
+     if(/değiş|ne zaman|başlık|meta|yayın|kanonik|canonical|\bh1\b/i.test(body.question))return json(answerContextQuestion(context,body.question,month));
+     const current=await this.gscMonth(month);
+     const previousDate=new Date(month+'-01T00:00:00Z');previousDate.setUTCMonth(previousDate.getUTCMonth()-1);
+     const previous=current.available?await this.gscMonth(previousDate.toISOString().slice(0,7)):undefined;
+     const mappings=context?.products.map(p=>({id:p.id,name:p.name,pages:[p.canonical_url]}))||[];
+     return json({...answerVerifiedGsc(current,previous,body.question,mappings),mapping_evidence:context?{source_hash:context.source_hash,captured_at:context.captured_at}:null});
+    }
+   }
    const snapshot=await this.independentSnapshot();
    const historical=await withVerifiedPreviousMonth(this.ctx.storage,snapshot);
    const report=independentReport(historical.records,url.searchParams.get('month')||undefined,snapshot.captured_at,snapshot.quarantined_records);
@@ -256,15 +332,9 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     const coverage=await gsc.status();
     return json({ok:true,storage:'durable-object-sqlite',d1_requests:0,source:'verified Google Sheets',captured_at:snapshot.captured_at,source_hash:snapshot.source_hash,records:snapshot.records.length,stale:snapshot.stale,available_months:report.months,gsc:{...coverage,connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')}});
    }
-   if(request.method==='GET'&&path==='/api/independent/gsc-month'){
-    const month=url.searchParams.get('month');
-    if(!month)return json({code:'INVALID_MONTH'},400);
-    return json(await verifiedGscMonth(this.ctx.storage,this.key(),month));
-   }
    if(request.method==='GET'&&path==='/api/independent/report')return json({...report,stale:snapshot.stale,source_hash:snapshot.source_hash,previous_source_hash:historical.previous_source_hash||null});
    if(request.method==='POST'&&path==='/api/independent/questions'){
-    const body=await request.json() as {question?:unknown;month?:unknown};
-    if(typeof body.question!=='string'||body.question.length>1000||body.month!==undefined&&typeof body.month!=='string')return json({code:'INVALID_QUESTION'},400);
+    const body=questionBody!;
     const selected=independentReport(historical.records,body.month||undefined,snapshot.captured_at,snapshot.quarantined_records);
     return json({...independentAnswer(selected,body.question),stale:snapshot.stale,source_hash:snapshot.source_hash,previous_source_hash:historical.previous_source_hash||null,captured_at:snapshot.captured_at});
    }
@@ -272,7 +342,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
   }catch(error){
    const reason=error instanceof Error?error.message:'INDEPENDENT_SOURCE_UNAVAILABLE';
    const invalid=reason==='INVALID_MONTH'||reason==='INVALID_QUESTION';
-   const safeCode=/^(INDEPENDENT_|SOURCE_|SHEETS_|ARCHIVE_RESPONSE_)[A-Z0-9_]+$/.test(reason)?reason:'INDEPENDENT_SOURCE_UNAVAILABLE';
+   const safeCode=/^(GSC_|INDEPENDENT_|SOURCE_|SHEETS_|ARCHIVE_RESPONSE_)[A-Z0-9_]+$/.test(reason)?reason:'INDEPENDENT_SOURCE_UNAVAILABLE';
    return json({error:invalid?'İstek geçersiz.':'Doğrulanmış bağımsız Sheets kaynağı henüz okunamıyor. Geçmiş SEO kayıtları korunuyor.',code:invalid?reason:safeCode},invalid?400:503);
   }
  }

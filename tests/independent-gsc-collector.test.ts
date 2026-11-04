@@ -4,7 +4,7 @@ import {independentGscCron} from '../src/independent-gsc-bridge';
 const time=new Date('2026-10-31T00:15:00Z');
 function storage(){
  const map=new Map<string,unknown>();
- return {map,get:async<T>(key:string)=>map.get(key) as T|undefined,put:async(key:string,value:unknown)=>{map.set(key,value);}} as any;
+ return {map,get:async<T>(key:string)=>structuredClone(map.get(key)) as T|undefined,put:async(key:string,value:unknown)=>{map.set(key,structuredClone(value));}} as any;
 }
 const reply=(scope:'page'|'query')=>Response.json({
  responseAggregationType:'byPage',rows:[{keys:scope==='page'?['2026-10-28','https://mavibasim.com/brosur','tur','DESKTOP']:['2026-10-28','https://mavibasim.com/brosur','broşür baskı','tur','DESKTOP'],clicks:1,impressions:10,ctr:0.1,position:4}]

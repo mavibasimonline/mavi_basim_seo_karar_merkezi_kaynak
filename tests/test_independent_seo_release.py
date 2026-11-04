@@ -49,17 +49,19 @@ class IndependentReleaseTests(unittest.TestCase):
         source = (ROOT/'scripts/independent_seo_release.py').read_text()
         self.assertLess(source.index(' real_data_acceptance()'), source.index("deploy('deploy/wrangler.drive-archive.jsonc'"))
         self.assertLess(source.index('    acceptance_proof(proof)'), source.index('deploy(main_config,sha)'))
+        self.assertLess(source.index("need(gsc_proof['passed']"),source.index('deploy(main_config,sha)'))
+        self.assertIn("0c7dc869b14bace8c475032b51b5aa8d93c38c11",source)
         self.assertIn("changed==EXPECTED", source)
         self.assertIn("after_main['bindings']==existing[APP]['bindings']", source)
         self.assertIn("rollback(config,existing[worker]['version'])", source)
 
     def test_reviewed_refresh_release_keeps_exact_source_and_one_time_gates(self):
-        self.assertEqual(release.TITLE, 'release: verified history GSC diagnostics 20261104')
-        self.assertEqual(release.EXPECTED, {
-            'scripts/independent_seo_release.py',
-            'tests/test_independent_seo_release.py',
-            '.github/workflows/independent-seo-release.yml',
-        })
+        self.assertEqual(release.TITLE, 'release: verified daily GSC pipeline 20261104')
+        self.assertTrue({'scripts/independent_seo_release.py','tests/test_independent_seo_release.py',
+                         '.github/workflows/independent-seo-release.yml','src/independent-gsc.ts',
+                         'src/independent-gsc-report.ts','src/drive-independent.ts',
+                         'scripts/gsc_pipeline_acceptance.py'}.issubset(release.EXPECTED))
+        self.assertFalse(any(p.endswith('.csv') or p.startswith(('migrations/','work/')) for p in release.EXPECTED))
         source=(ROOT/'scripts/independent_seo_release.py').read_text()
         workflow=(ROOT/'.github/workflows/independent-seo-release.yml').read_text()
         self.assertIn('INDEPENDENT_UNREVIEWED_BASE',source)
@@ -70,6 +72,7 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertIn('SHEETS_ORPHAN_QUARANTINE_SOURCE_MISSING',source)
         self.assertIn('GOOGLE_HTTP_400',source)
         self.assertIn(release.TITLE,workflow)
+        self.assertIn('tests/independent-native-fetch.test.ts',release.EXPECTED)
         self.assertIn("after_main['bindings']==existing[APP]['bindings']",source)
         self.assertIn("rollback(config,existing[worker]['version'])",source)
 
