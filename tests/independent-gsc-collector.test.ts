@@ -61,3 +61,15 @@ it('bounds fresh-history scanning and respects source quota backoff before any w
  db.map.set('gsc:retry',{until:time.getTime()+3600000});
  expect(await collector.tick(time)).toMatchObject({status:'held'});expect(db.map.get('gsc:backfill-index')).toBe(64);expect(fetcher).not.toHaveBeenCalled();
 });
+
+it('never recollects completed historical queries after 30 days, even when anonymous query coverage is partial',async()=>{
+ const db=storage(),old=new Date(time.getTime()-31*86400000).toISOString();db.map.set('gsc:backfill-index',30);db.map.set('gsc:tick-count',3);
+ for(let ago=40;ago<=42;ago++)for(const scope of ['page','query']){
+  const day=new Date(time.getTime()-ago*86400000).toISOString().slice(0,10);
+  db.map.set('gsc:daily:'+day+':'+scope,{day,scope,captured_at:old,generation:'fixture-old',rows:1,pages:1,source:'GSC Search Analytics API',d1_requests:0,query_partial:scope==='query',page_proofs:[{index:0,count:1,bytes:200,chunks:1,sha256:'a'.repeat(64)}]});
+ }
+ const before=structuredClone([...db.map].filter(([key])=>key.startsWith('gsc:daily:'))),expected=new Date(time.getTime()-43*86400000).toISOString().slice(0,10);
+ const fetcher=vi.fn(async(_url:RequestInfo|URL,init?:RequestInit)=>{const body=JSON.parse(String(init?.body));expect(body.startDate).toBe(expected);return Response.json({responseAggregationType:'byPage',rows:[{keys:[body.startDate,'https://mavibasim.com/brosur','tur','DESKTOP'],clicks:1,impressions:10,ctr:.1,position:4}]});});
+ expect(await new IndependentGscCollector(db,'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',async()=> 'fixture-token',fetcher as typeof fetch).tick(time)).toMatchObject({status:'complete',day:expected,scope:'page'});
+ expect(fetcher).toHaveBeenCalledTimes(1);for(const [key,value] of before)expect(db.map.get(key)).toEqual(value);
+});

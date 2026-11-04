@@ -4,6 +4,17 @@ import json,secrets,subprocess,time,urllib.request,urllib.error
 from gsc_runtime_audit import APP,ARCHIVE,ROOT,need,safe_code
 
 def sanitize(value,mode):
+ if mode in ('ga4','ga4_setup'):
+  fields={'ok','mode','connected','reauthorization_required','property_verified','code','secure_link_verified','qa_source_verified','reports','d1_requests'}
+  need(isinstance(value,dict) and set(value)==fields and value.get('ok') is True and value.get('mode')==mode and type(value.get('d1_requests')) is int and value['d1_requests']==0,'GSC_HISTORY_GA4_INVALID')
+  for k in ('connected','reauthorization_required','property_verified','secure_link_verified','qa_source_verified'):need(type(value[k]) is bool,'GSC_HISTORY_GA4_INVALID')
+  need(value['qa_source_verified'] is True and (mode!='ga4_setup' or value['secure_link_verified'] is True),'GSC_HISTORY_GA4_LINK_INVALID')
+  need(value['code'] is None or isinstance(value['code'],str) and re.fullmatch(r'GA4_[A-Z0-9_]{1,100}',value['code']),'GSC_HISTORY_GA4_INVALID')
+  need(isinstance(value['reports'],list) and len(value['reports'])==2,'GSC_HISTORY_GA4_INVALID')
+  for index,r in enumerate(value['reports']):
+   need(isinstance(r,dict) and set(r)=={'month','available','closed','cities','devices','pages','evidence_refs'} and r['month']==('2026-09','2026-10')[index] and type(r['available']) is bool and type(r['closed']) is bool,'GSC_HISTORY_GA4_INVALID')
+   for k in ('cities','devices','pages','evidence_refs'):need(type(r[k]) is int and 0<=r[k]<=4000,'GSC_HISTORY_GA4_INVALID')
+  return value
  need(isinstance(value,dict) and value.get('ok') is True and value.get('mode')==mode,'GSC_HISTORY_RESPONSE_INVALID')
  allowed={'month':{'ok','mode','month','available','days_verified','expected_days','query_days_verified','evidence_refs','content_rows','chunk_reads','budget_limited','query_partial','source','d1_requests'},
  'analysis':{'ok','mode','month','available','facet_counts','devices','countries','evidence_refs','mapping_available','questions','d1_requests'},
@@ -55,7 +66,7 @@ def acceptance(exchange,max_ticks=200,context_only=False,verify_analysis=False):
  if verify_analysis:result['analyses']=[sanitize(exchange('analysis',m),'analysis') for m in status['months']]
  print(json.dumps({'gsc_history_acceptance':result}),flush=True);return result
 
-def runHistory(max_ticks=200,context_only=False,verify_analysis=False,warm_context=False):
+def runHistory(max_ticks=200,context_only=False,verify_analysis=False,warm_context=False,ga4_setup=False,ga4_only=False):
  folder=ROOT/'.local/gsc-history-acceptance';folder.mkdir(parents=True,exist_ok=True);key=secrets.token_hex(32)
  config={'name':APP,'main':str(ROOT/'scripts/gsc_history_probe.ts'),'compatibility_date':'2026-10-01','workers_dev':False,'preview_urls':False,'vars':{'PROBE_KEY':key},'services':[{'binding':'ARCHIVE','service':ARCHIVE}]}
  if warm_context:config['services'].append({'binding':'SOURCE','service':APP,'entrypoint':'MonthlyReportSource','environment':'production'})
@@ -79,16 +90,18 @@ def runHistory(max_ticks=200,context_only=False,verify_analysis=False,warm_conte
       if mode=='warm_context' and code=='GSC_HISTORY_SOURCE_VERSION_PENDING':time.sleep(1);continue
       if code:raise ValueError(safe_code(code)) from None
       # Never repeat an unconfirmed collection or metadata write.
-      if mode in ('tick','warm_context'):raise ValueError('GSC_HISTORY_MUTATION_UNCONFIRMED') from None
+      if mode in ('tick','warm_context','ga4_setup'):raise ValueError('GSC_HISTORY_MUTATION_UNCONFIRMED') from None
       if error.code in (400,401,403):raise ValueError('GSC_HISTORY_AUTH_REJECTED') from None
      except (urllib.error.URLError,TimeoutError):
-      if mode in ('tick','warm_context') and preview.poll() is None:
+      if mode in ('tick','warm_context','ga4_setup') and preview.poll() is None:
        # Startup may have no HTTP listener yet; only status is allowed to wait.
        raise ValueError('GSC_HISTORY_MUTATION_UNCONFIRMED') from None
      time.sleep(1)
     raise ValueError('GSC_HISTORY_PREVIEW_TIMEOUT')
    # Warm the preview with a read-only request before any mutation.
    sanitize(exchange('status',None),'status')
+   if ga4_setup or ga4_only:
+    mode='ga4_setup' if ga4_setup else 'ga4';proof=sanitize(exchange(mode,None),mode);print(json.dumps({'ga4_runtime':proof}),flush=True);return proof
    if warm_context:
     warm=sanitize(exchange('warm_context',None),'warm_context');print(json.dumps({'metadata_context_initial_copy':warm}),flush=True)
    report=acceptance(exchange,max_ticks,context_only,verify_analysis);(folder/('context.json' if context_only else 'evidence.json')).write_text(json.dumps(report,indent=2)+'\n');return report

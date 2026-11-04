@@ -1,3 +1,5 @@
+**4 Kasım 2026 devamı:** Tek [Türkçe SEO panelinde](https://mavi-basim-seo-prod.mavibasimonline.workers.dev/independent-seo.html) günlük GSC, ürün/sorgu/cihaz kanıtları, tarama değişiklikleri ve ayrı GA4 bağlantısı bulunur. GA4 için panelde Google Analytics izni verilir; yalnız mavibasim.com web akışı doğrulanan mülk kabul edilir. Bağlantı hazırlanması gerçek şehir verisi alındığı anlamına gelmez. Güncel kapsam ve yayın kanıtı Actions kayıtlarındadır.
+
 **26 Ekim GSC düzeltmesi — henüz yayımlanmadı:** sahip olunan apex/www URL gözlemleri, gerçek mülk kapsamı ve blocked iş karantinası için [kod/test/kapsam raporu](GSC_URL_VARIANTS_REPORT.md). Güncel devam kaydı [TODO.md](TODO.md); aşağıdaki tarihli üretim kayıtları tarihçedir.
 
 Veri kaynakları ve bağımsız metrik denetimi: [DATA_INTEGRITY_AUDIT.md](DATA_INTEGRITY_AUDIT.md).

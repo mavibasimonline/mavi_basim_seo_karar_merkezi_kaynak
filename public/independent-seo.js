@@ -2,7 +2,7 @@ const $=id=>document.getElementById(id),month=$('month'),state=$('state'),source
 const numbers=new Intl.NumberFormat('tr-TR',{maximumFractionDigits:2});
 const facets={products:'Ürün',pages:'Sayfa',queries:'Görünür sorgu',devices:'Cihaz',countries:'Ülke'};
 const deviceNames={MOBILE:'Mobil',DESKTOP:'Masaüstü',TABLET:'Tablet'};
-let monthlyGsc=null,loadVersion=0;
+let monthlyGsc=null,monthlyGa4=null,previousGa4=null,loadVersion=0;
 const text=(id,value)=>{$(id).textContent=value;};
 const numeric=value=>typeof value==='number'&&Number.isFinite(value)?numbers.format(value):'—';
 function dateTime(value){const date=new Date(value);return value&&Number.isFinite(date.getTime())?date.toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'}):'Tarih doğrulanamadı';}
@@ -63,6 +63,10 @@ function renderEvidence(list,records,fallback=[]){
  if(refs.length){
   for(const record of refs){
    const item=document.createElement('li');
+   if(record.property&&record.source==='Google Analytics 4 Data API'){
+    item.textContent='GA4 · Mülk '+record.property+' · '+record.month+' / '+record.kind+' · '+record.from+' — '+record.to+' ('+record.timezone+') · '+numeric(record.rows)+' kayıt · '+dateTime(record.captured_at)+' · '+record.generation+' · '+(record.hashes||[]).join(', ');list.appendChild(item);continue;
+   }
+   if(record.event_id){item.textContent='Değişiklik '+record.event_id+' · '+record.url+' · Tarama aralığı: '+dateTime(record.observed_interval?.from)+' — '+dateTime(record.observed_interval?.to)+' · Başlık: '+(record.before?.title||'—')+' → '+(record.after?.title||'—')+' · H1: '+(record.before?.h1||[]).join(' / ')+' → '+(record.after?.h1||[]).join(' / ')+' · Hash: '+(record.before?.content_hash||'—')+' → '+(record.after?.content_hash||'—')+' · Kaynak: '+record.source_hash;list.appendChild(item);continue;}
    const hashes=Array.isArray(record.page_hashes)?record.page_hashes:[];
    item.textContent=(record.day||'Gün belirtilmedi')+' · '+scopeName(record.scope)+' · '+numeric(record.rows)+' kayıt · '+dateTime(record.captured_at)+' · Kaynak: gsc:history:'+record.day+':'+record.scope+':'+record.generation+(hashes.length?' · İçerik özeti: '+hashes.slice(0,3).join(', ')+(hashes.length>3?' (+'+(hashes.length-3)+' doğrulama özeti)':''):'');
    list.appendChild(item);
@@ -89,12 +93,47 @@ function showAnalysis(data,target){
  text('gsc-month-note',(data.month||target)+' · Günlük sayfa kapsamı '+pages+'/'+expected+' gün; görünür sorgu kaydı '+queries+'/'+expected+' gün. '+(data.available?'Sayfa günlerinin tamamı içerik doğrulamasından geçti.':'Ayın tamamı doğrulanmadı. Eksik günler sıfır trafik değildir; aylık toplam hesaplanmadı.')+' Sorgu kapsamı anonimleştirme nedeniyle kısmi kalabilir.');
  renderEvidence($('gsc-evidence'),data.evidence);showFacet();
 }
+function ga4Problem(code){
+ const names={GA4_PERMISSION_REQUIRED:'Google hesabında Analytics okuma izni gerekiyor.',GA4_API_NOT_ENABLED:'Google projesinde Analytics API erişimi etkin değil.',GA4_PROPERTY_PERMISSION_REQUIRED:'Seçilen Analytics mülküne erişim izni gerekiyor.',GA4_PROPERTY_SELECTION_REQUIRED:'Mavibasim.com web mülkünü seçin.',GA4_PROPERTY_SCOPE_UNVERIFIED:'Mülkün web akışında mavibasim.com doğrulanamadı.',GA4_RATE_LIMITED:'Google istek sınırı nedeniyle yeniden deneme bekleniyor.'};
+ return names[code]||(code?'GA4 kaynak doğrulaması bekleniyor: '+code:'');
+}
+function showGa4(){
+ const body=$('ga4-rows'),type=$('ga4-facet').value;body.replaceChildren();
+ const rows=monthlyGa4?.[type]||[],previous=monthlyGa4?.closed&&previousGa4?.closed?previousGa4[type]||[]:[];
+ for(const observation of rows){
+  const key=r=>type==='cities'?[r.country,r.region,r.city].join(' / '):type==='devices'?r.device:r.page;
+  const old=previous.find(r=>key(r)===key(observation)),row=document.createElement('tr');
+  for(const value of [key(observation),numeric(observation.active_users),numeric(observation.sessions),numeric(observation.engaged_sessions),old?numeric(old.sessions):'Doğrulanmadı']){const cell=document.createElement('td');cell.textContent=value;row.appendChild(cell);}body.appendChild(row);
+ }
+ if(!rows.length)emptyRow(body,'Bu kırılımın GA4 kayıtları henüz doğrulanmadı. Eksik kayıt sıfır ziyaretçi değildir.');
+ const report=monthlyGa4;
+ text('ga4-period',report?(report.from?report.from+' — '+report.to+' · '+(report.closed?'Sonuçlanmış dönem':'Kısmi dönem')+' · '+report.property?.time_zone+'. ':'')+(report.message||'')+(report.thresholded?' Google gizlilik eşiği uygulanmış olabilir.':'')+(report.other_rows?' Google bazı satırları (other) altında toplamış.':''):'GA4 dönem kaydı doğrulanamadı.');
+ renderEvidence($('ga4-evidence'),report?.evidence);
+}
+async function loadGa4(target,fresh){
+ const status=await request('/api/independent/ga4-status');if(!fresh())return;
+ $('ga4-connect').hidden=status.connected&&!status.reauthorization_required;
+ $('ga4-connect').textContent=status.reauthorization_required?'Google Analytics iznini yenile':'Google Analytics’i bağla';
+ text('ga4-note',(status.connected?'Analytics izni kayıtlı. ':'Analytics izni doğrulanmadı. ')+(status.property?'Doğrulanmış web mülkü: '+status.property.name+' ('+status.property.id+'). ':'')+ga4Problem(status.last_attempt?.code||status.inspection?.code)+(status.cron?' Son otomatik deneme: '+dateTime(status.cron.scheduled_at)+'.':''));
+ $('ga4-select').hidden=!status.connected||!!status.property;
+ if(status.connected&&!status.property){
+  try{const list=await request('/api/independent/ga4-properties');if(!fresh())return;const select=$('ga4-property');select.replaceChildren();for(const p of list.properties||[]){const option=document.createElement('option');option.value=p.id;option.textContent=p.name+' ('+p.id+')';select.appendChild(option);}if(!select.children.length)text('ga4-note','Google hesabında okunabilir GA4 mülkü bulunamadı.');}
+  catch(error){if(fresh())text('ga4-note',String(error.message));}
+ }
+ const date=new Date(target+'-01T00:00:00Z');date.setUTCMonth(date.getUTCMonth()-1);
+ const [current,previous]=await Promise.all([request('/api/independent/ga4-report?month='+encodeURIComponent(target)),request('/api/independent/ga4-report?month='+date.toISOString().slice(0,7))]);
+ if(fresh()){monthlyGa4=current;previousGa4=previous;showGa4();}
+}
+async function loadChanges(target,fresh){
+ const data=await request('/api/independent/change-history?month='+encodeURIComponent(target));if(!fresh())return;
+ text('changes-note',data.answer);const list=document.createElement('ul');list.className='evidence';renderEvidence(list,data.evidence_refs,data.evidence);$('changes').replaceChildren(list);
+}
 async function load(){
  const version=++loadVersion,target=month.value||lastClosedMonth(),fresh=()=>version===loadVersion;
  $('reload').disabled=true;state.textContent='Aylık arşiv kontrol ediliyor';state.className='tag';
  source.textContent=target+' dönemi için arşiv kaynağı kontrol ediliyor.';
  emptyRow(products,'Seçilen dönemin aylık arşivi kontrol ediliyor.');
- monthlyGsc=null;showFacet();text('gsc-month-note',target+' dönemi için günlük kaynaklar inceleniyor.');$('gsc-evidence').replaceChildren();
+ monthlyGsc=null;monthlyGa4=null;previousGa4=null;showGa4();$('changes').replaceChildren();showFacet();text('gsc-month-note',target+' dönemi için günlük kaynaklar inceleniyor.');$('gsc-evidence').replaceChildren();
  answer.textContent='';$('answer-evidence').replaceChildren();
  const archive=request('/api/independent/report?month='+encodeURIComponent(target)).then(data=>{if(fresh())showArchive(data,target);}).catch(error=>{
   if(!fresh())return;state.textContent='Aylık arşiv kullanılamıyor';state.className='tag error';source.textContent=String(error.message||'Aylık kaynak alınamadı.');emptyRow(products,'Aylık arşiv sonucu doğrulanamadı. Günlük GSC kanıtları ayrıca kontrol edilir.');
@@ -105,7 +144,9 @@ async function load(){
  const analysis=request('/api/independent/gsc-analysis?month='+encodeURIComponent(target)).then(data=>{if(fresh())showAnalysis(data,target);}).catch(error=>{
   if(!fresh())return;monthlyGsc=null;text('gsc-month-note','Seçilen dönemin günlük kanıtları doğrulanamadı: '+String(error.message||'Veri alınamadı.'));renderEvidence($('gsc-evidence'),[]);showFacet();
  });
- await Promise.allSettled([archive,status,analysis]);if(fresh())$('reload').disabled=false;
+ const ga4=loadGa4(target,fresh).catch(error=>{if(fresh()){text('ga4-note',String(error.message));monthlyGa4=null;showGa4();}});
+ const changes=loadChanges(target,fresh).catch(error=>{if(fresh())text('changes-note','Değişiklik kaydı doğrulanamadı: '+String(error.message));});
+ await Promise.allSettled([archive,status,analysis,ga4,changes]);if(fresh())$('reload').disabled=false;
 }
 $('reload').addEventListener('click',load);month.addEventListener('change',load);$('gsc-facet').addEventListener('change',showFacet);
 $('reconnect').addEventListener('click',async()=>{
@@ -115,10 +156,20 @@ $('reconnect').addEventListener('click',async()=>{
 });
 $('ask').addEventListener('submit',async event=>{
  event.preventDefault();const version=loadVersion,askedMonth=month.value;answer.textContent='Kanıtlar inceleniyor';$('answer-evidence').replaceChildren();const button=$('ask').querySelector('button[type="submit"]');button.disabled=true;
- try{const choice=$('question-source').value,body={question:$('question').value,month:month.value,...(choice==='archive'?{source:'archive'}:{})};
+ try{const choice=$('question-source').value,body={question:$('question').value,month:month.value,...(['archive','ga4'].includes(choice)?{source:choice}:{})};
   const data=await request('/api/independent/'+(choice==='gsc'?'gsc-questions':'questions'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(version!==loadVersion)return;
   answer.textContent=data.answer+'\nDönem: '+(data.month||askedMonth)+' · Karar: '+data.decision+(data.source?' · Kaynak: '+data.source:'');renderEvidence($('answer-evidence'),data.evidence_refs,data.evidence);
  }catch(error){if(version===loadVersion)answer.textContent=String(error.message||error);}finally{button.disabled=false;}
+});
+$('ga4-facet').addEventListener('change',showGa4);
+$('ga4-connect').addEventListener('click',async()=>{
+ const button=$('ga4-connect');button.disabled=true;
+ try{const data=await request('/api/independent/ga4-oauth/start',{method:'POST'}),url=new URL(data.authorization_url);if(url.origin!=='https://accounts.google.com')throw Error('Güvenli Google yetki adresi doğrulanamadı.');location.assign(url.href);}
+ catch(error){text('ga4-note',String(error.message));button.disabled=false;}
+});
+$('ga4-select').addEventListener('submit',async event=>{
+ event.preventDefault();const button=$('ga4-select').querySelector('button');button.disabled=true;
+ try{await request('/api/independent/ga4-property',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({property_id:$('ga4-property').value})});await load();}catch(error){text('ga4-note',String(error.message));}finally{button.disabled=false;}
 });
 setMonths();load();

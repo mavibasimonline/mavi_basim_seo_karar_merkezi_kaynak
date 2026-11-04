@@ -130,3 +130,23 @@ it('accepts the real Cloudflare timestamp shape through the Cron bridge and pers
  expect(result.cron.last).toMatchObject({source:'Cloudflare Cron',scheduled_at:time.toISOString(),status:'complete',rows:1,d1_requests:0});
  const saved=await (await stub().fetch('https://archive.private/api/internal/gsc-proof?day='+day+'&scope=page')).json<any>();expect(saved).toMatchObject({verified:true,rows:1});
 });
+
+
+it('a bounded Cron batch collects three missing scopes once and redelivery performs no work',async()=>{
+ const imported=await stub().fetch('https://archive.private/api/internal/gsc-import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scope:'https://www.googleapis.com/auth/webmasters.readonly',refresh_token:'fixture-existing-google-refresh-token-for-gsc'})});expect(imported.status).toBe(200);
+ const slot=new Date();slot.setUTCMinutes(Math.floor(slot.getUTCMinutes()/15)*15,0,0);
+ const fetcher=vi.spyOn(globalThis,'fetch').mockImplementation(async(_url,init)=>{const body=JSON.parse(String(init?.body));return Response.json({responseAggregationType:'byPage',rows:[{keys:[body.startDate,'https://mavibasim.com/brosur',...(body.dimensions.includes('query')?['fixture-query']:[]),'tur','DESKTOP'],clicks:1,impressions:10,ctr:.1,position:4}]});});
+ const request=()=>stub().fetch('https://archive.private/api/internal/gsc-tick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'cloudflare-cron',scheduled_at:slot.toISOString(),limit:3})});
+ expect(await (await request()).json()).toMatchObject({status:'complete',batch_attempts:3,d1_requests:0});expect(fetcher).toHaveBeenCalledTimes(3);
+ expect((await request()).status).toBe(200);expect(fetcher).toHaveBeenCalledTimes(3);
+ expect((await (await stub().fetch('https://archive.private/api/internal/gsc-coverage')).json<any>()).coverage).toHaveLength(3);
+});
+it('GA4 consent/status/report and change evidence remain D1-free when unrelated Sheets are offline',async()=>{
+ const fetcher=vi.spyOn(globalThis,'fetch').mockRejectedValue(Error('TEST source offline'));
+ expect(await (await stub().fetch('https://archive.private/api/independent/ga4-status')).json()).toMatchObject({connected:false,property:null,d1_requests:0});
+ expect(await (await stub().fetch('https://archive.private/api/independent/ga4-report?month='+closedMonth())).json()).toMatchObject({available:false,d1_requests:0});
+ const start=await stub().fetch('https://archive.private/api/independent/ga4-oauth/start',{method:'POST'});expect(start.status).toBe(200);expect(new URL((await start.json<any>()).authorization_url).searchParams.get('scope')).toBe('https://www.googleapis.com/auth/analytics.readonly');
+ const history=await stub().fetch('https://archive.private/api/independent/change-history?month='+closedMonth());expect(history.status).toBe(200);expect(await history.json()).toMatchObject({d1_requests:0,decision:'Veri bekle'});
+ for(const path of ['/api/independent/ga4-status','/api/independent/ga4-report?month='+closedMonth(),'/api/internal/ga4-status','/api/internal/ga4-tick'])expect((await main.fetch(new Request('https://app.example'+path),{} as any,{} as any)).status).toBe(401);
+ expect(fetcher).not.toHaveBeenCalled();
+});

@@ -41,4 +41,10 @@ class HistoryTests(unittest.TestCase):
   self.assertTrue(r['verified']);self.assertEqual(r['manual_ticks'],0);self.assertEqual(calls,['status','month','month','analysis','analysis'])
   bad=exchange('analysis','2026-10');bad['questions']['performance']['answer']='private source text'
   with self.assertRaises(ValueError):history.sanitize(bad,'analysis')
+ def test_ga4_probe_reports_missing_permission_without_emitting_private_fields(self):
+  proof=dict(ok=True,mode='ga4_setup',connected=False,reauthorization_required=False,property_verified=False,code='GA4_PERMISSION_REQUIRED',secure_link_verified=True,qa_source_verified=True,reports=[dict(month=m,available=False,closed=False,cities=0,devices=0,pages=0,evidence_refs=0) for m in ('2026-09','2026-10')],d1_requests=0)
+  self.assertEqual(history.sanitize(proof,'ga4_setup'),proof)
+  for extra in ('access_token','authorization_url','raw_cities'):
+   with self.assertRaises(ValueError):history.sanitize({**proof,extra:'private'},'ga4_setup')
+  with self.assertRaises(ValueError):history.sanitize({**proof,'secure_link_verified':False},'ga4_setup')
 if __name__=='__main__':unittest.main()

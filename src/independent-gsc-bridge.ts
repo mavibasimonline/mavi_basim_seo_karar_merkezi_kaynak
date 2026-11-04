@@ -30,7 +30,7 @@ export async function independentGscCron(env:E,time=new Date()):Promise<'importe
   status=imported;
  }
  if(status.connected!==true)return 'unavailable';
- const result=await read(await svc.fetch('https://archive.private/api/internal/gsc-tick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'cloudflare-cron',scheduled_at:time.toISOString()})}));
+ const result=await read(await svc.fetch('https://archive.private/api/internal/gsc-tick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'cloudflare-cron',scheduled_at:time.toISOString(),limit:3})}));
  if(result.d1_requests!==0||!['partial','complete','idle','held'].includes(String(result.status)))throw Error('GSC_INDEPENDENT_TICK_UNVERIFIED');
  return 'collected';
 }
@@ -44,5 +44,14 @@ export async function independentGscBootstrapCron(env:E,time=new Date()):Promise
   const result=await read(await service.fetch('https://archive.private/api/internal/gsc-bootstrap-tick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'cloudflare-cron',scheduled_at:time.toISOString()})}));
   if(result.d1_requests!==0)return 'held';
   return result.status==='held'?'held':result.status==='idle'?'idle':'collected';
+ }catch{return 'held';}
+}
+
+// GA4 never gates GSC collection or touches the legacy D1 grant. Consent is separate.
+export async function independentGa4Cron(env:E,time=new Date()){
+ if(env.AUTOMATION_ENABLED!=='true'||typeof env.DRIVE_ARCHIVE_SERVICE?.fetch!=='function')return 'unavailable';
+ try{
+  const result=await read(await env.DRIVE_ARCHIVE_SERVICE.fetch('https://archive.private/api/internal/ga4-tick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'cloudflare-cron',scheduled_at:time.toISOString()})}));
+  if(result.d1_requests!==0)throw Error('GA4_TICK_UNVERIFIED');return String(result.status);
  }catch{return 'held';}
 }

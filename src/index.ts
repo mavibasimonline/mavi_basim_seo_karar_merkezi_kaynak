@@ -20,7 +20,7 @@ import {independentDriveRoute} from './drive-broker';
 import {monthlyRoute} from './monthly-route';
 import {independentSession} from './independent-session';
 import {independentRefreshDue,refreshIndependentSheets} from './independent-refresh';
-import {independentGscCron,independentGscBootstrapCron} from './independent-gsc-bridge';
+import {independentGscCron,independentGscBootstrapCron,independentGa4Cron} from './independent-gsc-bridge';
 import {independentContextCron} from './independent-context-bridge';
 export {MonthlyReportSource} from './monthly-source';
 export {DriveGoogleBroker} from './drive-broker';
@@ -66,7 +66,7 @@ async function route(request:Request,env:Env):Promise<Response>{
   if(request.method==='GET'&&path==='/api/drive-independent/health')return independentDriveRoute(request,env);
   if(request.method==='POST'&&path==='/api/session')return (env as Env&{DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE?independentSession(request,env):withReadBudget(env,path,safe=>login(request,safe));
   if(request.method==='GET'&&path==='/api/oauth/google/callback'&&(url.searchParams.get('state')||'').startsWith('drive2.'))return independentDriveRoute(request,env);
-  if(request.method==='GET'&&path==='/api/oauth/google/callback'&&(url.searchParams.get('state')||'').startsWith('gsc2.'))return independentDriveRoute(request,env);
+  if(request.method==='GET'&&path==='/api/oauth/google/callback'&&['gsc2.','ga42.'].some(prefix=>(url.searchParams.get('state')||'').startsWith(prefix)))return independentDriveRoute(request,env);
   if(request.method==='GET'&&path==='/api/oauth/google/callback')return withReadBudget(env,path,safe=>oauthCallback(request,safe));
   if(!path.startsWith('/api/'))return env.ASSETS.fetch(request);
   if(!await authenticated(request,env))return json({error:'Giriş yapmanız gerekiyor.'},401);
@@ -212,6 +212,7 @@ export default {
       try{await independentGscCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);}
       catch{console.log(JSON.stringify({event:'independent-gsc',status:'held',code:'GSC_PRIVATE_SYNC_UNAVAILABLE',d1_collection_writes:0}));}
       await independentGscBootstrapCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);
+      await independentGa4Cron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);
       // Optional bounded metadata copy has its own budget. Its failure never
       // gates daily collection or reads from a user-facing GSC report.
       await independentContextCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);

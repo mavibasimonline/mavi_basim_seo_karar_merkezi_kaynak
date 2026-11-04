@@ -7,7 +7,7 @@ const PROPERTY='sc-domain:mavibasim.com',PAGE=200,MAX_PAGES=250,CHUNK=36000;
 type Scope='page'|'query';
 type PageProof={index:number;count:number;bytes:number;chunks:number;sha256:string};
 type Job={day:string;scope:Scope;generation:string;cursor:number;pages:PageProof[];started_at:string;attempts:number;incomplete?:boolean;ready?:boolean;truncated?:boolean;completed_at?:string};
-export type DailyProof={day:string;scope:Scope;generation:string;captured_at:string;rows:number;pages:number;query_partial:boolean;source:'GSC Search Analytics API';d1_requests:0;page_proofs:PageProof[]};
+export type DailyProof={day:string;scope:Scope;generation:string;captured_at:string;rows:number;pages:number;query_partial:boolean;source:'GSC Search Analytics API';d1_requests:0;collection_complete?:boolean;page_proofs:PageProof[]};
 export type GscStorage=Pick<DurableObjectStorage,'get'|'put'>&{sql?:{readonly databaseSize:number}};
 export type GscPhase='authorization'|'provider'|'response'|'validation'|'storage'|'publication';
 const PHASE_CODE:Record<GscPhase,string>={authorization:'GSC_TOKEN_UNAVAILABLE',provider:'GSC_PROVIDER_UNAVAILABLE',response:'GSC_RESPONSE_INVALID',validation:'GSC_VALIDATION_UNAVAILABLE',storage:'GSC_STORAGE_UNAVAILABLE',publication:'GSC_PUBLICATION_UNAVAILABLE'};
@@ -20,11 +20,11 @@ const dayAgo=(n:number,time:Date)=>new Date(Date.UTC(time.getUTCFullYear(),time.
 function ensure(yes:unknown,code:string):asserts yes {if(!yes)throw Error(code);}
 function safeDay(day:string,time:Date){ensure(/^20\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(day)&&new Date(day+'T00:00:00Z').toISOString().slice(0,10)===day&&day<=dayAgo(3,time)&&day>=dayAgo(400,time),'GSC_DAY_OUT_OF_RANGE');}
 class RowFailure extends Error{constructor(public reason:string){super('GSC_ROW_REJECTED');}}
-type StorageBudget={version:1;measured_since:string;day:string;reserved_bytes:number;day_reserved_bytes:number;bootstrap_reserved_bytes?:number};
+type StorageBudget={version:1;measured_since:string;day:string;reserved_bytes:number;day_reserved_bytes:number;bootstrap_reserved_bytes?:number;ga4_day?:string;ga4_day_reserved_bytes?:number};
 const STORAGE_TOTAL=128*1024*1024,STORAGE_DAY=8*1024*1024;
 export const GSC_BOOTSTRAP_STORAGE_LIMIT=16*1024*1024;
-type BudgetMode='daily'|'bootstrap';
-async function reserveStorage(storage:GscStorage,planned:number,time:Date,mode:BudgetMode='daily'){
+type BudgetMode='daily'|'bootstrap'|'ga4';
+export async function reserveIndependentBytes(storage:GscStorage,planned:number,time:Date,mode:BudgetMode='daily'){
  const saved=await storage.get<StorageBudget>('gsc:storage-budget:v1'),day=time.toISOString().slice(0,10);
  ensure(Number.isSafeInteger(planned)&&planned>0,'GSC_STORAGE_BUDGET_INVALID');
  if(saved)ensure(saved.version===1&&Number.isSafeInteger(saved.reserved_bytes)&&saved.reserved_bytes>=0&&Number.isSafeInteger(saved.day_reserved_bytes)&&saved.day_reserved_bytes>=0,'GSC_STORAGE_BUDGET_INVALID');
@@ -35,11 +35,15 @@ async function reserveStorage(storage:GscStorage,planned:number,time:Date,mode:B
  ensure(budget.reserved_bytes+planned<=STORAGE_TOTAL,'GSC_STORAGE_TOTAL_LIMIT');
  ensure(Number.isSafeInteger(budget.bootstrap_reserved_bytes??0)&&(budget.bootstrap_reserved_bytes??0)>=0,'GSC_STORAGE_BUDGET_INVALID');
  if(mode==='bootstrap')ensure((budget.bootstrap_reserved_bytes??0)+planned<=GSC_BOOTSTRAP_STORAGE_LIMIT,'GSC_BOOTSTRAP_STORAGE_LIMIT');
- else ensure(budget.day_reserved_bytes+planned<=STORAGE_DAY,'GSC_STORAGE_DAILY_LIMIT');
+ else if(mode==='ga4'){
+  ensure(Number.isSafeInteger(budget.ga4_day_reserved_bytes??0)&&(budget.ga4_day_reserved_bytes??0)>=0,'GSC_STORAGE_BUDGET_INVALID');
+  ensure((budget.ga4_day===day?(budget.ga4_day_reserved_bytes??0):0)+planned<=2*1024*1024,'GA4_STORAGE_DAILY_LIMIT');
+ }else ensure(budget.day_reserved_bytes+planned<=STORAGE_DAY,'GSC_STORAGE_DAILY_LIMIT');
  // Reservation precedes chunks and is retained even after a failed write. It is
  // deliberately conservative; pre-upgrade/account-wide usage is not measured.
  budget.reserved_bytes+=planned;
  if(mode==='bootstrap')budget.bootstrap_reserved_bytes=(budget.bootstrap_reserved_bytes??0)+planned;
+ else if(mode==='ga4'){budget.ga4_day_reserved_bytes=(budget.ga4_day===day?(budget.ga4_day_reserved_bytes??0):0)+planned;budget.ga4_day=day;}
  else budget.day_reserved_bytes+=planned;
  await storage.put('gsc:storage-budget:v1',budget);
 }
@@ -87,7 +91,7 @@ async function writePage(storage:GscStorage,j:Job,rows:GscRow[],secret:string,ti
  ensure(index<MAX_PAGES,'GSC_PAGE_LIMIT');
  // 2x serialized plaintext covers base64+encryption overhead; identity lists,
  // page manifests and active/final pointers receive an additional allowance.
- await reserveStorage(storage,binary.length*2+bytes(JSON.stringify(hashes)).length*2+4096,time,mode);
+ await reserveIndependentBytes(storage,binary.length*2+bytes(JSON.stringify(hashes)).length*2+4096,time,mode);
  for(let i=0;i<chunks;i++){
   const slice=binary.subarray(i*CHUNK,(i+1)*CHUNK);
   await storage.put(pageKey(j,index,i),await encrypt({chunk:btoa(String.fromCharCode(...slice))},secret));
@@ -123,7 +127,7 @@ async function previousIdentities(storage:GscStorage,j:Job,secret:string,time:Da
   const raw=new TextDecoder().decode(all);ensure(at===p.bytes&&await digest(raw)===p.sha256,'GSC_READBACK_REJECTED');
   const rows=JSON.parse(raw) as GscRow[];ensure(Array.isArray(rows)&&rows.length===p.count,'GSC_READBACK_REJECTED');
   const hashes=await identities(rows);
-  await reserveStorage(storage,bytes(JSON.stringify(hashes)).length*2+1024,time,mode);
+  await reserveIndependentBytes(storage,bytes(JSON.stringify(hashes)).length*2+1024,time,mode);
   await storage.put(seenKey(j,p.index),hashes);
   return null;
  }
@@ -133,12 +137,19 @@ export function selectGscDay(time:Date,backfill=0,history=false){
  const index=Math.max(0,Math.min(390,backfill));
  return dayAgo(history?10+index:3,time);
 }
+/** A final, nonempty saved scope is collected once. Anonymous query coverage
+ * remains partial; that does not require refetching the same observed rows. */
+export function collectedGscProof(p:DailyProof|undefined,day:string,scope:Scope,time:Date){
+ if(!p||p.day!==day||p.scope!==scope||p.source!=='GSC Search Analytics API'||p.d1_requests!==0||p.collection_complete===false||p.rows<=0||p.rows>=50000||!Number.isSafeInteger(p.rows)||scope==='page'&&p.query_partial||!Number.isFinite(Date.parse(p.captured_at))||Date.parse(p.captured_at)>time.getTime())return false;
+ const parts=p.page_proofs;
+ return Array.isArray(parts)&&parts.length>0&&parts.length<=250&&p.pages===parts.length&&parts.every((v,i)=>v.index===i&&Number.isSafeInteger(v.count)&&v.count>=0&&v.count<=200&&/^[a-f0-9]{64}$/.test(v.sha256))&&parts.reduce((n,v)=>n+v.count,0)===p.rows&&parts.at(-1)!.count<200;
+}
 export class IndependentGscCollector {
  constructor(private storage:GscStorage,private keySecret:string,private token:(force:boolean)=>Promise<string>,private fetcher:typeof fetch=fetch,private budgetMode:BudgetMode='daily'){}
  private async finish(j:Job,time:Date){
   const final:DailyProof={day:j.day,scope:j.scope,generation:j.generation,captured_at:j.completed_at||time.toISOString(),
    rows:j.cursor,pages:j.pages.length,query_partial:j.scope==='query'||!!j.incomplete||!!j.truncated||j.cursor===0,
-   source:'GSC Search Analytics API',d1_requests:0,page_proofs:j.pages};
+   source:'GSC Search Analytics API',d1_requests:0,collection_complete:!j.incomplete&&!j.truncated&&j.cursor>0&&j.cursor<50000,page_proofs:j.pages};
   const history='gsc:history:'+j.day+':'+j.scope+':'+j.generation,existing=await this.storage.get<DailyProof>(history);
   // A failed pointer write may retry publication, but a verified historical
   // generation is immutable and never overwritten with a different manifest.
@@ -164,7 +175,7 @@ export class IndependentGscCollector {
    checked.sort((a,b)=>Number(!!a.old)-Number(!!b.old));
    for(const c of checked){
     const old=c.old,maxAge=c.history?30*86400000:24*3600000;
-    if(old&&time.getTime()-Date.parse(old.captured_at)<maxAge)continue;
+    if(collectedGscProof(old,c.day,c.scope,time)||old&&time.getTime()-Date.parse(old.captured_at)<maxAge)continue;
     const held=await this.storage.get<{until:number}>('gsc:held:'+c.day+':'+c.scope);
     if(held&&Number.isFinite(held.until)&&held.until>time.getTime())continue;
     const job:Job={day:c.day,scope:c.scope,generation:crypto.randomUUID(),cursor:0,pages:[],started_at:time.toISOString(),attempts:0,incomplete:false};
@@ -179,7 +190,7 @@ export class IndependentGscCollector {
    for(let scan=0;scan<64;scan++){
     const d=selectGscDay(time,index,true),pair=(['page','query'] as Scope[]).map(scope=>({day:d,scope,history:true}));
     const proofs=await Promise.all(pair.map(c=>this.storage.get<DailyProof>(key(c.day,c.scope))));
-    const fresh=proofs.every(p=>p&&Number.isFinite(Date.parse(p.captured_at))&&time.getTime()-Date.parse(p.captured_at)>=0&&time.getTime()-Date.parse(p.captured_at)<30*86400000);
+    const fresh=proofs.every((p,i)=>collectedGscProof(p,d,pair[i].scope,time)||p&&Number.isFinite(Date.parse(p.captured_at))&&time.getTime()-Date.parse(p.captured_at)>=0&&time.getTime()-Date.parse(p.captured_at)<30*86400000);
     if(!fresh){const picked=await pick(pair);if(picked)return picked;}
     index=(index+1)%391;await this.storage.put('gsc:backfill-index',index);
     // A held source day yields to recent work; an actual account backoff is

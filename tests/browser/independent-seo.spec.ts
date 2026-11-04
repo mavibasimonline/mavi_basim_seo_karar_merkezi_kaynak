@@ -24,6 +24,9 @@ async function fixtures(page:Page,options:Options={}){
     products:[{id:'brosur',title:'Broşür',metrics:{clicks:october?100:200,impressions:1000,ctr:october?.1:.2,position:5},
      previous:october?{clicks:200,impressions:1000,ctr:.2,position:4}:null,delta:october?-100:null,decision:october?'İncele':'Veri bekle'}]});
   }
+  if(path==='/api/independent/ga4-status')return json({connected:false,reauthorization_required:false,property:null,inspection:{code:'GA4_PERMISSION_REQUIRED'},d1_requests:0});
+  if(path==='/api/independent/ga4-report')return json({available:false,connected:false,month,property:null,cities:[],devices:[],pages:[],source:'Google Analytics 4 Data API',evidence:[],message:'GA4 şehir kayıtları henüz doğrulanmadı; eksik kayıt sıfır ziyaretçi değildir.',d1_requests:0});
+  if(path==='/api/independent/change-history')return json({answer:'CMS kanıtı yoksa yalnız tarama aralığı gösterilir.',evidence_refs:[{event_id:'fixture-event',url:'https://mavibasim.com/brosur',source_hash:'d'.repeat(64),observed_interval:{from:'2026-09-01T00:00:00Z',to:'2026-10-01T00:00:00Z'},before:{title:malicious,h1:['Önceki'],content_hash:'e'.repeat(64)},after:{title:'Yeni başlık',h1:['Sonraki'],content_hash:'f'.repeat(64)}}],d1_requests:0});
   if(path==='/api/independent/gsc-status')return json({connected:true,reauthorization_required:false,source:'GSC Search Analytics API',d1_requests:0,
    coverage:[],expected_records:14,last_attempt:{at:captured,status:'held',code:'GSC_ROW_REJECTED',day:'2026-11-01',scope:'page'},
    last_failure:{at:captured,code:'GSC_ROW_REJECTED',day:'2026-11-01',scope:'page'},last_complete:null,
@@ -131,4 +134,13 @@ test('September–October archive comparison remains separate and question sourc
  await expect(page.locator('#answer')).toContainText('Otomatik kaynak fixture yanıtı');
  expect(posts[1]).toEqual({path:'/api/independent/questions',body:{month:'2026-10',question:'Broşür neden düştü?'}});
  expect(await page.evaluate(()=>Boolean((window as unknown as {__gscXss?:number}).__gscXss))).toBe(false);
+});
+
+
+test('GA4 missing permission and before/after SEO evidence are explicit in the same Turkish panel',async({page})=>{
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await fixtures(page);await page.goto('/independent-seo.html');
+ await expect(page.locator('#ga4-note')).toContainText('Analytics izni doğrulanmadı');await expect(page.locator('#ga4-connect')).toBeVisible();await expect(page.locator('#ga4-rows')).toContainText('sıfır ziyaretçi değildir');
+ await expect(page.locator('#changes')).toContainText('fixture-event');await expect(page.locator('#changes')).toContainText(malicious);await expect(page.locator('#changes')).toContainText('Yeni başlık');await expect(page.locator('#changes img')).toHaveCount(0);
+ await page.locator('#question-source').selectOption('ga4');await page.locator('#question').fill('İstanbul ziyaretçisi kaç?');await page.locator('#ask button[type="submit"]').click();await expect(page.locator('#answer')).toContainText('Otomatik kaynak fixture yanıtı');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(errors).toEqual([]);
 });

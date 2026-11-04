@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'src/independent-gsc-analysis.ts', 'tests/test_independent_seo_release.py', 'scripts/gsc_history_probe.ts', 'tests/independent-gsc-analysis.test.ts', 'tests/test_gsc_history_acceptance.py', 'scripts/gsc_history_acceptance.py', 'scripts/independent_seo_release.py'}
+EXPECTED={'README.md', 'TODO.md', 'public/independent-seo.html', 'public/independent-seo.js', 'public/index.html', 'scripts/gsc_history_acceptance.py', 'scripts/gsc_history_probe.ts', 'scripts/gsc_runtime_audit.py', 'scripts/independent_seo_release.py', 'src/drive-broker.ts', 'src/drive-independent.ts', 'src/independent-ga4.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc.ts', 'src/index.ts', 'tests/browser/independent-seo.spec.ts', 'tests/drive-independent/gsc-routes.test.ts', 'tests/independent-ga4.test.ts', 'tests/independent-gsc-collector.test.ts', 'tests/test_gsc_history_acceptance.py', 'tests/test_independent_seo_release.py'}
 
 def need(condition,code):
  if not condition:raise ValueError(code)
@@ -86,7 +86,7 @@ def run():
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'INDEPENDENT_MAIN_SUPERSEDED')
  changed=set(git('diff','--name-only','HEAD^','HEAD').splitlines())
  need(changed==EXPECTED,'INDEPENDENT_UNREVIEWED_FILES')
- need(git('rev-parse','HEAD^')=='2490829be75623fde2cd74b39ac6a53a1c34f829','INDEPENDENT_UNREVIEWED_BASE')
+ need(git('rev-parse','HEAD^')=='cf7c9c822d2662bcaf9f20566a36272b36210125','INDEPENDENT_UNREVIEWED_BASE')
  # Preserve the reviewed Cron/DO source set exactly as merged and CI verified.
  need("independentRefreshDue(time)" in (ROOT/'src/index.ts').read_text()
       and "private async independentSnapshot(maxAgeMs=6*3600000)" in (ROOT/'src/drive-independent.ts').read_text()
@@ -206,12 +206,14 @@ def run():
   base='https://mavi-basim-seo-prod.mavibasimonline.workers.dev'
   html_status,body=http(base+'/independent-seo.html')
   ui_acceptance(html_status,body,(ROOT/'public/independent-seo.html').read_bytes())
-  for endpoint in ('/api/independent/status','/api/independent/report'):
+  for endpoint in ('/api/independent/status','/api/independent/report','/api/independent/ga4-status','/api/independent/ga4-report','/api/independent/change-history'):
    code,content=http(base+endpoint)
    need(code==401 and b'Giri' in content,'INDEPENDENT_PUBLIC_DATA_EXPOSED')
   need(snapshot(client,APP)['crons']==existing[APP]['crons'],'INDEPENDENT_CRON_CHANGED')
+  ga4_proof=runHistory(ga4_setup=True)
+  need(ga4_proof['secure_link_verified'] and ga4_proof['qa_source_verified'],'GA4_SECURE_FLOW_ACCEPTANCE_FAILED')
   context_proof=runHistory(context_only=True,warm_context=True)
-  print(json.dumps({'deployed':True,'source':sha,'d1_data_mutated':False,'new_billed_resources':False,'backup_mutated':False,'new_layer':'D1-free GSC daily proofs and preserved Sheets archives','history_months_verified':2 if history_proof['verified'] else 0,'history_plan_complete':history_proof['status']['plan_complete'],'metadata_context_available':context_proof['available'],'gsc_verified_scopes':gsc_proof['readback']['content_verified_scopes'],'gsc_manual_acceptance_ticks':gsc_proof['manual_ticks'],'gsc_natural_cron_verification':'separate runtime receipt required','login_uses_d1':False,'authenticated_data_acceptance':'requires existing admin session','public_endpoints_closed':True,'existing_site_changed':False}),flush=True)
+  print(json.dumps({'deployed':True,'source':sha,'d1_data_mutated':False,'new_billed_resources':False,'backup_mutated':False,'new_layer':'D1-free GSC daily proofs and preserved Sheets archives','history_months_verified':2 if history_proof['verified'] else 0,'history_plan_complete':history_proof['status']['plan_complete'],'metadata_context_available':context_proof['available'],'ga4_connected':ga4_proof['connected'],'ga4_property_verified':ga4_proof['property_verified'],'ga4_secure_link_verified':ga4_proof['secure_link_verified'],'ga4_access_code':ga4_proof['code'],'gsc_verified_scopes':gsc_proof['readback']['content_verified_scopes'],'gsc_manual_acceptance_ticks':gsc_proof['manual_ticks'],'gsc_natural_cron_verification':'separate runtime receipt required','login_uses_d1':False,'authenticated_data_acceptance':'requires existing admin session','public_endpoints_closed':True,'existing_site_changed':False}),flush=True)
  except Exception:
   for worker,config in ((APP,main_config),(ARCHIVE,'deploy/wrangler.drive-archive.jsonc')):
    if worker in changed_workers:

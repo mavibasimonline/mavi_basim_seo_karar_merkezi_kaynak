@@ -15,8 +15,29 @@ export default {async fetch(request:Request,env:HistoryEnv){
  if(!env.PROBE_KEY||request.headers.get('Authorization')!=='Bearer '+env.PROBE_KEY)return Response.json({ok:false,code:'GSC_HISTORY_UNAUTHORIZED'},{status:401});
  try{
   const url=new URL(request.url),mode=url.searchParams.get('mode');
-  if(request.method!=='POST'||!['status','tick','month','context','analysis','warm_context'].includes(mode||'')||[...url.searchParams.keys()].some(k=>!['mode','month'].includes(k)))throw Error('GSC_HISTORY_REQUEST_INVALID');
+  if(request.method!=='POST'||!['status','tick','month','context','analysis','warm_context','ga4','ga4_setup'].includes(mode||'')||[...url.searchParams.keys()].some(k=>!['mode','month'].includes(k)))throw Error('GSC_HISTORY_REQUEST_INVALID');
   const read=async(path:string,init?:RequestInit)=>{const r=await env.ARCHIVE.fetch('https://archive.private/api/internal/'+path,init);if(!r.ok)throw Error('GSC_HISTORY_PRIVATE_UNAVAILABLE');return r.json<any>();};
+  if(mode==='ga4'||mode==='ga4_setup'){
+   const app=async(path:string,init?:RequestInit)=>{const r=await env.ARCHIVE.fetch('https://archive.private/api/independent/'+path,init);if(!r.ok)throw Error('GSC_HISTORY_GA4_UNAVAILABLE');return r;};
+   if(mode==='ga4_setup')await read('ga4-inspect',{method:'POST'});
+   const status=await read('ga4-status');if(status.d1_requests!==0||typeof status.connected!=='boolean'||typeof status.reauthorization_required!=='boolean')throw Error('GSC_HISTORY_GA4_INVALID');
+   let linkReady=false;
+   if(mode==='ga4_setup'){
+    const response=await app('ga4-oauth/start',{method:'POST'}),reply=await response.json<any>(),url=new URL(reply.authorization_url),cookie=response.headers.get('Set-Cookie')||'';
+    if(url.origin!=='https://accounts.google.com'||url.searchParams.get('scope')!=='https://www.googleapis.com/auth/analytics.readonly'||url.searchParams.get('access_type')!=='offline'||!url.searchParams.get('state')?.startsWith('ga42.')||!cookie.includes('HttpOnly; Secure; SameSite=Lax'))throw Error('GSC_HISTORY_GA4_LINK_INVALID');linkReady=true;
+   }
+   const reports=[];
+   for(const month of ['2026-09','2026-10']){
+    const r=await (await app('ga4-report?month='+month)).json<any>();
+    if(r.d1_requests!==0||r.source!=='Google Analytics 4 Data API'||typeof r.available!=='boolean')throw Error('GSC_HISTORY_GA4_INVALID');
+    const counts:Record<string,number>={};for(const k of ['cities','devices','pages']){const rows=r[k]||[];if(!Array.isArray(rows)||rows.length>4000)throw Error('GSC_HISTORY_GA4_INVALID');counts[k]=rows.length;}
+    reports.push({month,available:r.available,closed:r.closed===true,...counts,evidence_refs:r.evidence?.length||0});
+   }
+   const qa=await (await app('questions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({month:'2026-10',question:'İstanbul şehir ziyaretçisi kaç?',source:'ga4'})})).json<any>();
+   if(qa.d1_requests!==0||qa.source!=='Google Analytics 4 Data API'||!['Koru','İncele','Veri bekle'].includes(qa.decision)||typeof qa.answer!=='string'||!qa.answer||typeof qa.requires_ga4!=='boolean')throw Error('GSC_HISTORY_GA4_QUESTION_INVALID');
+   const code=status.last_attempt?.code||status.inspection?.code||null;if(code!==null&&(typeof code!=='string'||!/^GA4_[A-Z0-9_]{1,100}$/.test(code)))throw Error('GSC_HISTORY_GA4_INVALID');
+   return Response.json({ok:true,mode,connected:status.connected,reauthorization_required:status.reauthorization_required,property_verified:!!status.property,code,secure_link_verified:linkReady,qa_source_verified:true,reports,d1_requests:0});
+  }
   if(mode==='warm_context'){
    if(!env.SOURCE)throw Error('GSC_HISTORY_SOURCE_UNAVAILABLE');
    const capability=await env.SOURCE.fetch('https://source.private/?part=evidence-context-status');

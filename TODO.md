@@ -1,3 +1,10 @@
+# 4 Kasım 2026 — devam işi
+
+- Önceden doğrulanan günlük GSC 14/14 ve Eylül–Ekim 122/122 korunur. Eski geçmiş kuyruğu Cron ile ilerler; doğrulanmış tamamlanmış kapsamlar tekrar çekilmez. Her Cron en fazla üç GSC sayfası toplar; kota beklemesi veri kaybı veya sıfır trafik sayılmaz.
+- GA4 ayrı şifreli izin, cookie/state korumalı Google bağlantısı ve kendi alan adı doğrulanan mülk seçimiyle hazırlanır. Analytics izni yoksa şehir analizi tamamlanmış sayılmaz; son gerçek erişim sonucu yayın/audit kaydında gösterilir.
+- Tamamlanmamış 400 günlük eski GSC kuyruğu mevcut ilerlemeden sürer. Yeni UTC günündeki doğal çalışma ayrıca gerçek Cron kaydıyla doğrulanır; gelecekteki başarı garanti edilmez.
+- Yayın için yeşil main CI, ücretsiz hesap, değişmeyen kaynaklar ve canlı sürüm/doğrulanmış kayıt kontrolü zorunludur. Bu kaynak notu tek başına yayın başarısı iddiası değildir.
+
 ## 4 Kasım 2026 — doğrulanmış canlı durum
 
 - [x] Üretim kodu `3abea4a2075ebf7f68f4f94fb3046e4a0d72a098`, yayın `41893586396`: kontrol düzlemi ve HTTP sürümü eşleşti; tam CI 983 test başarılı.
