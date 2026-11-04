@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/run.mjs wrangler dev --local --ip 127.0.0.1 --port 8787",
-    "build": "node scripts/run.mjs wrangler deploy --dry-run --outdir dist",
+    "build:panel": "esbuild src/browser/independent-seo-panel.js --minify --format=esm --charset=utf8 --outfile=public/independent-seo.js",
+    "build": "npm run build:panel && node scripts/run.mjs wrangler deploy --dry-run --outdir dist",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.browser.json --noEmit",
     "test": "node scripts/run.mjs vitest run",
     "test:e2e": "node scripts/run.mjs playwright test",

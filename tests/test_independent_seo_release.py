@@ -50,14 +50,14 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertLess(source.index(' real_data_acceptance()'), source.index("deploy('deploy/wrangler.drive-archive.jsonc'"))
         self.assertLess(source.index('    acceptance_proof(proof)'), source.index('deploy(main_config,sha)'))
         self.assertLess(source.index("need(gsc_proof['passed']"),source.index('deploy(main_config,sha)'))
-        self.assertIn("cf7c9c822d2662bcaf9f20566a36272b36210125",source)
+        self.assertIn("109b48d627dac336ff9fd6459af24c8cd445583c",source)
         self.assertIn("changed==EXPECTED", source)
         self.assertIn("after_main['bindings']==existing[APP]['bindings']", source)
         self.assertIn("rollback(config,existing[worker]['version'])", source)
 
     def test_reviewed_refresh_release_keeps_exact_source_and_one_time_gates(self):
         self.assertEqual(release.TITLE, 'release: verified GSC history bootstrap 20261104')
-        self.assertEqual(release.EXPECTED,{'README.md', 'TODO.md', 'public/independent-seo.html', 'public/independent-seo.js', 'public/index.html', 'scripts/gsc_history_acceptance.py', 'scripts/gsc_history_probe.ts', 'scripts/gsc_runtime_audit.py', 'scripts/independent_seo_release.py', 'src/drive-broker.ts', 'src/drive-independent.ts', 'src/independent-ga4.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc.ts', 'src/index.ts', 'tests/browser/independent-seo.spec.ts', 'tests/drive-independent/gsc-routes.test.ts', 'tests/independent-ga4.test.ts', 'tests/independent-gsc-collector.test.ts', 'tests/test_gsc_history_acceptance.py', 'tests/test_independent_seo_release.py'})
+        self.assertEqual(release.EXPECTED,{'README.md', 'package.json', 'public/independent-seo.js', 'scripts/independent_seo_release.py', 'src/browser/independent-seo-panel.js', 'tests/test_independent_seo_release.py'})
         source=(ROOT/'scripts/independent_seo_release.py').read_text()
         workflow=(ROOT/'.github/workflows/independent-seo-release.yml').read_text()
         self.assertIn('INDEPENDENT_UNREVIEWED_BASE',source)
