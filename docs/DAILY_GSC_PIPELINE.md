@@ -20,6 +20,8 @@ Bir tick en fazla bir GSC API sayfası alır; 401 için tek token yenilemesi yap
 
 Doğal Cron çağrıları zaman damgalı ayrı makbuz üretir. Manuel tanılama çağrıları Cron kanıtı olarak gösterilmez. Gün değişimi otomatik testte doğrulanır; yeni sürümün gerçek ertesi gün çalışması ancak o güne ait çalışma makbuzuyla doğrulanmış sayılır.
 
+Salt okunur çalışma denetimi kontrollü yayından sonra ve günlük 00:35 UTC'de (Türkiye saatiyle 03:35) çalışır. İki gerçek UTC gününde başarılı toplama/parça kaydı yoksa ertesi gün kabulünü başarısız sayar; eski kayıtları veya bekletmeleri değiştirmez. Yalnız CI onaylı tam main commit'i, mevcut Free kaynaklar ve özel hizmet bağı kullanılır.
+
 Ürün/tarama bağlamı D1'dan sınırlı, bütçe korumalı arka plan okumasıyla özel depoya kopyalanır. Bu isteğe bağlı kopya başarısız olsa da günlük GSC toplamayı engellemez. Kullanıcı sorguları D1 okumaz. Yeni içerik veya canonical eşlemesi tahmin edilmez.
 
 ## Ücretsiz kota korumaları

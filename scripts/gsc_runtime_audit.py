@@ -8,7 +8,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from cloudflare_diagnostics import Cloudflare
 from quota_observer_release import api, active_version, cron_rows, free_plan
@@ -18,6 +18,7 @@ ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
 TITLE='audit: daily GSC runtime evidence 20261104'
+RELEASE_TITLE='release: verified daily GSC pipeline 20261104'
 
 def need(value, code):
  if not value:raise ValueError(code)
@@ -153,11 +154,24 @@ def probe(ticks=0):
   # Random preview authentication is ephemeral and never enters artifacts/logs.
   config_path.unlink(missing_ok=True)
 
+def cron_acceptance(evidence, now=None):
+ now=now or datetime.now(timezone.utc)
+ after=evidence.get('after',{})
+ cron=after.get('cron') or {}
+ last=cron.get('last') or {}
+ today=now.date().isoformat()
+ yesterday=(now.date()-timedelta(days=1)).isoformat()
+ successful={row['day'] for row in cron.get('days',[]) if row.get('completed',0)+row.get('partial',0)>0}
+ return {'natural_execution_today':last.get('source')=='Cloudflare Cron' and str(last.get('scheduled_at','')).startswith(today),
+         'natural_collection_today':today in successful,
+         'two_utc_days_verified':{today,yesterday}.issubset(successful),
+         'manual_ticks':evidence.get('manual_ticks',0)}
+
 def run(ticks=0):
  sha=os.environ.get('GITHUB_SHA','')
  need(os.environ.get('GITHUB_REF')=='refs/heads/main' and os.environ.get('GITHUB_REPOSITORY')==REPOSITORY,'GSC_AUDIT_MAIN_REQUIRED')
  need(re.fullmatch('[a-f0-9]{40}',sha or '') and git('rev-parse','HEAD')==sha,'GSC_AUDIT_HEAD_MISMATCH')
- need(git('log','-1','--format=%s')==TITLE,'GSC_AUDIT_TITLE_REQUIRED')
+ need(git('log','-1','--format=%s') in (TITLE,RELEASE_TITLE),'GSC_AUDIT_TITLE_REQUIRED')
  need(os.environ.get('VERIFIED_CI_SHA')==sha,'GSC_AUDIT_CI_SHA_MISMATCH')
  token=os.environ.get('GITHUB_TOKEN')
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',token).get('commit',{}).get('sha')==sha,'GSC_AUDIT_MAIN_SUPERSEDED')
@@ -175,9 +189,10 @@ def run(ticks=0):
  need(before==after,'GSC_AUDIT_PRODUCTION_DRIFT')
  report={'audit_source':sha,'observed_at':datetime.now(timezone.utc).isoformat(),
          'production':before,'production_unchanged':True,'free_plan_verified':True,
-         'evidence':evidence,'d1_requests':0,'site_changed':False,'deployed':False}
+         'evidence':evidence,'cron_acceptance':cron_acceptance(evidence),'d1_requests':0,'site_changed':False,'deployed':False}
  output=ROOT/'.local/gsc-runtime-audit/evidence.json';output.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
  print(json.dumps(report,ensure_ascii=False),flush=True)
+ if os.environ.get('GITHUB_EVENT_NAME')=='schedule':need(report['cron_acceptance']['two_utc_days_verified'],'GSC_AUDIT_NEXT_DAY_UNVERIFIED')
  return report
 
 if __name__=='__main__':

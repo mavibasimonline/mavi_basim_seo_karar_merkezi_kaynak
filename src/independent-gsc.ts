@@ -131,7 +131,7 @@ export class IndependentGscCollector {
  constructor(private storage:GscStorage,private keySecret:string,private token:(force:boolean)=>Promise<string>,private fetcher:typeof fetch=fetch){}
  private async finish(j:Job,time:Date){
   const final:DailyProof={day:j.day,scope:j.scope,generation:j.generation,captured_at:j.completed_at||time.toISOString(),
-   rows:j.cursor,pages:j.pages.length,query_partial:j.scope==='query'||!!j.incomplete||!!j.truncated,
+   rows:j.cursor,pages:j.pages.length,query_partial:j.scope==='query'||!!j.incomplete||!!j.truncated||j.cursor===0,
    source:'GSC Search Analytics API',d1_requests:0,page_proofs:j.pages};
   const history='gsc:history:'+j.day+':'+j.scope+':'+j.generation,existing=await this.storage.get<DailyProof>(history);
   // A failed pointer write may retry publication, but a verified historical

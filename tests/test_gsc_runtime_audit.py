@@ -89,6 +89,17 @@ class RuntimeAuditTests(unittest.TestCase):
   proof=self.fixture();proof['after'].update(self.diagnostics())
   self.assertEqual(audit.sanitize(proof),proof)
 
+ def test_rollover_needs_successful_natural_receipts_on_both_real_utc_days(self):
+  from datetime import datetime,timezone
+  proof=self.fixture();proof['after'].update(self.diagnostics())
+  now=datetime(2026,11,4,8,tzinfo=timezone.utc)
+  first=audit.cron_acceptance(proof,now)
+  self.assertTrue(first['natural_collection_today']);self.assertFalse(first['two_utc_days_verified'])
+  proof['after']['cron']['days'].append(dict(day='2026-11-03',attempts=1,completed=0,partial=1,held=0,idle=0,last_scheduled_at='2026-11-03T23:45:00Z'))
+  self.assertTrue(audit.cron_acceptance(proof,now)['two_utc_days_verified'])
+  proof['after']['cron']['days'][1]['partial']=0;proof['after']['cron']['days'][1]['held']=1
+  self.assertFalse(audit.cron_acceptance(proof,now)['two_utc_days_verified'])
+
  def test_optional_diagnostics_reject_private_fields_invalid_reasons_and_fake_cron(self):
   for mode in ('held_secret','reason','phase','budget_private','claimed_account','cron_body','fake_source','counter','summary'):
    with self.subTest(mode=mode):

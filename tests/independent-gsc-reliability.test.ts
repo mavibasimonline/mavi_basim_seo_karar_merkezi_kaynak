@@ -16,6 +16,15 @@ function rows(init?:RequestInit,count=1,offset?:number,incomplete=false){
 }
 const collector=(db:ReturnType<typeof storage>,fetcher:ReturnType<typeof vi.fn>,token=async(_force:boolean)=>'TEST access token')=>new IndependentGscCollector(db as any,secret,token,fetcher as unknown as typeof fetch);
 describe('bounded, recoverable independent GSC collection',()=>{
+ it('keeps an empty source response distinct from a measured zero row',async()=>{
+  const empty=storage(),missing=collector(empty,vi.fn(async()=>Response.json({responseAggregationType:'byPage',rows:[]})));
+  expect(await missing.tick(start)).toMatchObject({status:'complete',rows:0,query_partial:true});
+  expect((await missing.status(start)).coverage).toEqual([]);
+  expect((await missing.status(start)).incomplete_coverage).toEqual([{day:'2026-10-28',scope:'page'}]);
+  const measured=storage(),zero=collector(measured,vi.fn(async()=>Response.json({responseAggregationType:'byPage',rows:[{keys:['2026-10-28','https://mavibasim.com/brosur','tur','DESKTOP'],clicks:0,impressions:0,ctr:0,position:0}]})));
+  expect(await zero.tick(start)).toMatchObject({status:'complete',rows:1,query_partial:false});
+  expect((await zero.status(start)).coverage).toHaveLength(1);
+ });
  it('uses recent missing work when both scopes of the scheduled historical date are held',async()=>{
   const db=storage(),fetcher=vi.fn(async(_url:string,init?:RequestInit)=>rows(init)),sync=collector(db,fetcher);
   db.map.set('gsc:tick-count',3);
