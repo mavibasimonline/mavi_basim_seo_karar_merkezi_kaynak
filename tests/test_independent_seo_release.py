@@ -50,14 +50,14 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertLess(source.index(' real_data_acceptance()'), source.index("deploy('deploy/wrangler.drive-archive.jsonc'"))
         self.assertLess(source.index('    acceptance_proof(proof)'), source.index('deploy(main_config,sha)'))
         self.assertLess(source.index("need(gsc_proof['passed']"),source.index('deploy(main_config,sha)'))
-        self.assertIn("83d8fe04a4be38a22b8f6e2ae00fcba5333f0376",source)
+        self.assertIn("3e2c1cd533403d496aae1f8e9c05b45676fbd173",source)
         self.assertIn("changed==EXPECTED", source)
         self.assertIn("after_main['bindings']==existing[APP]['bindings']", source)
         self.assertIn("rollback(config,existing[worker]['version'])", source)
 
     def test_reviewed_refresh_release_keeps_exact_source_and_one_time_gates(self):
         self.assertEqual(release.TITLE, 'release: verified daily GSC pipeline 20261104')
-        self.assertEqual(release.EXPECTED,{'scripts/independent_seo_release.py','tests/test_independent_seo_release.py'})
+        self.assertEqual(release.EXPECTED,{'scripts/independent_seo_release.py','tests/test_independent_seo_release.py','scripts/independent-acceptance-probe.ts','tests/independent-acceptance/real-source.test.ts','tests/independent-acceptance-probe.test.ts'})
         source=(ROOT/'scripts/independent_seo_release.py').read_text()
         workflow=(ROOT/'.github/workflows/independent-seo-release.yml').read_text()
         self.assertIn('INDEPENDENT_UNREVIEWED_BASE',source)

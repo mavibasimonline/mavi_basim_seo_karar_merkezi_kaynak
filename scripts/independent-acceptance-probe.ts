@@ -9,7 +9,7 @@ export default {async fetch(request:Request,env:ProbeEnv){
   const product=report.products?.[0];
   const age=Date.now()-Date.parse(report.captured_at);
   if(!report.available||!product||report.d1_requests!==0||report.stale!==false||!Number.isFinite(age)||age<0||age>=86400000||!report.source_hash||!/^[a-f0-9]{64}$/.test(report.source_hash))return Response.json({ok:false,code:'VERIFIED_MONTHLY_PROOF_MISSING'},{status:503});
-  const question=await env.ARCHIVE.fetch('https://archive.private/api/independent/questions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:product.title+' neden düştü?',month:report.month})});
+  const question=await env.ARCHIVE.fetch('https://archive.private/api/independent/questions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:product.title+' neden düştü?',month:report.month,source:'archive'})});
   const answer=await question.json<any>();
   if(!question.ok||answer.stale!==false||answer.source_hash!==report.source_hash||answer.d1_requests!==0||!Array.isArray(answer.evidence)||answer.evidence.length===0||typeof answer.answer!=='string'||!answer.answer.trim())return Response.json({ok:false,code:'INDEPENDENT_QUESTION_PROOF_MISSING'},{status:503});
   const readback=await env.ARCHIVE.fetch('https://archive.private/api/independent/report?month='+report.month),saved=await readback.json<any>();

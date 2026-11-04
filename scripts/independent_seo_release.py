@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
 TITLE='release: verified daily GSC pipeline 20261104'
-EXPECTED={'scripts/independent_seo_release.py','tests/test_independent_seo_release.py'}
+EXPECTED={'scripts/independent_seo_release.py','tests/test_independent_seo_release.py','scripts/independent-acceptance-probe.ts','tests/independent-acceptance/real-source.test.ts','tests/independent-acceptance-probe.test.ts'}
 
 def need(condition,code):
  if not condition:raise ValueError(code)
@@ -77,7 +77,7 @@ def run():
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'INDEPENDENT_MAIN_SUPERSEDED')
  changed=set(git('diff','--name-only','HEAD^','HEAD').splitlines())
  need(changed==EXPECTED,'INDEPENDENT_UNREVIEWED_FILES')
- need(git('rev-parse','HEAD^')=='83d8fe04a4be38a22b8f6e2ae00fcba5333f0376','INDEPENDENT_UNREVIEWED_BASE')
+ need(git('rev-parse','HEAD^')=='3e2c1cd533403d496aae1f8e9c05b45676fbd173','INDEPENDENT_UNREVIEWED_BASE')
  # Preserve the reviewed Cron/DO source set exactly as merged and CI verified.
  need("independentRefreshDue(time)" in (ROOT/'src/index.ts').read_text()
       and "private async independentSnapshot(maxAgeMs=6*3600000)" in (ROOT/'src/drive-independent.ts').read_text()

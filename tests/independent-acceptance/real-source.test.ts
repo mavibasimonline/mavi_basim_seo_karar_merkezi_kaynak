@@ -21,9 +21,9 @@ it('accepts real Sheets through the actual D1-free report, persisted readback an
   expect(manifest.record_count).toBeGreaterThan(0);expect(manifest.chunks).toBeGreaterThan(0);
   const readback=await (await stub.fetch('https://archive.private/api/independent/report?month='+report.month)).json<any>();
   expect(readback).toEqual(report);expect(spy).toHaveBeenCalledTimes(4);
-  const answerResponse=await stub.fetch('https://archive.private/api/independent/questions',{method:'POST',body:JSON.stringify({month:report.month,question:report.products[0].title+' neden düştü?'})});
+  const answerResponse=await stub.fetch('https://archive.private/api/independent/questions',{method:'POST',body:JSON.stringify({month:report.month,question:report.products[0].title+' neden düştü?',source:'archive'})});
   const answer=await answerResponse.json<any>();
-  expect(answerResponse.status).toBe(200);expect(answer.source_hash).toBe(report.source_hash);
+  expect(answerResponse.status,answer.code).toBe(200);expect(answer.source_hash).toBe(report.source_hash);
   expect(answer.evidence.length).toBeGreaterThan(0);expect(answer.d1_requests).toBe(0);expect(answer.stale).toBe(false);
   console.log(JSON.stringify({real_data_acceptance:true,month:report.month,products:report.products.length,records:manifest.record_count,bytes:manifest.bytes,chunks:manifest.chunks,source_hash:report.source_hash,d1_requests:0}));
  }finally{spy.mockRestore();}

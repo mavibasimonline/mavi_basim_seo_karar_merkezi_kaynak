@@ -17,8 +17,9 @@ describe('private real data release probe',()=>{
   expect((await probe.fetch(request(),{ARCHIVE:{fetch} as any,PROBE_KEY:key})).status).toBe(503);
  });
  it('requires a matching persisted report and a nonempty evidenced answer',async()=>{
-  const r=report();let calls=0;
-  const fetch=async()=>{calls++;if(calls===2)return Response.json({answer:'Önceki ay yok.',evidence:['source'],d1_requests:0,stale:false,source_hash:hash});if(calls===4)return Response.json({connected:false,d1_requests:0});return Response.json(r);};
+  const r=report();r.products=[{title:'Ana Sayfa'}];let calls=0;
+  const fetch=async(_url:string,init?:RequestInit)=>{calls++;if(calls===2){expect(JSON.parse(String(init?.body)).source).toBe('archive');}
+   if(calls===2)return Response.json({answer:'Önceki ay yok.',evidence:['source'],d1_requests:0,stale:false,source_hash:hash});if(calls===4)return Response.json({connected:false,d1_requests:0});return Response.json(r);};
   const response=await probe.fetch(request(),{ARCHIVE:{fetch} as any,PROBE_KEY:key});expect(response.status).toBe(200);expect((await response.json<any>()).ok).toBe(true);expect(calls).toBe(4);
  });
 });
