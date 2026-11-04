@@ -71,7 +71,9 @@ async function route(request:Request,env:Env):Promise<Response>{
   if(!path.startsWith('/api/'))return env.ASSETS.fetch(request);
   if(!await authenticated(request,env))return json({error:'Giriş yapmanız gerekiyor.'},401);
   if(!['GET','HEAD'].includes(request.method)&&!safeOrigin(request))return json({error:'Geçersiz istek kaynağı.'},403);
-  if(request.method==='DELETE'&&path==='/api/session')return new Response(null,{status:204,headers:{'Set-Cookie':'mavi_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'}});
+  if(request.method==='GET'&&path==='/api/session')return json({ok:true,landing:(env as Env&{DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE?'/independent-seo.html':'/'});
+  if(path==='/api/session/logout'&&request.method!=='POST')return json({error:'Geçersiz istek yöntemi.'},405);
+  if(request.method==='DELETE'&&path==='/api/session'||request.method==='POST'&&path==='/api/session/logout')return new Response(null,{status:request.method==='POST'?303:204,headers:{'Set-Cookie':'mavi_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0',...(request.method==='POST'?{Location:'/'}:{})}});
   if(path.startsWith('/api/drive-independent/')||path==='/api/drive/status'||path==='/api/oauth/google/start'&&url.searchParams.get('purpose')==='drive')return independentDriveRoute(request,env);
   if(path.startsWith('/api/independent/'))return independentDriveRoute(request,env);
   const saved=await monthlyRoute(request,env);if(saved)return saved;

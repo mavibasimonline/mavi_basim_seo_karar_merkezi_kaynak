@@ -1,6 +1,7 @@
 import {describe,it,expect,vi} from 'vitest';
 import {independentSession} from '../src/independent-session';
 import {authenticated} from '../src/security';
+import app from '../src/index';
 const token='long-independent-admin-key-with-fifty-six-characters-xxxxxxxxxxxxxxx';
 function env(result:{allowed:boolean;locked:boolean}){
  const service={fetch:vi.fn(async()=>Response.json(result))};
@@ -20,6 +21,13 @@ describe('D1-free login',()=>{
   const forwarded=new Request('https://seo.example/api/report',{headers:{Cookie:cookie.split(';')[0]}});
   expect(await authenticated(forwarded,setup.context)).toBe(true);
   expect(setup.service.fetch).toHaveBeenCalledTimes(1);
+  const sessionRequest=new Request('https://seo.example/api/session',{headers:{Cookie:cookie.split(';')[0]}});
+  const access=await app.fetch(sessionRequest,setup.context);expect(access.status).toBe(200);
+  expect(await access.json()).toMatchObject({ok:true,landing:'/independent-seo.html'});
+  expect((await app.fetch(new Request('https://seo.example/api/session'),setup.context)).status).toBe(401);
+  expect((await app.fetch(new Request('https://seo.example/api/session/logout',{method:'POST',headers:{Cookie:cookie.split(';')[0],Origin:'https://foreign.example'}}),setup.context)).status).toBe(403);
+  const logout=await app.fetch(new Request('https://seo.example/api/session/logout',{method:'POST',headers:{Cookie:cookie.split(';')[0],Origin:'https://seo.example'}}),setup.context);
+  expect(logout.status).toBe(303);expect(logout.headers.get('Location')).toBe('/');expect(logout.headers.get('Set-Cookie')).toContain('Max-Age=0');
  });
  it('never creates session for a wrong secret or locked client',async()=>{
   const wrong=env({allowed:false,locked:false});

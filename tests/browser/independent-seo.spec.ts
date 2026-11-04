@@ -144,3 +144,24 @@ test('GA4 missing permission and before/after SEO evidence are explicit in the s
  await page.locator('#question-source').selectOption('ga4');await page.locator('#question').fill('İstanbul ziyaretçisi kaç?');await page.locator('#ask button[type="submit"]').click();await expect(page.locator('#answer')).toContainText('Otomatik kaynak fixture yanıtı');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(errors).toEqual([]);
 });
+
+
+test('valid sign-in opens SEO evidence without touching quota-blocked legacy APIs and can sign out',async({page})=>{
+ await fixtures(page,{completeGsc:true});
+ const blocked:string[]=[];
+ await page.route(/\/api\/(?:status|report|performance)(?:[?]|$)/,route=>{blocked.push(route.request().url());return route.fulfill({status:429,json:{code:'D1_READ_BUDGET_WAIT',error:'Veri bütçesi bekleniyor'}});});
+ // Only the production private-service capability is a fixture. The real local
+ // session endpoint still authenticates the cookie and the submitted key.
+ await page.route('**/api/session',async route=>{
+  if(route.request().method()!=='GET')return route.continue();
+  const response=await route.fetch();if(response.status()!==200)return route.fulfill({response});
+  const session=await response.json();return route.fulfill({response,json:{...session,landing:'/independent-seo.html'}});
+ });
+ const localKey=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>line.startsWith('ADMIN_TOKEN='))!.slice('ADMIN_TOKEN='.length);
+ await page.goto('/');await expect(page.locator('#loginScreen')).toBeVisible();
+ await page.getByLabel('Erişim anahtarı').fill(localKey);await page.getByRole('button',{name:'Giriş yap',exact:true}).click();
+ await expect(page).toHaveURL(/\/independent-seo\.html$/);await expect(page.locator('#gsc-month-note')).toContainText('31/31');
+ expect(blocked).toEqual([]);
+ await page.getByRole('button',{name:'Çıkış yap',exact:true}).click();
+ await expect(page).toHaveURL(/\/$/);await expect(page.locator('#loginScreen')).toBeVisible();expect(blocked).toEqual([]);
+});

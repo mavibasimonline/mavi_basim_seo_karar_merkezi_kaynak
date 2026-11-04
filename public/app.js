@@ -195,6 +195,8 @@ async function load(initial = false) {
   document.body.classList.add("is-loading");
   $("mainContent").setAttribute("aria-busy", "true");
   try {
+    if ((await api("/api/session", { signal })).landing === "/independent-seo.html")
+      return location.replace("/independent-seo.html");
     const status = await api("/api/status", { signal });
     const selected = params().toString();
     const [reportResult, performanceResult] = await Promise.allSettled([
@@ -1157,6 +1159,7 @@ $("login").addEventListener("submit", async (e) => {
   e.preventDefault();
   const button = e.currentTarget.querySelector("button");
   button.disabled = true;
+  controller?.abort();
   notify();
   try {
     await api("/api/session", {
