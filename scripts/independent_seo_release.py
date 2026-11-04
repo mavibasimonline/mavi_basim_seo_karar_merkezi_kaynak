@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'src/independent-cron-proof.ts', 'scripts/independent_seo_release.py', 'tests/independent-cron-proof.test.ts', 'src/independent-context-bridge.ts', 'scripts/gsc_history_acceptance.py', '.github/workflows/independent-seo-release.yml', 'tests/gsc-history-probe.test.ts', 'docs/GSC_OTOMATIK_KANIT_20261104.md', 'scripts/gsc_runtime_audit.py', 'src/independent-gsc-bridge.ts', '.github/workflows/gsc-runtime-audit.yml', 'tests/test_gsc_history_acceptance.py', 'tests/independent-gsc-bootstrap.test.ts', 'TODO.md', 'tests/independent-context.test.ts', 'src/index.ts', 'tests/drive-independent/worker.test.ts', 'tests/test_independent_seo_release.py', 'src/independent-gsc-bootstrap.ts', 'scripts/gsc_history_probe.ts', 'tests/drive-independent/gsc-routes.test.ts', 'src/independent-gsc.ts', 'src/drive-independent.ts'}
+EXPECTED={'tests/drive-independent/gsc-routes.test.ts', 'src/drive-independent.ts', 'scripts/independent_seo_release.py', 'tests/test_independent_seo_release.py'}
 
 def need(condition,code):
  if not condition:raise ValueError(code)
@@ -86,7 +86,7 @@ def run():
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'INDEPENDENT_MAIN_SUPERSEDED')
  changed=set(git('diff','--name-only','HEAD^','HEAD').splitlines())
  need(changed==EXPECTED,'INDEPENDENT_UNREVIEWED_FILES')
- need(git('rev-parse','HEAD^')=='6b2721806969c2697f592d38108cf2625ea317a8','INDEPENDENT_UNREVIEWED_BASE')
+ need(git('rev-parse','HEAD^')=='9b69bc47f48aa503bcb9e20775b8a1166e99ff98','INDEPENDENT_UNREVIEWED_BASE')
  # Preserve the reviewed Cron/DO source set exactly as merged and CI verified.
  need("independentRefreshDue(time)" in (ROOT/'src/index.ts').read_text()
       and "private async independentSnapshot(maxAgeMs=6*3600000)" in (ROOT/'src/drive-independent.ts').read_text()

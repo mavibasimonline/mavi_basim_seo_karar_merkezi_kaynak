@@ -114,4 +114,6 @@ it('routes a verified product question to complete real GSC evidence before cont
  const response=await stub().fetch('https://archive.private/api/independent/questions',{method:'POST',body:JSON.stringify({question:'Broşür nasıl gidiyor?',month})});
  const result=await response.json<any>();expect(response.status).toBe(200);expect(result.d1_requests).toBe(0);expect(result.mapping_evidence.source_hash).toMatch(/^[a-f0-9]{64}$/);
  expect(new Set(result.evidence_refs.map((r:any)=>r.day.slice(0,7)))).toEqual(new Set(months));expect(network).not.toHaveBeenCalled();
+ const keyword=await stub().fetch('https://archive.private/api/independent/questions',{method:'POST',body:JSON.stringify({question:'Broşür “broşür baskı” sorgusu nasıl değişti?',month})});
+ expect(await keyword.json()).toMatchObject({source:'GSC Search Analytics API',decision:'Veri bekle',d1_requests:0});expect(network).not.toHaveBeenCalled();
 });

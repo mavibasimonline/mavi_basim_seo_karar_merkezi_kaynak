@@ -343,7 +343,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
      const latest=new Date(Date.now()-3*86400000);latest.setUTCDate(1);latest.setUTCMonth(latest.getUTCMonth()-1);
      const month=questionBody.month||latest.toISOString().slice(0,7);
      const context=await readIndependentContext(this.ctx.storage).catch(()=>null);
-     if(/değiş|ne zaman|başlık|meta|yayın|kanonik|canonical|\bh1\b/i.test(body.question))return json(answerContextQuestion(context,body.question,month));
+     if(/değişiklik geçmiş|geçmiş değiş|içerik.*değiş|neleri değişt|ne zaman|başlık|meta|yayın|kanonik|canonical|\bh1\b/i.test(body.question))return json(answerContextQuestion(context,body.question,month));
      const current=await this.gscMonth(month);
      const previousDate=new Date(month+'-01T00:00:00Z');previousDate.setUTCMonth(previousDate.getUTCMonth()-1);
      const previous=current.available?await this.gscMonth(previousDate.toISOString().slice(0,7)):undefined;
