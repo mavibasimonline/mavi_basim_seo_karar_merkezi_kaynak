@@ -8,53 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 APP='mavi-basim-seo-prod'
 ARCHIVE='mavi-basim-drive-archive'
 TITLE='release: verified daily GSC pipeline 20261104'
-EXPECTED={
- '.github/workflows/gsc-runtime-audit.yml',
- '.github/workflows/independent-seo-release.yml',
- 'README.md',
- 'TODO.md',
- 'docs/DAILY_GSC_PIPELINE.md',
- 'public/independent-seo.css',
- 'public/independent-seo.html',
- 'public/independent-seo.js',
- 'scripts/gsc_pipeline_acceptance.py',
- 'scripts/gsc_pipeline_probe.ts',
- 'scripts/gsc_runtime_audit.py',
- 'scripts/gsc_runtime_probe.ts',
- 'scripts/independent_seo_release.py',
- 'src/drive-independent.ts',
- 'src/independent-context-bridge.ts',
- 'src/independent-context.ts',
- 'src/independent-cron-proof.ts',
- 'src/independent-gsc-analysis.ts',
- 'src/independent-gsc-bridge.ts',
- 'src/independent-gsc-diagnostic.ts',
- 'src/independent-gsc-report.ts',
- 'src/independent-gsc.ts',
- 'src/independent-recovery.ts',
- 'src/independent-seo-model.ts',
- 'src/independent-snapshot.ts',
- 'src/index.ts',
- 'tests/browser/independent-seo.spec.ts',
- 'tests/drive-independent/gsc-routes.test.ts',
- 'tests/gsc-pipeline-probe.test.ts',
- 'tests/gsc-runtime-probe.test.ts',
- 'tests/independent-context.test.ts',
- 'tests/independent-cron-proof.test.ts',
- 'tests/independent-gsc-analysis.test.ts',
- 'tests/independent-gsc-collector.test.ts',
- 'tests/independent-gsc-diagnostic.test.ts',
- 'tests/independent-gsc-month.test.ts',
- 'tests/independent-native-fetch.test.ts',
- 'tests/independent-gsc-reliability.test.ts',
- 'tests/independent-history.test.ts',
- 'tests/independent-recovery.test.ts',
- 'tests/independent-seo-model.test.ts',
- 'tests/test_gsc_pipeline_acceptance.py',
- 'tests/test_gsc_runtime_audit.py',
- 'tests/test_independent_context_sql.py',
- 'tests/test_independent_seo_release.py',
-}
+EXPECTED={'scripts/independent_seo_release.py','tests/test_independent_seo_release.py'}
 
 def need(condition,code):
  if not condition:raise ValueError(code)
@@ -112,6 +66,9 @@ def app_config(bindings):
       'INDEPENDENT_SERVICE_BINDINGS_UNREVIEWED')
  return 'deploy/wrangler.monthly-app.jsonc' if 'MONTHLY_ANALYSES' in services else 'deploy/wrangler.drive-independent.jsonc'
 
+def ui_acceptance(status,body,expected):
+ need(status==200 and isinstance(body,bytes) and body==expected,'INDEPENDENT_UI_NOT_AVAILABLE')
+
 def run():
  sha=os.environ.get('GITHUB_SHA','')
  need(os.environ.get('GITHUB_REF')=='refs/heads/main' and os.environ.get('GITHUB_REPOSITORY')==REPOSITORY,'INDEPENDENT_MAIN_REQUIRED')
@@ -120,7 +77,7 @@ def run():
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'INDEPENDENT_MAIN_SUPERSEDED')
  changed=set(git('diff','--name-only','HEAD^','HEAD').splitlines())
  need(changed==EXPECTED,'INDEPENDENT_UNREVIEWED_FILES')
- need(git('rev-parse','HEAD^')=='0c7dc869b14bace8c475032b51b5aa8d93c38c11','INDEPENDENT_UNREVIEWED_BASE')
+ need(git('rev-parse','HEAD^')=='83d8fe04a4be38a22b8f6e2ae00fcba5333f0376','INDEPENDENT_UNREVIEWED_BASE')
  # Preserve the reviewed Cron/DO source set exactly as merged and CI verified.
  need("independentRefreshDue(time)" in (ROOT/'src/index.ts').read_text()
       and "private async independentSnapshot(maxAgeMs=6*3600000)" in (ROOT/'src/drive-independent.ts').read_text()
@@ -228,7 +185,7 @@ def run():
   else:raise ValueError('INDEPENDENT_RELEASE_NOT_CONVERGED')
   base='https://mavi-basim-seo-prod.mavibasimonline.workers.dev'
   html_status,body=http(base+'/independent-seo.html')
-  need(html_status==200 and b'D1' in body and b'Google Sheets' in body,'INDEPENDENT_UI_NOT_AVAILABLE')
+  ui_acceptance(html_status,body,(ROOT/'public/independent-seo.html').read_bytes())
   for endpoint in ('/api/independent/status','/api/independent/report'):
    code,content=http(base+endpoint)
    need(code==401 and b'Giri' in content,'INDEPENDENT_PUBLIC_DATA_EXPOSED')

@@ -50,18 +50,14 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertLess(source.index(' real_data_acceptance()'), source.index("deploy('deploy/wrangler.drive-archive.jsonc'"))
         self.assertLess(source.index('    acceptance_proof(proof)'), source.index('deploy(main_config,sha)'))
         self.assertLess(source.index("need(gsc_proof['passed']"),source.index('deploy(main_config,sha)'))
-        self.assertIn("0c7dc869b14bace8c475032b51b5aa8d93c38c11",source)
+        self.assertIn("83d8fe04a4be38a22b8f6e2ae00fcba5333f0376",source)
         self.assertIn("changed==EXPECTED", source)
         self.assertIn("after_main['bindings']==existing[APP]['bindings']", source)
         self.assertIn("rollback(config,existing[worker]['version'])", source)
 
     def test_reviewed_refresh_release_keeps_exact_source_and_one_time_gates(self):
         self.assertEqual(release.TITLE, 'release: verified daily GSC pipeline 20261104')
-        self.assertTrue({'scripts/independent_seo_release.py','tests/test_independent_seo_release.py',
-                         '.github/workflows/independent-seo-release.yml','src/independent-gsc.ts',
-                         'src/independent-gsc-report.ts','src/drive-independent.ts',
-                         'scripts/gsc_pipeline_acceptance.py'}.issubset(release.EXPECTED))
-        self.assertFalse(any(p.endswith('.csv') or p.startswith(('migrations/','work/')) for p in release.EXPECTED))
+        self.assertEqual(release.EXPECTED,{'scripts/independent_seo_release.py','tests/test_independent_seo_release.py'})
         source=(ROOT/'scripts/independent_seo_release.py').read_text()
         workflow=(ROOT/'.github/workflows/independent-seo-release.yml').read_text()
         self.assertIn('INDEPENDENT_UNREVIEWED_BASE',source)
@@ -72,9 +68,16 @@ class IndependentReleaseTests(unittest.TestCase):
         self.assertIn('SHEETS_ORPHAN_QUARANTINE_SOURCE_MISSING',source)
         self.assertIn('GOOGLE_HTTP_400',source)
         self.assertIn(release.TITLE,workflow)
-        self.assertIn('tests/independent-native-fetch.test.ts',release.EXPECTED)
+        self.assertTrue((ROOT/'tests/independent-native-fetch.test.ts').is_file())
         self.assertIn("after_main['bindings']==existing[APP]['bindings']",source)
         self.assertIn("rollback(config,existing[worker]['version'])",source)
+
+    def test_live_html_acceptance_matches_the_exact_tested_asset(self):
+        expected=(ROOT/'public/independent-seo.html').read_bytes()
+        release.ui_acceptance(200,expected,expected)
+        for status,body in ((503,expected),(200,b'old D1 Google Sheets page'),(200,expected[:-1]),(200,b'')):
+            with self.assertRaisesRegex(ValueError,'INDEPENDENT_UI_NOT_AVAILABLE'):
+                release.ui_acceptance(status,body,expected)
 
     def test_existing_optional_monthly_service_is_preserved_without_new_resources(self):
         drive = dict(name='DRIVE_ARCHIVE_SERVICE', type='service', service=release.ARCHIVE)
