@@ -8,6 +8,7 @@
     <title>Mavi Basım · SEO Karar Merkezi</title>
     <link rel="stylesheet" href="/app.css" />
     <script type="module" src="/app.js"></script>
+    <script type="module" src="/seo/catalog-sync.js"></script>
   </head>
   <body>
     <a class="skip-link" href="#loginScreen">İçeriğe geç</a>
@@ -799,6 +800,6 @@
         </p>
       </div>
     </dialog>
-    <dialog id="catalogDialog" class="evidence-dialog" aria-labelledby="catalogDialogTitle"><div class="dialog-heading"><h2 id="catalogDialogTitle">Ürün tanımı · yönetim taslağı</h2><button id="closeCatalogDialog" class="icon-button" type="button" aria-label="Katalog taslağını kapat">×</button></div><form id="catalogDraftForm" class="dialog-body"><p>Bu işlem yalnız JSON taslağı oluşturur. Doğrulanmış katalog, arşiv ve veri toplama sistemi değişmez.</p><label>Ürün / grup adı<input id="draftProductName" maxlength="100" required /></label><label>Kategori<select id="draftProductCategory"></select></label><label>GSC’de gözlenen sayfalar<textarea id="draftProductUrls" rows="4" maxlength="20000" required placeholder="Her satıra bir tam URL"></textarea></label><p id="catalogDraftError" role="status"></p><button class="button primary" type="submit">JSON taslağını indir</button></form></dialog>
+    <dialog id="catalogDialog" class="evidence-dialog" aria-labelledby="catalogDialogTitle"><div class="dialog-heading"><h2 id="catalogDialogTitle">Ürün tanımı · kalıcı eşleme</h2><button id="closeCatalogDialog" class="icon-button" type="button" aria-label="Katalog penceresini kapat">×</button></div><form id="catalogDraftForm" class="dialog-body"><p>Yalnızca GSC’de doğrulanmış ve henüz eşlenmemiş tek bir sayfayı, açık onayınızla ürün kataloğuna ekler. Site içeriğini değiştirmez.</p><label>Ürün / grup adı<input id="draftProductName" maxlength="100" required /></label><label>Kategori<select id="draftProductCategory"></select></label><label>GSC’de gözlenen tek sayfa<textarea id="draftProductUrls" rows="4" maxlength="20000" required placeholder="https://mavibasim.com/..."></textarea></label><p id="catalogDraftError" role="status"></p><button class="button primary" type="submit">Ürünü kalıcı kaydet</button></form></dialog>
   </body>
 </html>
