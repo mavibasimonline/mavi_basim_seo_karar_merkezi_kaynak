@@ -27,7 +27,7 @@ export default {async fetch(request:Request,env:Probe){
   if(mode==='/ga4-reconcile-step'){
    const result=await get('internal/ga4-tick',{source:'ga4-historical-reconcile'});
    need(['complete','partial','idle','held','unavailable'].includes(result.status),'SEO_ANSWER_GA4_TICK_INVALID');
-   return Response.json({status:result.status,month:result.month||null,kind:result.kind||null,code:result.code||null,d1_requests:0});
+   return Response.json({status:result.status,month:result.month||null,kind:result.kind||null,code:result.code||null,stage:result.stage||null,d1_requests:0});
   }
   const status=await get('internal/ga4-status');
   const months=[];for(const month of ['2026-06','2026-07','2026-08']){

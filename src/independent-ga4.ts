@@ -17,7 +17,14 @@ type Manifest=Job&{source:typeof SOURCE;captured_at:string;complete:boolean;d1_r
 type Broker=(path:string,body?:unknown)=>Promise<any>;
 function check(ok:unknown,code:string):asserts ok{if(!ok)throw Error(code);}
 const count=(n:unknown)=>Number.isSafeInteger(n)&&Number(n)>=0;
-const safeCode=(e:unknown)=>e instanceof Error&&/^(GA4_|GSC_STORAGE_)[A-Z0-9_]{1,100}$/.test(e.message)?e.message.replace(/^GSC_STORAGE_/,'GA4_STORAGE_'):'GA4_SOURCE_UNAVAILABLE';
+// Classify errors without exposing provider payloads, credentials or exception messages.
+const safeCode=(e:unknown)=>{
+ if(e instanceof Error&&/^(GA4_|GSC_STORAGE_)[A-Z0-9_]{1,100}$/.test(e.message))return e.message.replace(/^GSC_STORAGE_/,'GA4_STORAGE_');
+ if(e instanceof Error&&(e.name==='TimeoutError'||e.name==='AbortError'))return 'GA4_NETWORK_TIMEOUT';
+ if(e instanceof TypeError)return 'GA4_RUNTIME_TYPE_ERROR';
+ if(e instanceof RangeError)return 'GA4_RUNTIME_RANGE_ERROR';
+ return 'GA4_SOURCE_UNAVAILABLE';
+};
 const label=(v:unknown,max=512):v is string=>typeof v==='string'&&v.length<=max&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v);
 const manifestKey=(p:string,m:string,k:Kind)=>ROOT+'report:'+p+':'+m+':'+k;
 const partKey=(j:Job,i:number,c:number)=>ROOT+'part:'+j.property.id+':'+j.month+':'+j.kind+':'+j.generation+':'+i+':'+c;
@@ -144,9 +151,20 @@ export class IndependentGa4 {
   const raw=new TextDecoder('utf-8',{fatal:true,ignoreBOM:false}).decode(bytes);check(at===bytes.length&&await hash(raw)===part.sha256,'GA4_HASH_MISMATCH');const rows=JSON.parse(raw);check(Array.isArray(rows)&&rows.length===part.count,'GA4_ROW_COUNT_INVALID');
   check(rows.every((r:any)=>Array.isArray(r.dimensions)&&r.dimensions.length===DIMS[job.kind].length&&r.dimensions.every((v:unknown)=>label(v))&&count(r.activeUsers)&&count(r.sessions)&&count(r.engagedSessions)&&r.engagedSessions<=r.sessions),'GA4_ROW_INVALID');return rows as Row[];
  }
+ // A one-time account-only retry can inspect a generic runtime failure.
+ // Never clear Google quota, OAuth, provider HTTP or storage-limit holds.
+ async retryGenericOnce(time=new Date()){
+  const key=ROOT+'diagnostic-once:'+time.toISOString().slice(0,10);
+  const hold=await this.store.get<{until:number;code:string}>(ROOT+'retry');
+  const last=await this.store.get<{code:string}>(ROOT+'last');
+  if(hold?.code!=='GA4_SOURCE_UNAVAILABLE'||last?.code!=='GA4_SOURCE_UNAVAILABLE'||hold.until<=time.getTime()||await this.store.get(key))return false;
+  await this.store.put(key,{at:time.toISOString(),code:'GA4_SOURCE_UNAVAILABLE'});
+  await this.store.put(ROOT+'retry',null);return true;
+ }
  async tick(time=new Date(),historical=false){
   const property=await this.store.get<Property>(ROOT+'property');if(!property||!await this.store.get(ROOT+'oauth'))return {status:'unavailable',code:'GA4_CONNECTION_REQUIRED',d1_requests:0};
   const retry=await this.store.get<{until:number;code:string}>(ROOT+'retry');if(retry&&retry.until>time.getTime())return {status:'held',code:retry.code,d1_requests:0};
+  let stage='selection';
   let job=await this.store.get<Job>(ROOT+'active');
   try{
    if(!job){
@@ -158,11 +176,13 @@ export class IndependentGa4 {
     if(!job)return {status:'idle',d1_requests:0};await this.store.put(ROOT+'active',job);
    }
    if(job.completed_at)return await this.publish(job);
+   stage='provider';
    const result=await this.api('https://analyticsdata.googleapis.com/v1beta/properties/'+job.property.id+':runReport',{
     dateRanges:[{startDate:job.from,endDate:job.to}],dimensions:DIMS[job.kind].map(name=>({name})),metrics:METRICS.map(name=>({name})),
     dimensionFilter:{andGroup:{expressions:[{filter:{fieldName:'sessionDefaultChannelGroup',stringFilter:{matchType:'EXACT',value:'Organic Search'}}},{filter:{fieldName:'hostName',inListFilter:{values:['mavibasim.com','www.mavibasim.com']}}}]}},
     limit:PAGE,offset:job.cursor,returnPropertyQuota:true,keepEmptyRows:false,orderBys:DIMS[job.kind].map(dimensionName=>({dimension:{dimensionName}})),
    });
+   stage='validation';
    check(JSON.stringify((result.dimensionHeaders||[]).map((h:any)=>h.name))===JSON.stringify(DIMS[job.kind])&&JSON.stringify((result.metricHeaders||[]).map((h:any)=>h.name))===JSON.stringify(METRICS),'GA4_HEADERS_INVALID');
    const rowCount=result.rowCount??0;check(count(rowCount)&&rowCount<=4000&&(job.kind!=='total'||rowCount<=1)&&(job.row_count===undefined||job.row_count===rowCount),'GA4_SOURCE_CHANGED_OR_LIMITED');job.row_count=rowCount;
    const rows:Row[]=(result.rows||[]).map((r:any)=>{
@@ -175,14 +195,15 @@ export class IndependentGa4 {
    for(const part of job.pages)for(const row of await this.readPart(job,part))identities.add(JSON.stringify(row.dimensions));
    for(const row of rows){const id=JSON.stringify(row.dimensions);check(!identities.has(id),'GA4_DUPLICATE_ROW');identities.add(id);}
    job.thresholded ||= result.metadata?.subjectToThresholding===true;job.other_rows ||= result.metadata?.dataLossFromOtherRow===true;
+   stage='storage';
    job.pages.push(await this.write(job,rows));job.cursor+=rows.length;
    const quota=result.propertyQuota?.tokensPerHour?.remaining;if(typeof quota==='number'&&quota<64)await this.store.put(ROOT+'retry',{until:time.getTime()+3600000,code:'GA4_QUOTA_LOW'});
    if(job.cursor<rowCount){check(rows.length>0,'GA4_PAGINATION_INVALID');await this.store.put(ROOT+'active',job);const partial={status:'partial',month:job.month,kind:job.kind,cursor:job.cursor,d1_requests:0};await this.store.put(ROOT+'last',{at:time.toISOString(),...partial});return partial;}
    job.completed_at=time.toISOString();await this.store.put(ROOT+'active',job);return await this.publish(job);
-  }catch(error){const code=safeCode(error);if(code==='GA4_SOURCE_CHANGED_OR_LIMITED')await this.store.put(ROOT+'active',null);await this.store.put(ROOT+'last',{at:time.toISOString(),status:'held',code});
+  }catch(error){const code=safeCode(error);if(code==='GA4_SOURCE_CHANGED_OR_LIMITED')await this.store.put(ROOT+'active',null);await this.store.put(ROOT+'last',{at:time.toISOString(),status:'held',code,stage});
    const current=await this.store.get<{until:number}>(ROOT+'retry');if(!current||current.until<=time.getTime())await this.store.put(ROOT+'retry',{until:time.getTime()+(code.includes('STORAGE_DAILY')?86400000-(time.getTime()%86400000):3600000),code});
    if(code==='GA4_OAUTH_RECONNECT_REQUIRED'||code==='GA4_PERMISSION_REQUIRED')await this.store.put(ROOT+'reconnect',true);
-   return {status:'held',code,d1_requests:0};}
+   return {status:'held',code,stage,d1_requests:0};}
  }
  private async publish(job:Job){
   check(job.completed_at&&job.cursor===job.row_count,'GA4_PUBLICATION_INCOMPLETE');

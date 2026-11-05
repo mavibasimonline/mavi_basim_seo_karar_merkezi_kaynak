@@ -204,7 +204,9 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     if(path==='/api/internal/ga4-tick'&&request.method==='POST'){
       const input=request.body?JSON.parse(await boundedText(new Response(request.body),1024)):{},scheduled=cronTime(input);
       if(scheduled){const old=await this.ctx.storage.get('ga4:cron:'+scheduled);if(old)return json(old);}
-      const ga4=this.ga4();await ga4.prepare();const time=new Date(),current=await ga4.tick(time);
+      const ga4=this.ga4();await ga4.prepare();const time=new Date();
+      if(input?.source==='ga4-historical-reconcile'&&Object.keys(input).length===1)await ga4.retryGenericOnce(time);
+      const current=await ga4.tick(time);
       // Natural Cron fills at most one old GA4 scope only after current months are idle.
       // Private internal reconciliation can advance historical GA4 without a forged Cron receipt.
       // Existing current-month priority, OAuth, quota and immutable report semantics remain unchanged.
