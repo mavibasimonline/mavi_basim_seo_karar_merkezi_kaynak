@@ -8,6 +8,7 @@ from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
 BASE='94d06990ad71712051391d4267762f4c5229ec9e'
+PARENT='c4370a2ebc54f812fce5a6a99568e4446bc00982'
 APP_SOURCE='94d06990ad71712051391d4267762f4c5229ec9e'
 TITLE='release: verified GSC history bootstrap 20261104'
 EXPECTED={'scripts/seo_answer_release.py', 'src/seo-history-analysis.ts', 'scripts/gsc_history_probe.ts', 'src/browser/insights-workspace.js', 'scripts/gsc_history_acceptance.py', 'scripts/seo-answer-probe.ts', 'src/browser/unified-seo-panel.js', 'src/drive-independent.ts', 'src/planner-bridge.ts', 'src/independent-planner.ts', 'public/unified-seo.js', 'src/independent-gsc.ts', 'src/generated/planner-data.ts', 'src/independent-gsc-totals.ts', 'src/index.ts', 'src/browser/evidence-detail.js', 'src/product-source-context.ts', 'public/seo/workspace.js', 'scripts/import_keywords.py', 'src/gsc-catchup.ts'}
@@ -96,7 +97,7 @@ def run():
  sha=os.environ.get('GITHUB_SHA','')
  need(os.environ.get('GITHUB_REF')=='refs/heads/main' and os.environ.get('GITHUB_REPOSITORY')==REPOSITORY,'SEO_ANSWER_MAIN_REQUIRED')
  need(re.fullmatch('[a-f0-9]{40}',sha) and git('rev-parse','HEAD')==sha and git('log','-1','--format=%s')==TITLE,'SEO_ANSWER_SOURCE_REQUIRED')
- need(git('rev-parse','HEAD^')==BASE and set(git('diff','--name-only','HEAD^','HEAD').splitlines())==EXPECTED,'SEO_ANSWER_REVIEWED_SCOPE_REQUIRED')
+ need(git('rev-parse','HEAD^')==PARENT and set(git('diff','--name-only',BASE,'HEAD').splitlines())==EXPECTED,'SEO_ANSWER_REVIEWED_SCOPE_REQUIRED')
  for path in PROTECTED:need(subprocess.check_output(['git','show',BASE+':'+path],cwd=ROOT)==(ROOT/path).read_bytes(),'SEO_ANSWER_PROTECTED_SOURCE_CHANGED')
  old_index=subprocess.check_output(['git','show',BASE+':src/index.ts'],cwd=ROOT).decode()
  planner_hook="      try{await syncPlanner(env,true);}catch{/* Planner verification never gates existing collection. */}\n"
