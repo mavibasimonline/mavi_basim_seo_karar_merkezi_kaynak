@@ -8,10 +8,10 @@ from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
 BASE='94d06990ad71712051391d4267762f4c5229ec9e'
-PARENT='ffc50bb62649f691a12aed603badf33e317a21d8'
-APP_SOURCE='ffc50bb62649f691a12aed603badf33e317a21d8'
+PARENT='7d6e6920f6b382da237aee5872021196e8f7246e'
+APP_SOURCE='7d6e6920f6b382da237aee5872021196e8f7246e'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'scripts/seo_answer_release.py', 'src/seo-history-analysis.ts', 'scripts/gsc_history_probe.ts', 'src/browser/insights-workspace.js', 'scripts/gsc_history_acceptance.py', 'scripts/seo-answer-probe.ts', 'src/browser/unified-seo-panel.js', 'src/drive-independent.ts', 'src/planner-bridge.ts', 'src/independent-planner.ts', 'public/unified-seo.js', 'src/independent-gsc.ts', 'src/generated/planner-data.ts', 'src/independent-gsc-totals.ts', 'src/index.ts', 'src/browser/evidence-detail.js', 'src/product-source-context.ts', 'public/seo/workspace.js', 'scripts/import_keywords.py', 'src/gsc-catchup.ts', 'src/independent-ga4.ts', 'scripts/ga4_history_completion.py', 'scripts/ga4-history-probe.ts', '.github/workflows/ga4-history-completion.yml'}
+EXPECTED={'scripts/seo_answer_release.py', 'src/seo-history-analysis.ts', 'scripts/gsc_history_probe.ts', 'src/browser/insights-workspace.js', 'scripts/gsc_history_acceptance.py', 'scripts/seo-answer-probe.ts', 'src/browser/unified-seo-panel.js', 'src/drive-independent.ts', 'src/planner-bridge.ts', 'src/independent-planner.ts', 'public/unified-seo.js', 'src/independent-gsc.ts', 'src/generated/planner-data.ts', 'src/independent-gsc-totals.ts', 'src/index.ts', 'src/browser/evidence-detail.js', 'src/product-source-context.ts', 'public/seo/workspace.js', 'scripts/import_keywords.py', 'src/gsc-catchup.ts', 'src/independent-ga4.ts', 'scripts/ga4_history_completion.py', 'scripts/ga4-history-probe.ts', '.github/workflows/ga4-history-completion.yml', 'src/product-decision-ledger.ts', 'tests/product-decision-ledger.test.ts'}
 PROTECTED=('src/independent-gsc-analysis.ts', 'public/app.css', 'public/chart.js', 'src/independent-product-answer.ts', 'src/independent-session.ts', 'src/security.ts', 'src/independent-seo-model.ts', 'src/drive-broker.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc-bootstrap.ts', 'src/independent-context-bridge.ts', 'src/independent-cron-proof.ts', 'src/independent-refresh.ts', 'src/independent-snapshot.ts', 'src/drive-records.ts', 'src/d1-read-budget.ts', 'public/ui.js', 'public/period.js', 'public/independent-seo.js', 'public/independent-seo.html', 'deploy/wrangler.monthly-app.jsonc', 'deploy/wrangler.drive-archive.jsonc', 'src/independent-catalog.ts', 'src/independent-context.ts', 'src/independent-insights.ts', 'src/independent-gsc-report.ts', 'public/index.html', 'public/seo/catalog-sync.js', 'public/seo/tables.css', 'public/seo/tables.js', 'public/app.js', 'src/urls.ts', 'scripts/build-unified-panel.mjs', 'public/seo/history.css', 'public/seo/history.js', 'src/browser/history-workspace.js', 'src/seo-history-bridge.ts', 'src/seo-history.ts')
 
 def browser_acceptance(key):
@@ -39,6 +39,13 @@ try{
  if(!await page.locator('#productDetail table').count())throw Error();await page.locator('#closeDialog').click();
  stage='history-health';await page.locator('#navigation [data-view=health]').click();await page.locator('#history-health-from').waitFor();
  stage='pages';await page.locator('#navigation [data-view=products]').click();await page.locator('#pageCoverage .insight-stat').first().waitFor();
+ stage='product-ledger';await page.waitForFunction(()=>document.querySelector('#productPeriod')?.textContent.includes('29 ürün için kanıtlı inceleme sırası'));
+ if(!await page.locator('#products th').filter({hasText:'İnceleme önceliği'}).count())throw Error();
+ if(await page.locator('#products tbody tr').count()!==29)throw Error();
+ await page.locator('#products tbody tr').first().getByRole('button',{name:'İncele'}).click();
+ await page.waitForFunction(()=>document.querySelector('#productDetail').textContent.includes('Kanıtlı ürün kararı')&&document.querySelector('#productDetail').textContent.includes('Korunacak anahtar kelimeler'));
+ await page.locator('#closeDialog').click();
+
  await page.locator('[data-page-mode=unmapped]').click();await page.waitForFunction(()=>document.querySelector('#products thead').textContent.includes('Eşlenmemiş'));
  if(await page.getByRole('button',{name:'Ürün Tanımla',exact:true}).count()>0){await page.getByRole('button',{name:'Ürün Tanımla',exact:true}).first().click();await page.locator('#catalogDialog').waitFor({state:'visible'});if(!await page.locator('#draftProductUrls').inputValue())throw Error();await page.locator('#closeCatalogDialog').click();}
  await page.locator('[data-page-mode=products]').click();
@@ -107,6 +114,7 @@ def run():
  runs=get_json('https://api.github.com/repos/'+REPOSITORY+'/actions/workflows/ci.yml/runs?head_sha='+sha+'&per_page=20',os.environ.get('GITHUB_TOKEN')).get('workflow_runs',[])
  need(any(r.get('head_sha')==sha and r.get('head_branch')=='main' and r.get('event')=='push' and r.get('conclusion')=='success' for r in runs),'SEO_ANSWER_GREEN_CI_REQUIRED')
  client=Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID'));free_plan(api(client,'GET','/subscriptions'))
+ subprocess.run(['node','scripts/build-unified-panel.mjs'],cwd=ROOT,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
  before={w:snapshot(client,w) for w in (APP,ARCHIVE)}
  main_config=app_config(before[APP]['bindings'])
  need(before[APP]['crons']==['*/15 * * * *'] and url_json('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/health').get('deployment',{}).get('commit')==APP_SOURCE,'SEO_ANSWER_APP_DRIFT')

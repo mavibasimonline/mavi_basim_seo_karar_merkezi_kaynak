@@ -4,6 +4,7 @@ import {drawChart} from '../../public/chart.js';
 import {cell,sortableChart} from '../../public/seo/tables.js';
 import {createEvidenceDetails} from './evidence-detail.js';
 import {buildInsights,metric,CATEGORIES,QUERY_TYPES,fold} from '../independent-insights';
+import {buildProductDecisionLedger} from '../product-decision-ledger';
 const prior=m=>{const d=new Date(m+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()-1);return d.toISOString().slice(0,7);};
 const monthLabel=m=>new Date(m+'-01T00:00:00Z').toLocaleDateString('tr-TR',{month:'long',year:'numeric',timeZone:'UTC'});
 const stamp=s=>s?new Date(s).toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'})+' (TSİ)':'Doğrulanmadı';
@@ -44,6 +45,7 @@ export function createInsightsWorkspace({scope,read,table,evidence,openProduct,a
   if(at!==version)return false;
   raw=nextRaw;catalog=nextCatalog;old=nextOld;modelRevision=s.revision;
   data=buildInsights(raw,old,catalog.products||[],{device:s.device,country:s.country},catalog.available===true);
+  data.product_decisions=buildProductDecisionLedger(raw,old,s.ga4,s.oldGa4,catalog.products||[],catalog.changes||[],{device:s.device,country:s.country},catalog.available===true);
   for(const id of ['pageCoverage','pageModes','catalogManagement','catalogDraftNote'])$(id).hidden=false;
   setOptions('groupFilter',CATEGORIES.map(c=>[c,c]),'Tüm kategoriler');$('groupFilter').hidden=false;
   setOptions('impactCategory',CATEGORIES.map(c=>[c,c]),'Tüm Gruplar');
@@ -56,17 +58,19 @@ export function createInsightsWorkspace({scope,read,table,evidence,openProduct,a
  function products(nextSort){
   if(!data)return;const search=fold($('productSearch').value),category=$('groupFilter').value,decision=$('decisionFilter').value;
   stats($('pageCoverage'),[['Toplam GSC sayfası',number(data.counters.pages),'Seçili cihazda gözlenen URL'],['Eşleşen',data.catalog_verified?number(data.counters.matched):'Doğrulanmadı','Birebir katalog eşlemesi'],['Eşleşmeyen',data.catalog_verified?number(data.counters.unmapped):'Doğrulanmadı','URL tahmini yapılmaz'],['Çakışma',data.catalog_verified?number(data.counters.conflicts):'Doğrulanmadı','Aynı URL birden çok grupta'],['Tıklama kapsamı',percent(data.counters.click_coverage),data.complete?'Doğrulanmış sayfa tıklamaları':'Yalnız gözlenen kısmi sayfalar']]);
-  const source=pageMode==='products'?data.products:pageMode==='unmapped'?data.unmapped:pageMode==='conflicts'?data.conflicts:data.pages.filter(r=>r.current);
+  const order=new Map(data.product_decisions.map((r,i)=>[r.id,i]));
+  const source=pageMode==='products'?[...data.products].sort((a,b)=>(order.get(a.id)??999)-(order.get(b.id)??999)):pageMode==='unmapped'?data.unmapped:pageMode==='conflicts'?data.conflicts:data.pages.filter(r=>r.current);
   const rows=source.filter(p=>fold(p.label+' '+(p.urls?.join(' ')||p.canonical_url||p.url||'')).includes(search)&&(!category||p.category===category)&&(!decision||p.decision===decision));
   let sortOption;const signature=nextSort?JSON.stringify(nextSort):'';if(signature&&(signature!==lastQuickSort||document.activeElement?.dataset.productSort===nextSort.key)){lastQuickSort=signature;const columns=pageMode==='unmapped'?['name','clicks','impressions','ctr','position']:['name','clicks','change','impressions','ctr','position','decision'];sortOption={index:Math.max(0,columns.indexOf(nextSort.key)),direction:nextSort.direction};}
   page=Math.min(page,Math.max(1,Math.ceil(rows.length/40)));const values=rows.map(p=>{
    const name=node('div',null,'insight-meta');const link=node('button',p.label,'text-button');link.onclick=()=>pageMode==='products'?details.product(p):details.page(p.url);name.append(link,node('small',p.category));if(p.canonical_url)name.append(siteLink(p.canonical_url,'Siteyi aç'));else name.append(siteLink(p.url,'Siteyi aç'));
    const status=!p.verified?'Veri bekle':p.mapping==='conflict'||p.mapping_conflict?'Çakışma':p.decision==='İncele'?'Gerileme · İncele':p.opportunities?.[0]||p.decision;
+   const ledger=data.product_decisions.find(r=>r.id===p.id);
    if(pageMode==='unmapped'){const define=node('button','Ürün Tanımla','button secondary');define.onclick=()=>draft(p.url);return [name,...['clicks','impressions','ctr','position'].map(k=>metricCell(p.verified?p.current:null,k)),define];}
-   return [name,metricCell(p.verified?p.current:null,'clicks'),cell(delta(p.delta),p.delta),...['impressions','ctr','position'].map(k=>metricCell(p.verified?p.current:null,k)),cell(tags([status]),p.decision==='İncele'?3:p.decision==='Koru'?2:null),inspect(p,pageMode==='products'?'product':'page')];
+   return [name,metricCell(p.verified?p.current:null,'clicks'),cell(delta(p.delta),p.delta),...['impressions','ctr','position'].map(k=>metricCell(p.verified?p.current:null,k)),cell(tags([status]),p.decision==='İncele'?3:p.decision==='Koru'?2:null),...(pageMode==='products'?[cell(tags([ledger?.priority||'Veri bekle']),ledger?.rank??3)]:[]),inspect(p,pageMode==='products'?'product':'page')];
   });
-  table($('products'),pageMode==='unmapped'?['Eşlenmemiş sayfa URL','Tıklama','Gösterim','CTR','Ort. sıra','İşlem']:['Ürün / sayfa','Tıklama','Değişim','Gösterim','CTR','Ort. sıra','Durum','İncele'],values,{sort:sortOption});
-  activeFilters('products',[['Arama',search],['Kategori',category],['Karar',decision]],()=>{for(const id of ['productSearch','groupFilter','decisionFilter'])$(id).value='';products();});$('productCount').textContent=number(rows.length);$('productPeriod').textContent=note();
+  table($('products'),pageMode==='unmapped'?['Eşlenmemiş sayfa URL','Tıklama','Gösterim','CTR','Ort. sıra','İşlem']:['Ürün / sayfa','Tıklama','Değişim','Gösterim','CTR','Ort. sıra','Durum',...(pageMode==='products'?['İnceleme önceliği']:[]),'İncele'],values,{sort:sortOption});
+  activeFilters('products',[['Arama',search],['Kategori',category],['Karar',decision]],()=>{for(const id of ['productSearch','groupFilter','decisionFilter'])$(id).value='';products();});$('productCount').textContent=number(rows.length);$('productPeriod').textContent=note()+(pageMode==='products'?' · '+data.product_decisions.length+' ürün için kanıtlı inceleme sırası. İçerik değişikliği önerilmez.':'');
   document.querySelectorAll('[data-page-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.pageMode===pageMode)));
  }
  function opportunities(){

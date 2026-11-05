@@ -1,0 +1,100 @@
+// Read-only monthly decision register for every verified product URL group.
+// No network, D1, writes or content changes; source scopes stay separate.
+import {buildInsights,metric} from './independent-insights';
+import type {InsightMonth,InsightScope,Metric} from './independent-insights';
+import type {ContextProduct,ContextChange} from './independent-context';
+import type {Ga4View} from './independent-product-answer';
+import {productGa4} from './independent-product-answer';
+
+type GscQuery={page:string;query:string;device:string;country:string;clicks:number;impressions:number;position:number};
+type QuerySignal={query:string;current:Metric;previous:Metric;delta:number;rate:number|null;position_delta:number|null};
+const prior=(month:string)=>{const d=new Date(month+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()-1);return d.toISOString().slice(0,7);};
+const last=(month:string)=>new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5)),0)).toISOString().slice(0,10);
+const rank={'Öncelikli incele':0,'İncele':1,'Koru':2,'Veri bekle':3} as const;
+const match=(r:{page:string;device:string;country:string},urls:Set<string>,scope:InsightScope)=>urls.has(r.page)&&(!scope.device||scope.device==='ALL'||r.device===scope.device)&&(!scope.country||r.country===scope.country);
+function grouped<T extends GscQuery>(rows:T[]){
+ const by=new Map<string,T[]>();for(const row of rows){const array=by.get(row.query)||[];array.push(row);by.set(row.query,array);}return by;
+}
+function querySignals(now:GscQuery[],old:GscQuery[],complete:boolean){
+ if(!complete)return {losses:[] as QuerySignal[],protected:[] as QuerySignal[],unpaired:0};
+ const current=grouped(now),previous=grouped(old),paired:QuerySignal[]=[];
+ for(const [query,rows] of current){
+  const before=previous.get(query);if(!before)continue;const a=metric(rows),b=metric(before);if(!a||!b)continue;
+  paired.push({query,current:a,previous:b,delta:a.clicks-b.clicks,rate:b.clicks>0?(a.clicks-b.clicks)/b.clicks:null,position_delta:a.impressions>0&&b.impressions>0?a.position-b.position:null});
+ }
+ return {
+  losses:paired.filter(q=>q.delta<0).sort((a,b)=>a.delta-b.delta||a.query.localeCompare(b.query)).slice(0,8),
+  protected:paired.filter(q=>q.current.clicks>=10&&q.current.impressions>=100&&q.current.clicks>=q.previous.clicks&&q.position_delta!==null&&q.position_delta<=.5)
+   .sort((a,b)=>b.current.clicks-a.current.clicks||a.query.localeCompare(b.query)).slice(0,8),
+  unpaired:new Set([...current.keys(),...previous.keys()]).size-paired.length
+ };
+}
+export function buildProductDecisionLedger(
+ current:InsightMonth,previous:InsightMonth|null|undefined,
+ ga4Current:Ga4View|null|undefined,ga4Previous:Ga4View|null|undefined,
+ products:ContextProduct[],changes:ContextChange[]=[],scope:InsightScope={},catalogVerified=true
+){
+ const data=buildInsights(current,previous,products,scope,catalogVerified);
+ const queryComplete=data.query_comparison_available;
+ const allUrls=new Map<string,number>();
+ for(const p of products)for(const url of new Set(p.urls||[p.canonical_url]))allUrls.set(url,(allUrls.get(url)||0)+1);
+ const globalPageRefs=[...(current.evidence||[]),...(previous?.evidence||[])].filter(ref=>ref.scope==='page');
+ const globalQueryRefs=queryComplete?[...(current.evidence||[]),...(previous?.evidence||[])].filter(ref=>ref.scope==='query'):[];
+ const ga4Allowed=(!scope.device||scope.device==='ALL')&&!scope.country&&!scope.page;
+ const output=data.products.map(p=>{
+  const urls=[...new Set(p.urls||[p.canonical_url])],urlSet=new Set(urls),mappingValid=catalogVerified&&!p.mapping_conflict&&urls.every(u=>allUrls.get(u)===1);
+  const pageRows=data.pages.filter(r=>urlSet.has(r.url)),main=pageRows.find(r=>r.url===p.canonical_url);
+  const droppingPages=data.comparison_available?pageRows.filter(r=>r.current&&r.previous&&r.delta!==null&&r.delta<0)
+   .sort((a,b)=>a.delta!-b.delta!||a.url.localeCompare(b.url)).slice(0,8):[];
+  const nowQ=(current.queries||[]).filter(r=>match(r,urlSet,scope));
+  const oldQ=(previous?.queries||[]).filter(r=>match(r,urlSet,scope));
+  const signals=querySignals(nowQ,oldQ,queryComplete&&mappingValid);
+  const devices=[...new Set([...(current.pages||[]),...(previous?.pages||[])].filter(r=>urlSet.has(r.page)&&(!scope.country||r.country===scope.country)).map(r=>r.device))].sort().filter(d=>!scope.device||scope.device==='ALL'||d===scope.device).map(device=>{
+   const n=metric((current.pages||[]).filter(r=>match(r,urlSet,{...scope,device})));
+   const b=data.comparison_available?metric((previous?.pages||[]).filter(r=>match(r,urlSet,{...scope,device}))):null;
+   return {device,current:n,previous:b,delta:n&&b?n.clicks-b.clicks:null,comparable:!!n&&!!b&&data.comparison_available};
+  });
+  const from=(data.previous_month||prior(data.month))+'-01',to=data.month+'-'+last(data.month).slice(-2);
+  const events=changes.filter(e=>urlSet.has(e.url)).sort((a,b)=>b.observed_to.localeCompare(a.observed_to));
+  const overlapping=events.filter(e=>e.observed_from.slice(0,10)<=to&&e.observed_to.slice(0,10)>=from);
+  // GA4 is canonical-path-only, all-device/all-country, and never a query or group total.
+  const ga4=productGa4(ga4Current,ga4Previous,p,current.month,'');
+  const ga4Usable=ga4Allowed&&ga4.comparable&&!ga4.thresholded&&!ga4.other_rows&&
+   ga4Current?.month===current.month&&ga4Previous?.month===prior(current.month)&&
+   ga4Current?.closed===true&&ga4Previous?.closed===true;
+  const bothDown=!!(ga4Usable&&main?.current&&main.previous&&main.current.clicks<main.previous.clicks&&ga4.delta!==null&&ga4.delta<0);
+  const comparable=data.comparison_available&&p.comparison_available&&mappingValid;
+  const priority=(!comparable?'Veri bekle':p.decision==='İncele'?(bothDown?'Öncelikli incele':'İncele'):'Koru') as keyof typeof rank;
+  const signalsText:string[]=[];
+  if(comparable&&p.current&&p.previous){
+   if(p.delta!==null&&p.delta<0)signalsText.push('GSC grup tıklaması '+p.previous.clicks+' → '+p.current.clicks+' ('+p.delta+').');
+   if(p.current.impressions<p.previous.impressions)signalsText.push('GSC gösterimi '+p.previous.impressions+' → '+p.current.impressions+'.');
+   if(p.previous.impressions>=100&&p.current.impressions>=100&&p.current.ctr<p.previous.ctr)signalsText.push('CTR %'+(p.previous.ctr*100).toFixed(2)+' → %'+(p.current.ctr*100).toFixed(2)+'.');
+   if(p.previous.impressions>=100&&p.current.impressions>=100&&p.current.position>p.previous.position+.5)signalsText.push('Gösterim ağırlıklı ortalama sıra '+p.previous.position.toFixed(1)+' → '+p.current.position.toFixed(1)+' (büyük sıra kötüdür).');
+   if(p.delta!==null&&p.delta>=0)signalsText.push('GSC grup tıklamaları gerilemedi ('+p.previous.clicks+' → '+p.current.clicks+').');
+  }
+  if(bothDown)signalsText.push('Ana URL için GA4 Organic Search '+ga4.previous_sessions+' → '+ga4.current_sessions+' oturum; GSC tıklamasıyla eşit değildir.');
+  if(!comparable)signalsText.push(!catalogVerified?'Doğrulanmış ürün eşlemesi bekleniyor.':!mappingValid?'URL eşleme çakışması var.':'Aynı URL için iki tam ve eşleşen dönem kaydı bulunmuyor.');
+  if(overlapping.length)signalsText.push('Karşılaştırma aralığına denk gelen '+overlapping.length+' SEO tarama değişikliği gözlendi; yayın veya neden kanıtı değildir.');
+  const action=priority==='Öncelikli incele'
+   ?'Ana URL ve ürünün kaybeden sorgularını, cihaz kırılımlarını ve dönemle örtüşen SEO değişikliklerini birlikte incele; kanıtlanmış neden olmadan içerik değiştirme.'
+   :priority==='İncele'
+    ?'Önce GSC kaybeden URL, görünür sorgu ve cihaz kanıtını incele; GA4 eksikliğini sıfır kabul etme.'
+    :priority==='Koru'
+     ?'Önemli GSC düşüş eşiği aşılmadı. Kazanan sorguları ve mevcut başarılı içeriği koru; küçük dalgalanmada müdahale etme.'
+     :'Karşılaştırılabilir dönem/URL eşlemesini doğrula; eksik satırlardan sıfır trafik çıkarma.';
+  return {
+   id:p.id,name:p.name,canonical_url:p.canonical_url,urls,month:current.month,previous_month:previous?.month||null,
+   priority,rank:rank[priority],comparison_available:comparable,decision:comparable?p.decision:'Veri bekle',
+   gsc:{current:comparable?p.current:null,previous:comparable?p.previous:null,delta:comparable?p.delta:null,main_url:main?.url||p.canonical_url,main_current:main?.current||null,main_previous:main?.previous||null,dropping_pages:droppingPages},
+   queries:{comparable:queryComplete&&mappingValid,losses:signals.losses,protected:signals.protected,unpaired_visible_queries:signals.unpaired,anonymous_queries_excluded:true},
+   devices,ga4:{scope_comparable:ga4Usable,canonical_path:ga4.path,current_sessions:ga4Usable?ga4.current_sessions:null,previous_sessions:ga4Usable?ga4.previous_sessions:null,delta:ga4Usable?ga4.delta:null,cross_source_decline:bothDown,query_support:false},
+   seo_changes:{matching_events:events.length,overlapping:overlapping.slice(0,8).map(e=>({id:e.id,url:e.url,changed_fields:e.changed_fields,observed_from:e.observed_from,observed_to:e.observed_to,published_at:e.publication_evidence?e.published_at:null,publication_proven:!!e.publication_evidence})),coverage_limit:'Tarama arşivi son olaylarla sınırlı olabilir.'},
+   signals:signalsText,action,content_change_recommended:false,cause_confirmed:false,
+   evidence:{gsc_pages:globalPageRefs,gsc_queries:globalQueryRefs,ga4_pages:ga4Usable?ga4.evidence.filter(e=>e.kind==='pages'):[]},
+   limitations:['URL grubu ve ana URL farklı kapsamlardır.','GSC görünür sorgular eksik ve anonimleştirilmiş olabilir; tek ayda görünmeyen satır sıfır değildir.','GA4 yalnız kanıtlı ana açılış sayfası ve tüm cihazlar kapsamındadır; GSC tıklaması ile karşılaştırılarak nedensellik çıkarılmaz.','Tarihli tarama aralığı kesin yayın tarihi veya sıralama etkisi değildir.'],
+   d1_requests:0
+  };
+ });
+ return output.sort((a,b)=>a.rank-b.rank||(a.gsc.delta??0)-(b.gsc.delta??0)||a.name.localeCompare(b.name,'tr'));
+}
