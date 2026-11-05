@@ -1,5 +1,5 @@
 import {it,expect,vi} from 'vitest';
-import {IndependentGa4,GA4_SCOPE,answerGa4} from '../src/independent-ga4';
+import {IndependentGa4,GA4_SCOPE,answerGa4,ownStream} from '../src/independent-ga4';
 import {encrypt} from '../src/security';
 const KEY='AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 function fixture(){
@@ -15,7 +15,7 @@ async function authorize(f:ReturnType<typeof fixture>,ga4:IndependentGa4){
 }
 function provider(){return vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>{
  if(String(url).endsWith('/accountSummaries?pageSize=50'))return Response.json({accountSummaries:[{propertySummaries:[{property:'properties/123',displayName:'Mavi Basım'}]}]});
- if(String(url).endsWith('/dataStreams?pageSize=200'))return Response.json({dataStreams:[{webStreamData:{defaultUri:'https://mavibasim.com/'}}]});
+ if(String(url).endsWith('/dataStreams?pageSize=200'))return Response.json({dataStreams:[{webStreamData:{defaultUri:'mavibasim.com'}}]});
  if(String(url).endsWith('/properties/123'))return Response.json({name:'properties/123',displayName:'Mavi Basım',timeZone:'Europe/Istanbul'});
  const body=JSON.parse(String(init?.body)),dims=body.dimensions.map((d:any)=>d.name);
  const values=dims.length===3?['Türkiye','İstanbul','İstanbul']:dims[0]==='deviceCategory'?['mobile']:dims[0]==='landingPage'?['/brosur']:[];
@@ -32,6 +32,7 @@ it('requires cookie-bound, one-use Analytics consent and never replaces the GSC 
  expect((await ga4.callback(valid)).status).toBe(303);await expect(ga4.callback(valid)).rejects.toThrow('GA4_STATE_INVALID');
  expect(f.values.get('gsc:oauth')).toBe('existing encrypted GSC');expect(f.values.get('ga4:oauth')).not.toContain('fixture-analytics-refresh-token');
  expect((await ga4.status()).property?.id).toBe('123');
+ expect((await ga4.status()).property?.web_stream).toMatchObject({origin:'https://mavibasim.com',address_format:'scheme-less',source:'Google Analytics Admin API'});
 });
 it('does not pretend the existing GSC-only permission includes Analytics',async()=>{
  const f=fixture();f.values.set('gsc:oauth',await encrypt({refresh_token:'existing-gsc-refresh-token'},KEY));const original=f.values.get('gsc:oauth');
@@ -41,6 +42,8 @@ it('does not pretend the existing GSC-only permission includes Analytics',async(
  expect(f.values.get('gsc:oauth')).toBe(original);expect((await ga4.report('2026-10')).available).toBe(false);
 });
 it('rejects a different site property without writing a selected property',async()=>{
+ for(const uri of ['mavibasim.com','www.mavibasim.com/','https://mavibasim.com/','HTTP://WWW.MAVIBASIM.COM/path'])expect(ownStream(uri)?.hostname).toMatch(/^(www\.)?mavibasim\.com$/);
+ for(const uri of ['other.example','https://mavibasim.com.evil.example','https://evil.example/mavibasim.com','https://evil.example@mavibasim.com','mavibasim.com@evil.example','//mavibasim.com','https:mavibasim.com','https://mavibasim.com:444','mavibasim.com:443','https://mavibasim.com\\@evil.example',' mavibasim.com','mavibasim.com\n','javascript:alert(1)','ｍavibasim.com'])expect(ownStream(uri)).toBeNull();
  const f=fixture();f.values.set('ga4:oauth',await encrypt({access_token:'fixture-access-token',refresh_token:'fixture-refresh-token',scope:GA4_SCOPE,expires_at:Date.now()+3600000},KEY));
  const ga4=new IndependentGa4(f.store,KEY,f.broker,vi.fn(async(url)=>Response.json(String(url).includes('dataStreams')?{dataStreams:[{webStreamData:{defaultUri:'https://other.example'}}]}:{name:'properties/123',displayName:'Other',timeZone:'UTC'})) as typeof fetch);
  await expect(ga4.select('123')).rejects.toThrow('GA4_PROPERTY_SCOPE_UNVERIFIED');expect(f.values.has('ga4:property')).toBe(false);

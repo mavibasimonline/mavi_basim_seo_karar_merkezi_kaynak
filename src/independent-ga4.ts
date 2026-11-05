@@ -9,7 +9,7 @@ const SOURCE='Google Analytics 4 Data API',METRICS=['activeUsers','sessions','en
 const DIMS={total:[],cities:['country','region','city'],devices:['deviceCategory'],pages:['landingPage']} as const;
 type Kind=keyof typeof DIMS;
 type Token={access_token:string;refresh_token:string;scope:string;expires_at:number};
-type Property={id:string;name:string;time_zone:string;verified_at:string};
+type Property={id:string;name:string;time_zone:string;verified_at:string;web_stream?:{origin:string;address_format:'absolute'|'scheme-less';source:'Google Analytics Admin API'}};
 type Row={dimensions:string[];activeUsers:number;sessions:number;engagedSessions:number};
 type Part={index:number;count:number;bytes:number;chunks:number;sha256:string};
 type Job={property:Property;month:string;kind:Kind;from:string;to:string;closed:boolean;generation:string;cursor:number;pages:Part[];completed_at?:string;row_count?:number;thresholded:boolean;other_rows:boolean};
@@ -33,7 +33,14 @@ function months(time:Date,zone:string){
  const d=new Date(cutoff(time,zone)+'T00:00:00Z');d.setUTCDate(1);
  return Array.from({length:3},(_,i)=>{const x=new Date(d);x.setUTCMonth(x.getUTCMonth()-i);return x.toISOString().slice(0,7);});
 }
-function ownStream(value:unknown){try{const u=new URL(String(value));return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password&&!u.port&&['mavibasim.com','www.mavibasim.com'].includes(u.hostname);}catch{return false;}}
+export function ownStream(value:unknown):URL|null{
+ // Admin accepts scheme-less defaultUri values. Normalize only an exact owned
+ // authority; reject credentials, ports, other domains and URL parser shortcuts.
+ if(typeof value!=='string'||value.length>2048||/[\s\\\u0000-\u001f\u007f]/u.test(value))return null;
+ const normalized=/^https?:\/\//i.test(value)?value:'https://'+value;
+ if(!/^https?:\/\/(?:www\.)?mavibasim\.com(?:[/?#]|$)/i.test(normalized))return null;
+ try{const u=new URL(normalized);return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password&&!u.port&&['mavibasim.com','www.mavibasim.com'].includes(u.hostname)?u:null;}catch{return null;}
+}
 export class IndependentGa4 {
  constructor(private store:GscStorage,private secret:string,private broker:Broker,private transport:typeof fetch=fetch){}
  async status(){
@@ -106,10 +113,16 @@ export class IndependentGa4 {
  async select(id:unknown){
   check(typeof id==='string'&&/^\d{1,20}$/.test(id),'GA4_PROPERTY_INVALID');
   const [p,streams]=await Promise.all([this.api('https://analyticsadmin.googleapis.com/v1beta/properties/'+id),this.api('https://analyticsadmin.googleapis.com/v1beta/properties/'+id+'/dataStreams?pageSize=200')]);
-  check(p.name==='properties/'+id&&label(p.displayName,256)&&typeof p.timeZone==='string'&&(streams.dataStreams||[]).some((s:any)=>ownStream(s.webStreamData?.defaultUri)),'GA4_PROPERTY_SCOPE_UNVERIFIED');
+  const stream=Array.isArray(streams.dataStreams)?streams.dataStreams.find((s:any)=>ownStream(s.webStreamData?.defaultUri)):null;
+  check(p.name==='properties/'+id&&label(p.displayName,256)&&typeof p.timeZone==='string'&&stream,'GA4_PROPERTY_SCOPE_UNVERIFIED');
   try{propertyDate(new Date(),p.timeZone);}catch{throw Error('GA4_PROPERTY_TIMEZONE_INVALID');}
-  const property:Property={id,name:p.displayName,time_zone:p.timeZone,verified_at:new Date().toISOString()};
-  await this.store.put(ROOT+'property',property);await this.store.put(ROOT+'active',null);return {property,d1_requests:0};
+  const property:Property={id,name:p.displayName,time_zone:p.timeZone,verified_at:new Date().toISOString(),web_stream:{origin:ownStream(stream.webStreamData.defaultUri)!.origin,address_format:/^https?:\/\//i.test(stream.webStreamData.defaultUri)?'absolute':'scheme-less',source:'Google Analytics Admin API'}};
+  const old=await this.store.get<Property>(ROOT+'property');
+  await this.store.put(ROOT+'property',property);
+  if(!old||old.id!==id||old.time_zone!==property.time_zone)await this.store.put(ROOT+'active',null);
+  const retry=await this.store.get<{code:string}>(ROOT+'retry');
+  if(retry&&['GA4_PROPERTY_SCOPE_UNVERIFIED','GA4_PROPERTY_SELECTION_REQUIRED'].includes(retry.code))await this.store.put(ROOT+'retry',null);
+  await this.store.put(ROOT+'inspection',null);return {property,d1_requests:0};
  }
  private async write(job:Job,rows:Row[]){
   const raw=JSON.stringify(rows),bytes=new TextEncoder().encode(raw),part:Part={index:job.pages.length,count:rows.length,bytes:bytes.length,chunks:Math.ceil(bytes.length/CHUNK),sha256:await hash(raw)};
