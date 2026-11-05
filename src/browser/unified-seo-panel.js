@@ -33,6 +33,8 @@ function evidence(refs=[]){
 }
 export function createIndependentPanel({api,notify}){
  document.querySelector('[data-view="products"]').setAttribute('aria-label','Ürün & Canlı Sayfa Analizi');
+ document.querySelector('[data-view="products"] .nav-label').textContent='Ürün & Canlı Sayfa Analizi';
+ $('leadersTitle').textContent='İlk 5 Lider Ürün';
  let current=[],previous=null,ga4=null,oldGa4=null,status=null,ga4Status=null,changes=null,archive=null,catalog=null,workspace=null,workspacePromise=null,activeView='overview',errors=[],revision=0,queryPage=1,first=true,metric='clicks',sort={key:'clicks',direction:'desc'};
  const cache=new Map();
  const target=()=>$('month').value,device=()=>$('device').value;

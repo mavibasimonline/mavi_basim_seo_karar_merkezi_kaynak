@@ -7,11 +7,11 @@ from quota_observer_release import api,free_plan
 from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
-BASE='d2d34fe3c981752c790e3a53f9cf57be26d00236'
+BASE='b38dfd7c548ed92673483e433d52fa25fd80d495'
 APP_SOURCE='1fd7c759987c3b5bd4904db340ac17248d64cff6'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'public/app.css','public/app.js','public/chart.js','public/index.html','public/unified-seo.js','public/seo/workspace.css','public/seo/workspace.js','scripts/build-unified-panel.mjs','scripts/seo-answer-probe.ts','scripts/seo_answer_release.py','src/browser/unified-seo-panel.js','src/browser/insights-workspace.js','src/independent-insights.ts','src/drive-independent.ts','src/independent-gsc-analysis.ts'}
-PROTECTED=('src/index.ts','src/independent-gsc-report.ts','src/independent-product-answer.ts','src/independent-session.ts','src/security.ts','src/independent-seo-model.ts','src/drive-broker.ts','src/independent-gsc.ts','src/independent-gsc-bridge.ts','src/independent-gsc-bootstrap.ts','src/independent-ga4.ts','src/independent-context.ts','src/independent-context-bridge.ts','src/independent-cron-proof.ts','src/independent-refresh.ts','src/independent-snapshot.ts','src/drive-records.ts','src/d1-read-budget.ts','public/ui.js','public/period.js','public/independent-seo.js','public/independent-seo.html','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.drive-archive.jsonc')
+EXPECTED={'public/index.html','public/unified-seo.js','src/browser/unified-seo-panel.js','scripts/seo_answer_release.py'}
+PROTECTED=('src/index.ts','src/drive-independent.ts','src/independent-insights.ts','src/independent-gsc-analysis.ts','src/browser/insights-workspace.js','public/app.css','public/app.js','public/chart.js','public/seo/workspace.js','public/seo/workspace.css','scripts/seo-answer-probe.ts','scripts/build-unified-panel.mjs','src/independent-gsc-report.ts','src/independent-product-answer.ts','src/independent-session.ts','src/security.ts','src/independent-seo-model.ts','src/drive-broker.ts','src/independent-gsc.ts','src/independent-gsc-bridge.ts','src/independent-gsc-bootstrap.ts','src/independent-ga4.ts','src/independent-context.ts','src/independent-context-bridge.ts','src/independent-cron-proof.ts','src/independent-refresh.ts','src/independent-snapshot.ts','src/drive-records.ts','src/d1-read-budget.ts','public/ui.js','public/period.js','public/independent-seo.js','public/independent-seo.html','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.drive-archive.jsonc')
 
 def browser_acceptance(key):
  # One mandatory live UI acceptance, outside the test suite. No source rows/logs.
@@ -82,12 +82,6 @@ def run():
  for path in PROTECTED:need(subprocess.check_output(['git','show',BASE+':'+path],cwd=ROOT)==(ROOT/path).read_bytes(),'SEO_ANSWER_PROTECTED_SOURCE_CHANGED')
  old_index=subprocess.check_output(['git','show',BASE+':src/index.ts'],cwd=ROOT).decode()
  need(old_index.split('  async scheduled(',1)[1]==(ROOT/'src/index.ts').read_text().split('  async scheduled(',1)[1],'SEO_ANSWER_CRON_SOURCE_CHANGED')
- old_router=subprocess.check_output(['git','show',BASE+':src/drive-independent.ts'],cwd=ROOT).decode()
- new_router=(ROOT/'src/drive-independent.ts').read_text().replace("import {insightIntent,answerInsightQuestion,answerCityTrend,categoryOf} from './independent-insights';\n",'')
- catalog_start="   if(path==='/api/independent/catalog'&&request.method==='GET'){"
- before,rest=new_router.split(catalog_start,1);new_router=before+rest.split('\n   }',1)[1].lstrip('\n')
- marker='   let questionBody:';end='   const snapshot=await this.independentSnapshot();'
- need(old_router.split(marker,1)[0]==new_router.split(marker,1)[0] and old_router.split(end,1)[1]==new_router.split(end,1)[1],'SEO_ANSWER_COLLECTOR_SOURCE_CHANGED')
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'SEO_ANSWER_MAIN_SUPERSEDED')
  runs=get_json('https://api.github.com/repos/'+REPOSITORY+'/actions/workflows/ci.yml/runs?head_sha='+sha+'&per_page=20',os.environ.get('GITHUB_TOKEN')).get('workflow_runs',[])
  need(any(r.get('head_sha')==sha and r.get('head_branch')=='main' and r.get('event')=='push' and r.get('conclusion')=='success' for r in runs),'SEO_ANSWER_GREEN_CI_REQUIRED')
