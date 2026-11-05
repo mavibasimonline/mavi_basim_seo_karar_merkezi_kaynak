@@ -15,6 +15,7 @@ export function comparisonDecision(current:Pick<Metrics,'clicks'|'impressions'>|
  return materialDrop&&Math.min(current.impressions,previous.impressions)>=100?'İncele':'Koru';
 }
 export type GscComparison={current:Metrics;previous:Metrics;delta:number;rate:number|null;pages:{page:string;current:Metrics|null;previous:Metrics|null}[]};
+export function comparisonTrend(delta:number){return delta>0?'Bu dönemde düşüş yok, yükseliş var.':delta===0?'Bu dönemde düşüş yok; tıklama sayısı değişmedi.':'Bu dönemde GSC tıklamalarında düşüş var.';}
 type Facet=Metrics&{id:string;label:string};
 type Filters={product?:string;page?:string;device?:string;country?:string;query?:string};
 const SOURCE='GSC Search Analytics API',LIMIT=150;
@@ -133,5 +134,5 @@ export function answerVerifiedGsc(current:MonthlyGscAnalysisInput,previous:Month
  const comparison:GscComparison={current:now,previous:before,delta,rate,pages:[...new Set([...currentRows,...previousRows].map(r=>r.page))].sort().map(page=>({page,current:metrics(currentRows.filter(r=>r.page===page)),previous:metrics(previousRows.filter(r=>r.page===page))}))};
  const change='Önceki ay '+previous.month+': '+before.clicks+' tıklama / '+before.impressions+' gösterim; tıklama farkı '+(delta>0?'+':'')+delta+(rate===null?' (önceki ay sıfır olduğundan yüzde hesaplanmaz)':' (%'+(rate*100).toFixed(1)+')')+'. ';
  const ctrContext=now.impressions>before.impressions&&now.ctr<before.ctr?'Gösterimler büyürken CTR düşüşü tek başına başarısızlık sayılmaz. ':'';
- return {...respond(observed+change+'Yorum: '+ctrContext+'Aylık fark nedeni kanıtlamaz; marka, cihaz karışımı ve mevsimsellik ayrıca incelenmelidir. SEO kararı: '+(decision==='İncele'?'kayda değer düşüşü incele; değişiklik geçmişiyle doğrulamadan içerik veya yönlendirme değiştirme. İncele, sayfayı değiştir kararı değildir.':'küçük veya az örneklemli dalgalanma; mevcut sayfayı koru, değişiklik yapma.'),decision,'page',true),comparison};
+ return {...respond(observed+change+'Yorum: '+comparisonTrend(delta)+' '+ctrContext+'Aylık fark nedeni kanıtlamaz; marka, cihaz karışımı ve mevsimsellik ayrıca incelenmelidir. SEO kararı: '+(decision==='İncele'?'kayda değer düşüşü incele; değişiklik geçmişiyle doğrulamadan içerik veya yönlendirme değiştirme. İncele, sayfayı değiştir kararı değildir.':delta>=0?'tıklama düşüşü yok; mevcut sayfayı koru, değişiklik yapma.':'küçük veya az örneklemli dalgalanma; mevcut sayfayı koru, değişiklik yapma.'),decision,'page',true),comparison};
 }

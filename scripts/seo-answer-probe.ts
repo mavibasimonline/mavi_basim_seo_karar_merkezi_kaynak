@@ -17,8 +17,8 @@ export default {async fetch(request:Request,env:Probe){
  }
  try{
   need(request.method==='POST'&&!!env.ADMIN_TOKEN&&['/before','/accept'].includes(mode),'SEO_ANSWER_REQUEST_INVALID');
-  const call=async(question:string,source?:string,route='questions')=>{
-   const r=await env.LIVE_APP.fetch(ORIGIN+'/api/independent/'+route,{method:'POST',headers:{Authorization:'Bearer '+env.ADMIN_TOKEN,Origin:ORIGIN,'Content-Type':'application/json'},body:JSON.stringify({month:'2026-10',question,...(source?{source}:{})})});
+  const call=async(question:string,source?:string,route='questions',selectedMonth='2026-10')=>{
+   const r=await env.LIVE_APP.fetch(ORIGIN+'/api/independent/'+route,{method:'POST',headers:{Authorization:'Bearer '+env.ADMIN_TOKEN,Origin:ORIGIN,'Content-Type':'application/json'},body:JSON.stringify({month:selectedMonth,question,...(source?{source}:{})})});
    need(r.ok,'SEO_ANSWER_UNAVAILABLE');return r.json<any>();
   };
   const auto=await call('Broşür neden düşüyor?'),direct=await call('Broşür neden düşüyor?',undefined,'gsc-questions'),manual=await call('Broşür neden düşüyor?','ga4');
@@ -43,6 +43,11 @@ export default {async fetch(request:Request,env:Probe){
   need(JSON.stringify(periods)===JSON.stringify(['2026-09','2026-10'])&&refs.filter((r:any)=>r.source==='Google Analytics 4 Data API').length===2,'SEO_ANSWER_REFERENCES_INVALID');
   const joint=auto.evaluation.cross_source_page_decline,priority=auto.evaluation.review_priority;
   need(typeof joint==='boolean'&&['Öncelikli','Normal','Yok','Veri bekle'].includes(priority)&&auto.answer.includes('Ürün grubu toplamı tek URL performansı değildir.')&&(priority!=='Öncelikli'||joint&&ga4.delta<0&&auto.decision==='İncele'&&auto.answer.includes('İnceleme önceliği yüksek')),'SEO_ANSWER_REVIEW_SCOPE_INVALID');
-  return Response.json({verified:true,unified_panel:true,daily_chart_days:month.daily.length,product_mappings:month.mappings.length,product_scope:true,periods,decision:auto.decision,decision_consistent:true,gsc_drop_verified:auto.comparison.delta<0,ga4_sessions_compared:true,ga4_drop_verified:ga4.delta<0,cross_source_page_decline:joint,review_priority:priority,content_change_recommended:false,changes_referenced:auto.evaluation.changes.length,change_dates_present:true,cause_confirmed:false,manual_ga4_respected:true,unsupported_ga4_explicit:true,city_misrouting:false,d1_requests:0});
+  const rise=await call('Broşür mobilde neden düştü?',undefined,'questions','2026-09'),riseGsc=await call('Broşür mobilde neden düştü?',undefined,'gsc-questions','2026-09');
+  need(rise.answer.includes('Bu dönemde düşüş yok, yükseliş var.')&&riseGsc.answer.includes('Bu dönemde düşüş yok, yükseliş var.'),'SEO_ANSWER_RUNTIME_PENDING');
+  need([rise,riseGsc].every(r=>r.month==='2026-09'&&r.previous_month==='2026-08'&&r.filters.product===auto.product_id&&r.filters.device==='MOBILE'&&r.comparison?.previous.clicks===1&&r.comparison.current.clicks===19&&r.comparison.delta===18&&r.decision==='Koru'&&r.d1_requests===0),'SEO_ANSWER_GROWTH_SCOPE_INVALID');
+  const wording=rise.answer.toLocaleLowerCase('tr-TR');
+  need(wording.includes('karşılaştırma dönemi: ağustos 2026 → eylül 2026.')&&!rise.answer.includes('Eylül–Ekim')&&!rise.answer.includes('düşüşün nedeni kesinleştirilemedi')&&rise.evaluation.content_change_recommended===false,'SEO_ANSWER_PERIOD_WORDING_INVALID');
+  return Response.json({verified:true,september_mobile_growth_verified:true,dynamic_comparison_period_verified:true,growth_comparison_months:['2026-08','2026-09'],unified_panel:true,daily_chart_days:month.daily.length,product_mappings:month.mappings.length,product_scope:true,periods,decision:auto.decision,decision_consistent:true,gsc_drop_verified:auto.comparison.delta<0,ga4_sessions_compared:true,ga4_drop_verified:ga4.delta<0,cross_source_page_decline:joint,review_priority:priority,content_change_recommended:false,changes_referenced:auto.evaluation.changes.length,change_dates_present:true,cause_confirmed:false,manual_ga4_respected:true,unsupported_ga4_explicit:true,city_misrouting:false,d1_requests:0});
  }catch(error){const code=error instanceof Error&&/^SEO_ANSWER_[A-Z0-9_]+$/.test(error.message)?error.message:'SEO_ANSWER_INVALID';return Response.json({code},{status:503});}
 }};
