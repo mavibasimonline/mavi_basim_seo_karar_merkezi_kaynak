@@ -111,6 +111,7 @@ export async function verifiedGscMonth(storage:GscStorage,secret:string,month:st
  const dates=Array.from({length:end.getUTCDate()},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
  const missing:string[]=[],queryMissing:string[]=[],budgetDays:string[]=[],evidence:GscEvidenceRef[]=[];
  const pageGroup=new Map<string,Aggregate>(),queryGroup=new Map<string,Aggregate>();
+ const daily:{day:string;verified:true;fetched_at:string;devices:{device:string;clicks:number;impressions:number;ctr:number;position:number}[]}[]=[];
  let days=0,queryDays=0;
  // Page totals take priority. Query volume cannot consume the page read budget.
  for(const scope of ['page','query'] as Scope[])for(const day of dates){
@@ -121,6 +122,13 @@ export async function verifiedGscMonth(storage:GscStorage,secret:string,month:st
   if(!canRead(p,budget)){missingList.push(day);budgetDays.push(day+':'+scope);continue;}
   const rows=await readProof(storage,secret,p,budget);
   add(scope==='page'?pageGroup:queryGroup,rows,scope==='query');
+  if(scope==='page'){
+   const devices=[...new Set(rows.map(r=>r.device))].map(device=>{
+    const selected=rows.filter(r=>r.device===device),clicks=selected.reduce((n,r)=>n+r.clicks,0),impressions=selected.reduce((n,r)=>n+r.impressions,0);
+    return {device,clicks,impressions,ctr:impressions?clicks/impressions:0,position:impressions?selected.reduce((n,r)=>n+r.position*r.impressions,0)/impressions:0};
+   });
+   daily.push({day,verified:true,fetched_at:p.captured_at,devices});
+  }
   if(scope==='page')days++;else queryDays++;
   evidence.push({day,scope,generation:p.generation,captured_at:p.captured_at,rows:p.rows,page_hashes:p.page_proofs.map(x=>x.sha256)});
  }
@@ -132,7 +140,7 @@ export async function verifiedGscMonth(storage:GscStorage,secret:string,month:st
   query_days_verified:queryDays,query_missing_days:queryMissing,query_partial:true as const,
   source:'GSC Search Analytics API',property:'sc-domain:mavibasim.com',search_type:'web',data_state:'final',timezone:'America/Los_Angeles',
   scope:'verified daily page-country-device and observed query rows; anonymized queries are incomplete',d1_requests:0,
-  pages,queries,evidence,read_budget:{chunk_reads:budget.chunk_reads,max_chunk_reads:budget.max_chunk_reads,rows:budget.rows,max_rows:budget.max_rows,budget_limited:budgetDays.length>0,unread:budgetDays},
+  pages,queries,daily,evidence,read_budget:{chunk_reads:budget.chunk_reads,max_chunk_reads:budget.max_chunk_reads,rows:budget.rows,max_rows:budget.max_rows,budget_limited:budgetDays.length>0,unread:budgetDays},
   // Partial observations remain inspectable but are never labeled monthly totals.
   observed_clicks:observedClicks,observed_impressions:observedImpressions,
   total_clicks:complete?observedClicks:null,total_impressions:complete?observedImpressions:null,

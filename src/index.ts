@@ -68,10 +68,11 @@ async function route(request:Request,env:Env):Promise<Response>{
   if(request.method==='GET'&&path==='/api/oauth/google/callback'&&(url.searchParams.get('state')||'').startsWith('drive2.'))return independentDriveRoute(request,env);
   if(request.method==='GET'&&path==='/api/oauth/google/callback'&&['gsc2.','ga42.'].some(prefix=>(url.searchParams.get('state')||'').startsWith(prefix)))return independentDriveRoute(request,env);
   if(request.method==='GET'&&path==='/api/oauth/google/callback')return withReadBudget(env,path,safe=>oauthCallback(request,safe));
+  if(['/independent-seo.html','/independent-seo','/independent-seo/'].includes(path)&&(env as Env&{DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE)return new Response(null,{status:302,headers:{Location:'/'+url.search+url.hash,'Cache-Control':'no-store'}});
   if(!path.startsWith('/api/'))return env.ASSETS.fetch(request);
   if(!await authenticated(request,env))return json({error:'Giriş yapmanız gerekiyor.'},401);
   if(!['GET','HEAD'].includes(request.method)&&!safeOrigin(request))return json({error:'Geçersiz istek kaynağı.'},403);
-  if(request.method==='GET'&&path==='/api/session')return json({ok:true,landing:(env as Env&{DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE?'/independent-seo.html':'/'});
+  if(request.method==='GET'&&path==='/api/session')return json({ok:true,landing:(env as Env&{DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE?'/independent-seo.html':'/',...((env as Env&{DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE?{panel:'unified-independent-v1'}:{})});
   if(path==='/api/session/logout'&&request.method!=='POST')return json({error:'Geçersiz istek yöntemi.'},405);
   if(request.method==='DELETE'&&path==='/api/session'||request.method==='POST'&&path==='/api/session/logout')return new Response(null,{status:request.method==='POST'?303:204,headers:{'Set-Cookie':'mavi_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0',...(request.method==='POST'?{Location:'/'}:{})}});
   if(path.startsWith('/api/drive-independent/')||path==='/api/drive/status'||path==='/api/oauth/google/start'&&url.searchParams.get('purpose')==='drive')return independentDriveRoute(request,env);

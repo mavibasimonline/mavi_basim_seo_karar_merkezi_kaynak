@@ -127,7 +127,6 @@
           >
         </nav>
         <div class="sidebar-bottom">
-          <a class="nav-label independent-seo-link" href="/independent-seo.html">SEO Karar Merkezi</a>
           <div class="sidebar-note nav-label">
             <svg class="icon" aria-hidden="true">
               <use href="/icons.svg#shield" /></svg
@@ -375,6 +374,14 @@
                   </button>
                 </section>
               </div>
+              <section id="organicPanel" class="panel" hidden aria-labelledby="organicTitle">
+                <div class="panel-heading"><div><h2 id="organicTitle">Organik ziyaretler · GA4</h2><p id="organicPeriod"></p></div>
+                  <label>Görünüm <select id="organicFacet"><option value="cities">Şehir / Bölge</option><option value="devices">Cihaz</option><option value="pages">Açılış sayfası</option></select></label>
+                </div>
+                <div id="organicSummary" class="organic-summary padded"></div>
+                <div id="organicTable" class="table-scroll" role="region" tabindex="0" aria-label="GA4 organik ziyaret ölçümleri"></div>
+                <p class="source-note padded">GA4 oturumları GSC tıklaması değildir. Şehir toplamı bir ürünün veya arama sorgusunun performansını kanıtlamaz.</p>
+              </section>
             </section>
             <section
               id="view-products"
@@ -599,6 +606,11 @@
                     Bir günlük GSC verisini doğrula
                   </button>
                 </div>
+                <div id="analyticsConnections" class="inline-controls" hidden>
+                  <button id="analyticsConnect" class="button secondary" type="button">Google Analytics bağlantısını yenile</button>
+                  <button id="analyticsProperties" class="button secondary" type="button">GA4 mülkünü seç</button>
+                  <form id="analyticsSelect" hidden><label for="analyticsProperty">GA4 mülkü</label> <select id="analyticsProperty"></select> <button class="button secondary" type="submit">Doğrula ve seç</button></form>
+                </div>
                 <button id="runDataAudit" class="button secondary">
                   <svg class="icon" aria-hidden="true">
                     <use href="/icons.svg#refresh" />
@@ -623,6 +635,7 @@
                 >
                   <div class="question-tools" data-actions-slot>
                     <label for="questionText">SEO verilerine sorun</label>
+                    <label id="questionSourceLabel" hidden>Kaynak <select id="questionSource"><option value="auto">Otomatik · ilgili kanıtlar</option><option value="gsc">GSC arama performansı</option><option value="ga4">GA4 organik ziyaretler</option><option value="archive">Doğrulanmış eski arşiv</option></select></label>
                   </div>
                   <div class="question-row">
                     <input

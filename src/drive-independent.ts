@@ -346,7 +346,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     const gsc=await this.gscMonth(month);
     const context=await readIndependentContext(this.ctx.storage).catch(()=>null);
     const mappings=context?.products.map(p=>({id:p.id,name:p.name,pages:[p.canonical_url]}))||[];
-    return json(path.endsWith('gsc-analysis')?{...analyzeVerifiedGsc(gsc,mappings),mapping_evidence:context?{source_hash:context.source_hash,captured_at:context.captured_at,coverage:context.coverage}:null}:gsc);
+    return json(path.endsWith('gsc-analysis')?{...analyzeVerifiedGsc(gsc,mappings),mapping_evidence:context?{source_hash:context.source_hash,captured_at:context.captured_at,coverage:context.coverage}:null}:{...gsc,mappings:context?.products||[],mapping_evidence:context?{source_hash:context.source_hash,captured_at:context.captured_at,coverage:context.coverage}:null});
    }
    if(request.method==='GET'&&path==='/api/independent/gsc-status'){
     const collector=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});

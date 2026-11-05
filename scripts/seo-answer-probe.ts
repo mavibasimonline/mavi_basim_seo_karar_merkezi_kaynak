@@ -6,6 +6,15 @@ export default {async fetch(request:Request,env:Probe){
  if(!env.PROBE_KEY||request.headers.get('Authorization')!=='Bearer '+env.PROBE_KEY)return new Response(null,{status:404});
  const mode=new URL(request.url).pathname;
  if(mode==='/health')return Response.json({ready:true,admin_configured:!!env.ADMIN_TOKEN});
+ // Account-only browser acceptance of the actual published assets and read APIs.
+ // The real admin key remains in Workers; the temporary preview key is local.
+ if(!['/before','/accept'].includes(mode)){
+  const assets=['/','/index.html','/app.js','/app.css','/ui.js','/chart.js','/evidence.js','/modules.js','/gsc-review.js','/period.js','/icons.svg','/unified-seo.js'];
+  const allowed=request.method==='GET'&&(assets.includes(mode)||mode==='/api/session'||/^\/api\/independent\/(gsc-month|gsc-status|ga4-status|ga4-report|change-history|report)$/.test(mode))||request.method==='POST'&&/^\/api\/independent\/(questions|gsc-questions)$/.test(mode);
+  if(!allowed||!env.ADMIN_TOKEN)return new Response(null,{status:404});
+  const url=new URL(request.url),headers=new Headers({'Authorization':'Bearer '+env.ADMIN_TOKEN,Origin:ORIGIN,'Content-Type':'application/json'});
+  return env.LIVE_APP.fetch(new Request(ORIGIN+mode+url.search,{method:request.method,headers,...(request.method==='POST'?{body:await request.text()}:{})}));
+ }
  try{
   need(request.method==='POST'&&!!env.ADMIN_TOKEN&&['/before','/accept'].includes(mode),'SEO_ANSWER_REQUEST_INVALID');
   const call=async(question:string,source?:string,route='questions')=>{
@@ -15,6 +24,10 @@ export default {async fetch(request:Request,env:Probe){
   const auto=await call('Broşür neden düşüyor?'),direct=await call('Broşür neden düşüyor?',undefined,'gsc-questions'),manual=await call('Broşür neden düşüyor?','ga4');
   if(mode==='/before')return Response.json({auto_source:auto.source,auto_decision:auto.decision,gsc_decision:direct.decision,manual_ga4_source:manual.source,combined_evidence:!!auto.evaluation,d1_requests:0});
   const visitor=await call('Broşür organik ziyaretçileri neden düşüyor?'),unsupported=await call('Broşür anahtar kelimeleri neden düşüyor?','ga4');
+  const read=async(path:string)=>{const r=await env.LIVE_APP.fetch(ORIGIN+path,{headers:{Authorization:'Bearer '+env.ADMIN_TOKEN}});need(r.ok,'SEO_ANSWER_PANEL_READ_FAILED');return r.json<any>();};
+  const session=await read('/api/session'),month=await read('/api/independent/gsc-month?month=2026-10');
+  need(session.panel==='unified-independent-v1'&&Array.isArray(month.daily)&&Array.isArray(month.mappings),'SEO_ANSWER_RUNTIME_PENDING');
+  need(month.available===true&&month.daily.length===31&&month.daily.every((r:any)=>r.verified===true&&Array.isArray(r.devices)&&r.fetched_at)&&month.mappings.length>0&&month.d1_requests===0,'SEO_ANSWER_PANEL_SCOPE_INVALID');
   need(typeof auto.evaluation?.content_change_recommended==='boolean','SEO_ANSWER_RUNTIME_PENDING');
   need(auto.source==='GSC Search Analytics API'&&typeof auto.product_id==='string'&&!!auto.product_id&&auto.filters.product===auto.product_id,'SEO_ANSWER_PRODUCT_SCOPE_INVALID');
   need(auto.month==='2026-10'&&auto.previous_month==='2026-09'&&auto.comparison&&auto.evaluation?.gsc,'SEO_ANSWER_GSC_COMPARISON_MISSING');
@@ -30,6 +43,6 @@ export default {async fetch(request:Request,env:Probe){
   need(JSON.stringify(periods)===JSON.stringify(['2026-09','2026-10'])&&refs.filter((r:any)=>r.source==='Google Analytics 4 Data API').length===2,'SEO_ANSWER_REFERENCES_INVALID');
   const joint=auto.evaluation.cross_source_page_decline,priority=auto.evaluation.review_priority;
   need(typeof joint==='boolean'&&['Öncelikli','Normal','Yok','Veri bekle'].includes(priority)&&auto.answer.includes('Ürün grubu toplamı tek URL performansı değildir.')&&(priority!=='Öncelikli'||joint&&ga4.delta<0&&auto.decision==='İncele'&&auto.answer.includes('İnceleme önceliği yüksek')),'SEO_ANSWER_REVIEW_SCOPE_INVALID');
-  return Response.json({verified:true,product_scope:true,periods,decision:auto.decision,decision_consistent:true,gsc_drop_verified:auto.comparison.delta<0,ga4_sessions_compared:true,ga4_drop_verified:ga4.delta<0,cross_source_page_decline:joint,review_priority:priority,content_change_recommended:false,changes_referenced:auto.evaluation.changes.length,change_dates_present:true,cause_confirmed:false,manual_ga4_respected:true,unsupported_ga4_explicit:true,city_misrouting:false,d1_requests:0});
+  return Response.json({verified:true,unified_panel:true,daily_chart_days:month.daily.length,product_mappings:month.mappings.length,product_scope:true,periods,decision:auto.decision,decision_consistent:true,gsc_drop_verified:auto.comparison.delta<0,ga4_sessions_compared:true,ga4_drop_verified:ga4.delta<0,cross_source_page_decline:joint,review_priority:priority,content_change_recommended:false,changes_referenced:auto.evaluation.changes.length,change_dates_present:true,cause_confirmed:false,manual_ga4_respected:true,unsupported_ga4_explicit:true,city_misrouting:false,d1_requests:0});
  }catch(error){const code=error instanceof Error&&/^SEO_ANSWER_[A-Z0-9_]+$/.test(error.message)?error.message:'SEO_ANSWER_INVALID';return Response.json({code},{status:503});}
 }};

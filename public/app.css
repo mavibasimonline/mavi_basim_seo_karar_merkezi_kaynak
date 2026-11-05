@@ -3333,3 +3333,24 @@ dialog::backdrop {
 /* Accessible link to the D1-independent verified evidence screen. */
 .sidebar-bottom .independent-seo-link{display:block;margin-bottom:12px;padding:10px 12px;border:1px solid #6881a8;border-radius:9px;background:#203858;color:#f4f8ff;text-decoration:none;font-size:14px;font-weight:700;line-height:1.4}
 .sidebar-bottom .independent-seo-link:hover,.sidebar-bottom .independent-seo-link:focus-visible{color:#ffffff;background:#355783;outline-offset:2px}
+/* Independent evidence uses the original dashboard palette and components. */
+#organicPanel { margin-top: 24px; }
+#organicPanel .table-scroll { max-height: 440px; }
+.organic-summary > strong { font-size: 1.5rem; color: var(--text, #14243e); }
+.organic-summary p { color: var(--muted, #64748b); line-height: 1.65; }
+.answer-text { white-space: pre-line; line-height: 1.8; overflow-wrap: anywhere; }
+.evidence-list { padding-left: 20px; line-height: 1.7; overflow-wrap: anywhere; }
+.change-card { padding: 20px 0; border-bottom: 1px solid var(--border, #e4e9f1); }
+.change-card h3, .product-name a { overflow-wrap: anywhere; }
+#radarResults .button { margin: 5px; }
+#analyticsConnections { flex-wrap: wrap; margin: 16px 0; }
+#questionSourceLabel { font-size: .8rem; color: var(--muted, #64748b); }
+#questionSourceLabel select { max-width: 240px; }
+#organicPanel .panel-heading label { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 700px) {
+  #organicPanel .panel-heading { flex-wrap: wrap; gap: 12px; }
+  #questionSourceLabel select { max-width: 180px; }
+  .question-tools { flex-wrap: wrap; }
+  #analyticsSelect { max-width: 100%; }
+  #analyticsProperty { max-width: 100%; }
+}

@@ -57,6 +57,7 @@ const state = {
 let controller,
   queryController,
   sessionEpoch = 0;
+let independentMode = false, independentPanel = null;
 const periodControl = setupPeriod(Object.keys(views), scopeChanged);
 state.view = periodControl.view;
 function syncCalendar() {
@@ -91,6 +92,7 @@ function notify(text = "") {
   $("message").hidden = !text;
 }
 function showLogin() {
+  independentPanel?.clear();
   document.body.classList.remove("is-loading");
   $("loadStatus").textContent = "";
 
@@ -140,6 +142,8 @@ function showLogin() {
   closeMobile();
 }
 async function api(path, options = {}) {
+  if (independentMode && !path.startsWith('/api/independent/') && !/^\/api\/session(?:$|\/logout$)/.test(path))
+    throw new Error('Bu özellik bağımsız veri kaynağında bulunmuyor.');
   const epoch = sessionEpoch;
   let response;
   try {
@@ -195,7 +199,23 @@ async function load(initial = false) {
   document.body.classList.add("is-loading");
   $("mainContent").setAttribute("aria-busy", "true");
   try {
-    if ((await api("/api/session", { signal })).landing === "/independent-seo.html")
+    const session = await api("/api/session", { signal });
+    if (session.panel === 'unified-independent-v1') {
+      independentMode = true;
+      if (!independentPanel) {
+        const {createIndependentPanel} = await import('/unified-seo.js');
+        independentPanel = createIndependentPanel({api,notify});
+      }
+      $("loginScreen").hidden = true;
+      $("app").hidden = false;
+      document.querySelector('.skip-link').href = '#mainContent';
+      await independentPanel.load(signal);
+      if (revision !== state.request) return;
+      periodControl.sync();
+      setView(views[location.hash.slice(1)] ? location.hash.slice(1) : state.view, false);
+      return;
+    }
+    if (session.landing === "/independent-seo.html")
       return location.replace("/independent-seo.html");
     const status = await api("/api/status", { signal });
     const selected = params().toString();
@@ -484,6 +504,7 @@ function renderKpis() {
   );
 }
 function renderChart() {
+  if (independentMode) return independentPanel?.chart(state.metric);
   const data = state.performance;
   $("chartPeriod").textContent =
     period(data.period) + " · " + deviceName(data.device);
@@ -656,6 +677,7 @@ function productChange(p) {
     : null;
 }
 function renderProducts() {
+  if (independentMode) return independentPanel?.products(state.productSort);
   if (!state.report) return;
   const search = $("productSearch").value.toLocaleLowerCase("tr-TR"),
     decision = $("decisionFilter").value,
@@ -896,6 +918,7 @@ function openProduct(p, summary = null) {
   $("productDialog").showModal();
 }
 async function loadQueries() {
+  if (independentMode) return independentPanel?.queries(state.queryPage);
   const revision = ++state.queryRequest;
   queryController?.abort();
   queryController = new AbortController();
@@ -1042,9 +1065,10 @@ function setView(view, focus = true) {
           ? "Bağımsız kaynak denetimi"
           : "Google Search Console · Web araması";
   closeMobile();
-  if (!state.report) return;
-  if (view === "queries") loadQueries();
-  if (modules[view] && !state.loaded[view]) {
+  if (independentMode) independentPanel?.view(view);
+  else if (!state.report) return;
+  if (!independentMode && view === "queries") loadQueries();
+  if (!independentMode && modules[view] && !state.loaded[view]) {
     state.loaded[view] = true;
     modules[view]();
   }
@@ -1243,6 +1267,7 @@ $("freshness").addEventListener("click", () => {
 });
 $("closeHelp").addEventListener("click", () => $("helpDialog").close());
 $("google").addEventListener("click", async () => {
+  if (independentMode) return independentPanel?.connect('gsc');
   try {
     const data = await api("/api/oauth/google/start", { method: "POST" }),
       url = new URL(data.authorization_url);
@@ -1269,6 +1294,7 @@ $("pilot").addEventListener("click", async () => {
 });
 $("question").addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (independentMode) return independentPanel?.ask();
   const b = e.currentTarget.querySelector("button"),
     questionScope = params().toString();
   b.disabled = true;
@@ -1334,7 +1360,7 @@ $("loadGscReview").addEventListener("click", async () => {
   }
 });
 setInterval(() => {
-  if (!document.hidden && !$("app").hidden && state.view === "radar")
+  if (!independentMode && !document.hidden && !$("app").hidden && state.view === "radar")
     modules.radar();
 }, 300000);
 load(true);
