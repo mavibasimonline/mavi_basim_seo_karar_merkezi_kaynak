@@ -3,7 +3,8 @@ import {buildInsights,metric} from './independent-insights';
 import {plannerLookup} from './independent-planner';
 export async function productSourceContext(answer:any,current:any,previous:any,product:any){
  const urls=new Set<string>(answer.filters?.page?[answer.filters.page]:product.urls||[product.canonical_url]),scope={device:answer.filters?.device||'ALL',country:answer.filters?.country};
- const narrow=(m:any)=>m?{...m,pages:(m.pages||[]).filter((r:any)=>urls.has(r.page)),queries:(m.queries||[]).filter((r:any)=>urls.has(r.page))}:null;
+ const selected=(r:any)=>urls.has(r.page)&&(!scope.country||r.country===scope.country)&&(scope.device==='ALL'||r.device===scope.device);
+ const narrow=(m:any)=>m?{...m,pages:(m.pages||[]).filter(selected),queries:(m.queries||[]).filter(selected)}:null;
  const now=narrow(current),old=narrow(previous),data=buildInsights(now,old,[product],scope),pages=data.pages.filter(r=>r.delta!==null&&r.delta<0).sort((a,b)=>a.delta!-b.delta!).slice(0,8);
  const losses=data.queries.filter(r=>r.delta!==null&&r.delta<0).sort((a,b)=>a.delta!-b.delta!).slice(0,8),keep=data.queries.filter(r=>r.comparison_available&&r.current&&r.previous&&r.current.clicks>=10&&r.current.impressions>=100&&r.current.clicks>=r.previous.clicks&&r.current.position<=r.previous.position+.5).slice(0,5);
  const devices=[...new Set([...(now.pages||[]),...(old?.pages||[])].map((r:any)=>r.device))].filter(d=>scope.device==='ALL'||d===scope.device).map(device=>{const current=metric((now.pages||[]).filter((r:any)=>r.device===device)),previous=data.comparison_available?metric((old?.pages||[]).filter((r:any)=>r.device===device)):null;return {device,current,previous,delta:current&&previous&&data.comparison_available?current.clicks-previous.clicks:null};});

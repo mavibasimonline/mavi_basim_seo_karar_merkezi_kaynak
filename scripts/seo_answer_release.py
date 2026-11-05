@@ -8,7 +8,7 @@ from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
 BASE='94d06990ad71712051391d4267762f4c5229ec9e'
-PARENT='c4370a2ebc54f812fce5a6a99568e4446bc00982'
+PARENT='48ea09341600e15c8e3a66faa198ec95c082138f'
 APP_SOURCE='94d06990ad71712051391d4267762f4c5229ec9e'
 TITLE='release: verified GSC history bootstrap 20261104'
 EXPECTED={'scripts/seo_answer_release.py', 'src/seo-history-analysis.ts', 'scripts/gsc_history_probe.ts', 'src/browser/insights-workspace.js', 'scripts/gsc_history_acceptance.py', 'scripts/seo-answer-probe.ts', 'src/browser/unified-seo-panel.js', 'src/drive-independent.ts', 'src/planner-bridge.ts', 'src/independent-planner.ts', 'public/unified-seo.js', 'src/independent-gsc.ts', 'src/generated/planner-data.ts', 'src/independent-gsc-totals.ts', 'src/index.ts', 'src/browser/evidence-detail.js', 'src/product-source-context.ts', 'public/seo/workspace.js', 'scripts/import_keywords.py', 'src/gsc-catchup.ts'}
