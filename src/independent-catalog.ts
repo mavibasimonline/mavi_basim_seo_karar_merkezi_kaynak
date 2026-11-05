@@ -17,10 +17,10 @@ export async function readCustomCatalog(storage:Storage,secret:string,context:In
  for(const p of saved.products){
   valid(p.source==='user-confirmed'&&p.id.startsWith('custom-')&&p.name.length>0&&p.name.length<=100&&categories.includes(p.category)
    &&gscPageURL(p.canonical_url)===p.canonical_url&&/^20\d\d-(0[1-9]|1[0-2])$/.test(p.source_month)
-   &&!base.has(p.canonical_url)&&!taken.has(p.canonical_url));
+   &&!taken.has(p.canonical_url));
   taken.add(p.canonical_url);
  }
- return {products:saved.products,revision:saved.revision};
+ return {products:saved.products.filter(p=>!base.has(p.canonical_url)),revision:saved.revision};
 }
 export async function addCustomProduct(storage:Storage,secret:string,context:IndependentContext|null,
  report:MonthlyGscAnalysisInput,input:unknown,time=new Date()){
