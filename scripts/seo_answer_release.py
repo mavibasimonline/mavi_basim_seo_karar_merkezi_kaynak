@@ -6,11 +6,11 @@ from cloudflare_diagnostics import Cloudflare
 from quota_observer_release import api,free_plan
 from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,deploy,rollback,verify_active_source,url_json,need,git
-BASE='067c0e6d593552766a00d731edab9ceeef63d279'
+BASE='a36ebd87c7b9dd872ab8e7ac10f961048bcbb83b'
 APP_SOURCE='35121b40966707e107bde67dd2bcd8766ccb67d9'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'src/independent-gsc-analysis.ts','src/independent-product-answer.ts','scripts/seo-answer-probe.ts','scripts/seo_answer_release.py'}
-PROTECTED=('src/index.ts','src/independent-session.ts','src/security.ts','src/drive-independent.ts','src/independent-seo-model.ts','src/drive-broker.ts','src/independent-gsc.ts','src/independent-gsc-bridge.ts','src/independent-gsc-bootstrap.ts','src/independent-gsc-report.ts','src/independent-ga4.ts','src/independent-context.ts','src/independent-context-bridge.ts','src/d1-read-budget.ts','public/app.js','public/independent-seo.js','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.drive-archive.jsonc')
+EXPECTED={'scripts/seo-answer-probe.ts','scripts/seo_answer_release.py'}
+PROTECTED=('src/index.ts','src/independent-session.ts','src/security.ts','src/drive-independent.ts','src/independent-gsc-analysis.ts','src/independent-product-answer.ts','src/independent-seo-model.ts','src/drive-broker.ts','src/independent-gsc.ts','src/independent-gsc-bridge.ts','src/independent-gsc-bootstrap.ts','src/independent-gsc-report.ts','src/independent-ga4.ts','src/independent-context.ts','src/independent-context-bridge.ts','src/d1-read-budget.ts','public/app.js','public/independent-seo.js','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.drive-archive.jsonc')
 
 def run():
  sha=os.environ.get('GITHUB_SHA','')
@@ -51,7 +51,15 @@ def run():
    deployed=True;deploy('deploy/wrangler.drive-archive.jsonc',sha)
    after=snapshot(client,ARCHIVE);verify_active_source(client,ARCHIVE,after['version'],sha)
    need(after['bindings']==before[ARCHIVE]['bindings'] and after['crons']==before[ARCHIVE]['crons'] and snapshot(client,APP)==before[APP],'SEO_ANSWER_CONFIGURATION_CHANGED')
-   proof=exchange('/accept');need(proof.get('verified') is True,'SEO_ANSWER_ACCEPTANCE_FAILED')
+   for attempt in range(10):
+    try:
+     proof=exchange('/accept');break
+    except ValueError as error:
+     # The control plane can switch before service-bound requests reach the new
+     # runtime. Retry only the missing new rule marker, never a semantic failure.
+     if str(error)!='SEO_ANSWER_RUNTIME_PENDING' or attempt==9:raise
+     time.sleep(3)
+   need(proof.get('verified') is True,'SEO_ANSWER_ACCEPTANCE_FAILED')
    need(snapshot(client,APP)==before[APP] and snapshot(client,ARCHIVE)==after,'SEO_ANSWER_PRODUCTION_DRIFT')
    print(json.dumps({'seo_answer_release':{'deployed':True,'source':sha,'archive_version':after['version'],'app_unchanged':True,'cron_unchanged':True,'source_datasets_unchanged':True,'proof':proof,'d1_requests':0,'new_billed_resources':False,'site_changed':False}}),flush=True)
  except Exception:

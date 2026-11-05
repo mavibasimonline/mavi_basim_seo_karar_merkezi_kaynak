@@ -15,6 +15,7 @@ export default {async fetch(request:Request,env:Probe){
   const auto=await call('Broşür neden düşüyor?'),direct=await call('Broşür neden düşüyor?',undefined,'gsc-questions'),manual=await call('Broşür neden düşüyor?','ga4');
   if(mode==='/before')return Response.json({auto_source:auto.source,auto_decision:auto.decision,gsc_decision:direct.decision,manual_ga4_source:manual.source,combined_evidence:!!auto.evaluation,d1_requests:0});
   const visitor=await call('Broşür organik ziyaretçileri neden düşüyor?'),unsupported=await call('Broşür anahtar kelimeleri neden düşüyor?','ga4');
+  need(typeof auto.evaluation?.content_change_recommended==='boolean','SEO_ANSWER_RUNTIME_PENDING');
   need(auto.source==='GSC Search Analytics API'&&typeof auto.product_id==='string'&&!!auto.product_id&&auto.filters.product===auto.product_id,'SEO_ANSWER_PRODUCT_SCOPE_INVALID');
   need(auto.month==='2026-10'&&auto.previous_month==='2026-09'&&auto.comparison&&auto.evaluation?.gsc,'SEO_ANSWER_GSC_COMPARISON_MISSING');
   need(auto.decision===direct.decision&&auto.decision===visitor.decision&&JSON.stringify(auto.comparison)===JSON.stringify(direct.comparison)&&JSON.stringify(auto.comparison)===JSON.stringify(visitor.comparison),'SEO_ANSWER_DECISION_CONFLICT');
