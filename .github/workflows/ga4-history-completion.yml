@@ -1,0 +1,45 @@
+name: GA4 Haziran-Ağustos güvenli geçmiş tamamlama
+on:
+  workflow_run:
+    workflows: ["Kontrollü D1 bağımsız SEO yayını"]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: ga4-historical-backfill
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Aynı doğrulanmış kaynak sürümü koru
+        id: guard
+        env:
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ "$VERIFIED_SHA" != "$(git rev-parse HEAD)" ]; then exit 0; fi
+          if [ "$(git log -1 --format=%s)" != 'release: verified GSC history bootstrap 20261104' ]; then exit 0; fi
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        if: steps.guard.outputs.ready == 'true'
+        with:
+          node-version: '24'
+      - if: steps.guard.outputs.ready == 'true'
+        run: npm ci --ignore-scripts --no-fund
+      - name: Gizli Cloudflare hizmet bağlantısı ile GA4 geçmişini tamamla
+        if: steps.guard.outputs.ready == 'true'
+        run: python3 scripts/ga4_history_completion.py
