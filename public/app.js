@@ -94,7 +94,8 @@ function notify(text = "") {
   $("message").textContent = text;
   $("message").hidden = !text;
 }
-function showLogin() {
+function showLogin(preserveToken = false) {
+  const enteredToken = preserveToken ? $("token").value : "";
   independentPanel?.clear();
   document.body.classList.remove("is-loading");
   $("loadStatus").textContent = "";
@@ -117,7 +118,7 @@ function showLogin() {
   $("questionText").value = "";
   $("querySearch").value = "";
   $("productSearch").value = "";
-  $("token").value = "";
+  $("token").value = enteredToken;
   $("answer").hidden = true;
   for (const id of [
     "products",
@@ -163,7 +164,8 @@ async function api(path, options = {}) {
     if (response.status !== 204) data = await response.json();
   } catch (cause) {
     if (cause.name === "AbortError") throw cause;
-    if (response.status === 401) showLogin();
+    if (epoch !== sessionEpoch) throw new DOMException("Oturum değişti", "AbortError");
+    if (response.status === 401) showLogin(path === "/api/session" && options.method !== "POST" && $("app").hidden);
     const error = new Error(
       "Sunucudan beklenen yanıt alınamadı. Lütfen yeniden deneyin.",
     );
@@ -173,7 +175,7 @@ async function api(path, options = {}) {
   if (epoch !== sessionEpoch)
     throw new DOMException("Oturum değişti", "AbortError");
   if (!response.ok) {
-    if (response.status === 401) showLogin();
+    if (response.status === 401) showLogin(path === "/api/session" && options.method !== "POST" && $("app").hidden);
     const error = new Error(data?.error || "İstek tamamlanamadı.");
     error.status = response.status;
     throw error;
@@ -1186,6 +1188,8 @@ $("login").addEventListener("submit", async (e) => {
   e.preventDefault();
   const button = e.currentTarget.querySelector("button");
   button.disabled = true;
+  sessionEpoch++;
+  state.request++;
   controller?.abort();
   notify();
   try {
