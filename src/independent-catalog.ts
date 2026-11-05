@@ -8,7 +8,7 @@ export type CustomProduct=ContextProduct&{category:string;source:'user-confirmed
 type Saved={version:1;based_on:string;revision:string;products:CustomProduct[];updated_at:string};
 const KEY='catalog:custom:v1';
 const categories=['Broşürler ve El İlanları','Reklam Ürünleri','Kurumsal Ürünler','Makbuz ve Formlar','Diğer Sayfalar'];
-const valid=(ok:unknown):asserts ok=>{if(!ok)throw Error('CATALOG_MAPPING_INVALID');};
+const valid:(ok:unknown)=>asserts ok=(ok)=>{if(!ok)throw Error('CATALOG_MAPPING_INVALID');};
 export async function readCustomCatalog(storage:Storage,secret:string,context:IndependentContext|null){
  const cipher=await storage.get<string>(KEY);if(!cipher)return {products:[] as CustomProduct[],revision:null as string|null};
  const saved=await decrypt<Saved>(cipher,secret);
@@ -16,7 +16,7 @@ export async function readCustomCatalog(storage:Storage,secret:string,context:In
  const base=new Set(context?.products.map(p=>p.canonical_url)||[]),taken=new Set<string>();
  for(const p of saved.products){
   valid(p.source==='user-confirmed'&&p.id.startsWith('custom-')&&p.name.length>0&&p.name.length<=100&&categories.includes(p.category)
-   &&gscPageURL(p.canonical_url)===p.canonical_url&&/^20\\d\\d-(0[1-9]|1[0-2])$/.test(p.source_month)
+   &&gscPageURL(p.canonical_url)===p.canonical_url&&/^20\d\d-(0[1-9]|1[0-2])$/.test(p.source_month)
    &&!base.has(p.canonical_url)&&!taken.has(p.canonical_url));
   taken.add(p.canonical_url);
  }
