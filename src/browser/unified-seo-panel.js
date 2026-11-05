@@ -29,7 +29,7 @@ export function createIndependentPanel({api,notify}){
  document.querySelector('[data-view="products"]').setAttribute('aria-label','Ürün & Canlı Sayfa Analizi');
  document.querySelector('[data-view="products"] .nav-label').textContent='Ürün & Canlı Sayfa Analizi';
  $('leadersTitle').textContent='İlk 5 Lider Ürün';
- let current=[],previous=null,ga4=null,oldGa4=null,status=null,ga4Status=null,changes=null,archive=null,catalog=null,workspace=null,workspacePromise=null,activeView='overview',errors=[],revision=0,queryPage=1,first=true,metric='clicks',sort={key:'clicks',direction:'desc'};
+ let current=[],previous=null,ga4=null,oldGa4=null,status=null,ga4Status=null,changes=null,archive=null,catalog=null,workspace=null,workspacePromise=null,history=null,historyPromise=null,activeView='overview',errors=[],revision=0,queryPage=1,first=true,metric='clicks',sort={key:'clicks',direction:'desc'};
  const cache=new Map();
  const target=()=>$('month').value,device=()=>$('device').value;
  const selectedRows=raw=>(raw?.pages||[]).filter(r=>device()==='ALL'||r.device===device());
@@ -39,6 +39,7 @@ export function createIndependentPanel({api,notify}){
    workspacePromise=import('./seo/workspace.js').then(({createInsightsWorkspace})=>workspace=createInsightsWorkspace({api,read,table,evidence,openProduct,ask,notify,scope:()=>({current,previous,ga4,oldGa4,status,ga4Status,changes,catalog,month:target(),device:device(),revision})})).catch(()=>{workspacePromise=null;throw Error('Analiz ekranı şu an yüklenemedi. Yenilemeyi deneyin.');});
   }return workspacePromise;
  }
+ function historyModule(){if(!historyPromise)historyPromise=import('./seo/history.js').then(({createHistoryWorkspace})=>history=createHistoryWorkspace({read,notify,evidence,scope:()=>({catalog,month:target(),device:device(),revision})})).catch(()=>{historyPromise=null;throw Error('Geçmiş ekranı yüklenemedi.');});return historyPromise;}
  const complete=()=>current.length===Number($('rangeMonths').value)&&current.every(r=>r.available);
  const productsData=()=>mappings().map(p=>{
   const now=complete()?sum(current.flatMap(selectedRows).filter(r=>(p.urls||[p.canonical_url]).includes(r.page))):null;
@@ -46,7 +47,7 @@ export function createIndependentPanel({api,notify}){
   return {...p,current:now,previous:before,delta:now&&before?now.clicks-before.clicks:null,decision:comparisonDecision(now,before)};
  });
  async function read(path,signal){
-  const saved=cache.get(path);if(saved&&Date.now()-saved.at<300000)return saved.value;
+  const saved=cache.get(path);if(saved&&Date.now()-saved.at<(path.startsWith('seo-history')?60000:300000))return saved.value;
   const timeout=AbortSignal.timeout(30000),combined=signal?AbortSignal.any([signal,timeout]):timeout;const value=await api('/api/independent/'+path,{signal:combined});if(cache.size>=40)cache.delete(cache.keys().next().value);cache.set(path,{at:Date.now(),value});return value;
  }
  function coverage(){
@@ -116,13 +117,7 @@ export function createIndependentPanel({api,notify}){
    if(!items.length)section.append(node('p','Bu karar için kayıt yok.'));root.append(section);
   }
  }
- function calendar(day=null){
-  const refs=(catalog?.changes?.map(e=>({...e,event_id:e.id,source_hash:catalog.source_hash,observed_interval:{from:e.observed_from,to:e.observed_to}}))||changes?.evidence_refs||[]).filter(r=>!day?r.observed_interval?.from?.slice(0,7)<=target()&&r.observed_interval?.to?.slice(0,7)>=target():r.observed_interval?.from?.slice(0,10)<=day&&r.observed_interval?.to?.slice(0,10)>=day),root=$('changeResults');
-  root.replaceChildren(node('p',changes?.answer||'Değişiklik kaynağı doğrulanamadı.'));
-  if(!refs.length)root.append(empty('Bu kapsamda değişiklik kanıtı yok','Sınırlı arşivde kayıt bulunmaması, değişiklik yapılmadığını kanıtlamaz.'));
-  for(const r of refs){const card=node('article',null,'change-card');card.append(node('h3',r.url),node('p',r.publication_evidence?'Kanıtlı yayın: '+stamp(r.published_at):'Kesin yayın zamanı bilinmiyor. Tarama aralığı: '+stamp(r.observed_interval?.from)+' — '+stamp(r.observed_interval?.to)),node('p','Değişen alanlar: '+(r.changed_fields||[]).join(', ')),node('p','Başlık: '+r.before?.title+' → '+r.after?.title),node('p','H1: '+(r.before?.h1||[]).join(' / ')+' → '+(r.after?.h1||[]).join(' / ')),evidence([r]));root.append(card);}
-  root.append(node('p','Mevcut doğrulanmış arşivdeki ilgili bütün kayıtlar kullanılır. Tarama aralığı bir yayın günü veya düşüş nedeni değildir.'));
- }
+ function calendar(day=null){const at=revision;historyModule().then(w=>{if(at===revision&&!$('app').hidden)return w.render('changes',day);}).catch(e=>notify(e.message));}
  function health(){
   const seen=new Set((status?.coverage||[]).map(r=>r.day+':'+r.scope));
   const root=$('dataAuditResults');root.replaceChildren(node('h3','Kaynaklar ve otomatik çalışma'),node('p','Günlük GSC: '+seen.size+'/14 kayıt · '+(status?.connected?'Google izni kayıtlı':'Bağlantı doğrulanmadı')),node('p',coverage()),node('p',current.map(r=>r.month+': '+(r.query_days_verified||0)+'/'+(r.expected_days||0)+' görünür sorgu günü').join(' · ')),node('p','Son Cron: '+stamp(status?.cron?.last?.scheduled_at)+' · '+(status?.cron?.last?.status||'Doğrulanmadı')),node('p','GA4: '+(ga4Status?.property?ga4Status.property.name+' · '+ga4Status.property.id:'Doğrulanmış mülk bekleniyor')+' · '+(ga4Status?.connected?'İzin kayıtlı':'İzin doğrulanmadı')),node('p','Son GA4 otomasyonu: '+stamp(ga4Status?.cron?.scheduled_at)),node('p','Değişiklik kaynağı: '+stamp(changes?.captured_at)+' · '+(changes?.source_hash||'Doğrulanmadı')),node('p','Veriler bağımsız kayıt deposundan okunur. Arşiv ve D1 koruması korunur. Eksik veri sıfır trafik değildir.'),...(status?.last_failure?[node('p','Son GSC hata kaydı: '+stamp(status.last_failure.at)+' · '+status.last_failure.code)]:[]),...errors.map(e=>node('p',e)),evidence(current.flatMap(r=>r.evidence||[])));
@@ -139,7 +134,7 @@ export function createIndependentPanel({api,notify}){
   if(['comparison','products','opportunities','impact'].includes(name)){const at=revision;workspaceModule().then(w=>{if(at===revision&&activeView===name&&!$('app').hidden)return w.render(name);}).catch(e=>notify(e.message));}
   $('scopeLabel').textContent=name==='changes'?'Doğrulanmış tarama aralıkları · UTC':name==='health'?'GSC · GA4 · Arşiv sağlığı':'GSC arama performansı · GA4 ziyaret ölçümleri';
   if(name==='queries')queries();if(name==='radar')radar();if(name==='changes')calendar();if(name==='health'){
-   health();if(!archive){const at=revision,month=target();read('report?month='+month).then(value=>{if(at===revision){archive=value;health();}}).catch(e=>{if(at===revision)$('summary').textContent='Eski aylık arşiv şu an okunamadı: '+e.message+'. GSC/GA4 ölçümleri ayrı gösteriliyor.';});}
+   health();const at=revision;historyModule().then(w=>{if(at===revision&&activeView==='health'&&!$('app').hidden)return w.render('health');}).catch(e=>notify(e.message));if(!archive){const at=revision,month=target();read('report?month='+month).then(value=>{if(at===revision){archive=value;health();}}).catch(e=>{if(at===revision)$('summary').textContent='Eski aylık arşiv şu an okunamadı: '+e.message+'. GSC/GA4 ölçümleri ayrı gösteriliyor.';});}
   }
  }
  async function ask(question=$('questionText').value,root=$('answer'),choice=$('questionSource').value){
@@ -159,7 +154,7 @@ export function createIndependentPanel({api,notify}){
  async function load(signal){
   const at=++revision;if(first){first=false;if(target()>closedMonth())$('month').value=closedMonth();}
   const month=target(),n=Number($('rangeMonths').value),months=Array.from({length:n},(_,i)=>prior(month,n-i-1));
-  workspace?.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;changes=null;archive=null;catalog=null;errors=[];queryPage=1;
+  workspace?.clear();history?.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;changes=null;archive=null;catalog=null;errors=[];queryPage=1;
   $('groupFilter').hidden=true;$('groupFilter').value='';$('pilot').hidden=true;$('loadGscReview').closest('section').hidden=true;$('questionSourceLabel').hidden=false;
   $('freshness').replaceChildren(node('span',null,'status-dot'),node('span','Doğrulanmış kaynaklar okunuyor'));
   const jobs=[...months,...(n===1?[prior(month)]:[])],results=[];
@@ -175,7 +170,7 @@ export function createIndependentPanel({api,notify}){
   $('export').hidden=false;$('export').href='#';$('exportLabel').textContent='GSC ölçümlerini indir';
   products();kpis();chart();organic();health();notify();
  }
- function clear(){revision++;workspace?.clear();cache.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;changes=null;archive=null;catalog=null;$('organicTable').replaceChildren();$('organicSummary').replaceChildren();}
+ function clear(){revision++;workspace?.clear();history?.clear();cache.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;changes=null;archive=null;catalog=null;$('organicTable').replaceChildren();$('organicSummary').replaceChildren();}
  $('organicFacet').addEventListener('change',organic);
  for(const [id,delta] of [['queryPrevious',-1],['queryNext',1]])$(id).addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();queries(Math.max(1,Number($('queryPage').dataset.page||queryPage)+delta));},true);
  for(const [id,handler] of [['showChanges',()=>calendar($('changeDay').value)],['runDataAudit',()=>{cache.clear();$('refresh').click();}]])$(id).addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();handler();},true);

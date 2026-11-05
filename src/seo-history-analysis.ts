@@ -1,0 +1,41 @@
+// GSC month evidence remains a separate observation, never a causal SEO claim.
+import {historyDetail,listHistory,historyStatus} from './seo-history';
+import {metric} from './independent-insights';
+import {comparisonDecision} from './independent-gsc-analysis';
+const shift=(m:string,n:number)=>new Date(Date.UTC(Number(m.slice(0,4)),Number(m.slice(5))-1+n,1)).toISOString().slice(0,7);
+const providerMonth=(s:string)=>{const p=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit'}).formatToParts(new Date(s));return p.find(v=>v.type==='year')!.value+'-'+p.find(v=>v.type==='month')!.value;};
+export function historyIntent(q:string){return /degis|guncelle|baslik|meta description|kanonik|canonical|\bh1\b/.test(q)&&/neler|ne zaman|gecmis|degis|guncelle|sonuc|etki/.test(q);}
+export function historyEventRef(e:any){return {source:'Doğrulanmış SEO değişiklik arşivi',source_hash:e.record_hash,event_id:e.id,url:e.url,changed_fields:e.changed_fields,
+ observed_interval:{from:e.observed_from,to:e.observed_to},published_at:e.publication_evidence?e.published_at:null,publication_evidence:e.publication_evidence,
+ before:e.before?{...e.before.fields,id:e.before.id,observed_at:e.before.observed_at,content_hash:e.before.content_hash,h1:Array.isArray(e.before.fields.headings)?e.before.fields.headings.filter((h:any)=>h.level===1).map((h:any)=>h.text):null}:null,
+ after:e.after?{...e.after.fields,id:e.after.id,observed_at:e.after.observed_at,content_hash:e.after.content_hash,h1:Array.isArray(e.after.fields.headings)?e.after.fields.headings.filter((h:any)=>h.level===1).map((h:any)=>h.text):null}:null};}
+export async function historyImpact(storage:any,secret:string,id:string,selectedMonth:string,device:string,readMonth:(month:string)=>Promise<any>){
+ if(!/^20\d\d-(0[1-9]|1[0-2])$/.test(selectedMonth)||!['ALL','MOBILE','DESKTOP','TABLET'].includes(device))throw Error('HISTORY_FILTER_INVALID');
+ const e=await historyDetail(storage,secret,'event',id);if(!e)return null;
+ const beforeMonth=shift(providerMonth(e.observed_from),-1),transitionFrom=providerMonth(e.observed_from),transitionTo=providerMonth(e.observed_to),afterMonth=shift(transitionTo,1);
+ const months=[...new Set([beforeMonth,afterMonth,selectedMonth,shift(selectedMonth,-1)])];
+ const observations=[];
+ for(const month of months){
+  let source:any=null;try{source=await readMonth(month);}catch{/* Future, unclosed or missing periods remain unknown. */}
+  const verified=source?.source==='GSC Search Analytics API'&&source.available===true&&source.days_verified===source.expected_days&&source.evidence?.some((r:any)=>r.scope==='page');
+  const rows=verified?(source.pages||[]).filter((r:any)=>r.page===e.url&&(device==='ALL'||r.device===device)):[];
+  observations.push({month,role:month===beforeMonth?'Değişiklik aralığından önceki tam ay':month===afterMonth?'Aralıktan sonraki ilk tam ay':month>=transitionFrom&&month<=transitionTo?'Tarama aralığıyla kesişen ay; temiz sonrası dönem değil':'Seçili aylık bağlam',metrics:verified?metric(rows):null,verified:verified&&rows.length>0,days_verified:source?.days_verified||0,expected_days:source?.expected_days||null,evidence:source?.evidence?.filter((r:any)=>r.scope==='page')||[]});
+ }
+ observations.sort((a,b)=>a.month.localeCompare(b.month));
+ const before=observations.find(r=>r.month===beforeMonth),after=observations.find(r=>r.month===afterMonth),comparable=!!before?.verified&&!!after?.verified&&!!before.metrics&&!!after.metrics;
+ return {event:e,source:'GSC Search Analytics API + doğrulanmış SEO değişiklik arşivi',url:e.url,device,country:'ALL',timezone:'America/Los_Angeles',observations,
+  before_month:beforeMonth,after_month:afterMonth,transition:{from:e.observed_from,to:e.observed_to},comparison:comparable?{previous:before!.metrics,current:after!.metrics,click_delta:after!.metrics!.clicks-before!.metrics!.clicks}:null,
+  decision:comparable?comparisonDecision(after!.metrics,before!.metrics):'Veri bekle',cause_confirmed:false,content_change_recommended:false,d1_requests:0,
+  limitations:['Tarama aralığıyla kesişen ay değişiklik sonrası etki ölçümü değildir.','Aylık dönemler farklı gün sayısına sahip olabilir; diğer değişiklikler, talep ve mevsimsellik elenmedi.','GSC tıklaması GA4 oturumu değildir; eksik ay veya URL satırı sıfır sayılmaz.','Korelasyon kesin neden değildir; kanıtlı neden olmadan içerik veya yönlendirme değiştirme.']};
+}
+export async function answerHistory(storage:any,secret:string,question:string,month:string,urls:string[],device:string,readMonth:(month:string)=>Promise<any>){
+ const page=await listHistory(storage,secret,{urls,kind:'event'}),status=page.coverage,latest=page.items[0];
+ const impact=latest?await historyImpact(storage,secret,latest.id,month,device,readMonth):null;
+ const details=[];for(const e of page.items.slice(0,4)){const value=await historyDetail(storage,secret,'event',e.id);if(value)details.push(value);}
+ const refs=details.map(historyEventRef),observations=impact?.observations||[],gscRefs=observations.flatMap(r=>r.evidence);
+ const format=(v:unknown)=>v===null||v===undefined?'kaynakta bulunmuyor':typeof v==='string'?JSON.stringify(v):JSON.stringify(v);
+ const changes=details.map(e=>e.observed_from+' — '+e.observed_to+' · '+e.url+' · '+(e.publication_evidence?'kanıtlı yayın '+e.published_at:'kesin yayın tarihi bilinmiyor')+' · değişen alanlar: '+e.changed_fields.join(', ')+(e.details_available&&e.content_comparable?' · title '+format(e.before.fields.title)+' → '+format(e.after.fields.title)+' · meta description '+format(e.before.fields.description)+' → '+format(e.after.fields.description)+' · H1 '+format(refs.find(r=>r.event_id===e.id)?.before?.h1)+' → '+format(refs.find(r=>r.event_id===e.id)?.after?.h1)+' · canonical '+format(e.before.fields.canonical)+' → '+format(e.after.fields.canonical)+' · içerik hash '+format(e.before.fields.body_hash)+' → '+format(e.after.fields.body_hash)+(Array.isArray(e.before.fields.links)&&Array.isArray(e.after.fields.links)?' · bağlantı farkı '+e.after.fields.links.filter((u:string)=>!e.before.fields.links.includes(u)).length+' eklenen / '+e.before.fields.links.filter((u:string)=>!e.after.fields.links.includes(u)).length+' kaldırılan':' · bağlantı karşılaştırması kaynakta doğrulanmadı'):e.details_available?' · İki başarılı HTML kaydı yok; hata/yönlendirme gövdesi SEO içerik değişikliği sayılmaz':' · eski/yeni tarama ayrıntılarının aktarımı bekleniyor')).join('\n');
+ const performance=observations.map(r=>r.month+' ('+r.role+'): '+(r.metrics&&r.verified?r.metrics.clicks+' GSC tıklama, '+r.metrics.impressions+' gösterim, CTR %'+(r.metrics.ctr*100).toFixed(2)+', ortalama konum '+(r.metrics.impressions?r.metrics.position.toFixed(2):'doğrulanmadı'):'Veri bekle; karşılaştırılabilir tam ay/URL kaydı yok')).join('\n');
+ const answer='Kanıt: '+(latest?changes:'Bu filtre için bağımsız arşivde değişiklik kaydı yok; değişiklik yapılmadığını kanıtlamaz.')+'\nKapsam: '+page.items.length+' olay bu sayfada; ilk '+details.length+' olayın eski/yeni ayrıntıları yukarıda; '+status.events+' olay ve '+status.snapshots+' tarama arşivde. '+(status.caught_up?'Kaynakta o an bulunan kayıtların sayfalı aktarımı tamamlandı.':'Geçmiş aktarımı bekliyor; eski kayıt kapsamı tam doğrulanmadı.')+(page.next_cursor?' Diğer kayıtlar Değişiklik Takvimi’nde sayfalanabilir.':'')+'\nGSC · '+device+' · tüm ülkeler · aynı tam URL · America/Los_Angeles:\n'+(performance||'Aylık performans bu kapsamda doğrulanmadı.')+'\nYorum: Son olaya göre önceki tam ay ile tarama aralığından sonraki ilk tam ay ayrı gösterildi. Seçili ay değişiklik aralığıyla kesişiyorsa tamamını sonrasına mal etme. Tarih çakışması kesin neden değildir.\nSEO kararı: '+(impact?.decision||'Veri bekle')+'. İncele, sayfayı değiştir demek değildir; kanıtlı neden olmadan içerik değişikliği önerilmez.';
+ return {answer,question,month,source:'Doğrulanmış SEO değişiklik arşivi + GSC Search Analytics API',decision:impact?.decision||'Veri bekle',available:!!latest,history_scope:{urls,coverage:status,next_cursor:page.next_cursor},evidence_refs:[...refs,...gscRefs],evidence:[...refs.map(r=>r.source_hash+':'+r.event_id),...gscRefs.map((r:any)=>'gsc:'+r.day+':'+r.generation)],impact,content_change_recommended:false,cause_confirmed:false,d1_requests:0};
+}

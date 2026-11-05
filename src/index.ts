@@ -21,6 +21,7 @@ import {monthlyRoute} from './monthly-route';
 import {independentSession} from './independent-session';
 import {independentRefreshDue,refreshIndependentSheets} from './independent-refresh';
 import {independentGscCron,independentGscBootstrapCron,independentGa4Cron} from './independent-gsc-bridge';
+import {syncSeoHistory} from './seo-history-bridge';
 import {independentContextCron} from './independent-context-bridge';
 export {MonthlyReportSource} from './monthly-source';
 export {DriveGoogleBroker} from './drive-broker';
@@ -219,6 +220,7 @@ export default {
       // Optional bounded metadata copy has its own budget. Its failure never
       // gates daily collection or reads from a user-facing GSC report.
       await independentContextCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);
+      try{await syncSeoHistory(env,'Cloudflare Cron',time.toISOString());}catch{/* History never gates existing collection. */}
       const result=await tick(env,fetch,time,'cron');
       if(time.getUTCMinutes()%15!==0)return;
     }catch(error){

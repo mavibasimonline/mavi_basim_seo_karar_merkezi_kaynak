@@ -1,5 +1,7 @@
 // Independent Drive OAuth + serialized archive storage. Intentionally no DB/D1 binding.
 import {DurableObject} from 'cloudflare:workers';
+import {historyStatus,claimHistory,saveHistoryPage,holdHistory,listHistory,historyDetail} from './seo-history';
+import {historyIntent,historyImpact,answerHistory} from './seo-history-analysis';
 import {encrypt,decrypt,cookie,equalSecret} from './security';
 import {hash,json} from './types';
 import {boundedText,ProviderError} from './google';
@@ -292,6 +294,16 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
       const collector=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
       return json({...await collector.status(),cron:await gscCronProof(this.ctx.storage),connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')});
     }
+    if(path.startsWith('/api/internal/seo-history/')){
+     const action=path.split('/').at(-1);
+     if(action==='status'&&request.method==='GET')return json(await historyStatus(this.ctx.storage));
+     if(request.method!=='POST')return json({code:'HISTORY_METHOD_INVALID'},405);
+     const body=JSON.parse(await boundedText(new Response(request.body),2_000_000));
+     if(action==='claim')return json(await claimHistory(this.ctx.storage,body));
+     if(action==='page')return json(await saveHistoryPage(this.ctx.storage,this.key(),body));
+     if(action==='held')return json(await holdHistory(this.ctx.storage,body));
+     return json({code:'HISTORY_ROUTE_INVALID'},404);
+    }
     if(path==='/api/internal/independent-refresh'&&request.method==='POST'){
       const snapshot=await this.independentSnapshot(6*3600000);
       const report=independentReport(snapshot.records,undefined,snapshot.captured_at,snapshot.quarantined_records);
@@ -310,7 +322,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     if(request.method==='POST'&&(path==='/api/drive-independent/start'||path==='/api/oauth/google/start'&&url.searchParams.get('purpose')==='drive'))return await this.start();
     if(request.method==='GET'&&(path==='/api/drive-independent/status'||path==='/api/drive/status'))return json({connected:!!await this.ctx.storage.get('oauth'),storage:'durable-object-sqlite',d1_requests:0,last_archive:await this.ctx.storage.get('last_archive')||null,last_error:await this.ctx.storage.get('last_error')||null,next_run:await this.ctx.storage.getAlarm(),scope:SCOPE});
     return json({error:'Bulunamadı.'},404);
-   }catch(error){return json({error:'Kaynak işlemi tamamlanamadı.',code:error instanceof ProviderError?error.code:error instanceof Error&&/^(GA4_|GSC_|INDEPENDENT_CONTEXT_)[A-Z0-9_]+$/.test(error.message)?error.message:'DRIVE_UNAVAILABLE'},400);}
+   }catch(error){return json({error:'Kaynak işlemi tamamlanamadı.',code:error instanceof ProviderError?error.code:error instanceof Error&&/^(GA4_|GSC_|INDEPENDENT_CONTEXT_|HISTORY_)[A-Z0-9_]+$/.test(error.message)?error.message:'DRIVE_UNAVAILABLE'},400);}
   });
  }
  private async independentSnapshot(maxAgeMs=6*3600000){
@@ -337,6 +349,14 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
  private async independentRoute(request:Request){
   try{
    const url=new URL(request.url),path=url.pathname;
+   if(path.startsWith('/api/independent/seo-history')&&request.method==='GET'){
+    if(path.endsWith('/status'))return json(await historyStatus(this.ctx.storage));
+    if(path.endsWith('/detail')){const detail=await historyDetail(this.ctx.storage,this.key(),url.searchParams.get('kind')||'event',url.searchParams.get('id')||'');return detail?json(detail):json({code:'HISTORY_RECORD_NOT_ARCHIVED'},404);}
+    if(path.endsWith('/impact')){const result=await historyImpact(this.ctx.storage,this.key(),url.searchParams.get('id')||'',url.searchParams.get('month')||'',url.searchParams.get('device')||'ALL',m=>this.gscMonth(m));return result?json(result):json({code:'HISTORY_RECORD_NOT_ARCHIVED'},404);}
+    const context=await readIndependentContext(this.ctx.storage),catalog=await resolvedCatalog(this.ctx.storage,this.key(),context),productId=url.searchParams.get('product'),product=productId?catalog.products.find(p=>p.id===productId):null;
+    if(productId&&!product)return json({code:'HISTORY_PRODUCT_INVALID'},400);
+    return json(await listHistory(this.ctx.storage,this.key(),{kind:url.searchParams.get('kind')||'event',url:url.searchParams.get('url')||undefined,urls:product?.urls,from:url.searchParams.get('from')||undefined,to:url.searchParams.get('to')||undefined,type:url.searchParams.get('type')||undefined,cursor:url.searchParams.get('cursor')||undefined}));
+   }
    if(path==='/api/independent/catalog'&&request.method==='GET'){
      const context=await readIndependentContext(this.ctx.storage),custom=await resolvedCatalog(this.ctx.storage,this.key(),context);
      return json({available:!!context,products:custom.products.map(p=>({...p,category:categoryOf(p)})),category_source:'Kaynak katalog ve kullanıcı onaylı GSC sayfaları',catalog_revision:custom.revision,changes:context?.changes||[],snapshots:context?.snapshots||[],source:context?.source||null,source_hash:context?.source_hash||null,captured_at:context?.captured_at||null,coverage:context?.coverage||null,limitations:context?.limitations||[],read_only:false,d1_requests:0});
@@ -397,6 +417,12 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
      if(!context)return json({answer:'Kanıt: doğrulanmış ürün kataloğu ve kapsam bilgisi şu an okunamadı; sayfalar eşlenmemiş veya sıfır kabul edilmedi. SEO kararı: veri bekle.',source:'GSC Search Analytics API',month,decision:'Veri bekle',evidence:[],evidence_refs:[],d1_requests:0});
      const current=await this.gscMonth(month),previous=await this.gscMonth(previousMonth).catch(()=>undefined);
      return json(answerInsightQuestion(current,previous,context.products,body.question,intent,{device:/mobil|mobile/.test(q)?'MOBILE':/masaustu|desktop/.test(q)?'DESKTOP':/tablet/.test(q)?'TABLET':undefined,product:product?.id,page:product?.canonical_url}));
+    }
+    if(!manualGa4&&body.source!=='archive'&&historyIntent(q)){
+     const exact=(body.question.match(/https?:\/\/[^\s<>"')]+/g)||[]).filter(u=>/^https?:\/\/(?:www\.)?mavibasim\.com(?:\/|$)/.test(u));
+     const urls=product?.urls||exact;
+     if(!urls.length)return json({answer:'Doğrulanmış ürün adı veya tam URL ile geçmişi seçin. Sayfa ilişkisi veya kaydı bulunmayan geçmiş tahmin edilmez.',source:'Doğrulanmış SEO değişiklik arşivi',month,decision:'Veri bekle',evidence_refs:[],d1_requests:0});
+     return json(await answerHistory(this.ctx.storage,this.key(),body.question,month,urls,/mobil|mobile/.test(q)?'MOBILE':/masaustu|desktop/.test(q)?'DESKTOP':/tablet/.test(q)?'TABLET':'ALL',m=>this.gscMonth(m)));
     }
     const geographic=/sehir|ilce|bolge|istanbul|ankara|izmir|bursa|antalya/.test(q);
     const changeQuestion=/degisiklik gecmis|gecmis degis|icerik.*degis|neleri degist|ne zaman|baslik|meta|yayin|kanonik|canonical|\bh1\b/.test(q);

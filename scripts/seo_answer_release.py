@@ -7,11 +7,11 @@ from quota_observer_release import api,free_plan
 from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
-BASE='788055bca107c48e3450020f3756c3eef9a63925'
-APP_SOURCE='bae95476734a411fd06b3f799fdb80deddf07037'
+BASE='98917869af739ad5a2112dc785c0a65c47d8a2fe'
+APP_SOURCE='98917869af739ad5a2112dc785c0a65c47d8a2fe'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'scripts/seo_answer_release.py'}
-PROTECTED=('src/index.ts', 'src/independent-gsc-analysis.ts', 'public/app.css', 'public/chart.js', 'src/independent-product-answer.ts', 'src/independent-session.ts', 'src/security.ts', 'src/independent-seo-model.ts', 'src/drive-broker.ts', 'src/independent-gsc.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc-bootstrap.ts', 'src/independent-ga4.ts', 'src/independent-context-bridge.ts', 'src/independent-cron-proof.ts', 'src/independent-refresh.ts', 'src/independent-snapshot.ts', 'src/drive-records.ts', 'src/d1-read-budget.ts', 'public/ui.js', 'public/period.js', 'public/independent-seo.js', 'public/independent-seo.html', 'deploy/wrangler.monthly-app.jsonc', 'deploy/wrangler.drive-archive.jsonc', 'src/independent-gsc-totals.ts', 'src/drive-independent.ts', 'src/independent-catalog.ts', 'src/independent-context.ts', 'src/independent-insights.ts', 'src/independent-gsc-report.ts', 'src/browser/unified-seo-panel.js', 'public/unified-seo.js', 'public/index.html', 'public/seo/catalog-sync.js', 'public/seo/tables.css', 'scripts/build-unified-panel.mjs', 'src/browser/evidence-detail.js', 'public/seo/tables.js', 'public/app.js', 'src/browser/insights-workspace.js', 'public/seo/workspace.js', 'scripts/seo-answer-probe.ts')
+EXPECTED={'src/drive-independent.ts', 'src/browser/unified-seo-panel.js', 'src/seo-history-analysis.ts', 'src/seo-history-bridge.ts', 'public/unified-seo.js', 'src/index.ts', 'scripts/seo-answer-probe.ts', 'public/seo/history.js', 'src/seo-history.ts', 'src/browser/history-workspace.js', 'scripts/build-unified-panel.mjs', 'public/seo/history.css', 'scripts/seo_answer_release.py'}
+PROTECTED=('src/independent-gsc-analysis.ts', 'public/app.css', 'public/chart.js', 'src/independent-product-answer.ts', 'src/independent-session.ts', 'src/security.ts', 'src/independent-seo-model.ts', 'src/drive-broker.ts', 'src/independent-gsc.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc-bootstrap.ts', 'src/independent-ga4.ts', 'src/independent-context-bridge.ts', 'src/independent-cron-proof.ts', 'src/independent-refresh.ts', 'src/independent-snapshot.ts', 'src/drive-records.ts', 'src/d1-read-budget.ts', 'public/ui.js', 'public/period.js', 'public/independent-seo.js', 'public/independent-seo.html', 'deploy/wrangler.monthly-app.jsonc', 'deploy/wrangler.drive-archive.jsonc', 'src/independent-gsc-totals.ts', 'src/independent-catalog.ts', 'src/independent-context.ts', 'src/independent-insights.ts', 'src/independent-gsc-report.ts', 'public/index.html', 'public/seo/catalog-sync.js', 'public/seo/tables.css', 'src/browser/evidence-detail.js', 'public/seo/tables.js', 'public/app.js', 'src/browser/insights-workspace.js', 'public/seo/workspace.js', 'src/urls.ts')
 
 def browser_acceptance(key):
  # One mandatory live UI acceptance, outside the test suite. No source rows/logs.
@@ -30,6 +30,13 @@ try{
  for(const name of ['overview','products','comparison','queries','opportunities','impact','radar','changes','health','questions']){
   stage=name;await page.locator('#navigation [data-view='+name+']').click();await page.locator('#view-'+name).waitFor({state:'visible'});
  }
+ stage='history';await page.locator('#navigation [data-view=changes]').click();
+ await page.locator('#history-changes-product').waitFor();
+ await page.waitForFunction(()=>document.querySelector('#changeResults .history-record'));
+ await page.locator('#changeResults .history-record button').first().click();await page.locator('#productDialog').waitFor({state:'visible'});
+ await page.waitForFunction(()=>document.querySelector('#productDetail').textContent.includes('GSC aylık performansı'));
+ if(!await page.locator('#productDetail table').count())throw Error();await page.locator('#closeDialog').click();
+ stage='history-health';await page.locator('#navigation [data-view=health]').click();await page.locator('#history-health-from').waitFor();
  stage='pages';await page.locator('#navigation [data-view=products]').click();await page.locator('#pageCoverage .insight-stat').first().waitFor();
  await page.locator('[data-page-mode=unmapped]').click();await page.waitForFunction(()=>document.querySelector('#products thead').textContent.includes('Eşlenmemiş'));
  if(await page.getByRole('button',{name:'Ürün Tanımla',exact:true}).count()>0){await page.getByRole('button',{name:'Ürün Tanımla',exact:true}).first().click();await page.locator('#catalogDialog').waitFor({state:'visible'});if(!await page.locator('#draftProductUrls').inputValue())throw Error();await page.locator('#closeCatalogDialog').click();}
@@ -75,7 +82,7 @@ try{
  stage='logout';await page.locator('#sidebarToggle').click();await page.locator('#logout').click();await page.locator('#loginScreen').waitFor({state:'visible'});
  if((await page.locator('#impactSummary').innerText()).trim()||(await page.locator('#comparisonResult').innerText()).trim())throw Error();
  if(legacy||errors)throw Error();
- console.log(JSON.stringify({passed:true,views:10,query_daily_responses:seriesResponses,monthly_comparison:true,unmapped_pages:true,catalog_user_submission_only:true,query_opportunities:true,impact_analysis:true,official_totals_not_fabricated:true,global_answers:true,mobile:true,logout_data_cleared:true,september_mobile_growth_verified:true,dynamic_comparison_period_verified:true,legacy_data_requests:legacy,page_errors:errors,content_change_recommended:false}));
+ console.log(JSON.stringify({passed:true,views:10,history_filters:true,history_details:true,history_gsc_timeline:true,query_daily_responses:seriesResponses,monthly_comparison:true,unmapped_pages:true,catalog_user_submission_only:true,query_opportunities:true,impact_analysis:true,official_totals_not_fabricated:true,global_answers:true,mobile:true,logout_data_cleared:true,september_mobile_growth_verified:true,dynamic_comparison_period_verified:true,legacy_data_requests:legacy,page_errors:errors,content_change_recommended:false}));
 }catch(error){console.log(JSON.stringify({passed:false,stage,error_name:error?.name||'Error',query_daily_responses:seriesResponses,legacy_data_requests:legacy,page_errors:errors}));process.exitCode=1;}
 finally{await browser.close();}
 '''
@@ -92,7 +99,8 @@ def run():
  need(git('rev-parse','HEAD^')==BASE and set(git('diff','--name-only','HEAD^','HEAD').splitlines())==EXPECTED,'SEO_ANSWER_REVIEWED_SCOPE_REQUIRED')
  for path in PROTECTED:need(subprocess.check_output(['git','show',BASE+':'+path],cwd=ROOT)==(ROOT/path).read_bytes(),'SEO_ANSWER_PROTECTED_SOURCE_CHANGED')
  old_index=subprocess.check_output(['git','show',BASE+':src/index.ts'],cwd=ROOT).decode()
- need(old_index.split('  async scheduled(',1)[1]==(ROOT/'src/index.ts').read_text().split('  async scheduled(',1)[1],'SEO_ANSWER_CRON_SOURCE_CHANGED')
+ history_hook="      try{await syncSeoHistory(env,'Cloudflare Cron',time.toISOString());}catch{/* History never gates existing collection. */}\n"
+ need(old_index.split('  async scheduled(',1)[1]==(ROOT/'src/index.ts').read_text().split('  async scheduled(',1)[1].replace(history_hook,''),'SEO_ANSWER_CRON_SOURCE_CHANGED')
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'SEO_ANSWER_MAIN_SUPERSEDED')
  runs=get_json('https://api.github.com/repos/'+REPOSITORY+'/actions/workflows/ci.yml/runs?head_sha='+sha+'&per_page=20',os.environ.get('GITHUB_TOKEN')).get('workflow_runs',[])
  need(any(r.get('head_sha')==sha and r.get('head_branch')=='main' and r.get('event')=='push' and r.get('conclusion')=='success' for r in runs),'SEO_ANSWER_GREEN_CI_REQUIRED')
@@ -102,7 +110,7 @@ def run():
  need(before[APP]['crons']==['*/15 * * * *'] and url_json('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/health').get('deployment',{}).get('commit')==APP_SOURCE,'SEO_ANSWER_APP_DRIFT')
  folder=ROOT/'.local/seo-answer';folder.mkdir(parents=True,exist_ok=True);folder.chmod(0o700)
  key=secrets.token_hex(32);secret=folder/'.dev.vars';secret.write_text('PROBE_KEY='+key+'\n');secret.chmod(0o600)
- cfg=folder/'wrangler.jsonc';cfg.write_text(json.dumps({'name':APP,'main':str(ROOT/'scripts/seo-answer-probe.ts'),'compatibility_date':'2026-10-01','workers_dev':False,'preview_urls':False,'unsafe':{'bindings':[{'name':'ADMIN_TOKEN','type':'inherit'}]},'services':[{'binding':'LIVE_APP','service':APP,'environment':'production'}]}));cfg.chmod(0o600)
+ cfg=folder/'wrangler.jsonc';cfg.write_text(json.dumps({'name':APP,'main':str(ROOT/'scripts/seo-answer-probe.ts'),'compatibility_date':'2026-10-01','workers_dev':False,'preview_urls':False,'unsafe':{'bindings':[{'name':'ADMIN_TOKEN','type':'inherit'}]},'vars':{'D1_READ_GUARD_ENABLED':'true'},'d1_databases':[{**{key:db[key] for key in ('binding','database_name','database_id')},'preview_database_id':db['database_id']} for db in json.loads((ROOT/main_config).read_text())['d1_databases']],'services':[{'binding':'LIVE_APP','service':APP,'environment':'production'},{'binding':'DRIVE_ARCHIVE_SERVICE','service':ARCHIVE,'environment':'production'}]}));cfg.chmod(0o600)
  preview=None;deployed=[]
  try:
   with (folder/'runtime.log').open('w') as logs:
@@ -127,6 +135,13 @@ def run():
    deployed.append(ARCHIVE);deploy('deploy/wrangler.drive-archive.jsonc',sha)
    after=snapshot(client,ARCHIVE);verify_active_source(client,ARCHIVE,after['version'],sha)
    need(after['bindings']==before[ARCHIVE]['bindings'] and after['crons']==before[ARCHIVE]['crons'] and snapshot(client,APP)==before[APP],'SEO_ANSWER_CONFIGURATION_CHANGED')
+   history=None
+   for batch in range(32):
+    history=exchange('/history-bootstrap')
+    print(json.dumps({'seo_history_copy':{'batch':batch+1,'events':history.get('events'),'snapshots':history.get('snapshots'),'caught_up':history.get('caught_up'),'held':history.get('held'),'source_mutations':0}}),flush=True)
+    if history.get('verified') is True:break
+    if history.get('held') or not any(r.get('status')=='partial' for r in history.get('receipts',[])):break
+   need(history and history.get('verified') is True,'SEO_ANSWER_HISTORY_COPY_INCOMPLETE')
    deployed.append(APP);deploy(main_config,sha)
    app_after=snapshot(client,APP);verify_active_source(client,APP,app_after['version'],sha)
    need(app_after['bindings']==before[APP]['bindings'] and app_after['crons']==before[APP]['crons'],'SEO_ANSWER_CONFIGURATION_CHANGED')
@@ -145,7 +160,7 @@ def run():
     if health.get('deployment',{}).get('commit')==sha and health['deployment'].get('version_id')==app_after['version']:break
     time.sleep(2)
    else:raise ValueError('SEO_ANSWER_HTTP_SOURCE_MISMATCH')
-   for path in ('index.html','app.js','app.css','chart.js','unified-seo.js','seo/workspace.js','seo/workspace.css','seo/tables.js','seo/tables.css','seo/catalog-sync.js'):
+   for path in ('index.html','app.js','app.css','chart.js','unified-seo.js','seo/workspace.js','seo/workspace.css','seo/tables.js','seo/tables.css','seo/catalog-sync.js','seo/history.js','seo/history.css'):
     expected=(ROOT/'public'/path).read_bytes()
     for attempt in range(10):
      status,body=http('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/'+path+'?release='+sha+'&asset_check='+str(attempt))
@@ -154,12 +169,12 @@ def run():
      print(json.dumps({'seo_answer_asset_pending':{'path':path,'status':status,'actual_sha256':hashlib.sha256(body).hexdigest(),'expected_sha256':hashlib.sha256(expected).hexdigest(),'attempt':attempt+1}}),flush=True)
      if attempt<9:time.sleep(2)
     need(status==200 and body==expected,'SEO_ANSWER_ASSET_MISMATCH')
-   for path in ('gsc-month?month=2026-10','ga4-report?month=2026-10','change-history?month=2026-10','catalog','gsc-series?month=2026-10&query=bro%C5%9F%C3%BCr'):
+   for path in ('gsc-month?month=2026-10','ga4-report?month=2026-10','change-history?month=2026-10','catalog','gsc-series?month=2026-10&query=bro%C5%9F%C3%BCr','seo-history','seo-history/status'):
     status,_=http('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/independent/'+path)
     need(status==401,'SEO_ANSWER_PUBLIC_DATA_EXPOSED')
    login=live_acceptance();browser=browser_acceptance(key)
    need(snapshot(client,APP)==app_after and snapshot(client,ARCHIVE)==after,'SEO_ANSWER_PRODUCTION_DRIFT')
-   print(json.dumps({'seo_answer_release':{'deployed':True,'source':sha,'archive_version':after['version'],'app_version':app_after['version'],'unified_panel':True,'cron_unchanged':True,'source_datasets_unchanged':True,'proof':proof,'login':login,'browser':browser,'d1_requests':0,'new_billed_resources':False,'site_changed':False}}),flush=True)
+   print(json.dumps({'seo_answer_release':{'deployed':True,'source':sha,'archive_version':after['version'],'app_version':app_after['version'],'unified_panel':True,'cron_unchanged':True,'source_datasets_unchanged':True,'proof':proof,'login':login,'browser':browser,'panel_d1_requests':0,'history_copy_metered_d1':True,'history_source_mutations':0,'new_billed_resources':False,'site_changed':False}}),flush=True)
  except Exception:
   for worker,config in ((APP,main_config),(ARCHIVE,'deploy/wrangler.drive-archive.jsonc')):
    if worker in deployed:rollback(config,before[worker]['version']);need(snapshot(client,worker)==before[worker],'SEO_ANSWER_ROLLBACK_FAILED')
