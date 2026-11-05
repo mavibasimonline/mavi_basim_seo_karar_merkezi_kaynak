@@ -63,6 +63,10 @@ export default {async fetch(request:Request,env:Probe){
   };
   const auto=await call('Broşür neden düşüyor?'),direct=await call('Broşür neden düşüyor?',undefined,'gsc-questions'),manual=await call('Broşür neden düşüyor?','ga4');
   if(mode==='/before')return Response.json({auto_source:auto.source,auto_decision:auto.decision,gsc_decision:direct.decision,manual_ga4_source:manual.source,combined_evidence:!!auto.evaluation,d1_requests:0});
+  const three=await call('Bu ay hangi üç ürüne öncelik vermeliyim?');
+  need(three.intent==='top-product-priorities'&&three.requested_count===3&&three.items.length===Math.min(3,three.total_candidates),'SEO_ANSWER_THREE_PRODUCTS_MISSING');
+  need(three.items.every((item:any)=>item.product_id&&item.task&&item.cause_confirmed===false&&item.content_change_recommended===false),'SEO_ANSWER_THREE_PRODUCTS_UNVERIFIED');
+  need(three.evidence_refs?.some((ref:any)=>ref.scope==='page')&&three.d1_requests===0,'SEO_ANSWER_THREE_PRODUCTS_EVIDENCE_MISSING');
   const visitor=await call('Broşür organik ziyaretçileri neden düşüyor?'),unsupported=await call('Broşür anahtar kelimeleri neden düşüyor?','ga4');
   const read=async(path:string)=>{const r=await env.LIVE_APP.fetch(ORIGIN+path,{headers:{Authorization:'Bearer '+env.ADMIN_TOKEN}});if(path.endsWith('/catalog')&&r.status===404)throw Error('SEO_ANSWER_RUNTIME_PENDING');need(r.ok,'SEO_ANSWER_PANEL_READ_FAILED');return r.json<any>();};
   const session=await read('/api/session'),month=await read('/api/independent/gsc-month?month=2026-10');

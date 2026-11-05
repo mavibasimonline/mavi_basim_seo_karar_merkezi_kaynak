@@ -22,6 +22,7 @@ import {IndependentGa4,answerGa4} from './independent-ga4';
 import {questionProduct,answerProductEvidence,answerGa4Product} from './independent-product-answer';
 import {variantFamily} from './urls';
 import {insightIntent,answerInsightQuestion,answerCityTrend,categoryOf} from './independent-insights';
+import {answerTopProductPriorities} from './top-product-priorities';
 import {retryGscHold} from './independent-recovery';
 import {runGscDiagnostic} from './independent-gsc-diagnostic';
 import {runGscBootstrapTick,gscBootstrapStatus} from './independent-gsc-bootstrap';
@@ -438,6 +439,15 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     const mappings=context?.products.map(p=>({id:p.id,name:p.name,pages:p.urls||[p.canonical_url]}))||[];
     const explicitGsc=path.endsWith('gsc-questions')||body.source==='gsc',manualGa4=body.source==='ga4'&&!explicitGsc;
     const exactPage=/https?:\/\//i.test(body.question),queryQuestion=/sorgu|anahtar|kelime/.test(q);
+    // Three-product requests rank evidence, not just material drops.
+    const topRequest=!product&&!exactPage&&!queryQuestion&&!manualGa4&&body.source!=='archive'
+      &&/oncelik/.test(q)&&/(?:uc|3)\s+urun/.test(q);
+    if(topRequest){
+     if(!context)return json({answer:'Üç ürün için doğrulanmış katalog henüz okunamadı; veri uydurulmadı.',source:'GSC Search Analytics API',month,decision:'Veri bekle',requested_count:3,items:[],evidence_refs:[],d1_requests:0});
+     const current=await this.gscMonth(month),previous=await this.gscMonth(previousMonth).catch(()=>undefined);
+     const ga4Current=await this.ga4().report(month).catch(()=>null),ga4Previous=await this.ga4().report(previousMonth).catch(()=>null);
+     return json(answerTopProductPriorities(current,previous,ga4Current,ga4Previous,context.products,context.changes,{device:/mobil|mobile/.test(q)?'MOBILE':/masaustu|desktop/.test(q)?'DESKTOP':/tablet/.test(q)?'TABLET':undefined}));
+    }
     const candidate=!exactPage&&!/[“”"]/.test(body.question)&&body.source!=='archive'?insightIntent(body.question):null;
     const intent=!product||candidate==='protect-queries'||candidate==='opportunities'?candidate:null;
     if(intent&&intent.startsWith('city-')&&!explicitGsc){

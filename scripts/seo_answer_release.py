@@ -8,10 +8,10 @@ from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
 BASE='94d06990ad71712051391d4267762f4c5229ec9e'
-PARENT='7d6e6920f6b382da237aee5872021196e8f7246e'
-APP_SOURCE='7d6e6920f6b382da237aee5872021196e8f7246e'
+PARENT='45963bb0ce8758194daeaa7d57d2dee62393174b'
+APP_SOURCE='45963bb0ce8758194daeaa7d57d2dee62393174b'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'scripts/seo_answer_release.py', 'src/seo-history-analysis.ts', 'scripts/gsc_history_probe.ts', 'src/browser/insights-workspace.js', 'scripts/gsc_history_acceptance.py', 'scripts/seo-answer-probe.ts', 'src/browser/unified-seo-panel.js', 'src/drive-independent.ts', 'src/planner-bridge.ts', 'src/independent-planner.ts', 'public/unified-seo.js', 'src/independent-gsc.ts', 'src/generated/planner-data.ts', 'src/independent-gsc-totals.ts', 'src/index.ts', 'src/browser/evidence-detail.js', 'src/product-source-context.ts', 'public/seo/workspace.js', 'scripts/import_keywords.py', 'src/gsc-catchup.ts', 'src/independent-ga4.ts', 'scripts/ga4_history_completion.py', 'scripts/ga4-history-probe.ts', '.github/workflows/ga4-history-completion.yml', 'src/product-decision-ledger.ts', 'tests/product-decision-ledger.test.ts'}
+EXPECTED={'scripts/seo_answer_release.py', 'src/seo-history-analysis.ts', 'scripts/gsc_history_probe.ts', 'src/browser/insights-workspace.js', 'scripts/gsc_history_acceptance.py', 'scripts/seo-answer-probe.ts', 'src/browser/unified-seo-panel.js', 'src/drive-independent.ts', 'src/planner-bridge.ts', 'src/independent-planner.ts', 'public/unified-seo.js', 'src/independent-gsc.ts', 'src/generated/planner-data.ts', 'src/independent-gsc-totals.ts', 'src/index.ts', 'src/browser/evidence-detail.js', 'src/product-source-context.ts', 'public/seo/workspace.js', 'scripts/import_keywords.py', 'src/gsc-catchup.ts', 'src/independent-ga4.ts', 'scripts/ga4_history_completion.py', 'scripts/ga4-history-probe.ts', '.github/workflows/ga4-history-completion.yml', 'src/product-decision-ledger.ts', 'tests/product-decision-ledger.test.ts', 'src/top-product-priorities.ts', 'tests/top-product-priorities.test.ts'}
 PROTECTED=('src/independent-gsc-analysis.ts', 'public/app.css', 'public/chart.js', 'src/independent-product-answer.ts', 'src/independent-session.ts', 'src/security.ts', 'src/independent-seo-model.ts', 'src/drive-broker.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc-bootstrap.ts', 'src/independent-context-bridge.ts', 'src/independent-cron-proof.ts', 'src/independent-refresh.ts', 'src/independent-snapshot.ts', 'src/drive-records.ts', 'src/d1-read-budget.ts', 'public/ui.js', 'public/period.js', 'public/independent-seo.js', 'public/independent-seo.html', 'deploy/wrangler.monthly-app.jsonc', 'deploy/wrangler.drive-archive.jsonc', 'src/independent-catalog.ts', 'src/independent-context.ts', 'src/independent-insights.ts', 'src/independent-gsc-report.ts', 'public/index.html', 'public/seo/catalog-sync.js', 'public/seo/tables.css', 'public/seo/tables.js', 'public/app.js', 'src/urls.ts', 'scripts/build-unified-panel.mjs', 'public/seo/history.css', 'public/seo/history.js', 'src/browser/history-workspace.js', 'src/seo-history-bridge.ts', 'src/seo-history.ts')
 
 def browser_acceptance(key):
@@ -72,7 +72,10 @@ try{
  stage='impact';await page.locator('#navigation [data-view=impact]').click();await page.locator('#impactSummary .insight-stat').first().waitFor();
  const official=page.locator('#impactSummary article').filter({hasText:'Resmi GSC site toplamı'});if(!await official.locator('strong').innerText())throw Error();
  if(!await page.locator('#impactQueries table').count()||!await page.locator('#impactDevices table').count())throw Error();
- stage='global-answer';await page.locator('#navigation [data-view=questions]').click();await page.locator('#questionText').fill('Hangi sayfalar eşlenmemiş?');await page.locator('#question button[type=submit]').click();
+ stage='global-answer';await page.locator('#navigation [data-view=questions]').click();
+ stage='top-three-answer';await page.locator('#questionText').fill('Bu ay hangi üç ürüne öncelik vermeliyim?');await page.locator('#question button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#answer').textContent.includes('1. ')&&document.querySelector('#answer').textContent.includes('2. ')&&document.querySelector('#answer').textContent.includes('3. '));
+await page.locator('#questionText').fill('Hangi sayfalar eşlenmemiş?');await page.locator('#question button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('#answer').textContent.includes('URL’ler doğrulanmış katalogda'));
  stage='brochure';await page.locator('#questionText').fill('Broşür neden düşüyor?');await page.locator('#question button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('#answer').textContent.includes('İnceleme önceliği yüksek'));
