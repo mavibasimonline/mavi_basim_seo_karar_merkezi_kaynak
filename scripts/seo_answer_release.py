@@ -7,11 +7,11 @@ from quota_observer_release import api,free_plan
 from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
-BASE='9288b5a9e3b21640f9267d8085cdc8449957407e'
+BASE='45084596d82daab0378280ef3578289f1fa6aac9'
 APP_SOURCE='35121b40966707e107bde67dd2bcd8766ccb67d9'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'scripts/seo-answer-probe.ts','scripts/seo_answer_release.py','package.json','public/index.html','public/app.js','public/app.css','public/unified-seo.js','src/browser/unified-seo-panel.js','src/index.ts','src/drive-independent.ts','src/independent-gsc-report.ts'}
-PROTECTED=('src/independent-session.ts','src/security.ts','src/independent-gsc-analysis.ts','src/independent-product-answer.ts','src/independent-seo-model.ts','src/drive-broker.ts','src/independent-gsc.ts','src/independent-gsc-bridge.ts','src/independent-gsc-bootstrap.ts','src/independent-ga4.ts','src/independent-context.ts','src/independent-context-bridge.ts','src/d1-read-budget.ts','public/ui.js','public/chart.js','public/period.js','public/independent-seo.js','public/independent-seo.html','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.drive-archive.jsonc')
+EXPECTED={'scripts/seo_answer_release.py','scripts/build-unified-panel.mjs','package.json','public/unified-seo.js','tests/test_frontend_assets.py'}
+PROTECTED=('src/index.ts','src/drive-independent.ts','src/independent-gsc-report.ts','src/browser/unified-seo-panel.js','public/index.html','public/app.js','public/app.css','scripts/seo-answer-probe.ts','src/independent-session.ts','src/security.ts','src/independent-gsc-analysis.ts','src/independent-product-answer.ts','src/independent-seo-model.ts','src/drive-broker.ts','src/independent-gsc.ts','src/independent-gsc-bridge.ts','src/independent-gsc-bootstrap.ts','src/independent-ga4.ts','src/independent-context.ts','src/independent-context-bridge.ts','src/d1-read-budget.ts','public/ui.js','public/chart.js','public/period.js','public/independent-seo.js','public/independent-seo.html','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.drive-archive.jsonc')
 
 def browser_acceptance(key):
  # One mandatory live UI acceptance, outside the test suite. No source rows/logs.
@@ -59,11 +59,6 @@ def run():
  for path in PROTECTED:need(subprocess.check_output(['git','show',BASE+':'+path],cwd=ROOT)==(ROOT/path).read_bytes(),'SEO_ANSWER_PROTECTED_SOURCE_CHANGED')
  old_index=subprocess.check_output(['git','show',BASE+':src/index.ts'],cwd=ROOT).decode()
  need(old_index.split('  async scheduled(',1)[1]==(ROOT/'src/index.ts').read_text().split('  async scheduled(',1)[1],'SEO_ANSWER_CRON_SOURCE_CHANGED')
- old_router=subprocess.check_output(['git','show',BASE+':src/drive-independent.ts'],cwd=ROOT).decode()
- new_router=(ROOT/'src/drive-independent.ts').read_text()
- old_return="return json(path.endsWith('gsc-analysis')?{...analyzeVerifiedGsc(gsc,mappings),mapping_evidence:context?{source_hash:context.source_hash,captured_at:context.captured_at,coverage:context.coverage}:null}:gsc);"
- new_return="return json(path.endsWith('gsc-analysis')?{...analyzeVerifiedGsc(gsc,mappings),mapping_evidence:context?{source_hash:context.source_hash,captured_at:context.captured_at,coverage:context.coverage}:null}:{...gsc,mappings:context?.products||[],mapping_evidence:context?{source_hash:context.source_hash,captured_at:context.captured_at,coverage:context.coverage}:null});"
- need(old_return in old_router and old_router.replace(old_return,new_return)==new_router,'SEO_ANSWER_COLLECTOR_SOURCE_CHANGED')
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'SEO_ANSWER_MAIN_SUPERSEDED')
  runs=get_json('https://api.github.com/repos/'+REPOSITORY+'/actions/workflows/ci.yml/runs?head_sha='+sha+'&per_page=20',os.environ.get('GITHUB_TOKEN')).get('workflow_runs',[])
  need(any(r.get('head_sha')==sha and r.get('head_branch')=='main' and r.get('event')=='push' and r.get('conclusion')=='success' for r in runs),'SEO_ANSWER_GREEN_CI_REQUIRED')
