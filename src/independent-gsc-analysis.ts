@@ -104,6 +104,38 @@ export function answerVerifiedGsc(current:MonthlyGscAnalysisInput,previous:Month
  if(/değişiklik geçmiş|ne zaman|yayın|başlık|meta|kanonik|canonical/.test(q))return respond('Kanıt: bu rapor GSC performans kayıtlarını içerir; tarihli CMS yayını veya önceki/sonraki tarama kanıtı içermez. Yorum: düşüş bir içerik değişikliğinin neden olduğunu kanıtlamaz. SEO kararı: değişiklik geçmişi ve taramalar arası zaman aralığı doğrulanmadan neden veya kesin yayın tarihi atfetme.','Veri bekle');
  if(!refs('page').length)return respond('Kanıt: günlük sayfa kaynak referansları yok. Yorum: metrikler tek başına doğrulanmış kaynak kanıtı değildir. SEO kararı: veri bekle.','Veri bekle');
  if(!current.available)return respond('Kanıt: '+current.month+' için günlük sayfa kapsamı '+current.days_verified+'/'+current.expected_days+'. Yorum: eksik günler sıfır trafik değildir; tam ay karşılaştırması yapılamaz. SEO kararı: veri bekle; eksik kapsamdan düşüş çıkarma.','Veri bekle');
+ const protectionIntent=/(hangi|korunacak|korumali|korumam|dokunma|basarili|koru).*(kelim|sorgu)|(kelim|sorgu).*(koru|korun|dokunma)/.test(variantFamily(q));
+ if(protectionIntent){
+  // A product name can also match a visible query; protection asks for a list,
+  // not for a single accidentally matched product-name query.
+  delete filters.query;
+  const expectedPrevious=new Date(current.month+'-01T00:00:00Z');
+  expectedPrevious.setUTCMonth(expectedPrevious.getUTCMonth()-1);
+  const ready=current.available&&current.query_days_verified===current.expected_days
+   &&previous?.available&&previous.month===expectedPrevious.toISOString().slice(0,7)
+   &&previous.query_days_verified===previous.expected_days
+   &&refs('query').length>0&&previous.evidence?.some(ref=>ref.scope==='query');
+  if(!ready)return respond('Kanıt: aynı ürün, cihaz ve ülke filtresiyle karşılaştırılabilir iki tam aylık görünür sorgu kanıtı henüz doğrulanmadı. Yorum: eksik veya Google tarafından gizlenen sorgular sıfır değildir; korunacak kelimeler tahmin edilemez. SEO kararı: veri tamamlanana kadar mevcut başarılı içeriğe dokunma.','Veri bekle','query',true);
+  const now=facets(filtered(current.queries||[],filters,index),row=>row.query);
+  const old=new Map(facets(filtered(previous.queries||[],filters,index),row=>row.query).map(row=>[row.id,row]));
+  const candidates=now.filter(row=>{
+   const before=old.get(row.id);
+   // Compare only a visible query observed in both months. This is a
+   // conservative protection shortlist, not a claim about all Google queries.
+   return !!before&&before.clicks>=1&&row.clicks>=2
+    &&before.impressions>=20&&row.impressions>=20
+    &&row.clicks>=before.clicks*.8;
+  }).sort((a,b)=>b.clicks-a.clicks||b.impressions-a.impressions||a.id.localeCompare(b.id,'tr')).slice(0,8);
+  if(!candidates.length)return respond('Kanıt: '+previous!.month+' → '+current.month+' dönemlerinde karşılaştırılabilir görünür sorgular incelendi; yeterli ölçümle istikrarlı kalan koruma adayı bulunamadı. Yorum: bu, başarılı arama kelimesi bulunmadığını göstermez; gizlenmiş sorgular ve düşük örneklem dışarıda tutuldu. SEO kararı: veri bekle; kanıtsız içerik veya yönlendirme değiştirme.','Veri bekle','query',true);
+  const details=candidates.map(row=>{
+   const before=old.get(row.id)!;
+   return '“'+row.id+'”'+(isBrand(row.id)?' (markalı)':'')+': '+before.clicks+' → '+row.clicks
+    +' tıklama; gösterim '+before.impressions+' → '+row.impressions
+    +'; güncel CTR %'+(row.ctr*100).toFixed(2);
+  }).join('; ');
+  const filterText=Object.entries(filters).filter(([,value])=>!!value).map(([key,value])=>key+'='+value).join(', ')||'site geneli';
+  return respond('Kanıt: '+previous!.month+' → '+current.month+', '+filterText+'; iki ayda da gözlenen ve yeterli örneklemde istikrarlı kalan görünür GSC sorguları: '+details+'. Yorum: bu bir koruma adayı listesidir, tüm aramaların listesi değildir; anonim sorgular gizlenebilir ve sorgu satırları site toplamına eşit değildir. SEO kararı: bu sorgulara hizmet eden çalışan sayfaları koru; önce sayfa, cihaz ve değişiklik kanıtlarını karşılaştırmadan başlık, içerik veya yönlendirme değiştirme.','Koru','query',true);
+ }
  const queryQuestion=!!filters.query||/anahtar|kelime|sorgu|hangi arama/.test(q);
  if(queryQuestion){
   if(!refs('query').length)return respond('Kanıt: günlük sorgu kaynak referansları yok. Yorum: sorgu metni veya tahmini metrik kaynak kanıtının yerini alamaz. SEO kararı: sorgu verisi bekle.','Veri bekle','query');
