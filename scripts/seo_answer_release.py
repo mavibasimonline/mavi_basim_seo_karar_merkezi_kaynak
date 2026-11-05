@@ -7,21 +7,21 @@ from quota_observer_release import api,free_plan
 from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
-BASE='70923fb6c4f4cfa02fe3d7606eb991c2f820baf3'
+BASE='3668697af9209db0b7ed792439b801022f322559'
 APP_SOURCE='bae95476734a411fd06b3f799fdb80deddf07037'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'public/app.js','scripts/seo_answer_release.py'}
-PROTECTED=('src/index.ts', 'src/independent-gsc-analysis.ts', 'public/app.css', 'public/chart.js', 'src/independent-product-answer.ts', 'src/independent-session.ts', 'src/security.ts', 'src/independent-seo-model.ts', 'src/drive-broker.ts', 'src/independent-gsc.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc-bootstrap.ts', 'src/independent-ga4.ts', 'src/independent-context-bridge.ts', 'src/independent-cron-proof.ts', 'src/independent-refresh.ts', 'src/independent-snapshot.ts', 'src/drive-records.ts', 'src/d1-read-budget.ts', 'public/ui.js', 'public/period.js', 'public/independent-seo.js', 'public/independent-seo.html', 'deploy/wrangler.monthly-app.jsonc', 'deploy/wrangler.drive-archive.jsonc', 'src/independent-gsc-totals.ts', 'src/drive-independent.ts', 'src/independent-catalog.ts', 'src/independent-context.ts', 'src/independent-insights.ts', 'src/independent-gsc-report.ts', 'src/browser/unified-seo-panel.js', 'public/unified-seo.js', 'public/index.html', 'public/seo/catalog-sync.js', 'public/seo/tables.css', 'scripts/build-unified-panel.mjs', 'scripts/seo-answer-probe.ts', 'src/browser/insights-workspace.js', 'src/browser/evidence-detail.js', 'public/seo/tables.js', 'public/seo/workspace.js')
+EXPECTED={'src/browser/insights-workspace.js','public/seo/workspace.js','scripts/seo_answer_release.py','scripts/seo-answer-probe.ts'}
+PROTECTED=('src/index.ts', 'src/independent-gsc-analysis.ts', 'public/app.css', 'public/chart.js', 'src/independent-product-answer.ts', 'src/independent-session.ts', 'src/security.ts', 'src/independent-seo-model.ts', 'src/drive-broker.ts', 'src/independent-gsc.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc-bootstrap.ts', 'src/independent-ga4.ts', 'src/independent-context-bridge.ts', 'src/independent-cron-proof.ts', 'src/independent-refresh.ts', 'src/independent-snapshot.ts', 'src/drive-records.ts', 'src/d1-read-budget.ts', 'public/ui.js', 'public/period.js', 'public/independent-seo.js', 'public/independent-seo.html', 'deploy/wrangler.monthly-app.jsonc', 'deploy/wrangler.drive-archive.jsonc', 'src/independent-gsc-totals.ts', 'src/drive-independent.ts', 'src/independent-catalog.ts', 'src/independent-context.ts', 'src/independent-insights.ts', 'src/independent-gsc-report.ts', 'src/browser/unified-seo-panel.js', 'public/unified-seo.js', 'public/index.html', 'public/seo/catalog-sync.js', 'public/seo/tables.css', 'scripts/build-unified-panel.mjs', 'src/browser/evidence-detail.js', 'public/seo/tables.js', 'public/app.js')
 
 def browser_acceptance(key):
  # One mandatory live UI acceptance, outside the test suite. No source rows/logs.
  code=r'''
 import {chromium} from '@playwright/test';
 const browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});
-let stage='open',legacy=0,errors=0;
+let stage='open',legacy=0,errors=0,seriesResponses=[];
 try{
  const context=await browser.newContext({viewport:{width:1440,height:1000},locale:'tr-TR',extraHTTPHeaders:{Authorization:'Bearer '+process.env.SEO_PREVIEW_KEY}});
- const page=await context.newPage();page.on('pageerror',()=>errors++);
+ const page=await context.newPage();page.on('pageerror',()=>errors++);page.on('response',r=>{if(new URL(r.url()).pathname==='/api/independent/gsc-series')seriesResponses.push(r.status());});
  page.on('request',r=>{const p=new URL(r.url()).pathname;if(p.startsWith('/api/')&&p!=='/api/session'&&!p.startsWith('/api/independent/'))legacy++;});
  await page.goto('http://127.0.0.1:8806/',{waitUntil:'networkidle',timeout:60000});
  await page.locator('#app').waitFor({state:'visible'});
@@ -43,9 +43,14 @@ try{
  await page.locator('#comparisonProduct').selectOption(product);await page.locator('#comparisonForm button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('#comparisonResult').textContent.includes('2/2 seçili ay doğrulandı'));
  if(await page.locator('#comparisonTable tbody tr').count()!==2||!await page.locator('#comparisonChart svg').count())throw Error();
- stage='queries';await page.locator('#navigation [data-view=queries]').click();await page.locator('#queryProduct').selectOption(product);await page.locator('#queryTable tbody button').first().waitFor();
- await page.locator('#queryTable tbody button').first().click();await page.locator('#productDialog').waitFor({state:'visible'});
- await page.waitForFunction(()=>document.querySelector('#productDetail').textContent.includes('GSC günlük kapsam:'));if(!await page.locator('#productDetail table thead button').count())throw Error();await page.locator('#closeDialog').click();
+ stage='queries-filter';await page.locator('#navigation [data-view=queries]').click();await page.locator('#queryProduct').selectOption(product);
+ await page.waitForFunction(()=>document.querySelector('#queryTableActiveFilters')?.textContent.includes('Broşür'));
+ stage='queries-table';const queryRows=await page.locator('#queryTable tbody button').count();
+ if(queryRows){
+  stage='query-modal';await page.locator('#queryTable tbody button').first().click();await page.locator('#productDialog').waitFor({state:'visible'});
+  stage='query-daily';await page.waitForFunction(()=>document.querySelector('#productDetail').textContent.includes('GSC günlük kapsam:'),null,{timeout:65000});
+  if(!await page.locator('#productDetail table thead button').count()||seriesResponses.length!==2||seriesResponses.some(s=>s!==200))throw Error();await page.locator('#closeDialog').click();
+ }else if(!/sorgu kaydı yok|Veri bekle/.test(await page.locator('#queryTable').innerText()))throw Error();
  stage='opportunities';await page.locator('#navigation [data-view=opportunities]').click();await page.locator('#opportunityTable table').waitFor();
  await page.locator('[data-query-type="Yerel / Şehir"]').click();
  if(await page.locator('#opportunityTable th').count()!==10)throw Error();
@@ -70,8 +75,8 @@ try{
  stage='logout';await page.locator('#sidebarToggle').click();await page.locator('#logout').click();await page.locator('#loginScreen').waitFor({state:'visible'});
  if((await page.locator('#impactSummary').innerText()).trim()||(await page.locator('#comparisonResult').innerText()).trim())throw Error();
  if(legacy||errors)throw Error();
- console.log(JSON.stringify({passed:true,views:10,monthly_comparison:true,unmapped_pages:true,catalog_user_submission_only:true,query_opportunities:true,impact_analysis:true,official_totals_not_fabricated:true,global_answers:true,mobile:true,logout_data_cleared:true,september_mobile_growth_verified:true,dynamic_comparison_period_verified:true,legacy_data_requests:legacy,page_errors:errors,content_change_recommended:false}));
-}catch{console.log(JSON.stringify({passed:false,stage,legacy_data_requests:legacy,page_errors:errors}));process.exitCode=1;}
+ console.log(JSON.stringify({passed:true,views:10,query_daily_responses:seriesResponses,monthly_comparison:true,unmapped_pages:true,catalog_user_submission_only:true,query_opportunities:true,impact_analysis:true,official_totals_not_fabricated:true,global_answers:true,mobile:true,logout_data_cleared:true,september_mobile_growth_verified:true,dynamic_comparison_period_verified:true,legacy_data_requests:legacy,page_errors:errors,content_change_recommended:false}));
+}catch(error){console.log(JSON.stringify({passed:false,stage,error_name:error?.name||'Error',query_daily_responses:seriesResponses,legacy_data_requests:legacy,page_errors:errors}));process.exitCode=1;}
 finally{await browser.close();}
 '''
  result=subprocess.run(['node','--input-type=module','-e',code],cwd=ROOT,env={**os.environ,'SEO_PREVIEW_KEY':key},capture_output=True,text=True,timeout=240)
@@ -134,6 +139,7 @@ def run():
      if str(error)!='SEO_ANSWER_RUNTIME_PENDING' or attempt==9:raise
      time.sleep(3)
    need(proof.get('verified') is True,'SEO_ANSWER_ACCEPTANCE_FAILED')
+   print(json.dumps({'seo_answer_read_scope':{k:proof.get(k) for k in ('visible_query_rows','query_days_verified','query_expected_days','query_read_budget_limited','official_property_total_available')}}),flush=True)
    for _ in range(7):
     health=url_json('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/health')
     if health.get('deployment',{}).get('commit')==sha and health['deployment'].get('version_id')==app_after['version']:break
