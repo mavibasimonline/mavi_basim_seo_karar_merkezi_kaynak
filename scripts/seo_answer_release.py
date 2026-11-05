@@ -8,8 +8,8 @@ from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
 BASE='94d06990ad71712051391d4267762f4c5229ec9e'
-PARENT='a04166a70ff9e2a2a9ac4c77d90ff516d6b25ac6'
-APP_SOURCE='a04166a70ff9e2a2a9ac4c77d90ff516d6b25ac6'
+PARENT='b9f5208dce1e112c1af2a823093bc65254f14fe4'
+APP_SOURCE='b9f5208dce1e112c1af2a823093bc65254f14fe4'
 TITLE='release: verified GSC history bootstrap 20261104'
 EXPECTED={'scripts/seo_answer_release.py', 'src/seo-history-analysis.ts', 'scripts/gsc_history_probe.ts', 'src/browser/insights-workspace.js', 'scripts/gsc_history_acceptance.py', 'scripts/seo-answer-probe.ts', 'src/browser/unified-seo-panel.js', 'src/drive-independent.ts', 'src/planner-bridge.ts', 'src/independent-planner.ts', 'public/unified-seo.js', 'src/independent-gsc.ts', 'src/generated/planner-data.ts', 'src/independent-gsc-totals.ts', 'src/index.ts', 'src/browser/evidence-detail.js', 'src/product-source-context.ts', 'public/seo/workspace.js', 'scripts/import_keywords.py', 'src/gsc-catchup.ts', 'src/independent-ga4.ts', 'scripts/ga4_history_completion.py', 'scripts/ga4-history-probe.ts', '.github/workflows/ga4-history-completion.yml'}
 PROTECTED=('src/independent-gsc-analysis.ts', 'public/app.css', 'public/chart.js', 'src/independent-product-answer.ts', 'src/independent-session.ts', 'src/security.ts', 'src/independent-seo-model.ts', 'src/drive-broker.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc-bootstrap.ts', 'src/independent-context-bridge.ts', 'src/independent-cron-proof.ts', 'src/independent-refresh.ts', 'src/independent-snapshot.ts', 'src/drive-records.ts', 'src/d1-read-budget.ts', 'public/ui.js', 'public/period.js', 'public/independent-seo.js', 'public/independent-seo.html', 'deploy/wrangler.monthly-app.jsonc', 'deploy/wrangler.drive-archive.jsonc', 'src/independent-catalog.ts', 'src/independent-context.ts', 'src/independent-insights.ts', 'src/independent-gsc-report.ts', 'public/index.html', 'public/seo/catalog-sync.js', 'public/seo/tables.css', 'public/seo/tables.js', 'public/app.js', 'src/urls.ts', 'scripts/build-unified-panel.mjs', 'public/seo/history.css', 'public/seo/history.js', 'src/browser/history-workspace.js', 'src/seo-history-bridge.ts', 'src/seo-history.ts')
@@ -162,6 +162,18 @@ def run():
     if batch%20==0 or progress.get('status') in ('held','idle'):print(json.dumps({'seo_gsc_progress':progress}),flush=True)
     if progress.get('status') in ('idle','held'):break
    final_data=exchange('/completion-status');print(json.dumps({'seo_data_after':final_data}),flush=True)
+   ga4=exchange('/ga4-reconcile-status')
+   print(json.dumps({'seo_ga4_before':ga4}),flush=True)
+   if ga4.get('connected') and ga4.get('property_verified') and not ga4.get('reauthorization_required'):
+    ga4_deadline=time.monotonic()+180
+    for batch in range(72):
+     if all(m.get('verified') for m in ga4.get('months',[])) or time.monotonic()>ga4_deadline:break
+     step=exchange('/ga4-reconcile-step')
+     if batch%8==0 or step.get('status') in ('held','unavailable','idle'):print(json.dumps({'seo_ga4_progress':{'attempt':batch+1,'step':step}}),flush=True)
+     if step.get('status') in ('held','unavailable','idle'):break
+     if batch%4==3:ga4=exchange('/ga4-reconcile-status')
+    ga4=exchange('/ga4-reconcile-status')
+   print(json.dumps({'seo_ga4_after':ga4,'seo_ga4_verified':all(m.get('verified') for m in ga4.get('months',[]))}),flush=True)
    from gsc_history_acceptance import sanitize
    audit=sanitize(exchange('/audit-read'),'analysis');print(json.dumps({'seo_gsc_audit_fixed':audit}),flush=True)
    deployed.append(APP);deploy(main_config,sha)

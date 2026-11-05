@@ -1,8 +1,6 @@
 name: GA4 Haziran-Ağustos güvenli geçmiş tamamlama
 on:
-  workflow_run:
-    workflows: ["Kontrollü D1 bağımsız SEO yayını"]
-    types: [completed]
+  workflow_dispatch: {}
 permissions:
   contents: read
   actions: read

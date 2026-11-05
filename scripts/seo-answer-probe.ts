@@ -20,6 +20,24 @@ export default {async fetch(request:Request,env:Probe){
   const totals=await read('internal/property-totals/status'),properties=totals.months.map((m:any)=>({month:m.month,verified:!!m.total,days_verified:m.daily.days_verified,expected_days:m.daily.expected_days,daily_sums_match:!!m.total&&m.daily.days_verified===m.daily.expected_days&&m.daily.rows.reduce((n:number,r:any)=>n+r.clicks,0)===m.total.clicks&&m.daily.rows.reduce((n:number,r:any)=>n+r.impressions,0)===m.total.impressions}));
   return Response.json({months,properties,planner:await read('independent/planner-status'),catchup:(await read('internal/data-completion/status')).catchup});
  }
+ // Reuse the proven, private release preview for GA4 history reconciliation.
+ // Do not claim Cloudflare Cron execution or publish raw user analytics.
+ if(['/ga4-reconcile-status','/ga4-reconcile-step'].includes(mode)&&request.method==='POST'){
+  const get=async(path:string,body?:unknown)=>{const r=await env.DRIVE_ARCHIVE_SERVICE.fetch('https://archive.private/api/'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});if(!r.ok)throw Error('SEO_ANSWER_GA4_SOURCE_UNAVAILABLE');const value=await r.json<any>();need(value.d1_requests===0,'SEO_ANSWER_GA4_D1_UNEXPECTED');return value;};
+  if(mode==='/ga4-reconcile-step'){
+   const result=await get('internal/ga4-tick',{source:'ga4-historical-reconcile'});
+   need(['complete','partial','idle','held','unavailable'].includes(result.status),'SEO_ANSWER_GA4_TICK_INVALID');
+   return Response.json({status:result.status,month:result.month||null,kind:result.kind||null,code:result.code||null,d1_requests:0});
+  }
+  const status=await get('internal/ga4-status');
+  const months=[];for(const month of ['2026-06','2026-07','2026-08']){
+   const record=await get('independent/ga4-report?month='+month);
+   need(record.month===month&&record.source==='Google Analytics 4 Data API'&&record.channel==='Organic Search','SEO_ANSWER_GA4_SCOPE_INVALID');
+   const kinds=(record.evidence||[]).map((v:any)=>v.kind).sort();
+   months.push({month,available:record.available===true,closed:record.closed===true,has_total:!!record.totals,kinds,verified:kinds.join(',')==='cities,devices,pages,total'&&record.available===true&&record.closed===true&&!!record.totals,thresholded:record.thresholded===true,other_rows:record.other_rows===true});
+  }
+  return Response.json({connected:status.connected===true,reauthorization_required:status.reauthorization_required===true,property_verified:status.property?.id==='532525867',months,d1_requests:0});
+ }
  if(mode==='/history-bootstrap'&&request.method==='POST'){
   const receipts=[await syncSeoHistory(env as unknown as Env)];
   const r=await env.DRIVE_ARCHIVE_SERVICE.fetch('https://archive.private/api/internal/seo-history/status');
