@@ -253,7 +253,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
       }
       const result=[...attempts].reverse().find(r=>r.status==='complete'||r.status==='partial')||attempts.at(-1)!;
       if(scheduled)await recordGscCron(this.ctx.storage,scheduled,result);
-      if(scheduled)try{await collectPropertyTotal(this.ctx.storage,this.key(),force=>this.gscToken(force));}catch{/* Monthly total never blocks daily collection. */}
+      if(scheduled&&/T03:15:00(?:\.000)?Z$/.test(scheduled))try{await collectPropertyTotal(this.ctx.storage,this.key(),force=>this.gscToken(force));}catch{/* Once daily, never blocks daily records. */}
       return json({...result,batch_attempts:attempts.length});
     }
     if(path==='/api/internal/gsc-retry'&&request.method==='POST')return json(await retryGscHold(this.ctx.storage,JSON.parse(await boundedText(new Response(request.body),2048))));
