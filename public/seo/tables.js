@@ -6,6 +6,11 @@ function value(v,header){
  if(v&&typeof v==='object'&&'display'in v)return v.sort;
  const text=(v instanceof Node?v.textContent:String(v??'')).trim();
  if(!text||/doğrulanmadı|veri bekle|veri yok|eksik kayıt|^—$|^–$/i.test(text))return null;
+ if(/^(gün|tarih|ay)$/i.test(header)){
+  if(/^\d{4}-\d{2}(?:-\d{2})?$/.test(text))return Date.parse(text.length===7?text+'-01':text);
+  const parts=text.toLocaleLowerCase('tr-TR').split(/\s+/),months=['oca','şub','mar','nis','may','haz','tem','ağu','eyl','eki','kas','ara'],month=months.indexOf(parts[parts.length===3?1:0]?.slice(0,3));
+  if(month>=0&&/^\d{4}$/.test(parts.at(-1)))return Date.UTC(Number(parts.at(-1)),month,parts.length===3?Number(parts[0]):1);
+ }
  if(/karar|durum/i.test(header)){if(/öncelikli.*incele/i.test(text))return 4;if(/incele|gerileme/i.test(text))return 3;if(/koru/i.test(text))return 2;return 1;}
  if(/tıklama|gösterim|ctr|konum|sıra|fark|değişim|oturum|kullanıcı/i.test(header)&&!/(sorgu|fırsat|tür|sayfa)/i.test(header)){
   const raw=text.replace(/\./g,'').replace(',','.').replace(/[^\d+\-.]/g,'');const n=raw?Number(raw):NaN;return Number.isFinite(n)?n:null;
