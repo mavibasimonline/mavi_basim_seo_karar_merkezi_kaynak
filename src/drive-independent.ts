@@ -12,6 +12,8 @@ import {analyzeVerifiedGsc,answerVerifiedGsc} from './independent-gsc-analysis';
 import {cronTime,recordGscCron,gscCronProof} from './independent-cron-proof';
 import {validateIndependentContext,saveIndependentContext,readIndependentContext,independentContextStatus,answerContextQuestion} from './independent-context';
 import {IndependentGa4,answerGa4} from './independent-ga4';
+import {questionProduct,answerProductEvidence,answerGa4Product} from './independent-product-answer';
+import {variantFamily} from './urls';
 import {retryGscHold} from './independent-recovery';
 import {runGscDiagnostic} from './independent-gsc-diagnostic';
 import {runGscBootstrapTick,gscBootstrapStatus} from './independent-gsc-bootstrap';
@@ -355,30 +357,33 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     const body=JSON.parse(await boundedText(new Response(request.body),8192)) as {question?:unknown;month?:unknown;source?:unknown};
     if(typeof body.question!=='string'||!body.question.trim()||body.question.length>1000||body.month!==undefined&&typeof body.month!=='string')return json({code:'INVALID_QUESTION'},400);
     questionBody={question:body.question,month:body.month as string|undefined,source:body.source};
-    // Preserve Turkish dotted/dotless I and the existing ASCII uppercase routes.
-    const normalizedQuestion=body.question.toLocaleLowerCase('tr-TR')+' '+body.question.toLowerCase();
-    if(body.source==='ga4'||body.source!=='archive'&&body.source!=='gsc'&&!path.endsWith('gsc-questions')&&/şehir|ilçe|bölge|istanbul|ankara|izmir|ziyaretçi|organik oturum/i.test(normalizedQuestion)){
-     const latest=new Date(Date.now()-3*86400000);latest.setUTCDate(1);latest.setUTCMonth(latest.getUTCMonth()-1);
-     const month=questionBody.month||latest.toISOString().slice(0,7),ga4=this.ga4(),current=await ga4.report(month),p=new Date(month+'-01T00:00:00Z');p.setUTCMonth(p.getUTCMonth()-1);
-     const previous=current.available?await ga4.report(p.toISOString().slice(0,7)):null;return json(answerGa4(current,previous,body.question));
+    const latest=new Date(Date.now()-3*86400000);latest.setUTCDate(1);latest.setUTCMonth(latest.getUTCMonth()-1);
+    const month=questionBody.month||latest.toISOString().slice(0,7);
+    if(!/^20\d\d-(0[1-9]|1[0-2])$/.test(month))return json({code:'INVALID_MONTH'},400);
+    const p=new Date(month+'-01T00:00:00Z');p.setUTCMonth(p.getUTCMonth()-1);const previousMonth=p.toISOString().slice(0,7);
+    const q=variantFamily(body.question),context=await readIndependentContext(this.ctx.storage).catch(()=>null),product=questionProduct(context,body.question);
+    const mappings=context?.products.map(p=>({id:p.id,name:p.name,pages:[p.canonical_url]}))||[];
+    const explicitGsc=path.endsWith('gsc-questions')||body.source==='gsc',manualGa4=body.source==='ga4'&&!explicitGsc;
+    const geographic=/sehir|ilce|bolge|istanbul|ankara|izmir|bursa|antalya/.test(q);
+    const changeQuestion=/degisiklik gecmis|gecmis degis|icerik.*degis|neleri degist|ne zaman|baslik|meta|yayin|kanonik|canonical|\bh1\b/.test(q);
+    const performanceQuestion=/neden|dus|gerile|performans|karsilastir/.test(q);
+    // A registered product takes priority over generic visitor/city routing.
+    if(manualGa4||!product&&!explicitGsc&&body.source!=='archive'&&(geographic||/ziyaretci|organik oturum/.test(q))){
+     const current=await this.ga4().report(month).catch(()=>null),previous=await this.ga4().report(previousMonth).catch(()=>null);
+     if(product)return json(answerGa4Product(current,previous,product,month,body.question));
+     if(!geographic)return json({answer:'Kanıt: seçilen GA4 kaynağında bu soru için doğrulanmış ürün/açılış sayfası eşlemesi veya sorgu kanıtı yok. Yorum: şehir toplamı bu isteğin yerine kullanılamaz; eksik kayıt sıfır değildir. SEO kararı: uygun veri bekle.',source:'Google Analytics 4 Data API',month,decision:'Veri bekle',evidence:[],evidence_refs:[],d1_requests:0});
+     return json(answerGa4(current||{available:false,month,cities:[],evidence:[]},previous,body.question));
     }
-    let useGsc=path.endsWith('gsc-questions')||body.source==='gsc'||body.source!=='archive'&&/cihaz|mobil|masaüstü|tablet|ülke|türkiye|anahtar|kelime|sorgu|sayfa|https?:|şehir|ilçe|istanbul|bölge|değiş|ne zaman|başlık|meta|yayın|kanonik|canonical|\bh1\b/i.test(normalizedQuestion);
-    if(!useGsc&&body.source!=='archive'){
-     const latest=new Date(Date.now()-3*86400000);latest.setUTCDate(1);latest.setUTCMonth(latest.getUTCMonth()-1);
-     const month=questionBody.month||latest.toISOString().slice(0,7),context=await readIndependentContext(this.ctx.storage).catch(()=>null);
-     const q=body.question.toLocaleLowerCase('tr-TR'),mapped=context?.products.some(p=>q.includes(p.name.toLocaleLowerCase('tr-TR'))||q.includes(p.id.toLocaleLowerCase('tr-TR')));
-     if(mapped&&/^20\d\d-(0[1-9]|1[0-2])$/.test(month)&&Date.parse(month+'-01T00:00:00Z')>Date.now()-400*86400000)useGsc=(await this.gscMonth(month)).available;
-    }
+    const useGsc=explicitGsc||body.source!=='archive'&&(!!product||/cihaz|mobil|masaustu|tablet|ulke|turkiye|anahtar|kelime|sorgu|sayfa|https?:/.test(q)||changeQuestion);
     if(useGsc){
-     const latest=new Date(Date.now()-3*86400000);latest.setUTCDate(1);latest.setUTCMonth(latest.getUTCMonth()-1);
-     const month=questionBody.month||latest.toISOString().slice(0,7);
-     const context=await readIndependentContext(this.ctx.storage).catch(()=>null);
-     if(/değişiklik geçmiş|geçmiş değiş|içerik.*değiş|neleri değişt|ne zaman|başlık|meta|yayın|kanonik|canonical|\bh1\b/i.test(normalizedQuestion))return json(answerContextQuestion(context,body.question,month));
-     const current=await this.gscMonth(month);
-     const previousDate=new Date(month+'-01T00:00:00Z');previousDate.setUTCMonth(previousDate.getUTCMonth()-1);
-     const previous=current.available?await this.gscMonth(previousDate.toISOString().slice(0,7)):undefined;
-     const mappings=context?.products.map(p=>({id:p.id,name:p.name,pages:[p.canonical_url]}))||[];
-     return json({...answerVerifiedGsc(current,previous,body.question,mappings),mapping_evidence:context?{source_hash:context.source_hash,captured_at:context.captured_at}:null});
+     if(changeQuestion&&!performanceQuestion)return json(answerContextQuestion(context,body.question,month));
+     const current=await this.gscMonth(month),previous=current.available?await this.gscMonth(previousMonth):undefined;
+     const answer=answerVerifiedGsc(current,previous,body.question,mappings);
+     if(product&&context&&!explicitGsc&&!answer.filters.query&&!/anahtar|kelime|sorgu|hangi arama/.test(q)){
+      const ga4Current=await this.ga4().report(month).catch(()=>null),ga4Previous=await this.ga4().report(previousMonth).catch(()=>null);
+      return json(answerProductEvidence(answer,ga4Current,ga4Previous,context,product,body.question));
+     }
+     return json({...answer,mapping_evidence:context?{source_hash:context.source_hash,captured_at:context.captured_at}:null});
     }
    }
    const snapshot=await this.independentSnapshot();

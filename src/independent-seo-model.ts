@@ -1,5 +1,6 @@
 // D1-free verified Google Sheets analysis. Missing daily query/page coverage is NEVER inferred.
 import {stable} from './drive-records';
+import {comparisonDecision} from './independent-gsc-analysis';
 export type SheetRecord={source:string;source_key:string;section:string;family:string;identity:unknown;start:string;end:string;payload:Record<string,any>;daily_page_query_coverage:false;source_filters_verified:false};
 type Measurement={clicks:number;impressions:number;ctr:number;position:number};
 type Entry={id:string;title:string;period:{start:string;end:string};metrics:Measurement;source_key:string;source:string;section:string};
@@ -38,7 +39,7 @@ export function independentReport(records:SheetRecord[],requested:string|undefin
   const old=previousMap.get(product.id),delta=old?product.metrics.clicks-old.metrics.clicks:null,rate=old&&old.metrics.clicks>0?delta!/old.metrics.clicks:null;
   return {...product,previous:old?.metrics||null,previous_source_key:old?.source_key||null,
    previous_evidence:old?{source_key:old.source_key,source:old.source,section:old.section,period:old.period}:null,
-   delta,rate,decision:!old?'Veri bekle':rate!==null&&rate>=-0.1?'Koru':rate!==null&&rate<-0.2&&delta!==null&&delta<=-30?'İncele':'Koru'};
+   delta,rate,decision:comparisonDecision(product.metrics,old?.metrics||null)};
  });
  return {available:true as const,month,months,previous_month:months.includes(prevMonth)?prevMonth:null,overview,products:productComparisons,queries:queries.slice(0,150),query_count:queries.length,quarantined_records:quarantined,captured_at:capturedAt,source:'Google Sheets',source_scope:'Eski doğrulanmış Sheets dönem özetleri; anlık GSC veya günlük sayfa/sorgu kanıtı değildir.',limitations:['Şehir/cihaz kırılımı kaynağın doğrulanmış alanlarında yoksa gösterilmez.','Eksik dönemler ve sorgular sıfır kabul edilmez.','Bu panel tek başına Google Search Console canlı bağlantısını kanıtlamaz.'],d1_requests:0};
 }

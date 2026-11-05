@@ -1,5 +1,5 @@
 // Deterministic analysis of hash-verified GSC observations. No provider IO or D1.
-import {isBrand} from './urls';
+import {isBrand,variantFamily} from './urls';
 
 export type GscMetricRow={page:string;device:string;country:string;clicks:number;impressions:number;ctr:number;position:number};
 export type GscQueryMetricRow=GscMetricRow&{query:string;is_brand?:number};
@@ -7,6 +7,12 @@ export type GscEvidenceRef={day:string;scope:'page'|'query';generation:string;ca
 export type MonthlyGscAnalysisInput={available:boolean;month:string;days_verified:number;expected_days:number;missing_days?:string[];query_days_verified:number;query_missing_days?:string[];query_partial?:boolean;pages?:GscMetricRow[];queries?:GscQueryMetricRow[];evidence?:GscEvidenceRef[]};
 export type GscProductMapping={id:string;name:string;pages:string[]};
 type Metrics={clicks:number;impressions:number;ctr:number;position:number};
+export function comparisonDecision(current:Pick<Metrics,'clicks'|'impressions'>|null,previous:Pick<Metrics,'clicks'|'impressions'>|null):'Koru'|'İncele'|'Veri bekle'{
+ if(!current||!previous||[current.clicks,current.impressions,previous.clicks,previous.impressions].some(n=>!Number.isFinite(n)||n<0))return 'Veri bekle';
+ const delta=current.clicks-previous.clicks,rate=previous.clicks?delta/previous.clicks:null;
+ return rate!==null&&rate<=-.2&&delta<=-30&&Math.min(current.impressions,previous.impressions)>=100?'İncele':'Koru';
+}
+export type GscComparison={current:Metrics;previous:Metrics;delta:number;rate:number|null;pages:{page:string;current:Metrics|null;previous:Metrics|null}[]};
 type Facet=Metrics&{id:string;label:string};
 type Filters={product?:string;page?:string;device?:string;country?:string;query?:string};
 const SOURCE='GSC Search Analytics API',LIMIT=150;
@@ -75,7 +81,7 @@ function requestedFilters(question:string,current:MonthlyGscAnalysisInput,previo
  if(/türkiye/.test(q))filters.country='tur';
  const queries=[...new Set([...(current.queries||[]),...(previous?.queries||[])].map(r=>r.query))];
  const observed=queries.sort((a,b)=>b.length-a.length).find(query=>query.length>=3&&q.includes(lower(query)));
- const explicitQuery=/sorgu|anahtar|kelime|[\"“”]/.test(q),sameProduct=product&&observed&&[lower(product.name),lower(product.id)].includes(lower(observed));
+ const explicitQuery=/sorgu|anahtar|kelime|[\"“”]/.test(q),sameProduct=product&&observed&&[variantFamily(product.name),variantFamily(product.id)].includes(variantFamily(observed));
  // A product name can also be a query. Preserve the user's selected product
  // or exact page unless the question explicitly selects that query.
  if(explicitQuery||!filters.page&&!sameProduct)filters.query=observed;
@@ -89,7 +95,7 @@ export function answerVerifiedGsc(current:MonthlyGscAnalysisInput,previous:Month
  const respond=(answer:string,decision:'Koru'|'İncele'|'Veri bekle',scope:'page'|'query'='page',both=false)=>{
   const evidence=refs(scope,both);
   return {answer,decision,evidence:evidence.map(refKey),evidence_refs:evidence,filters,source:SOURCE,month:current.month,
-   previous_month:both?previous?.month||null:null,coverage:coverage(current),d1_requests:0};
+   previous_month:both?previous?.month||null:null,coverage:coverage(current),comparison:null as GscComparison|null,d1_requests:0};
  };
  if(/şehir|ilçe|bölge|istanbul|ankara|izmir|bursa|antalya/.test(q))return respond('Kanıt: GSC ülke boyutu sağlar; şehir veya bölge kanıtı yok. Yorum: ülke tıklamaları şehir performansını açıklamaz. SEO kararı: doğrulanmış GA4 organik oturum verisi gelene kadar şehir için değişiklik yapma.','Veri bekle');
  if(/değişiklik geçmiş|ne zaman|yayın|başlık|meta|kanonik|canonical/.test(q))return respond('Kanıt: bu rapor GSC performans kayıtlarını içerir; tarihli CMS yayını veya önceki/sonraki tarama kanıtı içermez. Yorum: düşüş bir içerik değişikliğinin neden olduğunu kanıtlamaz. SEO kararı: değişiklik geçmişi ve taramalar arası zaman aralığı doğrulanmadan neden veya kesin yayın tarihi atfetme.','Veri bekle');
@@ -112,17 +118,18 @@ export function answerVerifiedGsc(current:MonthlyGscAnalysisInput,previous:Month
   const labels=list.map(r=>'“'+r.label+'”: '+r.clicks+' tıklama / '+r.impressions+' gösterim').join('; ');
   return respond('Kanıt: '+current.month+', görünür sorgu günleri '+current.query_days_verified+'/'+current.expected_days+'; '+labels+'. Yorum: bunlar GSC tarafından gösterilen sorgulardır; anonimleştirilmiş sorgular ve eksik günler bu toplama dahil değildir. Varyant kelimeler ayrı tutulur; sorgu toplamı site toplamı değildir. SEO kararı: yalnız bu kısmi sorgu listesiyle içerik veya yönlendirme değişikliği yapma.','Veri bekle','query');
  }
- const now=metrics(filtered(current.pages||[],filters,index));
+ const currentRows=filtered(current.pages||[],filters,index),now=metrics(currentRows);
  if(!now)return respond('Kanıt: istenen ürün/sayfa/cihaz/ülke filtresinde doğrulanmış satır yok. Yorum: istenen kırılım için sayısal karşılaştırma kurulamaz. SEO kararı: veri bekle; bulunmayan satırı sıfır sayma.','Veri bekle');
  const filterLabel=Object.entries(filters).filter(([,v])=>v).map(([k,v])=>k+'='+v).join(', ')||'site geneli';
  const observed='Kanıt: '+current.month+', '+filterLabel+', '+now.clicks+' tıklama / '+now.impressions+' gösterim, CTR %'+(now.ctr*100).toFixed(2)+', gösterim ağırlıklı konum '+now.position.toFixed(2)+'. ';
  const expectedPrevious=new Date(current.month+'-01T00:00:00Z');expectedPrevious.setUTCMonth(expectedPrevious.getUTCMonth()-1);
  if(!previous?.available||previous.month!==expectedPrevious.toISOString().slice(0,7)||!previous.evidence?.some(r=>r.scope==='page'))return respond(observed+'Yorum: karşılaştırılabilir önceki ayın tamamı doğrulanmadı; düşüş nedeni çıkarılamaz. SEO kararı: veri bekle.','Veri bekle');
- const before=metrics(filtered(previous.pages||[],filters,index));
+ const previousRows=filtered(previous.pages||[],filters,index),before=metrics(previousRows);
  if(!before)return respond(observed+'Yorum: aynı filtrede önceki aya ait doğrulanmış satır yok; sıfır varsayımıyla fark hesaplanamaz. SEO kararı: veri bekle.','Veri bekle');
  const delta=now.clicks-before.clicks,rate=before.clicks?delta/before.clicks:null;
- const decision=rate!==null&&rate<=-.2&&delta<=-30&&Math.min(now.impressions,before.impressions)>=100?'İncele':'Koru';
+ const decision=comparisonDecision(now,before);
+ const comparison:GscComparison={current:now,previous:before,delta,rate,pages:[...new Set([...currentRows,...previousRows].map(r=>r.page))].sort().map(page=>({page,current:metrics(currentRows.filter(r=>r.page===page)),previous:metrics(previousRows.filter(r=>r.page===page))}))};
  const change='Önceki ay '+previous.month+': '+before.clicks+' tıklama / '+before.impressions+' gösterim; tıklama farkı '+(delta>0?'+':'')+delta+(rate===null?' (önceki ay sıfır olduğundan yüzde hesaplanmaz)':' (%'+(rate*100).toFixed(1)+')')+'. ';
  const ctrContext=now.impressions>before.impressions&&now.ctr<before.ctr?'Gösterimler büyürken CTR düşüşü tek başına başarısızlık sayılmaz. ':'';
- return respond(observed+change+'Yorum: '+ctrContext+'Aylık fark nedeni kanıtlamaz; marka, cihaz karışımı ve mevsimsellik ayrıca incelenmelidir. SEO kararı: '+(decision==='İncele'?'kayda değer düşüşü incele; değişiklik geçmişiyle doğrulamadan içerik veya yönlendirme değiştirme.':'küçük dalgalanma veya güçlü olumsuz kanıt yok; değişiklik yapma.'),decision,'page',true);
+ return {...respond(observed+change+'Yorum: '+ctrContext+'Aylık fark nedeni kanıtlamaz; marka, cihaz karışımı ve mevsimsellik ayrıca incelenmelidir. SEO kararı: '+(decision==='İncele'?'kayda değer düşüşü incele; değişiklik geçmişiyle doğrulamadan içerik veya yönlendirme değiştirme.':'küçük dalgalanma veya güçlü olumsuz kanıt yok; değişiklik yapma.'),decision,'page',true),comparison};
 }

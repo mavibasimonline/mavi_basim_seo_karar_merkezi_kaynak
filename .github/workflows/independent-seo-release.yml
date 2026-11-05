@@ -43,4 +43,4 @@ jobs:
         if: steps.gate.outputs.ready == 'true'
       - name: Ücretsiz hesap, CI, mevcut Worker kilitleri ve D1 korumalı dağıtım
         if: steps.gate.outputs.ready == 'true'
-        run: python3 scripts/ga4_scope_release.py
+        run: python3 scripts/seo_answer_release.py
