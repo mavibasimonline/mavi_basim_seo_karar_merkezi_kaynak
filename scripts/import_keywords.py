@@ -1,5 +1,7 @@
 """Read-only, provenance-preserving Keyword Planner -> D1/SQLite import."""
 import argparse
+import base64
+import gzip
 import csv
 import hashlib
 import io
@@ -150,11 +152,56 @@ def inspect_sources(root=ROOT):
     return report, '\n'.join(statements) + '\n'
 
 
+def planner_bundle(output, root=ROOT):
+    """Compact, deterministic application data from the original read-only CSVs."""
+    sources, words, observations, index, products = [], [], [], {}, {}
+    for path in sorted(root.glob('*/*/*.csv')):
+        raw = path.read_bytes()
+        rows = list(csv.reader(io.StringIO(raw.decode('utf-16'), newline=''), delimiter='\t', strict=True))
+        if len(rows) < 4 or rows[2][:3] != ['Keyword', 'Currency', 'Avg. monthly searches']:
+            raise ValueError('PLANNER_SOURCE_HEADER_INVALID')
+        header, product, group = rows[2], path.parent.name, path.parent.parent.name
+        relative, sha = path.relative_to(root).as_posix(), digest(raw)
+        match = re.search(r'(\d{4}-\d{2}-\d{2}) at (\d{2})_(\d{2})_(\d{2})', path.name)
+        if not match:
+            raise ValueError('PLANNER_SOURCE_DATE_INVALID')
+        exported = f'{match[1]}T{match[2]}:{match[3]}:{match[4]}'
+        datetime.fromisoformat(exported)
+        sid, si = digest(relative + '\0' + sha), len(sources)
+        products[product] = {'id': product, 'name': LABELS.get(product, product), 'group_id': family(group).replace(' ', '-'), 'group': group, 'folder': str(path.parent.relative_to(root))}
+        count = 0
+        for line, cells in enumerate(rows[3:], 4):
+            if len(cells) != len(header) or not cells[0].strip():
+                raise ValueError('PLANNER_SOURCE_ROW_INVALID')
+            for col, value in zip(header, cells):
+                if col.startswith('Searches: ') or col in ('Avg. monthly searches', 'Competition (indexed value)'):
+                    number(value)
+            wid = digest(product + '\0' + cells[0])
+            if wid not in index:
+                index[wid] = len(words)
+                words.append([wid, product, cells[0], family(cells[0])])
+            observations.append([si, line, index[wid], cells])
+            count += 1
+        sources.append({'id': sid, 'product_id': product, 'path': relative, 'sha256': sha, 'exported_at': exported, 'export_timezone': None, 'period_label': rows[1][0], 'header': header, 'row_count': count})
+    value = {'format': 'repo-keyword-planner-v1', 'products': list(products.values()), 'sources': sources, 'words': words, 'observations': observations}
+    raw = json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode()
+    packed = base64.b64encode(gzip.compress(raw, mtime=0)).decode()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text('// Derived only from unchanged repository CSVs; not live Google Ads data.\nexport const plannerDigest=' + json.dumps(digest(raw)) + ';\nexport const plannerPacked=' + json.dumps(packed) + ';\n', encoding='utf-8')
+    return {'files': len(sources), 'rows': len(observations), 'product_keywords': len(words), 'products': len(products), 'sha256': digest(raw), 'raw_bytes': len(raw), 'packed_bytes': len(packed)}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--report', type=Path, required=True)
+    parser.add_argument('--output', type=Path)
+    parser.add_argument('--report', type=Path)
+    parser.add_argument('--planner-bundle', type=Path)
     args = parser.parse_args()
+    if args.planner_bundle:
+        print(json.dumps(planner_bundle(args.planner_bundle)))
+        return
+    if not args.output or not args.report:
+        parser.error('--output and --report are required for SQL preparation')
     report, commands = inspect_sources()
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')

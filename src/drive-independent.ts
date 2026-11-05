@@ -1,4 +1,7 @@
 // Independent Drive OAuth + serialized archive storage. Intentionally no DB/D1 binding.
+import {productSourceContext} from './product-source-context';
+import {plannerStatus,plannerLookup,plannerSyncPlan,verifyPlannerPage,holdPlanner} from './independent-planner';
+import {catchupTick,catchupStatus} from './gsc-catchup';
 import {DurableObject} from 'cloudflare:workers';
 import {historyStatus,claimHistory,saveHistoryPage,holdHistory,listHistory,historyDetail} from './seo-history';
 import {historyIntent,historyImpact,answerHistory} from './seo-history-analysis';
@@ -9,7 +12,7 @@ import {DRIVE_SHEET,DRIVE_SECTIONS,gvizRows,verifiedDriveRecords} from './drive-
 import {independentReport,independentAnswer,periodsOf,SheetRecord} from './independent-seo-model';
 import {readIndependentSnapshot,saveIndependentSnapshot,withVerifiedPreviousMonth,IndependentSnapshot} from './independent-snapshot';
 import {IndependentGscCollector} from './independent-gsc';
-import {collectPropertyTotal,readPropertyTotal} from './independent-gsc-totals';
+import {collectPropertyTotal,readPropertyTotal,collectPropertyHistory,readPropertyDays} from './independent-gsc-totals';
 import {resolvedCatalog,addCustomProduct} from './independent-catalog';
 import {verifiedGscMonth,readVerifiedGscDay,verifiedGscSeries} from './independent-gsc-report';
 import {analyzeVerifiedGsc,answerVerifiedGsc} from './independent-gsc-analysis';
@@ -263,6 +266,18 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
       this.config();
       return json(await runGscDiagnostic(this.ctx.storage,this.key(),force=>this.gscToken(force)));
     }
+    if(path==='/api/internal/data-completion/status')return json({catchup:await catchupStatus(this.ctx.storage),planner:await plannerStatus(this.ctx.storage)});
+    if(path==='/api/internal/data-completion/tick'&&request.method==='POST'){
+     const result=await catchupTick(this.ctx.storage,this.key(),force=>this.gscToken(force));if(result.status==='complete')this.gscReports.clear();return json(result);
+    }
+    if(path==='/api/internal/property-totals/tick'&&request.method==='POST')return json(await collectPropertyHistory(this.ctx.storage,this.key(),force=>this.gscToken(force)));
+    if(path==='/api/internal/property-totals/status'&&request.method==='GET'){
+     const months=[];for(const month of ['2026-06','2026-07','2026-08','2026-09','2026-10'])months.push({month,total:await readPropertyTotal(this.ctx.storage,this.key(),month),daily:await readPropertyDays(this.ctx.storage,this.key(),month)});return json({months,d1_requests:0});
+    }
+    if(path.startsWith('/api/internal/planner/')&&request.method==='POST'){
+     const action=path.split('/').at(-1),body=JSON.parse(await boundedText(new Response(request.body),2_000_000));
+     if(action==='plan')return json(await plannerSyncPlan(this.ctx.storage));if(action==='verify')return json(await verifyPlannerPage(this.ctx.storage,body));if(action==='held')return json(await holdPlanner(this.ctx.storage,body));return json({code:'PLANNER_ROUTE_INVALID'},404);
+    }
     if(path==='/api/internal/gsc-bootstrap-status'&&request.method==='GET')return json(await gscBootstrapStatus(this.ctx.storage));
     if(path==='/api/internal/gsc-bootstrap-tick'&&request.method==='POST'){
       this.config();
@@ -274,6 +289,11 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
         if(diagnostic.ok&&(diagnostic.rows||diagnostic.cursor))result=await runGscBootstrapTick(this.ctx.storage,this.key(),force=>this.gscToken(force));
       }
       if(result.status==='complete')this.gscReports.clear();
+      if(result.status==='idle'&&(result as any).plan_complete){
+       result=await catchupTick(this.ctx.storage,this.key(),force=>this.gscToken(force)) as typeof result;
+       if(result.status==='complete')this.gscReports.clear();
+      }
+      if(scheduled)try{await collectPropertyHistory(this.ctx.storage,this.key(),force=>this.gscToken(force));}catch{/* Bounded totals never gate collection. */}
       if(scheduled)await recordGscCron(this.ctx.storage,scheduled,result,new Date(),'history');
       return json(result);
     }
@@ -292,7 +312,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     }
     if(path==='/api/internal/gsc-coverage'&&request.method==='GET'){
       const collector=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
-      return json({...await collector.status(),cron:await gscCronProof(this.ctx.storage),connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')});
+      return json({...await collector.status(),catchup:await catchupStatus(this.ctx.storage),cron:await gscCronProof(this.ctx.storage),connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')});
     }
     if(path.startsWith('/api/internal/seo-history/')){
      const action=path.split('/').at(-1);
@@ -322,7 +342,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     if(request.method==='POST'&&(path==='/api/drive-independent/start'||path==='/api/oauth/google/start'&&url.searchParams.get('purpose')==='drive'))return await this.start();
     if(request.method==='GET'&&(path==='/api/drive-independent/status'||path==='/api/drive/status'))return json({connected:!!await this.ctx.storage.get('oauth'),storage:'durable-object-sqlite',d1_requests:0,last_archive:await this.ctx.storage.get('last_archive')||null,last_error:await this.ctx.storage.get('last_error')||null,next_run:await this.ctx.storage.getAlarm(),scope:SCOPE});
     return json({error:'Bulunamadı.'},404);
-   }catch(error){return json({error:'Kaynak işlemi tamamlanamadı.',code:error instanceof ProviderError?error.code:error instanceof Error&&/^(GA4_|GSC_|INDEPENDENT_CONTEXT_|HISTORY_)[A-Z0-9_]+$/.test(error.message)?error.message:'DRIVE_UNAVAILABLE'},400);}
+   }catch(error){return json({error:'Kaynak işlemi tamamlanamadı.',code:error instanceof ProviderError?error.code:error instanceof Error&&/^(GA4_|GSC_|INDEPENDENT_CONTEXT_|HISTORY_|PLANNER_)[A-Z0-9_]+$/.test(error.message)?error.message:'DRIVE_UNAVAILABLE'},400);}
   });
  }
  private async independentSnapshot(maxAgeMs=6*3600000){
@@ -349,6 +369,8 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
  private async independentRoute(request:Request){
   try{
    const url=new URL(request.url),path=url.pathname;
+   if(path==='/api/independent/planner-status'&&request.method==='GET')return json(await plannerStatus(this.ctx.storage));
+   if(path==='/api/independent/planner'&&request.method==='GET')return json({...await plannerLookup(url.searchParams.get('query')||'',url.searchParams.get('product')||''),d1_requests:0});
    if(path.startsWith('/api/independent/seo-history')&&request.method==='GET'){
     if(path.endsWith('/status'))return json(await historyStatus(this.ctx.storage));
     if(path.endsWith('/detail')){const detail=await historyDetail(this.ctx.storage,this.key(),url.searchParams.get('kind')||'event',url.searchParams.get('id')||'');return detail?json(detail):json({code:'HISTORY_RECORD_NOT_ARCHIVED'},404);}
@@ -363,7 +385,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     }
     if(path==='/api/independent/catalog'&&request.method==='POST'){
      const body=JSON.parse(await boundedText(new Response(request.body),4096)),context=await readIndependentContext(this.ctx.storage);
-     const month=typeof body.month==='string'?body.month:'';
+     let month=typeof body.month==='string'?body.month:'';
      if(!/^20\d\d-(0[1-9]|1[0-2])$/.test(month))return json({code:'INVALID_MONTH'},400);
      return json(await addCustomProduct(this.ctx.storage,this.key(),context,await this.gscMonth(month),body));
     }
@@ -391,15 +413,17 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    }
    if(request.method==='GET'&&path==='/api/independent/gsc-status'){
     const collector=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
-    return json({...await collector.status(),cron:await gscCronProof(this.ctx.storage),connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')});
+    return json({...await collector.status(),catchup:await catchupStatus(this.ctx.storage),cron:await gscCronProof(this.ctx.storage),connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')});
    }
    let questionBody:{question:string;month?:string;source?:unknown}|undefined;
    if(request.method==='POST'&&(path==='/api/independent/questions'||path==='/api/independent/gsc-questions')){
-    const body=JSON.parse(await boundedText(new Response(request.body),8192)) as {question?:unknown;month?:unknown;source?:unknown};
+    const body=JSON.parse(await boundedText(new Response(request.body),8192)) as {question?:unknown;month?:unknown;source?:unknown;include_source_context?:unknown};
     if(typeof body.question!=='string'||!body.question.trim()||body.question.length>1000||body.month!==undefined&&typeof body.month!=='string')return json({code:'INVALID_QUESTION'},400);
     questionBody={question:body.question,month:body.month as string|undefined,source:body.source};
     const latest=new Date(Date.now()-3*86400000);latest.setUTCDate(1);latest.setUTCMonth(latest.getUTCMonth()-1);
-    const month=questionBody.month||latest.toISOString().slice(0,7);
+    let month=questionBody.month||latest.toISOString().slice(0,7);
+    const monthWords=['ocak','subat','mart','nisan','mayis','haziran','temmuz','agustos','eylul','ekim','kasim','aralik'],monthQuestion=variantFamily(body.question);
+    if(!/sorgu|anahtar|kelime|["“”]/.test(monthQuestion)){const selected=monthWords.map((word,i)=>({word,i})).filter(v=>new RegExp('(?:^|[^a-z])'+v.word+'(?:$|[^a-z])').test(monthQuestion));if(selected.length===1){const year=monthQuestion.match(/\b20\d\d\b/)?.[0]||month.slice(0,4);month=year+'-'+String(selected[0].i+1).padStart(2,'0');}}
     if(!/^20\d\d-(0[1-9]|1[0-2])$/.test(month))return json({code:'INVALID_MONTH'},400);
     const p=new Date(month+'-01T00:00:00Z');p.setUTCMonth(p.getUTCMonth()-1);const previousMonth=p.toISOString().slice(0,7);
     const q=variantFamily(body.question),base=await readIndependentContext(this.ctx.storage).catch(()=>null),custom=await resolvedCatalog(this.ctx.storage,this.key(),base);
@@ -421,7 +445,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     if(!manualGa4&&!queryQuestion&&body.source!=='archive'&&historyIntent(q)){
      const exact=(body.question.match(/https?:\/\/[^\s<>"')]+/g)||[]).filter(u=>/^https?:\/\/(?:www\.)?mavibasim\.com(?:\/|$)/.test(u));
      const urls=product?.urls||exact;
-     if(!urls.length)return json({answer:'Doğrulanmış ürün adı veya tam URL ile geçmişi seçin. Sayfa ilişkisi veya kaydı bulunmayan geçmiş tahmin edilmez.',source:'Doğrulanmış SEO değişiklik arşivi',month,decision:'Veri bekle',evidence_refs:[],d1_requests:0});
+     if(!urls.length&&!/site|genel|tum/.test(q))return json({answer:'Doğrulanmış ürün adı veya tam URL ile geçmişi seçin. Sayfa ilişkisi veya kaydı bulunmayan geçmiş tahmin edilmez.',source:'Doğrulanmış SEO değişiklik arşivi',month,decision:'Veri bekle',evidence_refs:[],d1_requests:0});
      return json(await answerHistory(this.ctx.storage,this.key(),body.question,month,urls,/mobil|mobile/.test(q)?'MOBILE':/masaustu|desktop/.test(q)?'DESKTOP':/tablet/.test(q)?'TABLET':'ALL',m=>this.gscMonth(m)));
     }
     const geographic=/sehir|ilce|bolge|istanbul|ankara|izmir|bursa|antalya/.test(q);
@@ -441,7 +465,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
      const answer=answerVerifiedGsc(current,previous,body.question,mappings);
      if(product&&context&&!explicitGsc&&!answer.filters.query&&!/anahtar|kelime|sorgu|hangi arama/.test(q)){
       const ga4Current=await this.ga4().report(month).catch(()=>null),ga4Previous=await this.ga4().report(previousMonth).catch(()=>null);
-      return json(answerProductEvidence(answer,ga4Current,ga4Previous,context,product,body.question));
+      const evaluated=answerProductEvidence(answer,ga4Current,ga4Previous,context,product,body.question);return json(body.include_source_context===true?await productSourceContext(evaluated,current,previous,product):evaluated);
      }
      return json({...answer,mapping_evidence:context?{source_hash:context.source_hash,captured_at:context.captured_at}:null});
     }

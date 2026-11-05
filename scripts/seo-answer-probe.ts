@@ -1,4 +1,6 @@
 // Account-only guarded history copy and live read acceptance. No source mutations or credential output.
+import {syncPlanner} from '../src/planner-bridge';
+import historyAudit from './gsc_history_probe';
 import {syncSeoHistory} from '../src/seo-history-bridge';
 import type {Env} from '../src/types';
 interface Probe {ADMIN_TOKEN?:string;PROBE_KEY:string;LIVE_APP:Fetcher;DB:D1Database;DRIVE_ARCHIVE_SERVICE:Fetcher;D1_READ_GUARD_ENABLED:string}
@@ -8,6 +10,16 @@ export default {async fetch(request:Request,env:Probe){
  if(!env.PROBE_KEY||request.headers.get('Authorization')!=='Bearer '+env.PROBE_KEY)return new Response(null,{status:404});
  const mode=new URL(request.url).pathname;
  if(mode==='/health')return Response.json({ready:true,admin_configured:!!env.ADMIN_TOKEN});
+ if(['/completion-step','/completion-status','/totals-step','/planner-bootstrap','/audit-read'].includes(mode)&&request.method==='POST'){
+  const read=async(path:string,method='GET')=>{const r=await env.DRIVE_ARCHIVE_SERVICE.fetch('https://archive.private/api/'+path,{method,...(method==='POST'?{body:'{}',headers:{'Content-Type':'application/json'}}:{})});if(!r.ok)throw Error('SEO_ANSWER_COMPLETION_SOURCE_UNAVAILABLE');return r.json<any>();};
+  if(mode==='/completion-step')return Response.json(await read('internal/data-completion/tick','POST'));
+  if(mode==='/totals-step')return Response.json(await read('internal/property-totals/tick','POST'));
+  if(mode==='/planner-bootstrap'){const result=await syncPlanner(env as unknown as Env);return Response.json({status:result.status,code:result.code||null,reason:result.reason||null,...await read('independent/planner-status')});}
+  if(mode==='/audit-read')return historyAudit.fetch(new Request('https://audit.private/?mode=analysis&month=2026-10',{method:'POST',headers:{Authorization:'Bearer '+env.PROBE_KEY}}),{PROBE_KEY:env.PROBE_KEY,ARCHIVE:env.DRIVE_ARCHIVE_SERVICE});
+  const months=[];for(const month of ['2026-06','2026-07','2026-08']){const m=await read('internal/gsc-month?month='+month);months.push({month,page_days:m.days_verified,query_days:m.query_days_verified,expected_days:m.expected_days,verified:m.available===true,read_budget_limited:m.read_budget.budget_limited});}
+  const totals=await read('internal/property-totals/status'),properties=totals.months.map((m:any)=>({month:m.month,verified:!!m.total,days_verified:m.daily.days_verified,expected_days:m.daily.expected_days,daily_sums_match:!!m.total&&m.daily.days_verified===m.daily.expected_days&&m.daily.rows.reduce((n:number,r:any)=>n+r.clicks,0)===m.total.clicks&&m.daily.rows.reduce((n:number,r:any)=>n+r.impressions,0)===m.total.impressions}));
+  return Response.json({months,properties,planner:await read('independent/planner-status'),catchup:(await read('internal/data-completion/status')).catchup});
+ }
  if(mode==='/history-bootstrap'&&request.method==='POST'){
   const receipts=[await syncSeoHistory(env as unknown as Env)];
   const r=await env.DRIVE_ARCHIVE_SERVICE.fetch('https://archive.private/api/internal/seo-history/status');
@@ -20,7 +32,7 @@ export default {async fetch(request:Request,env:Probe){
  // The real admin key remains in Workers; the temporary preview key is local.
  if(!['/before','/accept'].includes(mode)){
   const assets=['/','/index.html','/app.js','/app.css','/ui.js','/chart.js','/evidence.js','/modules.js','/gsc-review.js','/period.js','/icons.svg','/unified-seo.js','/seo/workspace.js','/seo/workspace.css','/seo/tables.js','/seo/tables.css','/seo/catalog-sync.js','/seo/history.js','/seo/history.css'];
-  const allowed=request.method==='GET'&&(assets.includes(mode)||/^\/fonts\/[a-zA-Z0-9._-]+\.woff2$/.test(mode)||mode==='/api/session'||/^\/api\/independent\/seo-history(?:\/(status|detail|impact))?$/.test(mode)||/^\/api\/independent\/(gsc-month|gsc-series|gsc-status|ga4-status|ga4-report|change-history|report|catalog)$/.test(mode))||request.method==='POST'&&/^\/api\/independent\/(questions|gsc-questions)$/.test(mode)||request.method==='DELETE'&&mode==='/api/session';
+  const allowed=request.method==='GET'&&(assets.includes(mode)||/^\/fonts\/[a-zA-Z0-9._-]+\.woff2$/.test(mode)||mode==='/api/session'||/^\/api\/independent\/seo-history(?:\/(status|detail|impact))?$/.test(mode)||/^\/api\/independent\/(planner|planner-status|gsc-month|gsc-series|gsc-status|ga4-status|ga4-report|change-history|report|catalog)$/.test(mode))||request.method==='POST'&&/^\/api\/independent\/(questions|gsc-questions)$/.test(mode)||request.method==='DELETE'&&mode==='/api/session';
   if(!allowed||!env.ADMIN_TOKEN)return new Response(null,{status:404});
   const url=new URL(request.url),headers=new Headers({'Authorization':'Bearer '+env.ADMIN_TOKEN,Origin:ORIGIN,'Content-Type':'application/json'});
   return env.LIVE_APP.fetch(new Request(ORIGIN+mode+url.search,{method:request.method,headers,...(request.method==='POST'?{body:await request.text()}:{})}));
@@ -28,7 +40,7 @@ export default {async fetch(request:Request,env:Probe){
  try{
   need(request.method==='POST'&&!!env.ADMIN_TOKEN&&['/before','/accept'].includes(mode),'SEO_ANSWER_REQUEST_INVALID');
   const call=async(question:string,source?:string,route='questions',selectedMonth='2026-10')=>{
-   const r=await env.LIVE_APP.fetch(ORIGIN+'/api/independent/'+route,{method:'POST',headers:{Authorization:'Bearer '+env.ADMIN_TOKEN,Origin:ORIGIN,'Content-Type':'application/json'},body:JSON.stringify({month:selectedMonth,question,...(source?{source}:{})})});
+   const r=await env.LIVE_APP.fetch(ORIGIN+'/api/independent/'+route,{method:'POST',headers:{Authorization:'Bearer '+env.ADMIN_TOKEN,Origin:ORIGIN,'Content-Type':'application/json'},body:JSON.stringify({month:selectedMonth,question,include_source_context:true,...(source?{source}:{})})});
    need(r.ok,'SEO_ANSWER_UNAVAILABLE');return r.json<any>();
   };
   const auto=await call('Broşür neden düşüyor?'),direct=await call('Broşür neden düşüyor?',undefined,'gsc-questions'),manual=await call('Broşür neden düşüyor?','ga4');
@@ -69,6 +81,6 @@ export default {async fetch(request:Request,env:Probe){
   if(history.next_cursor){const next=await read('/api/independent/seo-history?kind=event&cursor='+encodeURIComponent(history.next_cursor));const seen=new Set(history.items.map((e:any)=>e.id));need(next.items.every((e:any)=>!seen.has(e.id)),'SEO_ANSWER_HISTORY_PAGINATION_DUPLICATE');}
   const historyAnswer=await call('Broşür sayfasında neler değiştirdik ve sonuç ne oldu?');
   need(historyAnswer.source==='Doğrulanmış SEO değişiklik arşivi + GSC Search Analytics API'&&historyAnswer.available===true&&historyAnswer.impact?.url===auto.url&&historyAnswer.cause_confirmed===false&&historyAnswer.content_change_recommended===false&&historyAnswer.evidence_refs.some((r:any)=>r.event_id)&&historyAnswer.evidence_refs.some((r:any)=>r.scope==='page'),'SEO_ANSWER_HISTORY_QA_INVALID');
-  return Response.json({verified:true,history_events:history.coverage.events,history_snapshots:history.coverage.snapshots,history_caught_up:true,history_details_verified:true,history_pagination_verified:true,history_qa_verified:true,catalog_user_confirmed_mappings:true,global_qa_routing_verified:true,september_mobile_growth_verified:true,dynamic_comparison_period_verified:true,growth_comparison_months:['2026-08','2026-09'],unified_panel:true,daily_chart_days:month.daily.length,product_mappings:month.mappings.length,visible_query_rows:month.queries?.length||0,query_days_verified:month.query_days_verified,query_expected_days:month.expected_days,query_read_budget_limited:month.read_budget?.budget_limited===true,official_property_total_available:!!month.property_total,product_scope:true,periods,decision:auto.decision,decision_consistent:true,gsc_drop_verified:auto.comparison.delta<0,ga4_sessions_compared:true,ga4_drop_verified:ga4.delta<0,cross_source_page_decline:joint,review_priority:priority,content_change_recommended:false,changes_referenced:auto.evaluation.changes.length,change_dates_present:true,cause_confirmed:false,manual_ga4_respected:true,unsupported_ga4_explicit:true,city_misrouting:false,d1_requests:0});
+  return Response.json({verified:true,history_events:history.coverage.events,history_snapshots:history.coverage.snapshots,history_caught_up:true,history_details_verified:true,history_pagination_verified:true,history_qa_verified:true,planner_context_verified:!!auto.product_source_context?.planner,catalog_user_confirmed_mappings:true,global_qa_routing_verified:true,september_mobile_growth_verified:true,dynamic_comparison_period_verified:true,growth_comparison_months:['2026-08','2026-09'],unified_panel:true,daily_chart_days:month.daily.length,product_mappings:month.mappings.length,visible_query_rows:month.queries?.length||0,query_days_verified:month.query_days_verified,query_expected_days:month.expected_days,query_read_budget_limited:month.read_budget?.budget_limited===true,official_property_total_available:!!month.property_total,product_scope:true,periods,decision:auto.decision,decision_consistent:true,gsc_drop_verified:auto.comparison.delta<0,ga4_sessions_compared:true,ga4_drop_verified:ga4.delta<0,cross_source_page_decline:joint,review_priority:priority,content_change_recommended:false,changes_referenced:auto.evaluation.changes.length,change_dates_present:true,cause_confirmed:false,manual_ga4_respected:true,unsupported_ga4_explicit:true,city_misrouting:false,d1_requests:0});
  }catch(error){const code=error instanceof Error&&/^SEO_ANSWER_[A-Z0-9_]+$/.test(error.message)?error.message:'SEO_ANSWER_INVALID';return Response.json({code},{status:503});}
 }};

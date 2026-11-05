@@ -6,7 +6,7 @@ import {isBrand} from './urls';
 const PROPERTY='sc-domain:mavibasim.com',PAGE=200,MAX_PAGES=250,CHUNK=36000;
 type Scope='page'|'query';
 type PageProof={index:number;count:number;bytes:number;chunks:number;sha256:string};
-type Job={day:string;scope:Scope;generation:string;cursor:number;pages:PageProof[];started_at:string;attempts:number;incomplete?:boolean;ready?:boolean;truncated?:boolean;completed_at?:string};
+type Job={day:string;scope:Scope;generation:string;cursor:number;pages:PageProof[];started_at:string;attempts:number;incomplete?:boolean;ready?:boolean;truncated?:boolean;completed_at?:string;request_limit?:number};
 export type DailyProof={day:string;scope:Scope;generation:string;captured_at:string;rows:number;pages:number;query_partial:boolean;source:'GSC Search Analytics API';d1_requests:0;collection_complete?:boolean;page_proofs:PageProof[]};
 export type GscStorage=Pick<DurableObjectStorage,'get'|'put'>&{sql?:{readonly databaseSize:number}};
 export type GscPhase='authorization'|'provider'|'response'|'validation'|'storage'|'publication';
@@ -145,7 +145,7 @@ export function collectedGscProof(p:DailyProof|undefined,day:string,scope:Scope,
  return Array.isArray(parts)&&parts.length>0&&parts.length<=250&&p.pages===parts.length&&parts.every((v,i)=>v.index===i&&Number.isSafeInteger(v.count)&&v.count>=0&&v.count<=200&&/^[a-f0-9]{64}$/.test(v.sha256))&&parts.reduce((n,v)=>n+v.count,0)===p.rows&&parts.at(-1)!.count<200;
 }
 export class IndependentGscCollector {
- constructor(private storage:GscStorage,private keySecret:string,private token:(force:boolean)=>Promise<string>,private fetcher:typeof fetch=fetch,private budgetMode:BudgetMode='daily'){}
+ constructor(private storage:GscStorage,private keySecret:string,private token:(force:boolean)=>Promise<string>,private fetcher:typeof fetch=fetch,private budgetMode:BudgetMode='daily',private requestLimit=PAGE){}
  private async finish(j:Job,time:Date){
   const final:DailyProof={day:j.day,scope:j.scope,generation:j.generation,captured_at:j.completed_at||time.toISOString(),
    rows:j.cursor,pages:j.pages.length,query_partial:j.scope==='query'||!!j.incomplete||!!j.truncated||j.cursor===0,
@@ -225,7 +225,7 @@ export class IndependentGscCollector {
    const dimensions=j.scope==='query'?['date','page','query','country','device']:['date','page','country','device'];
    const endpoint='https://www.googleapis.com/webmasters/v3/sites/'+encodeURIComponent(PROPERTY)+'/searchAnalytics/query';
    // Use Google's recommended auto aggregation for page dimensions; reject non-byPage responses.
-   const payload={startDate:j.day,endDate:j.day,dimensions,type:'web',dataState:'final',aggregationType:'auto',rowLimit:PAGE,startRow:j.cursor};
+   const payload={startDate:j.day,endDate:j.day,dimensions,type:'web',dataState:'final',aggregationType:'auto',rowLimit:Math.min(j.request_limit||this.requestLimit,1000,50000-j.cursor),startRow:j.cursor};
    const send=async(force:boolean)=>{
     phase='authorization';
     const access=await this.token(force);
@@ -248,25 +248,30 @@ export class IndependentGscCollector {
    const raw=await boundedResponse(response);let body:unknown;
    try{body=JSON.parse(raw);}catch{throw Error('GSC_RESPONSE_INVALID');}
    phase='validation';
-   const page=validateGscPage(body,j.day,j.scope,j.cursor),hashes=await identities(page.rows);
-   for(const h of hashes)ensure(!seen.has(h),'GSC_DUPLICATE_ROW');
-   phase='storage';
-   const proof=await writePage(this.storage,j,page.rows,this.keySecret,time,hashes,this.budgetMode);
-   phase='publication';
-   j.pages.push(proof);j.cursor+=page.rows.length;
-   j.incomplete=!!j.incomplete||page.incomplete;
-   if(page.next!==null&&j.cursor<50000){
-    await this.storage.put('gsc:active',j);
+   const batch=body as {rows?:unknown[]};
+   ensure(batch&&typeof batch==='object'&&(batch.rows===undefined||Array.isArray(batch.rows))&&(batch.rows?.length||0)<=payload.rowLimit,'GSC_PAGE_LIMIT');
+   const rawRows=batch.rows||[],parts=[];
+   for(let offset=0;offset<Math.max(1,rawRows.length);offset+=PAGE)parts.push(validateGscPage({...batch,rows:rawRows.slice(offset,offset+PAGE)},j.day,j.scope,j.cursor+offset));
+   const hasNext=rawRows.length===payload.rowLimit;
+   if(!hasNext&&rawRows.length>0&&rawRows.length%PAGE===0)parts.push(validateGscPage({...batch,rows:[]},j.day,j.scope,j.cursor+rawRows.length));
+   for(const page of parts){
+    const hashes=await identities(page.rows);for(const h of hashes){ensure(!seen.has(h),'GSC_DUPLICATE_ROW');seen.add(h);}
+    phase='storage';const proof=await writePage(this.storage,j,page.rows,this.keySecret,time,hashes,this.budgetMode);
+    j.pages.push(proof);j.cursor+=page.rows.length;j.incomplete=!!j.incomplete||page.incomplete;
+    phase='publication';await this.storage.put('gsc:active',j);
+   }
+   if(hasNext&&j.cursor<50000){
     await this.storage.put('gsc:last-attempt',{at:time.toISOString(),status:'partial',day:j.day,scope:j.scope,cursor:j.cursor});
     return {status:'partial',day:j.day,scope:j.scope,cursor:j.cursor,d1_requests:0};
    }
    // Persist finalization state before publishing either pointer. A storage
    // interruption resumes publication without re-requesting a finished page.
-   j.ready=true;j.truncated=page.next!==null;j.completed_at=time.toISOString();
+   j.ready=true;j.truncated=hasNext;j.completed_at=time.toISOString();
    await this.storage.put('gsc:active',j);
    return await this.finish(j,time);
   }catch(error){
    const code=error instanceof Error&&/^GSC_[A-Z0-9_]{1,80}$/.test(error.message)?error.message:PHASE_CODE[phase];
+   if(code==='GSC_RESPONSE_BYTES_LIMIT'&&(j.request_limit||this.requestLimit)>PAGE){j.request_limit=PAGE;await this.storage.put('gsc:active',j);return {status:'partial',day:j.day,scope:j.scope,cursor:j.cursor,code:'GSC_SMALLER_BATCH_SELECTED',d1_requests:0};}
    const detail=error instanceof RowFailure&&/^(DATE|PAGE_PROPERTY_SCOPE|PAGE_ORIGIN|COUNTRY|DEVICE|METRIC_NUMBER|COUNTS|METRIC_RANGE|CTR_RATIO|QUERY)$/.test(error.reason)?error.reason:undefined;
    const failure={at:time.toISOString(),status:'held',day:j.day,scope:j.scope,code,phase,...(detail?{validation_reason:detail}:{}),cursor:j.cursor};
    await this.storage.put('gsc:last-failure',failure);

@@ -7,11 +7,11 @@ from quota_observer_release import api,free_plan
 from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
-BASE='46ebbcef7ea17e978313db918e0e3f400ef2fd89'
-APP_SOURCE='98917869af739ad5a2112dc785c0a65c47d8a2fe'
+BASE='94d06990ad71712051391d4267762f4c5229ec9e'
+APP_SOURCE='94d06990ad71712051391d4267762f4c5229ec9e'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'src/drive-independent.ts','scripts/seo_answer_release.py'}
-PROTECTED=('src/independent-gsc-analysis.ts', 'public/app.css', 'public/chart.js', 'src/independent-product-answer.ts', 'src/independent-session.ts', 'src/security.ts', 'src/independent-seo-model.ts', 'src/drive-broker.ts', 'src/independent-gsc.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc-bootstrap.ts', 'src/independent-ga4.ts', 'src/independent-context-bridge.ts', 'src/independent-cron-proof.ts', 'src/independent-refresh.ts', 'src/independent-snapshot.ts', 'src/drive-records.ts', 'src/d1-read-budget.ts', 'public/ui.js', 'public/period.js', 'public/independent-seo.js', 'public/independent-seo.html', 'deploy/wrangler.monthly-app.jsonc', 'deploy/wrangler.drive-archive.jsonc', 'src/independent-gsc-totals.ts', 'src/independent-catalog.ts', 'src/independent-context.ts', 'src/independent-insights.ts', 'src/independent-gsc-report.ts', 'public/index.html', 'public/seo/catalog-sync.js', 'public/seo/tables.css', 'src/browser/evidence-detail.js', 'public/seo/tables.js', 'public/app.js', 'src/browser/insights-workspace.js', 'public/seo/workspace.js', 'src/urls.ts', 'src/index.ts', 'public/unified-seo.js', 'scripts/build-unified-panel.mjs', 'scripts/seo-answer-probe.ts', 'src/browser/unified-seo-panel.js', 'public/seo/history.css', 'public/seo/history.js', 'src/browser/history-workspace.js', 'src/seo-history-analysis.ts', 'src/seo-history-bridge.ts', 'src/seo-history.ts')
+EXPECTED={'scripts/seo_answer_release.py', 'src/seo-history-analysis.ts', 'scripts/gsc_history_probe.ts', 'src/browser/insights-workspace.js', 'scripts/gsc_history_acceptance.py', 'scripts/seo-answer-probe.ts', 'src/browser/unified-seo-panel.js', 'src/drive-independent.ts', 'src/planner-bridge.ts', 'src/independent-planner.ts', 'public/unified-seo.js', 'src/independent-gsc.ts', 'src/generated/planner-data.ts', 'src/independent-gsc-totals.ts', 'src/index.ts', 'src/browser/evidence-detail.js', 'src/product-source-context.ts', 'public/seo/workspace.js', 'scripts/import_keywords.py', 'src/gsc-catchup.ts'}
+PROTECTED=('src/independent-gsc-analysis.ts', 'public/app.css', 'public/chart.js', 'src/independent-product-answer.ts', 'src/independent-session.ts', 'src/security.ts', 'src/independent-seo-model.ts', 'src/drive-broker.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc-bootstrap.ts', 'src/independent-ga4.ts', 'src/independent-context-bridge.ts', 'src/independent-cron-proof.ts', 'src/independent-refresh.ts', 'src/independent-snapshot.ts', 'src/drive-records.ts', 'src/d1-read-budget.ts', 'public/ui.js', 'public/period.js', 'public/independent-seo.js', 'public/independent-seo.html', 'deploy/wrangler.monthly-app.jsonc', 'deploy/wrangler.drive-archive.jsonc', 'src/independent-catalog.ts', 'src/independent-context.ts', 'src/independent-insights.ts', 'src/independent-gsc-report.ts', 'public/index.html', 'public/seo/catalog-sync.js', 'public/seo/tables.css', 'public/seo/tables.js', 'public/app.js', 'src/urls.ts', 'scripts/build-unified-panel.mjs', 'public/seo/history.css', 'public/seo/history.js', 'src/browser/history-workspace.js', 'src/seo-history-bridge.ts', 'src/seo-history.ts')
 
 def browser_acceptance(key):
  # One mandatory live UI acceptance, outside the test suite. No source rows/logs.
@@ -99,8 +99,9 @@ def run():
  need(git('rev-parse','HEAD^')==BASE and set(git('diff','--name-only','HEAD^','HEAD').splitlines())==EXPECTED,'SEO_ANSWER_REVIEWED_SCOPE_REQUIRED')
  for path in PROTECTED:need(subprocess.check_output(['git','show',BASE+':'+path],cwd=ROOT)==(ROOT/path).read_bytes(),'SEO_ANSWER_PROTECTED_SOURCE_CHANGED')
  old_index=subprocess.check_output(['git','show',BASE+':src/index.ts'],cwd=ROOT).decode()
+ planner_hook="      try{await syncPlanner(env,true);}catch{/* Planner verification never gates existing collection. */}\n"
  history_hook="      try{await syncSeoHistory(env,'Cloudflare Cron',time.toISOString());}catch{/* History never gates existing collection. */}\n"
- need(old_index.split('  async scheduled(',1)[1].replace(history_hook,'')==(ROOT/'src/index.ts').read_text().split('  async scheduled(',1)[1].replace(history_hook,''),'SEO_ANSWER_CRON_SOURCE_CHANGED')
+ need(old_index.split('  async scheduled(',1)[1].replace(history_hook,'').replace(planner_hook,'')==(ROOT/'src/index.ts').read_text().split('  async scheduled(',1)[1].replace(history_hook,'').replace(planner_hook,''),'SEO_ANSWER_CRON_SOURCE_CHANGED')
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'SEO_ANSWER_MAIN_SUPERSEDED')
  runs=get_json('https://api.github.com/repos/'+REPOSITORY+'/actions/workflows/ci.yml/runs?head_sha='+sha+'&per_page=20',os.environ.get('GITHUB_TOKEN')).get('workflow_runs',[])
  need(any(r.get('head_sha')==sha and r.get('head_branch')=='main' and r.get('event')=='push' and r.get('conclusion')=='success' for r in runs),'SEO_ANSWER_GREEN_CI_REQUIRED')
@@ -142,6 +143,26 @@ def run():
     if history.get('verified') is True:break
     if history.get('held') or not any(r.get('status')=='partial' for r in history.get('receipts',[])):break
    need(history and history.get('verified') is True,'SEO_ANSWER_HISTORY_COPY_INCOMPLETE')
+   initial_data=exchange('/completion-status');print(json.dumps({'seo_data_before':initial_data}),flush=True)
+   data_deadline=time.monotonic()+420
+   planner=None
+   for batch in range(160):
+    if time.monotonic()>data_deadline:break
+    planner=exchange('/planner-bootstrap')
+    if batch%10==0 or planner.get('status') in ('idle','held'):print(json.dumps({'seo_planner_progress':planner}),flush=True)
+    if planner.get('d1_import_complete') is True or planner.get('status')=='held':break
+   for batch in range(8):
+    totals=exchange('/totals-step')
+    print(json.dumps({'seo_property_progress':totals}),flush=True)
+    if totals.get('status') in ('idle','held','unavailable'):break
+   for batch in range(240):
+    if time.monotonic()>data_deadline:break
+    progress=exchange('/completion-step')
+    if batch%20==0 or progress.get('status') in ('held','idle'):print(json.dumps({'seo_gsc_progress':progress}),flush=True)
+    if progress.get('status') in ('idle','held'):break
+   final_data=exchange('/completion-status');print(json.dumps({'seo_data_after':final_data}),flush=True)
+   from gsc_history_acceptance import sanitize
+   audit=sanitize(exchange('/audit-read'),'analysis');print(json.dumps({'seo_gsc_audit_fixed':audit}),flush=True)
    deployed.append(APP);deploy(main_config,sha)
    app_after=snapshot(client,APP);verify_active_source(client,APP,app_after['version'],sha)
    need(app_after['bindings']==before[APP]['bindings'] and app_after['crons']==before[APP]['crons'],'SEO_ANSWER_CONFIGURATION_CHANGED')
@@ -174,7 +195,7 @@ def run():
     need(status==401,'SEO_ANSWER_PUBLIC_DATA_EXPOSED')
    login=live_acceptance();browser=browser_acceptance(key)
    need(snapshot(client,APP)==app_after and snapshot(client,ARCHIVE)==after,'SEO_ANSWER_PRODUCTION_DRIFT')
-   print(json.dumps({'seo_answer_release':{'deployed':True,'source':sha,'archive_version':after['version'],'app_version':app_after['version'],'unified_panel':True,'cron_unchanged':True,'source_datasets_unchanged':True,'proof':proof,'login':login,'browser':browser,'panel_d1_requests':0,'history_copy_metered_d1':True,'history_source_mutations':0,'new_billed_resources':False,'site_changed':False}}),flush=True)
+   print(json.dumps({'seo_answer_release':{'deployed':True,'source':sha,'archive_version':after['version'],'app_version':app_after['version'],'unified_panel':True,'cron_unchanged':True,'existing_source_records_preserved':True,'proof':proof,'login':login,'browser':browser,'panel_d1_requests':0,'history_copy_metered_d1':True,'history_source_mutations':0,'data_completion':final_data,'gsc_audit_verified':True,'new_billed_resources':False,'site_changed':False}}),flush=True)
  except Exception:
   for worker,config in ((APP,main_config),(ARCHIVE,'deploy/wrangler.drive-archive.jsonc')):
    if worker in deployed:rollback(config,before[worker]['version']);need(snapshot(client,worker)==before[worker],'SEO_ANSWER_ROLLBACK_FAILED')

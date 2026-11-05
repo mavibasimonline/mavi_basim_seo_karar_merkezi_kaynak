@@ -18,6 +18,7 @@ function evidence(refs=[]){
  for(const r of refs){
   let text;
   if(r.event_id)text='SEO değişikliği '+r.url+' · '+(r.publication_evidence?'Kanıtlı yayın: '+stamp(r.published_at):'Tarama aralığı: '+stamp(r.observed_interval?.from)+' — '+stamp(r.observed_interval?.to))+' · '+(r.changed_fields||[]).join(', ')+' · Başlık: '+r.before?.title+' → '+r.after?.title+' · H1: '+(r.before?.h1||[]).join(' / ')+' → '+(r.after?.h1||[]).join(' / ')+' · Hash: '+r.before?.content_hash+' → '+r.after?.content_hash+' · Kaynak: '+r.source_hash;
+  else if(r.source==='Google Ads Keyword Planner CSV arşivi')text='Keyword Planner · '+r.file+' · satır '+r.row_number+' · '+r.exported_at+' (kaynak saat dilimi bilinmiyor) · '+r.period+' · '+r.keyword+' · pazar hacmi '+r.avg_monthly_searches+' · SHA-256 '+r.sha256;
   else if(r.property)text='GA4 · '+r.property+' · '+r.kind+' · '+r.from+' — '+r.to+' · '+r.timezone+' · '+stamp(r.captured_at)+' · '+(r.hashes||[]).join(', ');
   else text='GSC · '+r.day+' · '+(r.scope==='page'?'Sayfa':'Görünür sorgu')+' · '+stamp(r.captured_at)+' · '+r.generation+' · '+(r.page_hashes||[]).join(', ');
   ul.append(node('li',text));
@@ -29,7 +30,7 @@ export function createIndependentPanel({api,notify}){
  document.querySelector('[data-view="products"]').setAttribute('aria-label','Ürün & Canlı Sayfa Analizi');
  document.querySelector('[data-view="products"] .nav-label').textContent='Ürün & Canlı Sayfa Analizi';
  $('leadersTitle').textContent='İlk 5 Lider Ürün';
- let current=[],previous=null,ga4=null,oldGa4=null,status=null,ga4Status=null,changes=null,archive=null,catalog=null,workspace=null,workspacePromise=null,history=null,historyPromise=null,activeView='overview',errors=[],revision=0,queryPage=1,first=true,metric='clicks',sort={key:'clicks',direction:'desc'};
+ let current=[],previous=null,ga4=null,oldGa4=null,status=null,ga4Status=null,planner=null,changes=null,archive=null,catalog=null,workspace=null,workspacePromise=null,history=null,historyPromise=null,activeView='overview',errors=[],revision=0,queryPage=1,first=true,metric='clicks',sort={key:'clicks',direction:'desc'};
  const cache=new Map();
  const target=()=>$('month').value,device=()=>$('device').value;
  const selectedRows=raw=>(raw?.pages||[]).filter(r=>device()==='ALL'||r.device===device());
@@ -120,7 +121,7 @@ export function createIndependentPanel({api,notify}){
  function calendar(day=null){const at=revision;historyModule().then(w=>{if(at===revision&&!$('app').hidden)return w.render('changes',day);}).catch(e=>notify(e.message));}
  function health(){
   const seen=new Set((status?.coverage||[]).map(r=>r.day+':'+r.scope));
-  const root=$('dataAuditResults');root.replaceChildren(node('h3','Kaynaklar ve otomatik çalışma'),node('p','Günlük GSC: '+seen.size+'/14 kayıt · '+(status?.connected?'Google izni kayıtlı':'Bağlantı doğrulanmadı')),node('p',coverage()),node('p',current.map(r=>r.month+': '+(r.query_days_verified||0)+'/'+(r.expected_days||0)+' görünür sorgu günü').join(' · ')),node('p','Son Cron: '+stamp(status?.cron?.last?.scheduled_at)+' · '+(status?.cron?.last?.status||'Doğrulanmadı')),node('p','GA4: '+(ga4Status?.property?ga4Status.property.name+' · '+ga4Status.property.id:'Doğrulanmış mülk bekleniyor')+' · '+(ga4Status?.connected?'İzin kayıtlı':'İzin doğrulanmadı')),node('p','Son GA4 otomasyonu: '+stamp(ga4Status?.cron?.scheduled_at)),node('p','Değişiklik kaynağı: '+stamp(changes?.captured_at)+' · '+(changes?.source_hash||'Doğrulanmadı')),node('p','Veriler bağımsız kayıt deposundan okunur. Arşiv ve D1 koruması korunur. Eksik veri sıfır trafik değildir.'),...(status?.last_failure?[node('p','Son GSC hata kaydı: '+stamp(status.last_failure.at)+' · '+status.last_failure.code)]:[]),...errors.map(e=>node('p',e)),evidence(current.flatMap(r=>r.evidence||[])));
+  const root=$('dataAuditResults');root.replaceChildren(node('h3','Kaynaklar ve otomatik çalışma'),node('p','Günlük GSC: '+seen.size+'/14 kayıt · '+(status?.connected?'Google izni kayıtlı':'Bağlantı doğrulanmadı')),node('p',coverage()),node('p',current.map(r=>r.month+': '+(r.query_days_verified||0)+'/'+(r.expected_days||0)+' görünür sorgu günü').join(' · ')),node('p','Son Cron: '+stamp(status?.cron?.last?.scheduled_at)+' · '+(status?.cron?.last?.status||'Doğrulanmadı')),node('p','GA4: '+(ga4Status?.property?ga4Status.property.name+' · '+ga4Status.property.id:'Doğrulanmış mülk bekleniyor')+' · '+(ga4Status?.connected?'İzin kayıtlı':'İzin doğrulanmadı')),node('p','Keyword Planner: '+(planner?planner.files+' CSV / '+planner.rows+' kaynak satırı; D1 doğrulaması '+planner.d1_verified_rows+'/'+planner.rows:'Kaynak bekleniyor')+'. Pazar hacmi GSC tıklaması değildir.'),node('p','Haziran–Ağustos kuyruğu: '+(status?.catchup?status.catchup.completed_scopes+'/'+status.catchup.total_scopes+' kapsam işi':'Durum bekleniyor')+'. Eksik gün sıfır değildir.'),node('p','Son GA4 otomasyonu: '+stamp(ga4Status?.cron?.scheduled_at)),node('p','Değişiklik kaynağı: '+stamp(changes?.captured_at)+' · '+(changes?.source_hash||'Doğrulanmadı')),node('p','Veriler bağımsız kayıt deposundan okunur. Arşiv ve D1 koruması korunur. Eksik veri sıfır trafik değildir.'),...(status?.last_failure?[node('p','Son GSC hata kaydı: '+stamp(status.last_failure.at)+' · '+status.last_failure.code)]:[]),...errors.map(e=>node('p',e)),evidence(current.flatMap(r=>r.evidence||[])));
   $('health').textContent='GSC: '+(status?.connected?'Bağlı':'Doğrulanmadı')+' · GA4: '+(ga4Status?.connected?'Bağlı':'Doğrulanmadı')+' · Son kesinleşmiş kayıtlar otomatik okunur.';
   $('connectionSummary').textContent='Search Console ve Google Analytics izinleri birbirinden bağımsızdır. Yenile yalnız ekran kayıtlarını okur.';
   $('google').hidden=!!status?.connected&&!status?.reauthorization_required;
@@ -141,7 +142,7 @@ export function createIndependentPanel({api,notify}){
   const at=revision,button=$('question').querySelector('button[type=submit]');button.disabled=true;root.hidden=false;root.replaceChildren(node('p','Kanıtlar inceleniyor…'));
   try{
    const suffix=device()==='ALL'?'':' '+deviceName(device());
-   const result=await api('/api/independent/'+(choice==='gsc'?'gsc-questions':'questions'),{method:'POST',body:JSON.stringify({question:question+suffix,month:target(),...(['ga4','archive'].includes(choice)?{source:choice}:{})})});
+   const result=await api('/api/independent/'+(choice==='gsc'?'gsc-questions':'questions'),{method:'POST',body:JSON.stringify({question:question+suffix,month:target(),include_source_context:true,...(['ga4','archive'].includes(choice)?{source:choice}:{})})});
    if(at!==revision)return;
    const priority=result.evaluation?.review_priority==='Öncelikli'?'Öncelikli incele':result.decision;
    root.replaceChildren(node('h2','Kanıta dayalı yanıt'),badge(priority),node('p',result.answer,'answer-text'),node('p','Dönem: '+result.month+' · Kaynak: '+result.source+'. Soru-cevap seçili bitiş ayını değerlendirir; grafikteki çok aylı aralık yanıt toplamı değildir.'),evidence(result.evidence_refs));
@@ -154,13 +155,13 @@ export function createIndependentPanel({api,notify}){
  async function load(signal){
   const at=++revision;if(first){first=false;if(target()>closedMonth())$('month').value=closedMonth();}
   const month=target(),n=Number($('rangeMonths').value),months=Array.from({length:n},(_,i)=>prior(month,n-i-1));
-  workspace?.clear();history?.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;changes=null;archive=null;catalog=null;errors=[];queryPage=1;
+  workspace?.clear();history?.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;planner=null;changes=null;archive=null;catalog=null;errors=[];queryPage=1;
   $('groupFilter').hidden=true;$('groupFilter').value='';$('pilot').hidden=true;$('loadGscReview').closest('section').hidden=true;$('questionSourceLabel').hidden=false;
   $('freshness').replaceChildren(node('span',null,'status-dot'),node('span','Doğrulanmış kaynaklar okunuyor'));
   const jobs=[...months,...(n===1?[prior(month)]:[])],results=[];
   async function worker(){while(jobs.length){const m=jobs.shift();try{results.push(await read('gsc-month?month='+m,signal));}catch(e){if(e.name==='AbortError')throw e;results.push({month:m,available:false,pages:[],queries:[],daily:[],mappings:[],expected_days:new Date(Date.UTC(Number(m.slice(0,4)),Number(m.slice(5)),0)).getUTCDate()});if(at===revision)errors.push(m+' GSC: '+e.message);}}}
   const source=async(path,set)=>{try{const value=await read(path,signal);if(at===revision)set(value);}catch(e){if(e.name==='AbortError')throw e;if(at===revision)errors.push(path.split('?')[0]+': '+e.message);}};
-  await Promise.all([worker(),worker(),source('gsc-status',v=>status=v),source('ga4-status',v=>ga4Status=v),source('ga4-report?month='+month,v=>ga4=v),source('ga4-report?month='+prior(month),v=>oldGa4=v),source('change-history?month='+month,v=>changes=v),source('catalog',v=>catalog=v)]);
+  await Promise.all([worker(),worker(),source('gsc-status',v=>status=v),source('ga4-status',v=>ga4Status=v),source('ga4-report?month='+month,v=>ga4=v),source('ga4-report?month='+prior(month),v=>oldGa4=v),source('change-history?month='+month,v=>changes=v),source('catalog',v=>catalog=v),source('planner-status',v=>planner=v)]);
   if(at!==revision||signal?.aborted)return;
   current=months.map(m=>results.find(r=>r.month===m));previous=n===1?results.find(r=>r.month===prior(month)):null;
   const selected=$('queryProduct').value;$('queryProduct').replaceChildren(new Option('Tüm ürünler',''),...mappings().map(p=>new Option(p.name,p.id)));if(mappings().some(p=>p.id===selected))$('queryProduct').value=selected;
@@ -170,7 +171,7 @@ export function createIndependentPanel({api,notify}){
   $('export').hidden=false;$('export').href='#';$('exportLabel').textContent='GSC ölçümlerini indir';
   products();kpis();chart();organic();health();notify();
  }
- function clear(){revision++;workspace?.clear();history?.clear();cache.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;changes=null;archive=null;catalog=null;$('organicTable').replaceChildren();$('organicSummary').replaceChildren();}
+ function clear(){revision++;workspace?.clear();history?.clear();cache.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;planner=null;changes=null;archive=null;catalog=null;$('organicTable').replaceChildren();$('organicSummary').replaceChildren();}
  $('organicFacet').addEventListener('change',organic);
  for(const [id,delta] of [['queryPrevious',-1],['queryNext',1]])$(id).addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();queries(Math.max(1,Number($('queryPage').dataset.page||queryPage)+delta));},true);
  for(const [id,handler] of [['showChanges',()=>calendar($('changeDay').value)],['runDataAudit',()=>{cache.clear();$('refresh').click();}]])$(id).addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();handler();},true);

@@ -56,12 +56,12 @@ export default {async fetch(request:Request,env:HistoryEnv){
    const counts:Record<string,number>={};for(const k of ['pages','queries','products']){if(!integer(a.facet_counts?.[k]))throw Error('GSC_HISTORY_ANALYSIS_INVALID');counts[k]=a.facet_counts[k];}
    const answer=async(question:string,route='gsc-questions',expected='GSC Search Analytics API')=>{
     const r=await app(route,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question,month:m})});
-    if(r.d1_requests!==0||!['Koru','İncele','Veri bekle'].includes(r.decision)||typeof r.answer!=='string'||!r.answer||!Array.isArray(r.evidence_refs)||r.evidence_refs.length>124)throw Error('GSC_HISTORY_QUESTION_INVALID');
+    if(r.d1_requests!==0||!['Koru','İncele','Veri bekle'].includes(r.decision)||typeof r.answer!=='string'||!r.answer||!Array.isArray(r.evidence_refs)||r.evidence_refs.length>200)throw Error('GSC_HISTORY_QUESTION_INVALID');
     const periods=[...new Set(r.evidence_refs.flatMap((e:any)=>typeof e.day==='string'&&/^20\d\d-\d\d-\d\d$/.test(e.day)?[e.day.slice(0,7)]:[]))].sort();
     if(r.source!==expected)throw Error('GSC_HISTORY_QUESTION_INVALID');
     return {source:r.source,decision:r.decision,evidence_refs:r.evidence_refs.length,periods,scopes:[...new Set(r.evidence_refs.map((e:any)=>e.scope).filter((scope:unknown)=>scope==='page'||scope==='query'))].sort(),requires_ga4:r.decision==='Veri bekle'&&r.answer.includes('GA4')};
    };
-   const questions:Record<string,unknown>={performance:await answer('Site genelinde önceki aya göre neden düştü?'),city:await answer('İstanbul şehir performansı?'),changes:await answer('Site genel değişiklik geçmişi','questions','Doğrulanmış SEO tarama/değişiklik arşivi')};
+   const questions:Record<string,unknown>={performance:await answer('Site genelinde önceki aya göre neden düştü?'),city:await answer('İstanbul şehir performansı?'),changes:await answer('Site genel değişiklik geçmişi','questions','Doğrulanmış SEO değişiklik arşivi + GSC Search Analytics API')};
    if(a.queries[0]?.label)questions.query=await answer('“'+a.queries[0].label+'” sorgusu nasıl değişti?');
    if(a.products[0]?.label)questions.product=await answer(a.products[0].label+' neden düştü?','questions');
    return Response.json({ok:true,mode,month:m,available:a.available,facet_counts:counts,devices:a.devices.length,countries:a.countries.length,evidence_refs:a.evidence.length,mapping_available:!!a.mapping_evidence,questions,d1_requests:0});

@@ -29,7 +29,7 @@ export async function historyImpact(storage:any,secret:string,id:string,selected
   limitations:['Tarama aralığıyla kesişen ay değişiklik sonrası etki ölçümü değildir.','Aylık dönemler farklı gün sayısına sahip olabilir; diğer değişiklikler, talep ve mevsimsellik elenmedi.','GSC tıklaması GA4 oturumu değildir; eksik ay veya URL satırı sıfır sayılmaz.','Korelasyon kesin neden değildir; kanıtlı neden olmadan içerik veya yönlendirme değiştirme.']};
 }
 export async function answerHistory(storage:any,secret:string,question:string,month:string,urls:string[],device:string,readMonth:(month:string)=>Promise<any>){
- const page=await listHistory(storage,secret,{urls,kind:'event'}),status=page.coverage,latest=page.items[0];
+ const page=await listHistory(storage,secret,{...(urls.length?{urls}:{}),kind:'event'}),status=page.coverage,latest=page.items[0];
  const impact=latest?await historyImpact(storage,secret,latest.id,month,device,readMonth):null;
  const details=[];for(const e of page.items.slice(0,4)){const value=await historyDetail(storage,secret,'event',e.id);if(value)details.push(value);}
  const refs=details.map(historyEventRef),observations=impact?.observations||[],gscRefs=observations.flatMap(r=>r.evidence);
