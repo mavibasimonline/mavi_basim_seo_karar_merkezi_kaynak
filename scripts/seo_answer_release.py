@@ -1,4 +1,4 @@
-"""Publish answer wording only; preserve the live interface and all source systems."""
+"""Publish independent analysis workspaces; preserve source storage, collectors and Cron."""
 import json,os,re,secrets,subprocess,time,urllib.request,urllib.error
 from datetime import datetime,timezone
 from zoneinfo import ZoneInfo
@@ -7,11 +7,11 @@ from quota_observer_release import api,free_plan
 from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
-BASE='1fd7c759987c3b5bd4904db340ac17248d64cff6'
-APP_SOURCE=BASE
+BASE='d2d34fe3c981752c790e3a53f9cf57be26d00236'
+APP_SOURCE='1fd7c759987c3b5bd4904db340ac17248d64cff6'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'scripts/seo_answer_release.py','scripts/seo-answer-probe.ts','src/independent-gsc-analysis.ts','src/independent-product-answer.ts','public/unified-seo.js'}
-PROTECTED=('src/index.ts','src/drive-independent.ts','src/independent-gsc-report.ts','src/browser/unified-seo-panel.js','public/index.html','public/app.js','public/app.css','src/independent-session.ts','src/security.ts','src/independent-seo-model.ts','src/drive-broker.ts','src/independent-gsc.ts','src/independent-gsc-bridge.ts','src/independent-gsc-bootstrap.ts','src/independent-ga4.ts','src/independent-context.ts','src/independent-context-bridge.ts','src/d1-read-budget.ts','public/ui.js','public/chart.js','public/period.js','public/independent-seo.js','public/independent-seo.html','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.drive-archive.jsonc')
+EXPECTED={'public/app.css','public/app.js','public/chart.js','public/index.html','public/unified-seo.js','public/seo/workspace.css','public/seo/workspace.js','scripts/build-unified-panel.mjs','scripts/seo-answer-probe.ts','scripts/seo_answer_release.py','src/browser/unified-seo-panel.js','src/browser/insights-workspace.js','src/independent-insights.ts','src/drive-independent.ts','src/independent-gsc-analysis.ts'}
+PROTECTED=('src/index.ts','src/independent-gsc-report.ts','src/independent-product-answer.ts','src/independent-session.ts','src/security.ts','src/independent-seo-model.ts','src/drive-broker.ts','src/independent-gsc.ts','src/independent-gsc-bridge.ts','src/independent-gsc-bootstrap.ts','src/independent-ga4.ts','src/independent-context.ts','src/independent-context-bridge.ts','src/independent-cron-proof.ts','src/independent-refresh.ts','src/independent-snapshot.ts','src/drive-records.ts','src/d1-read-budget.ts','public/ui.js','public/period.js','public/independent-seo.js','public/independent-seo.html','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.drive-archive.jsonc')
 
 def browser_acceptance(key):
  # One mandatory live UI acceptance, outside the test suite. No source rows/logs.
@@ -26,6 +26,30 @@ try{
  await page.goto('http://127.0.0.1:8806/',{waitUntil:'networkidle',timeout:60000});
  await page.locator('#app').waitFor({state:'visible'});
  await page.waitForFunction(()=>!document.body.classList.contains('is-loading')&&document.querySelector('#performanceChart svg'));
+ stage='overview';if(await page.locator('.leader-item').count()>5||await page.locator('.leader-item').count()<1)throw Error();
+ for(const name of ['overview','products','comparison','queries','opportunities','impact','radar','changes','health','questions']){
+  stage=name;await page.locator('#navigation [data-view='+name+']').click();await page.locator('#view-'+name).waitFor({state:'visible'});
+ }
+ stage='pages';await page.locator('#navigation [data-view=products]').click();await page.locator('#pageCoverage .insight-stat').first().waitFor();
+ await page.locator('[data-page-mode=unmapped]').click();await page.waitForFunction(()=>document.querySelector('#products thead').textContent.includes('Eşlenmemiş'));
+ if(await page.locator('#products button').count()>0){await page.locator('#products button').first().click();await page.locator('#catalogDialog').waitFor({state:'visible'});if(!await page.locator('#draftProductUrls').inputValue())throw Error();await page.locator('#closeCatalogDialog').click();}
+ await page.locator('[data-page-mode=products]').click();
+ stage='comparison';await page.locator('#navigation [data-view=comparison]').click();
+ await page.waitForFunction(()=>document.querySelector('#comparisonProduct').options.length>0);
+ const product=await page.locator('#comparisonProduct').evaluate(el=>[...el.options].find(o=>o.textContent.toLocaleLowerCase('tr-TR')==='broşür')?.value);if(!product)throw Error();
+ await page.locator('#comparisonProduct').selectOption(product);await page.locator('#comparisonForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#comparisonResult').textContent.includes('2/2 seçili ay doğrulandı'));
+ if(await page.locator('#comparisonTable tbody tr').count()!==2||!await page.locator('#comparisonChart svg').count())throw Error();
+ stage='opportunities';await page.locator('#navigation [data-view=opportunities]').click();await page.locator('#opportunityTable table').waitFor();
+ await page.locator('[data-query-type="Yerel / Şehir"]').click();
+ if(await page.locator('#opportunityTable th').count()!==10)throw Error();
+ stage='impact';await page.locator('#navigation [data-view=impact]').click();await page.locator('#impactSummary .insight-stat').first().waitFor();
+ const official=page.locator('#impactSummary article').filter({hasText:'Resmi GSC site toplamı'});if((await official.locator('strong').innerText())!=='Doğrulanmadı')throw Error();
+ if(!await page.locator('#impactQueries table').count()||!await page.locator('#impactDevices table').count())throw Error();
+ stage='global-answer';await page.locator('#navigation [data-view=questions]').click();await page.locator('#questionText').fill('Hangi sayfalar eşlenmemiş?');await page.locator('#question button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#answer').textContent.includes('URL’ler doğrulanmış katalogda'));
+ stage='brochure';await page.locator('#questionText').fill('Broşür neden düşüyor?');await page.locator('#question button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#answer').textContent.includes('İnceleme önceliği yüksek'));
  stage='september';await page.locator('#monthGrid [data-month="2026-09"]').click();
  await page.waitForFunction(()=>document.querySelector('#month').value==='2026-09'&&!document.body.classList.contains('is-loading'));
  stage='mobile-filter';await page.locator('#device').selectOption('MOBILE');
@@ -35,12 +59,16 @@ try{
  await page.waitForFunction(()=>document.querySelector('#answer').textContent.includes('Bu dönemde düşüş yok, yükseliş var.'));
  const answer=await page.locator('#answer').innerText(),lower=answer.toLocaleLowerCase('tr-TR');
  if(!answer.includes('1 → 19 tıklama')||!answer.includes('GSC kapsamı: MOBILE')||!lower.includes('ağustos 2026 → eylül 2026')||answer.includes('Eylül–Ekim')||answer.includes('düşüşün nedeni kesinleştirilemedi'))throw Error();
+ stage='mobile';await page.setViewportSize({width:390,height:844});await page.locator('#sidebarToggle').click();await page.locator('#navigation [data-view=products]').click();await page.locator('#pageCoverage .insight-stat').first().waitFor();
+ if(!await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))throw Error();
+ stage='logout';await page.locator('#sidebarToggle').click();await page.locator('#logout').click();await page.locator('#loginScreen').waitFor({state:'visible'});
+ if((await page.locator('#impactSummary').innerText()).trim()||(await page.locator('#comparisonResult').innerText()).trim())throw Error();
  if(legacy||errors)throw Error();
- console.log(JSON.stringify({passed:true,september_mobile_growth_verified:true,dynamic_comparison_period_verified:true,legacy_data_requests:legacy,page_errors:errors,content_change_recommended:false}));
+ console.log(JSON.stringify({passed:true,views:10,monthly_comparison:true,unmapped_pages:true,catalog_draft_only:true,query_opportunities:true,impact_analysis:true,official_totals_not_fabricated:true,global_answers:true,mobile:true,logout_data_cleared:true,september_mobile_growth_verified:true,dynamic_comparison_period_verified:true,legacy_data_requests:legacy,page_errors:errors,content_change_recommended:false}));
 }catch{console.log(JSON.stringify({passed:false,stage,legacy_data_requests:legacy,page_errors:errors}));process.exitCode=1;}
 finally{await browser.close();}
 '''
- result=subprocess.run(['node','--input-type=module','-e',code],cwd=ROOT,env={**os.environ,'SEO_PREVIEW_KEY':key},capture_output=True,text=True,timeout=150)
+ result=subprocess.run(['node','--input-type=module','-e',code],cwd=ROOT,env={**os.environ,'SEO_PREVIEW_KEY':key},capture_output=True,text=True,timeout=240)
  try:proof=json.loads(result.stdout.strip().splitlines()[-1])
  except (ValueError,IndexError):raise ValueError('SEO_ANSWER_BROWSER_UNAVAILABLE') from None
  if result.returncode or proof.get('passed') is not True:print(json.dumps({'browser_acceptance_failed':proof}),flush=True)
@@ -54,6 +82,12 @@ def run():
  for path in PROTECTED:need(subprocess.check_output(['git','show',BASE+':'+path],cwd=ROOT)==(ROOT/path).read_bytes(),'SEO_ANSWER_PROTECTED_SOURCE_CHANGED')
  old_index=subprocess.check_output(['git','show',BASE+':src/index.ts'],cwd=ROOT).decode()
  need(old_index.split('  async scheduled(',1)[1]==(ROOT/'src/index.ts').read_text().split('  async scheduled(',1)[1],'SEO_ANSWER_CRON_SOURCE_CHANGED')
+ old_router=subprocess.check_output(['git','show',BASE+':src/drive-independent.ts'],cwd=ROOT).decode()
+ new_router=(ROOT/'src/drive-independent.ts').read_text().replace("import {insightIntent,answerInsightQuestion,answerCityTrend,categoryOf} from './independent-insights';\n",'')
+ catalog_start="   if(path==='/api/independent/catalog'&&request.method==='GET'){"
+ before,rest=new_router.split(catalog_start,1);new_router=before+rest.split('\n   }',1)[1].lstrip('\n')
+ marker='   let questionBody:';end='   const snapshot=await this.independentSnapshot();'
+ need(old_router.split(marker,1)[0]==new_router.split(marker,1)[0] and old_router.split(end,1)[1]==new_router.split(end,1)[1],'SEO_ANSWER_COLLECTOR_SOURCE_CHANGED')
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'SEO_ANSWER_MAIN_SUPERSEDED')
  runs=get_json('https://api.github.com/repos/'+REPOSITORY+'/actions/workflows/ci.yml/runs?head_sha='+sha+'&per_page=20',os.environ.get('GITHUB_TOKEN')).get('workflow_runs',[])
  need(any(r.get('head_sha')==sha and r.get('head_branch')=='main' and r.get('event')=='push' and r.get('conclusion')=='success' for r in runs),'SEO_ANSWER_GREEN_CI_REQUIRED')
@@ -88,6 +122,9 @@ def run():
    deployed.append(ARCHIVE);deploy('deploy/wrangler.drive-archive.jsonc',sha)
    after=snapshot(client,ARCHIVE);verify_active_source(client,ARCHIVE,after['version'],sha)
    need(after['bindings']==before[ARCHIVE]['bindings'] and after['crons']==before[ARCHIVE]['crons'] and snapshot(client,APP)==before[APP],'SEO_ANSWER_CONFIGURATION_CHANGED')
+   deployed.append(APP);deploy(main_config,sha)
+   app_after=snapshot(client,APP);verify_active_source(client,APP,app_after['version'],sha)
+   need(app_after['bindings']==before[APP]['bindings'] and app_after['crons']==before[APP]['crons'],'SEO_ANSWER_CONFIGURATION_CHANGED')
    for attempt in range(10):
     try:
      proof=exchange('/accept');break
@@ -97,14 +134,20 @@ def run():
      if str(error)!='SEO_ANSWER_RUNTIME_PENDING' or attempt==9:raise
      time.sleep(3)
    need(proof.get('verified') is True,'SEO_ANSWER_ACCEPTANCE_FAILED')
-   health=url_json('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/health')
-   need(health.get('deployment',{}).get('commit')==APP_SOURCE and health['deployment'].get('version_id')==before[APP]['version'],'SEO_ANSWER_HTTP_SOURCE_MISMATCH')
-   for path in ('gsc-month?month=2026-10','ga4-report?month=2026-10','change-history?month=2026-10'):
+   for _ in range(7):
+    health=url_json('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/health')
+    if health.get('deployment',{}).get('commit')==sha and health['deployment'].get('version_id')==app_after['version']:break
+    time.sleep(2)
+   else:raise ValueError('SEO_ANSWER_HTTP_SOURCE_MISMATCH')
+   for path in ('index.html','app.js','app.css','chart.js','unified-seo.js','seo/workspace.js','seo/workspace.css'):
+    status,body=http('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/'+path+'?release='+sha)
+    need(status==200 and body==(ROOT/'public'/path).read_bytes(),'SEO_ANSWER_ASSET_MISMATCH')
+   for path in ('gsc-month?month=2026-10','ga4-report?month=2026-10','change-history?month=2026-10','catalog'):
     status,_=http('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/independent/'+path)
     need(status==401,'SEO_ANSWER_PUBLIC_DATA_EXPOSED')
-   browser=browser_acceptance(key)
-   need(snapshot(client,APP)==before[APP] and snapshot(client,ARCHIVE)==after,'SEO_ANSWER_PRODUCTION_DRIFT')
-   print(json.dumps({'seo_answer_release':{'deployed':True,'source':sha,'archive_version':after['version'],'app_unchanged':True,'unified_panel':True,'cron_unchanged':True,'source_datasets_unchanged':True,'proof':proof,'browser':browser,'d1_requests':0,'new_billed_resources':False,'site_changed':False}}),flush=True)
+   login=live_acceptance();browser=browser_acceptance(key)
+   need(snapshot(client,APP)==app_after and snapshot(client,ARCHIVE)==after,'SEO_ANSWER_PRODUCTION_DRIFT')
+   print(json.dumps({'seo_answer_release':{'deployed':True,'source':sha,'archive_version':after['version'],'app_version':app_after['version'],'unified_panel':True,'cron_unchanged':True,'source_datasets_unchanged':True,'proof':proof,'login':login,'browser':browser,'d1_requests':0,'new_billed_resources':False,'site_changed':False}}),flush=True)
  except Exception:
   for worker,config in ((APP,main_config),(ARCHIVE,'deploy/wrangler.drive-archive.jsonc')):
    if worker in deployed:rollback(config,before[worker]['version']);need(snapshot(client,worker)==before[worker],'SEO_ANSWER_ROLLBACK_FAILED')

@@ -15,6 +15,8 @@ export const metricNames = {
   position: "Ortalama konum",
 };
 export function drawChart(root, tableRoot, data, metric = "clicks") {
+  const monthly=data?.granularity==='month',unit=monthly?'ay':'gün';
+  const pointLabel=day=>monthly?new Date(day+'T00:00:00Z').toLocaleDateString('tr-TR',{month:'short',year:'numeric',timeZone:'UTC'}):date(day);
   root.replaceChildren();
   tableRoot.replaceChildren();
   root.setAttribute("aria-busy", "false");
@@ -41,7 +43,7 @@ export function drawChart(root, tableRoot, data, metric = "clicks") {
       ),
     );
     tableRoot.append(
-      node("p", "Günlük tablo için doğrulanmış ölçüm yok.", "empty-message"),
+      node("p", (monthly?"Aylık":"Günlük")+" tablo için doğrulanmış ölçüm yok.", "empty-message"),
     );
     return;
   }
@@ -60,7 +62,7 @@ export function drawChart(root, tableRoot, data, metric = "clicks") {
   const plot = svg("svg", {
     viewBox: `0 0 ${width} ${height}`,
     role: "img",
-    "aria-label": `${metricNames[metric]}: ${observed.length} gözlenen gün. Eksik günler boş bırakıldı.`,
+      "aria-label": `${metricNames[metric]}: ${observed.length} gözlenen ${unit}. Eksik dönemler boş bırakıldı.`,
   });
   plot.append(
     svg("title", {}, "Google Search Console · " + metricNames[metric]),
@@ -124,7 +126,7 @@ export function drawChart(root, tableRoot, data, metric = "clicks") {
           "text-anchor": "middle",
           class: "chart-axis",
         },
-        date(series[i].day).split(" ").slice(0, 2).join(" "),
+        monthly?pointLabel(series[i].day):date(series[i].day).split(" ").slice(0, 2).join(" "),
       ),
     );
   let segment = [];
@@ -192,7 +194,7 @@ export function drawChart(root, tableRoot, data, metric = "clicks") {
   root.setAttribute("role", "group");
   root.setAttribute(
     "aria-label",
-    "Günlük performans grafiği. Günleri incelemek için sol ve sağ ok tuşlarını kullanın.",
+    (monthly?"Aylık performans grafiği. Ayları":"Günlük performans grafiği. Günleri")+" incelemek için sol ve sağ ok tuşlarını kullanın.",
   );
   let active = observed.length ? series.findIndex((r) => value(r) !== null) : 0;
   const select = (i) => {
@@ -200,7 +202,7 @@ export function drawChart(root, tableRoot, data, metric = "clicks") {
     const row = series[active],
       v = value(row);
     tooltip.replaceChildren(
-      node("span", date(row.day)),
+      node("span", pointLabel(row.day)),
       node(
         "strong",
         v === null
@@ -210,7 +212,7 @@ export function drawChart(root, tableRoot, data, metric = "clicks") {
       node(
         "span",
         v === null
-          ? "Bu gün için doğrulanmış ölçüm yok."
+          ? (monthly?"Bu ay":"Bu gün")+" için doğrulanmış ölçüm yok."
           : "GSC · " + time(row.fetched_at),
       ),
     );
@@ -255,7 +257,7 @@ export function drawChart(root, tableRoot, data, metric = "clicks") {
     head = node("thead"),
     tr = node("tr");
   for (const label of [
-    "Gün",
+    monthly?"Ay":"Gün",
     "Tıklama",
     "Gösterim",
     "CTR",
@@ -272,7 +274,7 @@ export function drawChart(root, tableRoot, data, metric = "clicks") {
   for (const row of series) {
     const tr = node("tr");
     tr.append(
-      node("td", date(row.day)),
+      node("td", pointLabel(row.day)),
       metricCell(row.metrics?.clicks),
       metricCell(row.metrics?.impressions),
       metricCell(row.metrics?.ctr, "percent"),

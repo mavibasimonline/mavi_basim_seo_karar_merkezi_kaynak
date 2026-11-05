@@ -97,7 +97,8 @@
             aria-label="Ürün Performansı"
             ><svg class="icon" aria-hidden="true">
               <use href="/icons.svg#box" /></svg
-            ><span class="nav-label">Ürün Performansı</span></a
+            ><span class="nav-label">Ürün & Canlı Sayfa Analizi</span></a
+          ><a href="#comparison" data-view="comparison" aria-label="Ürün Aylık Karşılaştırma"><svg class="icon" aria-hidden="true"><use href="/icons.svg#calendar" /></svg><span class="nav-label">Ürün Aylık Karşılaştırma</span></a
           ><a href="#queries" data-view="queries" aria-label="Arama Sorguları"
             ><svg class="icon" aria-hidden="true">
               <use href="/icons.svg#search" /></svg
@@ -106,6 +107,8 @@
             ><svg class="icon" aria-hidden="true">
               <use href="/icons.svg#radar" /></svg
             ><span class="nav-label">SEO Fırsat Radarı</span></a
+          ><a href="#opportunities" data-view="opportunities" aria-label="Sorgu Fırsatları"><svg class="icon" aria-hidden="true"><use href="/icons.svg#search" /></svg><span class="nav-label">Sorgu Fırsatları</span></a
+          ><a href="#impact" data-view="impact" aria-label="Düşüş ve SEO Etki Analizi"><svg class="icon" aria-hidden="true"><use href="/icons.svg#radar" /></svg><span class="nav-label">Düşüş & SEO Etki Analizi</span></a
           ><a
             href="#changes"
             data-view="changes"
@@ -329,7 +332,7 @@
                 >
                   <div class="panel-heading">
                     <div>
-                      <h2 id="leadersTitle">İlk 10 Lider Ürün</h2>
+                      <h2 id="leadersTitle">İlk 5 Lider Ürün</h2>
                       <p id="leadersNote">
                         Doğrulanmış ürün ölçümleri gösterilir.
                       </p>
@@ -383,6 +386,16 @@
                 <p class="source-note padded">GA4 oturumları GSC tıklaması değildir. Şehir toplamı bir ürünün veya arama sorgusunun performansını kanıtlamaz.</p>
               </section>
             </section>
+            <section id="view-comparison" class="view" hidden aria-label="Ürün Aylık Karşılaştırma">
+              <section class="panel"><div class="panel-heading" data-actions-slot><div><h2>Ürün Aylık Karşılaştırma</h2><p>Tek ürün · aynı cihaz/ülke kapsamı · 2–6 ay</p></div></div>
+                <form id="comparisonForm" class="padded"><div class="insight-controls"><label>Ürün<select id="comparisonProduct" required></select></label><label>Yıl<select id="comparisonYear"></select></label></div>
+                  <div id="comparisonMonths" class="insight-tabs" role="group" aria-label="Karşılaştırma ayları"></div><p id="comparisonSelection" class="source-note"></p><button class="button primary" type="submit">Karşılaştırmayı Göster</button>
+                </form><div id="comparisonResult" class="padded" aria-live="polite"></div>
+                <div class="padded"><label>Grafik metriği<select id="comparisonMetric"><option value="clicks">Tıklama</option><option value="impressions">Gösterim</option><option value="ctr">CTR</option><option value="position">Ortalama konum</option></select></label></div>
+                <div id="comparisonChart" class="chart-container"></div><div id="comparisonTable" class="table-scroll padded"></div><details class="padded"><summary>Grafik verileri</summary><div id="comparisonChartTable" class="table-scroll"></div></details>
+                <p class="source-note padded">Bu sonuç yalnızca doğrulanmış dönemlerden üretilmiştir. Eksik aylar boş bırakılır; sıfır kabul edilmez.</p>
+              </section>
+            </section>
             <section
               id="view-products"
               class="view"
@@ -393,7 +406,7 @@
                 <div class="panel-heading" data-actions-slot>
                   <div>
                     <h2>
-                      Ürünlerin performansı
+                      Ürün & Canlı Sayfa Analizi
                       <span id="productCount" class="count-badge"></span>
                     </h2>
                     <p id="productPeriod" class="sr-only">
@@ -454,6 +467,9 @@
                     </div>
                   </details>
                 </div>
+                <div id="pageCoverage" class="insight-stats padded" aria-live="polite" hidden></div>
+                <div id="pageModes" class="insight-tabs padded" role="group" aria-label="Sayfa analizi sekmeleri" hidden><button type="button" data-page-mode="products" aria-pressed="true">Ürün Grupları</button><button type="button" data-page-mode="unmapped" aria-pressed="false">Eşlenmemiş Sayfalar</button><button type="button" data-page-mode="all" aria-pressed="false">Tüm Sayfalar</button><button type="button" data-page-mode="conflicts" aria-pressed="false">Çakışmalar</button></div>
+                <div id="catalogManagement" class="insight-controls padded" hidden><button id="catalogDownload" class="button secondary" type="button">Katalog JSON</button><label class="button secondary">JSON içe aktar<input id="catalogImport" type="file" accept="application/json,.json" class="sr-only" /></label><button id="newProductGroup" class="button secondary" type="button">Yeni ürün grubu</button></div><p id="catalogDraftNote" class="source-note padded" hidden></p>
                 <div
                   id="products"
                   class="table-scroll"
@@ -530,6 +546,20 @@
                 <summary>Veri kapsamı ve kaynak</summary>
                 <p id="queryNote" class="source-note"></p>
               </details>
+            </section>
+            <section id="view-opportunities" class="view" hidden aria-label="Sorgu Fırsatları">
+              <section class="panel"><div class="panel-heading" data-actions-slot><div><h2>Sorgu Fırsatları <span id="opportunityCount" class="count-badge"></span></h2><p>Görünür sorgulardan kanıtlı inceleme adayları</p></div></div>
+                <div id="opportunityTypes" class="insight-tabs padded" role="group" aria-label="Sorgu türü"><button data-query-type="Tümü" aria-pressed="true">Tümü</button><button data-query-type="Ürün / Ticari" aria-pressed="false">Ürün / Ticari</button><button data-query-type="Yerel / Şehir" aria-pressed="false">Yerel / Şehir</button><button data-query-type="Bilgilendirici" aria-pressed="false">Bilgilendirici</button><button data-query-type="Sınıflandırılmamış" aria-pressed="false">Sınıflandırılmamış</button></div>
+                <div class="insight-controls padded"><label>Sorgu ara<input id="opportunitySearch" type="search" placeholder="Görünür sorgularda ara…" /></label><label>Gösterim eşiği<select id="opportunityThreshold"><option value="30">30+ gösterim</option><option value="100">100+ gösterim</option><option value="300">300+ gösterim</option></select></label></div>
+                <p id="opportunityScope" class="source-note padded"></p><div id="opportunityTable" class="table-scroll"></div><p class="source-note padded">Türler metne dayalı sınıflandırmadır. Yerel sorgu, arayanın şehri veya GA4 oturumu değildir. İlk Sayfa: 30+ gösterim, sıra &gt;10 ve ≤20. CTR: 100+ gösterim, sıra ≤10 ve CTR &lt;%3. Etiketler içerik değişikliği önermez.</p>
+              </section>
+            </section>
+            <section id="view-impact" class="view" hidden aria-label="Düşüş ve SEO Etki Analizi">
+              <section class="panel"><div class="panel-heading" data-actions-slot><div><h2>Düşüş & SEO Etki Analizi</h2><p>Kanıt → yorum → karar</p></div></div>
+                <div id="impactContext" class="padded source-note"></div><div class="insight-controls padded"><label>Kategori<select id="impactCategory"></select></label><label>Ürün / sayfa grubu<select id="impactProduct"></select></label><label>Gösterim eşiği<select id="impactThreshold"><option value="30">30+ gösterim · önerilen</option><option value="100">100+ gösterim</option><option value="0">Tüm gözlemler</option></select></label></div>
+                <div id="impactSummary" class="insight-stats padded"></div><div id="impactTable" class="table-scroll"></div><div id="impactQueries" class="padded"></div><div id="impactDevices" class="padded"></div><div id="impactChanges" class="padded"></div>
+                <p class="source-note padded">İncele, sayfayı değiştir demek değildir. Sayfa ve sorgu kaybı, cihaz dağılımı ve tarama aralığı ayrı kanıtlardır; tarih çakışması neden kanıtı değildir.</p>
+              </section>
             </section>
             <section
               id="view-radar"
@@ -769,5 +799,6 @@
         </p>
       </div>
     </dialog>
+    <dialog id="catalogDialog" class="evidence-dialog" aria-labelledby="catalogDialogTitle"><div class="dialog-heading"><h2 id="catalogDialogTitle">Ürün tanımı · yönetim taslağı</h2><button id="closeCatalogDialog" class="icon-button" type="button" aria-label="Katalog taslağını kapat">×</button></div><form id="catalogDraftForm" class="dialog-body"><p>Bu işlem yalnız JSON taslağı oluşturur. Doğrulanmış katalog, arşiv ve veri toplama sistemi değişmez.</p><label>Ürün / grup adı<input id="draftProductName" maxlength="100" required /></label><label>Kategori<select id="draftProductCategory"></select></label><label>GSC’de gözlenen sayfalar<textarea id="draftProductUrls" rows="4" maxlength="20000" required placeholder="Her satıra bir tam URL"></textarea></label><p id="catalogDraftError" role="status"></p><button class="button primary" type="submit">JSON taslağını indir</button></form></dialog>
   </body>
 </html>

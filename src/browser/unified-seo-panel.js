@@ -32,11 +32,17 @@ function evidence(refs=[]){
  return detail('Kaynaklar, tarihler ve kanıtlar',ul);
 }
 export function createIndependentPanel({api,notify}){
- let current=[],previous=null,ga4=null,oldGa4=null,status=null,ga4Status=null,changes=null,archive=null,errors=[],revision=0,queryPage=1,first=true,metric='clicks',sort={key:'clicks',direction:'desc'};
+ document.querySelector('[data-view="products"]').setAttribute('aria-label','Ürün & Canlı Sayfa Analizi');
+ let current=[],previous=null,ga4=null,oldGa4=null,status=null,ga4Status=null,changes=null,archive=null,catalog=null,workspace=null,workspacePromise=null,activeView='overview',errors=[],revision=0,queryPage=1,first=true,metric='clicks',sort={key:'clicks',direction:'desc'};
  const cache=new Map();
  const target=()=>$('month').value,device=()=>$('device').value;
  const selectedRows=raw=>(raw?.pages||[]).filter(r=>device()==='ALL'||r.device===device());
- const mappings=()=>[...new Map(current.flatMap(r=>r.mappings||[]).map(p=>[p.id,p])).values()];
+ const mappings=()=>catalog?.available?catalog.products:[...new Map(current.flatMap(r=>r.mappings||[]).map(p=>[p.id,p])).values()];
+ function workspaceModule(){
+  if(!workspacePromise){const css=node('link');css.rel='stylesheet';css.href='/seo/workspace.css';document.head.append(css);
+   workspacePromise=import('./seo/workspace.js').then(({createInsightsWorkspace})=>workspace=createInsightsWorkspace({api,read,table,evidence,openProduct,ask,notify,scope:()=>({current,previous,ga4,oldGa4,status,ga4Status,changes,catalog,month:target(),device:device(),revision})})).catch(()=>{workspacePromise=null;throw Error('Analiz ekranı şu an yüklenemedi. Yenilemeyi deneyin.');});
+  }return workspacePromise;
+ }
  const complete=()=>current.length===Number($('rangeMonths').value)&&current.every(r=>r.available);
  const productsData=()=>mappings().map(p=>{
   const now=complete()?sum(current.flatMap(selectedRows).filter(r=>r.page===p.canonical_url)):null;
@@ -70,9 +76,9 @@ export function createIndependentPanel({api,notify}){
    const card=node('article',null,'kpi-card'),head=node('div',null,'kpi-label');head.append(node('span',title),icon(kind));
    card.append(head,node('div',key==='ctr'?percent(now?.[key]):number(now?.[key]),'kpi-value'+(!now?' no-data':'')));
    const caption=node('div',null,'kpi-caption');
-   if(now&&before&&before[key]>0){const rate=(now[key]-before[key])/before[key],better=key==='position'?rate<=0:rate>=0;caption.append(node('span',(rate>0?'+':'')+percent(rate),'delta'+(better?'':' down')),node('span','önceki aya göre'));}
+   if(now&&before&&before[key]>0){const rate=(now[key]-before[key])/before[key],change=now[key]-before[key],better=key==='position'?change<=0:change>=0;caption.append(node('span',key==='ctr'?number(change*100)+' puan':key==='position'?number(change)+' sıra':(rate>0?'+':'')+percent(rate),'delta'+(better?'':' down')),node('span','önceki aya göre'));}
    else caption.append(node('span','Karşılaştırılabilir dönem bekleniyor'));
-   card.append(caption);return card;
+   card.append(caption,node('p','Önceki dönem: '+(key==='ctr'?percent(before?.[key]):number(before?.[key])),'kpi-previous'),node('small',now?'GSC verisi doğrulandı':'GSC kapsamı bekleniyor','kpi-previous'));return card;
   }));
  }
  function productRows(items){return items.map(p=>{
@@ -82,13 +88,18 @@ export function createIndependentPanel({api,notify}){
  });}
  function products(next=sort){
   sort=next;const q=$('productSearch').value.toLocaleLowerCase('tr-TR'),decision=$('decisionFilter').value;
+  document.querySelectorAll('[data-product-sort]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.productSort===sort.key)));
   const rows=productsData().filter(p=>(p.name+' '+p.canonical_url).toLocaleLowerCase('tr-TR').includes(q)&&(!decision||p.decision===decision));
   rows.sort((a,b)=>{const key=sort.key,av=key==='name'?a.name:key==='decision'?a.decision:key==='change'?Math.abs(a.delta??0):a.current?.[key]??-1,bv=key==='name'?b.name:key==='decision'?b.decision:key==='change'?Math.abs(b.delta??0):b.current?.[key]??-1;return (typeof av==='string'?av.localeCompare(bv,'tr'):av-bv)*(sort.direction==='asc'?1:-1);});
   table($('products'),['Ürün / doğrulanmış URL','Tıklama','Gösterim','CTR','Ort. konum','Önceki aya fark','Karar'],productRows(rows));
   $('productCount').textContent=number(rows.length);$('productPeriod').textContent=coverage();
-  table($('leadersTable'),['Ürün / URL','Tıklama','Gösterim','CTR','Konum','Fark','Karar'],productRows(productsData().filter(p=>p.current).sort((a,b)=>b.current.clicks-a.current.clicks).slice(0,10)));
+  const leaders=productsData().filter(p=>p.current).sort((a,b)=>b.current.clicks-a.current.clicks).slice(0,5),total=complete()?sum(current.flatMap(selectedRows),true)?.clicks:null;
+  $('leadersTable').replaceChildren();const leaderList=node('div',null,'leader-list');
+  for(const p of leaders){const card=node('article',null,'leader-item'),button=node('button','Ürüne Git','button secondary');button.onclick=()=>openProduct(p);card.append(node('strong',p.name),node('small',p.category||'Kategori doğrulanmadı'),node('span',number(p.current.clicks)+' tıklama'),node('small','GSC sayfa tıklama payı: '+(total?percent(p.current.clicks/total):'Doğrulanmadı')),button);leaderList.append(card);}
+  $('leadersTable').append(leaderList);$('leadersNote').textContent='Tıklamaya göre ilk 5 · pay, doğrulanmış GSC sayfa toplamına göredir.';
   const keep=productsData().filter(p=>p.decision==='Koru');$('protect').textContent=keep.length?keep.map(p=>p.name).join(', ')+': önemli olumsuz kanıt yok; çalışan sayfaları koruyun.':'Kapsam veya örneklem yeterli olmadan sayfa değişikliği önermiyoruz.';
   const review=productsData().filter(p=>p.decision==='İncele');$('attentionPanel').hidden=!review.length;$('priorities').textContent=review.map(p=>p.name).join(', ')+': inceleme adayı. İncele, sayfayı değiştir kararı değildir.';
+  if(workspace&&activeView==='products')workspace.products(next);
  }
  function queries(page=1){
   queryPage=page;
@@ -136,6 +147,9 @@ export function createIndependentPanel({api,notify}){
   if(archive)$('summary').append(detail('Eski aylık arşiv · ayrı kaynak',node('p',(archive.source||'Arşiv')+' · '+archive.month+' · '+stamp(archive.captured_at)+' · '+(archive.stale?'Son doğrulanmış kayıt':'Doğrulanmış kayıt')+'. Günlük GSC yerine kullanılmaz.'),list((archive.products||[]).map(p=>p.title+': '+number(p.metrics?.clicks)+' tarihsel tıklama'))));
  }
  function view(name){
+  activeView=name;
+  $('export').hidden=['comparison','products','opportunities','impact'].includes(name);
+  if(['comparison','products','opportunities','impact'].includes(name)){const at=revision;workspaceModule().then(w=>{if(at===revision&&activeView===name&&!$('app').hidden)return w.render(name);}).catch(e=>notify(e.message));}
   $('scopeLabel').textContent=name==='changes'?'Doğrulanmış tarama aralıkları · UTC':name==='health'?'GSC · GA4 · Arşiv sağlığı':'GSC arama performansı · GA4 ziyaret ölçümleri';
   if(name==='queries')queries();if(name==='radar')radar();if(name==='changes')calendar();if(name==='health'){
    health();if(!archive){const at=revision,month=target();read('report?month='+month).then(value=>{if(at===revision){archive=value;health();}}).catch(e=>{if(at===revision)$('summary').textContent='Eski aylık arşiv şu an okunamadı: '+e.message+'. GSC/GA4 ölçümleri ayrı gösteriliyor.';});}
@@ -161,13 +175,13 @@ export function createIndependentPanel({api,notify}){
  async function load(signal){
   const at=++revision;if(first){first=false;if(target()>closedMonth())$('month').value=closedMonth();}
   const month=target(),n=Number($('rangeMonths').value),months=Array.from({length:n},(_,i)=>prior(month,n-i-1));
-  current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;changes=null;archive=null;errors=[];queryPage=1;
+  workspace?.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;changes=null;archive=null;catalog=null;errors=[];queryPage=1;
   $('groupFilter').hidden=true;$('groupFilter').value='';$('pilot').hidden=true;$('loadGscReview').closest('section').hidden=true;$('questionSourceLabel').hidden=false;
   $('freshness').replaceChildren(node('span',null,'status-dot'),node('span','Doğrulanmış kaynaklar okunuyor'));
   const jobs=[...months,...(n===1?[prior(month)]:[])],results=[];
   async function worker(){while(jobs.length){const m=jobs.shift();try{results.push(await read('gsc-month?month='+m,signal));}catch(e){if(e.name==='AbortError')throw e;results.push({month:m,available:false,pages:[],queries:[],daily:[],mappings:[],expected_days:new Date(Date.UTC(Number(m.slice(0,4)),Number(m.slice(5)),0)).getUTCDate()});if(at===revision)errors.push(m+' GSC: '+e.message);}}}
   const source=async(path,set)=>{try{const value=await read(path,signal);if(at===revision)set(value);}catch(e){if(e.name==='AbortError')throw e;if(at===revision)errors.push(path.split('?')[0]+': '+e.message);}};
-  await Promise.all([worker(),worker(),source('gsc-status',v=>status=v),source('ga4-status',v=>ga4Status=v),source('ga4-report?month='+month,v=>ga4=v),source('ga4-report?month='+prior(month),v=>oldGa4=v),source('change-history?month='+month,v=>changes=v)]);
+  await Promise.all([worker(),worker(),source('gsc-status',v=>status=v),source('ga4-status',v=>ga4Status=v),source('ga4-report?month='+month,v=>ga4=v),source('ga4-report?month='+prior(month),v=>oldGa4=v),source('change-history?month='+month,v=>changes=v),source('catalog',v=>catalog=v)]);
   if(at!==revision||signal?.aborted)return;
   current=months.map(m=>results.find(r=>r.month===m));previous=n===1?results.find(r=>r.month===prior(month)):null;
   const selected=$('queryProduct').value;$('queryProduct').replaceChildren(new Option('Tüm ürünler',''),...mappings().map(p=>new Option(p.name,p.id)));if(mappings().some(p=>p.id===selected))$('queryProduct').value=selected;
@@ -177,7 +191,7 @@ export function createIndependentPanel({api,notify}){
   $('export').hidden=false;$('export').href='#';$('exportLabel').textContent='GSC ölçümlerini indir';
   products();kpis();chart();organic();health();notify();
  }
- function clear(){revision++;cache.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;changes=null;archive=null;$('organicTable').replaceChildren();$('organicSummary').replaceChildren();}
+ function clear(){revision++;workspace?.clear();cache.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;changes=null;archive=null;catalog=null;$('organicTable').replaceChildren();$('organicSummary').replaceChildren();}
  $('organicFacet').addEventListener('change',organic);
  for(const [id,delta] of [['queryPrevious',-1],['queryNext',1]])$(id).addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();queries(Math.max(1,queryPage+delta));},true);
  for(const [id,handler] of [['showChanges',()=>calendar($('changeDay').value)],['runDataAudit',()=>{cache.clear();$('refresh').click();}]])$(id).addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();handler();},true);

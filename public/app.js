@@ -32,6 +32,9 @@ import { setupPeriod, currentMonth, scopeParams } from "./period.js";
 const views = {
   overview: "Genel Bakış",
   products: "Ürün Performansı",
+  comparison: "Ürün Aylık Karşılaştırma",
+  opportunities: "Sorgu Fırsatları",
+  impact: "Düşüş & SEO Etki Analizi",
   queries: "Arama Sorguları",
   radar: "SEO Fırsat Radarı",
   changes: "Değişiklik Takvimi",
