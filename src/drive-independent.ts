@@ -418,7 +418,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
      const current=await this.gscMonth(month),previous=await this.gscMonth(previousMonth).catch(()=>undefined);
      return json(answerInsightQuestion(current,previous,context.products,body.question,intent,{device:/mobil|mobile/.test(q)?'MOBILE':/masaustu|desktop/.test(q)?'DESKTOP':/tablet/.test(q)?'TABLET':undefined,product:product?.id,page:product?.canonical_url}));
     }
-    if(!manualGa4&&body.source!=='archive'&&historyIntent(q)){
+    if(!manualGa4&&!queryQuestion&&body.source!=='archive'&&historyIntent(q)){
      const exact=(body.question.match(/https?:\/\/[^\s<>"')]+/g)||[]).filter(u=>/^https?:\/\/(?:www\.)?mavibasim\.com(?:\/|$)/.test(u));
      const urls=product?.urls||exact;
      if(!urls.length)return json({answer:'Doğrulanmış ürün adı veya tam URL ile geçmişi seçin. Sayfa ilişkisi veya kaydı bulunmayan geçmiş tahmin edilmez.',source:'Doğrulanmış SEO değişiklik arşivi',month,decision:'Veri bekle',evidence_refs:[],d1_requests:0});
