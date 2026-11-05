@@ -102,6 +102,29 @@ export async function readVerifiedGscDay(storage:GscStorage,secret:string,day:st
   evidence:{day,scope,generation:proof.generation,captured_at:proof.captured_at,rows:proof.rows,page_hashes:proof.page_proofs.map(p=>p.sha256)},
   chunk_reads:budget.chunk_reads,d1_requests:0};
 }
+/** Bounded, read-only detail of existing final generations. No collection or writes. */
+export async function verifiedGscSeries(storage:GscStorage,secret:string,month:string,filters:{query?:string;page?:string;device?:string},time=new Date()){
+ fail(/^20\d\d-(0[1-9]|1[0-2])$/.test(month),'INVALID_MONTH');
+ const end=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5)),0));
+ fail(end.getTime()<time.getTime()-3*86400000&&end.getTime()>time.getTime()-401*86400000,'GSC_MONTH_NOT_CLOSED');
+ fail((!filters.query||filters.query.length<=512)&&(!filters.page||filters.page.length<=2048)
+  &&(!filters.device||['ALL','MOBILE','DESKTOP','TABLET'].includes(filters.device)),'GSC_SERIES_SCOPE_INVALID');
+ const scope:Scope=filters.query?'query':'page',budget:Budget={chunk_reads:0,rows:0,max_chunk_reads:256,max_rows:20000};
+ const series:{day:string;verified:boolean;observed:boolean;metrics:{clicks:number;impressions:number;ctr:number|null;position:number|null}|null;evidence?:GscEvidenceRef}[]=[];
+ for(let i=1;i<=end.getUTCDate();i++){
+  const day=month+'-'+String(i).padStart(2,'0'),proof=await storage.get<DailyProof>(dayKey(day,scope));
+  if(!proof){series.push({day,verified:false,observed:false,metrics:null});continue;}
+  validateManifest(proof,day,scope,time);
+  if(!canRead(proof,budget)||scope==='page'&&proof.query_partial){series.push({day,verified:false,observed:false,metrics:null});continue;}
+  const rows=(await readProof(storage,secret,proof,budget)).filter(r=>(!filters.query||r.query===filters.query)&&(!filters.page||r.page===filters.page)&&(!filters.device||filters.device==='ALL'||r.device===filters.device));
+  const clicks=rows.reduce((n,r)=>n+r.clicks,0),impressions=rows.reduce((n,r)=>n+r.impressions,0);
+  series.push({day,verified:true,observed:rows.length>0,metrics:rows.length?{clicks,impressions,ctr:impressions?clicks/impressions:null,position:impressions?rows.reduce((n,r)=>n+r.position*r.impressions,0)/impressions:null}:null,
+   evidence:{day,scope,generation:proof.generation,captured_at:proof.captured_at,rows:proof.rows,page_hashes:proof.page_proofs.map(p=>p.sha256)}});
+ }
+ return {source:'GSC Search Analytics API',month,scope,filters,timezone:'America/Los_Angeles',data_state:'final',series,
+  days_verified:series.filter(r=>r.verified).length,expected_days:end.getUTCDate(),read_budget:budget,d1_requests:0,
+  message:'Yalnız gözlenen satırlar gösterilir. Eksik/anonim sorgu sıfır değildir. Sıfır gösterimde CTR ve konum üretilmez.'};
+}
 export async function verifiedGscMonth(storage:GscStorage,secret:string,month:string,time=new Date(),options:GscReadOptions={}){
  fail(/^20\d\d-(0[1-9]|1[0-2])$/.test(month),'INVALID_MONTH');
  const end=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0));

@@ -1,6 +1,7 @@
 // Presentation of stored, verified evidence. Never invokes legacy D1 APIs or collection.
 import {$,node,number,percent,deviceName,date,time,icon,badge,detail,list,siteLink,empty} from '../../public/ui.js';
 import {drawChart} from '../../public/chart.js';
+import {table,sortableChart} from '../../public/seo/tables.js';
 import {comparisonDecision} from '../independent-gsc-analysis';
 
 const label=m=>new Date(m+'-01T00:00:00Z').toLocaleDateString('tr-TR',{month:'long',year:'numeric',timeZone:'UTC'});
@@ -11,13 +12,6 @@ function sum(rows,zero=false){
  if(!rows.length&&!zero)return null;
  const clicks=rows.reduce((n,r)=>n+r.clicks,0),impressions=rows.reduce((n,r)=>n+r.impressions,0);
  return {clicks,impressions,ctr:impressions?clicks/impressions:0,position:impressions?rows.reduce((n,r)=>n+r.position*r.impressions,0)/impressions:0};
-}
-function table(root,headers,rows){
- const t=node('table'),head=node('thead'),tr=node('tr'),body=node('tbody');
- headers.forEach(s=>{const th=node('th',s);th.scope='col';tr.append(th);});head.append(tr);t.append(head,body);
- for(const cells of rows){const tr=node('tr');for(const value of cells){const td=node('td');td.append(value instanceof Node?value:document.createTextNode(value??'—'));tr.append(td);}body.append(tr);}
- if(!rows.length){const tr=node('tr'),td=node('td','Bu kapsamda doğrulanmış kayıt yok; eksik kayıt sıfır değildir.');td.colSpan=headers.length;tr.append(td);body.append(tr);}
- root.replaceChildren(t);
 }
 function evidence(refs=[]){
  const ul=node('ul',null,'evidence-list');
@@ -47,13 +41,13 @@ export function createIndependentPanel({api,notify}){
  }
  const complete=()=>current.length===Number($('rangeMonths').value)&&current.every(r=>r.available);
  const productsData=()=>mappings().map(p=>{
-  const now=complete()?sum(current.flatMap(selectedRows).filter(r=>r.page===p.canonical_url)):null;
-  const before=previous?.available?sum(selectedRows(previous).filter(r=>r.page===p.canonical_url)):null;
+  const now=complete()?sum(current.flatMap(selectedRows).filter(r=>(p.urls||[p.canonical_url]).includes(r.page))):null;
+  const before=previous?.available?sum(selectedRows(previous).filter(r=>(p.urls||[p.canonical_url]).includes(r.page))):null;
   return {...p,current:now,previous:before,delta:now&&before?now.clicks-before.clicks:null,decision:comparisonDecision(now,before)};
  });
  async function read(path,signal){
   const saved=cache.get(path);if(saved&&Date.now()-saved.at<300000)return saved.value;
-  const value=await api('/api/independent/'+path,{signal});cache.set(path,{at:Date.now(),value});return value;
+  const timeout=AbortSignal.timeout(30000),combined=signal?AbortSignal.any([signal,timeout]):timeout;const value=await api('/api/independent/'+path,{signal:combined});if(cache.size>=40)cache.delete(cache.keys().next().value);cache.set(path,{at:Date.now(),value});return value;
  }
  function coverage(){
   const days=current.reduce((n,r)=>n+(r.days_verified||0),0),expected=current.reduce((n,r)=>n+(r.expected_days||0),0);
@@ -68,7 +62,7 @@ export function createIndependentPanel({api,notify}){
     series.push({day,verified:!!observed,metrics:observed?sum(observed.devices.filter(r=>device()==='ALL'||r.device===device()),true):null,fetched_at:observed?.fetched_at});
    }
   }
-  drawChart($('performanceChart'),$('chartTable'),{series},metric);
+  drawChart($('performanceChart'),$('chartTable'),{series},metric);sortableChart($('chartTable'));
   $('chartPeriod').textContent=current.map(r=>label(r.month)).join(' · ')+' · '+deviceName(device());
   $('chartCoverage').textContent=coverage();
  }
@@ -103,21 +97,12 @@ export function createIndependentPanel({api,notify}){
   const review=productsData().filter(p=>p.decision==='İncele');$('attentionPanel').hidden=!review.length;$('priorities').textContent=review.map(p=>p.name).join(', ')+': inceleme adayı. İncele, sayfayı değiştir kararı değildir.';
   if(workspace&&activeView==='products')workspace.products(next);
  }
- function queries(page=1){
-  queryPage=page;
-  const q=$('querySearch').value.toLocaleLowerCase('tr-TR'),product=mappings().find(p=>p.id===$('queryProduct').value),brand=$('queryBrand').value;
-  const rows=current.flatMap(r=>r.queries||[]).filter(r=>(device()==='ALL'||r.device===device())&&(!product||r.page===product.canonical_url)&&r.query.toLocaleLowerCase('tr-TR').includes(q)&&(!brand||brand==='all'||(brand==='brand'?!!r.is_brand:!r.is_brand)));
-  const grouped=new Map();for(const row of rows){const list=grouped.get(row.query)||[];list.push(row);grouped.set(row.query,list);}
-  const values=[...grouped].map(([query,rows])=>({query,...sum(rows)})).sort((a,b)=>b.impressions-a.impressions),start=(page-1)*40;
-  table($('queryTable'),['Görünür arama sorgusu','Tıklama','Gösterim','CTR','Ort. konum'],values.slice(start,start+40).map(r=>[r.query,number(r.clicks),number(r.impressions),percent(r.ctr),number(r.position)]));
-  $('queryCount').textContent=number(values.length);$('queryPage').textContent=page+'. sayfa';$('queryPrevious').disabled=page<=1;$('queryNext').disabled=start+40>=values.length;
-  $('queryNote').textContent=current.map(r=>r.month+': '+(r.query_days_verified||0)+'/'+(r.expected_days||0)+' sorgu günü').join(' · ')+'. Yalnız görünür sorgular; anonimleştirme ve eksik günler nedeniyle site toplamı değildir. Sıfır veya gizli sorgu tahmini yapılmaz.';
- }
+ function queries(page=1){queryPage=page;const at=revision;workspaceModule().then(w=>{if(at===revision&&!$('app').hidden)return w.queries(page);}).catch(e=>notify(e.message));}
  function organic(){
   $('organicPanel').hidden=false;
   const kind=$('organicFacet').value,rows=ga4?.[kind]||[],baseline=ga4?.closed&&oldGa4?.closed&&ga4.property?.id===oldGa4.property?.id&&ga4.property?.time_zone===oldGa4.property?.time_zone?oldGa4[kind]||[]:[];
   const key=r=>kind==='cities'?[r.country,r.region,r.city].join(' / '):kind==='devices'?deviceName(String(r.device).toUpperCase()):r.page;
-  table($('organicTable'),[kind==='cities'?'Ülke / Bölge / Şehir':kind==='devices'?'Cihaz':'Açılış yolu','Aktif kullanıcı','Organik oturum','Etkileşimli oturum','Önceki ay oturum'],rows.map(r=>{const old=baseline.find(p=>key(p)===key(r));return [key(r),number(r.active_users),number(r.sessions),number(r.engaged_sessions),old?number(old.sessions):'Doğrulanmadı'];}));
+  table($('organicTable'),[kind==='cities'?'Ülke / Bölge / Şehir':kind==='devices'?'Cihaz':'Açılış yolu','Aktif kullanıcı','Organik oturum','Etkileşimli oturum','Önceki ay oturum'],rows.map(r=>{const old=baseline.find(p=>key(p)===key(r));return [key(r),number(r.active_users),number(r.sessions),number(r.engaged_sessions),old?number(old.sessions):'Doğrulanmadı'];}),{initialSort:2});
   $('organicPeriod').textContent=ga4?.from?ga4.from+' — '+ga4.to+' · '+ga4.property?.time_zone+' · '+(ga4.closed?'Tam dönem':'Kısmi dönem'):'GA4 dönem verisi doğrulanmadı.';
   const total=ga4?.devices?.length?ga4.devices.reduce((n,r)=>n+r.sessions,0):null;
   $('organicSummary').replaceChildren(node('strong',total===null?'Organik oturum: doğrulanmadı':'Organik oturum: '+number(total)),node('p','Kaynak: GA4 Organic Search · '+target()+' · tüm cihazlar ve ülkeler. Üstteki GSC cihaz filtresi GA4 tablolarına uygulanmaz. Aktif kullanıcılar satırlar arasında toplanmaz.'),...(ga4?.thresholded?[node('p','Google gizlilik eşiği mevcut; kapsam sınırlı olabilir.')]:[]),...(ga4?.other_rows?[node('p','Bazı GA4 satırları (other) altında birleştirilmiş.')]:[]),evidence(ga4?.evidence));
@@ -132,11 +117,11 @@ export function createIndependentPanel({api,notify}){
   }
  }
  function calendar(day=null){
-  const refs=(changes?.evidence_refs||[]).filter(r=>!day||r.observed_interval?.from?.slice(0,10)<=day&&r.observed_interval?.to?.slice(0,10)>=day),root=$('changeResults');
+  const refs=(catalog?.changes?.map(e=>({...e,event_id:e.id,source_hash:catalog.source_hash,observed_interval:{from:e.observed_from,to:e.observed_to}}))||changes?.evidence_refs||[]).filter(r=>!day?r.observed_interval?.from?.slice(0,7)<=target()&&r.observed_interval?.to?.slice(0,7)>=target():r.observed_interval?.from?.slice(0,10)<=day&&r.observed_interval?.to?.slice(0,10)>=day),root=$('changeResults');
   root.replaceChildren(node('p',changes?.answer||'Değişiklik kaynağı doğrulanamadı.'));
   if(!refs.length)root.append(empty('Bu kapsamda değişiklik kanıtı yok','Sınırlı arşivde kayıt bulunmaması, değişiklik yapılmadığını kanıtlamaz.'));
   for(const r of refs){const card=node('article',null,'change-card');card.append(node('h3',r.url),node('p',r.publication_evidence?'Kanıtlı yayın: '+stamp(r.published_at):'Kesin yayın zamanı bilinmiyor. Tarama aralığı: '+stamp(r.observed_interval?.from)+' — '+stamp(r.observed_interval?.to)),node('p','Değişen alanlar: '+(r.changed_fields||[]).join(', ')),node('p','Başlık: '+r.before?.title+' → '+r.after?.title),node('p','H1: '+(r.before?.h1||[]).join(' / ')+' → '+(r.after?.h1||[]).join(' / ')),evidence([r]));root.append(card);}
-  root.append(node('p','Takvim seçili ayda en fazla 5 doğrulanmış kayıt gösterir. Tarama aralığı bir yayın günü veya düşüş nedeni değildir.'));
+  root.append(node('p','Mevcut doğrulanmış arşivdeki ilgili bütün kayıtlar kullanılır. Tarama aralığı bir yayın günü veya düşüş nedeni değildir.'));
  }
  function health(){
   const seen=new Set((status?.coverage||[]).map(r=>r.day+':'+r.scope));
@@ -167,10 +152,7 @@ export function createIndependentPanel({api,notify}){
    root.replaceChildren(node('h2','Kanıta dayalı yanıt'),badge(priority),node('p',result.answer,'answer-text'),node('p','Dönem: '+result.month+' · Kaynak: '+result.source+'. Soru-cevap seçili bitiş ayını değerlendirir; grafikteki çok aylı aralık yanıt toplamı değildir.'),evidence(result.evidence_refs));
   }catch(e){if(at===revision&&e.name!=='AbortError')root.replaceChildren(node('p',e.message));}finally{button.disabled=false;}
  }
- async function openProduct(p){
-  $('dialogTitle').textContent=p.name;$('productDialog').showModal();
-  const question=p.name+' neden düşüyor?',root=$('productDetail');await ask(question,root,'auto');
- }
+ async function openProduct(p){const at=revision;try{const w=await workspaceModule();if(at===revision&&!$('app').hidden)await w.openProduct(p);}catch(e){notify(e.message);}}
  async function connect(kind){
   try{const data=await api('/api/independent/'+kind+'-oauth/start',{method:'POST'}),url=new URL(data.authorization_url);if(url.origin!=='https://accounts.google.com')throw Error('Güvenli Google adresi doğrulanamadı.');location.assign(url.href);}catch(e){notify(e.message);}
  }
@@ -195,7 +177,7 @@ export function createIndependentPanel({api,notify}){
  }
  function clear(){revision++;workspace?.clear();cache.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;changes=null;archive=null;catalog=null;$('organicTable').replaceChildren();$('organicSummary').replaceChildren();}
  $('organicFacet').addEventListener('change',organic);
- for(const [id,delta] of [['queryPrevious',-1],['queryNext',1]])$(id).addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();queries(Math.max(1,queryPage+delta));},true);
+ for(const [id,delta] of [['queryPrevious',-1],['queryNext',1]])$(id).addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();queries(Math.max(1,Number($('queryPage').dataset.page||queryPage)+delta));},true);
  for(const [id,handler] of [['showChanges',()=>calendar($('changeDay').value)],['runDataAudit',()=>{cache.clear();$('refresh').click();}]])$(id).addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();handler();},true);
  $('analyticsConnect').onclick=()=>connect('ga4');
  $('analyticsProperties').onclick=async()=>{try{const data=await api('/api/independent/ga4-properties');$('analyticsProperty').replaceChildren(...(data.properties||[]).map(p=>new Option(p.name+' ('+p.id+')',p.id)));$('analyticsSelect').hidden=false;}catch(e){notify(e.message);}};

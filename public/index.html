@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="/app.css" />
     <script type="module" src="/app.js"></script>
     <script type="module" src="/seo/catalog-sync.js"></script>
+      <link rel="stylesheet" href="/seo/tables.css" />
   </head>
   <body>
     <a class="skip-link" href="#loginScreen">İçeriğe geç</a>
@@ -389,7 +390,7 @@
             </section>
             <section id="view-comparison" class="view" hidden aria-label="Ürün Aylık Karşılaştırma">
               <section class="panel"><div class="panel-heading" data-actions-slot><div><h2>Ürün Aylık Karşılaştırma</h2><p>Tek ürün · aynı cihaz/ülke kapsamı · 2–6 ay</p></div></div>
-                <form id="comparisonForm" class="padded"><div class="insight-controls"><label>Ürün<select id="comparisonProduct" required></select></label><label>Yıl<select id="comparisonYear"></select></label></div>
+                <form id="comparisonForm" class="padded"><div class="insight-controls"><label>Ürün ara<input id="comparisonSearch" type="search" placeholder="Ürün adı…" /></label><label>Ürün<select id="comparisonProduct" required></select></label><label>Yıl<select id="comparisonYear"></select></label></div>
                   <div id="comparisonMonths" class="insight-tabs" role="group" aria-label="Karşılaştırma ayları"></div><p id="comparisonSelection" class="source-note"></p><button class="button primary" type="submit">Karşılaştırmayı Göster</button>
                 </form><div id="comparisonResult" class="padded" aria-live="polite"></div>
                 <div class="padded"><label>Grafik metriği<select id="comparisonMetric"><option value="clicks">Tıklama</option><option value="impressions">Gösterim</option><option value="ctr">CTR</option><option value="position">Ortalama konum</option></select></label></div>
@@ -444,7 +445,7 @@
                     ><button
                       data-product-sort="change"
                       aria-pressed="false"
-                      title="Tam ayların mutlak tıklama farkına göre sıralar."
+                      title="Tam ayların işaretli tıklama farkına göre sıralar."
                     >
                       En fazla değişen
                     </button>
@@ -557,7 +558,7 @@
             </section>
             <section id="view-impact" class="view" hidden aria-label="Düşüş ve SEO Etki Analizi">
               <section class="panel"><div class="panel-heading" data-actions-slot><div><h2>Düşüş & SEO Etki Analizi</h2><p>Kanıt → yorum → karar</p></div></div>
-                <div id="impactContext" class="padded source-note"></div><div class="insight-controls padded"><label>Kategori<select id="impactCategory"></select></label><label>Ürün / sayfa grubu<select id="impactProduct"></select></label><label>Gösterim eşiği<select id="impactThreshold"><option value="30">30+ gösterim · önerilen</option><option value="100">100+ gösterim</option><option value="0">Tüm gözlemler</option></select></label></div>
+                <div id="impactContext" class="padded source-note"></div><div class="insight-controls padded"><label>Kategori<select id="impactCategory"></select></label><label>Ürün / sayfa grubu<select id="impactProduct"></select></label><label>Tam URL<select id="impactUrl"><option value="">Tüm URL’ler</option></select></label><label>Gösterim eşiği<select id="impactThreshold"><option value="30">30+ gösterim · önerilen</option><option value="100">100+ gösterim</option><option value="0">Tüm gözlemler</option></select></label></div>
                 <div id="impactSummary" class="insight-stats padded"></div><div id="impactTable" class="table-scroll"></div><div id="impactQueries" class="padded"></div><div id="impactDevices" class="padded"></div><div id="impactChanges" class="padded"></div>
                 <p class="source-note padded">İncele, sayfayı değiştir demek değildir. Sayfa ve sorgu kaybı, cihaz dağılımı ve tarama aralığı ayrı kanıtlardır; tarih çakışması neden kanıtı değildir.</p>
               </section>

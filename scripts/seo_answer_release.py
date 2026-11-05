@@ -7,11 +7,11 @@ from quota_observer_release import api,free_plan
 from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
-BASE='2c4ca013fcaddf8ff5bd8a97607d46bdbb9dad4e'
-APP_SOURCE='b4640c53c43c78c733eb13afc1c6f254270beaf7'
+BASE='bae95476734a411fd06b3f799fdb80deddf07037'
+APP_SOURCE='bae95476734a411fd06b3f799fdb80deddf07037'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'scripts/seo_answer_release.py','scripts/seo-answer-probe.ts'}
-PROTECTED=('src/index.ts','src/independent-gsc-analysis.ts','src/browser/unified-seo-panel.js','public/unified-seo.js','public/app.css','public/app.js','public/chart.js','scripts/build-unified-panel.mjs','src/independent-gsc-report.ts','src/independent-product-answer.ts','src/independent-session.ts','src/security.ts','src/independent-seo-model.ts','src/drive-broker.ts','src/independent-gsc.ts','src/independent-gsc-bridge.ts','src/independent-gsc-bootstrap.ts','src/independent-ga4.ts','src/independent-context.ts','src/independent-context-bridge.ts','src/independent-cron-proof.ts','src/independent-refresh.ts','src/independent-snapshot.ts','src/drive-records.ts','src/d1-read-budget.ts','public/ui.js','public/period.js','public/independent-seo.js','public/independent-seo.html','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.drive-archive.jsonc')
+EXPECTED={'src/browser/insights-workspace.js', 'src/browser/unified-seo-panel.js', 'src/independent-context.ts', 'public/seo/tables.css', 'src/independent-gsc-report.ts', 'src/independent-catalog.ts', 'scripts/build-unified-panel.mjs', 'public/seo/workspace.js', 'public/seo/tables.js', 'public/index.html', 'src/browser/evidence-detail.js', 'scripts/seo-answer-probe.ts', 'src/independent-insights.ts', 'public/seo/catalog-sync.js', 'public/unified-seo.js', 'scripts/seo_answer_release.py', 'src/drive-independent.ts'}
+PROTECTED=('src/index.ts', 'src/independent-gsc-analysis.ts', 'public/app.css', 'public/app.js', 'public/chart.js', 'src/independent-product-answer.ts', 'src/independent-session.ts', 'src/security.ts', 'src/independent-seo-model.ts', 'src/drive-broker.ts', 'src/independent-gsc.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc-bootstrap.ts', 'src/independent-ga4.ts', 'src/independent-context-bridge.ts', 'src/independent-cron-proof.ts', 'src/independent-refresh.ts', 'src/independent-snapshot.ts', 'src/drive-records.ts', 'src/d1-read-budget.ts', 'public/ui.js', 'public/period.js', 'public/independent-seo.js', 'public/independent-seo.html', 'deploy/wrangler.monthly-app.jsonc', 'deploy/wrangler.drive-archive.jsonc', 'src/independent-gsc-totals.ts')
 
 def browser_acceptance(key):
  # One mandatory live UI acceptance, outside the test suite. No source rows/logs.
@@ -32,14 +32,20 @@ try{
  }
  stage='pages';await page.locator('#navigation [data-view=products]').click();await page.locator('#pageCoverage .insight-stat').first().waitFor();
  await page.locator('[data-page-mode=unmapped]').click();await page.waitForFunction(()=>document.querySelector('#products thead').textContent.includes('Eşlenmemiş'));
- if(await page.locator('#products button').count()>0){await page.locator('#products button').first().click();await page.locator('#catalogDialog').waitFor({state:'visible'});if(!await page.locator('#draftProductUrls').inputValue())throw Error();await page.locator('#closeCatalogDialog').click();}
+ if(await page.getByRole('button',{name:'Ürün Tanımla',exact:true}).count()>0){await page.getByRole('button',{name:'Ürün Tanımla',exact:true}).first().click();await page.locator('#catalogDialog').waitFor({state:'visible'});if(!await page.locator('#draftProductUrls').inputValue())throw Error();await page.locator('#closeCatalogDialog').click();}
  await page.locator('[data-page-mode=products]').click();
+ await page.locator('#products thead button').filter({hasText:'Tıklama'}).click();
+ await page.getByRole('button',{name:'Broşür',exact:true}).click();await page.locator('#productDialog').waitFor({state:'visible'});
+ if(!await page.locator('#productDetail').getByText('Ürün grubu toplamı',{exact:false}).count())throw Error();await page.locator('#closeDialog').click();
  stage='comparison';await page.locator('#navigation [data-view=comparison]').click();
  await page.waitForFunction(()=>document.querySelector('#comparisonProduct').options.length>0);
  const product=await page.locator('#comparisonProduct').evaluate(el=>[...el.options].find(o=>o.textContent.toLocaleLowerCase('tr-TR')==='broşür')?.value);if(!product)throw Error();
  await page.locator('#comparisonProduct').selectOption(product);await page.locator('#comparisonForm button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('#comparisonResult').textContent.includes('2/2 seçili ay doğrulandı'));
  if(await page.locator('#comparisonTable tbody tr').count()!==2||!await page.locator('#comparisonChart svg').count())throw Error();
+ stage='queries';await page.locator('#navigation [data-view=queries]').click();await page.locator('#queryProduct').selectOption(product);await page.locator('#queryTable tbody button').first().waitFor();
+ await page.locator('#queryTable tbody button').first().click();await page.locator('#productDialog').waitFor({state:'visible'});
+ await page.waitForFunction(()=>document.querySelector('#productDetail').textContent.includes('GSC günlük kapsam:'));if(!await page.locator('#productDetail table thead button').count())throw Error();await page.locator('#closeDialog').click();
  stage='opportunities';await page.locator('#navigation [data-view=opportunities]').click();await page.locator('#opportunityTable table').waitFor();
  await page.locator('[data-query-type="Yerel / Şehir"]').click();
  if(await page.locator('#opportunityTable th').count()!==10)throw Error();
@@ -64,7 +70,7 @@ try{
  stage='logout';await page.locator('#sidebarToggle').click();await page.locator('#logout').click();await page.locator('#loginScreen').waitFor({state:'visible'});
  if((await page.locator('#impactSummary').innerText()).trim()||(await page.locator('#comparisonResult').innerText()).trim())throw Error();
  if(legacy||errors)throw Error();
- console.log(JSON.stringify({passed:true,views:10,monthly_comparison:true,unmapped_pages:true,catalog_draft_only:true,query_opportunities:true,impact_analysis:true,official_totals_not_fabricated:true,global_answers:true,mobile:true,logout_data_cleared:true,september_mobile_growth_verified:true,dynamic_comparison_period_verified:true,legacy_data_requests:legacy,page_errors:errors,content_change_recommended:false}));
+ console.log(JSON.stringify({passed:true,views:10,monthly_comparison:true,unmapped_pages:true,catalog_user_submission_only:true,query_opportunities:true,impact_analysis:true,official_totals_not_fabricated:true,global_answers:true,mobile:true,logout_data_cleared:true,september_mobile_growth_verified:true,dynamic_comparison_period_verified:true,legacy_data_requests:legacy,page_errors:errors,content_change_recommended:false}));
 }catch{console.log(JSON.stringify({passed:false,stage,legacy_data_requests:legacy,page_errors:errors}));process.exitCode=1;}
 finally{await browser.close();}
 '''
@@ -133,10 +139,10 @@ def run():
     if health.get('deployment',{}).get('commit')==sha and health['deployment'].get('version_id')==app_after['version']:break
     time.sleep(2)
    else:raise ValueError('SEO_ANSWER_HTTP_SOURCE_MISMATCH')
-   for path in ('index.html','app.js','app.css','chart.js','unified-seo.js','seo/workspace.js','seo/workspace.css','seo/catalog-sync.js'):
+   for path in ('index.html','app.js','app.css','chart.js','unified-seo.js','seo/workspace.js','seo/workspace.css','seo/tables.js','seo/tables.css','seo/catalog-sync.js','seo/catalog-sync.js'):
     status,body=http('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/'+path+'?release='+sha)
     need(status==200 and body==(ROOT/'public'/path).read_bytes(),'SEO_ANSWER_ASSET_MISMATCH')
-   for path in ('gsc-month?month=2026-10','ga4-report?month=2026-10','change-history?month=2026-10','catalog'):
+   for path in ('gsc-month?month=2026-10','ga4-report?month=2026-10','change-history?month=2026-10','catalog','gsc-series?month=2026-10&query=bro%C5%9F%C3%BCr'):
     status,_=http('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/independent/'+path)
     need(status==401,'SEO_ANSWER_PUBLIC_DATA_EXPOSED')
    login=live_acceptance();browser=browser_acceptance(key)

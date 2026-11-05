@@ -11,6 +11,7 @@ export const CATEGORIES=['Broşürler ve El İlanları','Reklam Ürünleri','Kur
 const categoryIds=[['brosur','el-ilani','afis'],['magnet','kitap-ayraci','yag-karti','etiket','amerikan-servis','tepsi-alti','oto-paspas','kutu','ambalaj'],['kartvizit','zarf','antetli-kagit','dosya','katalog','bloknot','kup-bloknot','karton-canta']];
 export const fold=(s:string)=>s.toLocaleLowerCase('tr-TR').replaceAll('ı','i').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 export function categoryOf(p:Pick<ContextProduct,'id'|'name'>){
+ if('category' in p&&typeof p.category==='string'&&CATEGORIES.includes(p.category))return p.category;
  const id=fold(p.id).replaceAll('_','-'),name=fold(p.name).replaceAll(' ','-');
  for(let i=0;i<categoryIds.length;i++)if(categoryIds[i].some(v=>id===v||name===v))return CATEGORIES[i];
  return /makbuz|adisyon|fis|sozlesme|police|tahsilat|kiralama|gider|bilet|recete|tediye|form/.test(id+' '+name)?CATEGORIES[3]:CATEGORIES[4];
@@ -28,7 +29,7 @@ const queryComplete=(m:InsightMonth|undefined|null)=>pageComplete(m)&&m!.query_d
 const previousMonth=(month:string)=>{const d=new Date(month+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()-1);return d.toISOString().slice(0,7);};
 function paired(now:Metric|null,before:Metric|null,complete:boolean){
  const delta=complete&&now&&before?now.clicks-before.clicks:null;
- return {current:now,previous:before,delta,rate:delta!==null&&before!.clicks>0?delta/before!.clicks:null,position_delta:complete&&now&&before?now.position-before.position:null,
+ return {current:now,previous:before,delta,rate:delta!==null&&before!.clicks>0?delta/before!.clicks:null,position_delta:complete&&now&&before&&now.impressions>0&&before.impressions>0?now.position-before.position:null,
   decision:complete?comparisonDecision(now,before):'Veri bekle',comparison_available:complete&&!!now&&!!before};
 }
 export function opportunityTypes(now:Metric|null){
@@ -51,21 +52,21 @@ export function queryType(query:string,products:ContextProduct[],productPattern=
 export function buildInsights(current:InsightMonth,previous:InsightMonth|null|undefined,products:ContextProduct[],scope:InsightScope={},catalogVerified=true){
  const nowRows=selected(current.pages||[],scope),oldRows=selected(previous?.pages||[],scope),valid=pageComplete(current),prior=pageComplete(previous)&&previous!.month===previousMonth(current.month),complete=valid&&prior;
  const nowPages=groups(nowRows,r=>r.page),oldPages=groups(oldRows,r=>r.page);
- const index=new Map<string,ContextProduct[]>();for(const p of products){const list=index.get(p.canonical_url)||[];list.push(p);index.set(p.canonical_url,list);}
+ const index=new Map<string,ContextProduct[]>();for(const p of products){for(const url of p.urls||[p.canonical_url]){const list=index.get(url)||[];list.push(p);index.set(url,list);}}
  const allPages=[...new Set([...nowPages.keys(),...oldPages.keys()])];
  const pages=allPages.map(url=>{const matches=index.get(url)||[],now=metric(nowPages.get(url)||[]),before=metric(oldPages.get(url)||[]);
   return {id:url,url,label:url,product_id:matches.length===1?matches[0].id:null,category:matches.length===1?categoryOf(matches[0]):CATEGORIES[4],mapping:!catalogVerified?'unknown':matches.length===1?'matched':matches.length?'conflict':'unmapped',...paired(now,before,complete),opportunities:opportunityTypes(now),verified:valid};
  });
- const grouped=products.map(p=>{const unique=index.get(p.canonical_url)?.length===1,now=unique?metric(nowPages.get(p.canonical_url)||[]):null,before=unique?metric(oldPages.get(p.canonical_url)||[]):null;
-  return {...p,label:p.name,category:categoryOf(p),urls:[p.canonical_url],...paired(now,before,complete),opportunities:opportunityTypes(now),verified:valid,mapping_conflict:!unique};
+ const grouped=products.map(p=>{const urls=p.urls||[p.canonical_url],unique=urls.every(url=>index.get(url)?.length===1),now=unique?metric(urls.flatMap(url=>nowPages.get(url)||[])):null,before=unique?metric(urls.flatMap(url=>oldPages.get(url)||[])):null;
+  return {...p,label:p.name,category:categoryOf(p),urls:p.urls||[p.canonical_url],...paired(now,before,complete),opportunities:opportunityTypes(now),verified:valid,mapping_conflict:!unique};
  });
- const totalsEnabled=(m:InsightMonth|null|undefined)=>!!m?.property_total&&m.property_total.property==='sc-domain:mavibasim.com'&&m.property_total.month===m.month&&m.property_total.from===m.month+'-01'&&m.property_total.data_state==='final';
+ const totalsEnabled=(m:InsightMonth|null|undefined)=>!!m?.property_total&&m.property_total.property==='sc-domain:mavibasim.com'&&m.property_total.month===m.month&&m.property_total.from===m.month+'-01'&&m.property_total.to===new Date(Date.UTC(Number(m.month.slice(0,4)),Number(m.month.slice(5)),0)).toISOString().slice(0,10)&&m.property_total.data_state==='final'&&m.property_total.search_type==='web'&&m.property_total.dimensions?.length===0;
  const official=valid&&(!scope.device||scope.device==='ALL')&&!scope.country&&!scope.page&&totalsEnabled(current)?current.property_total!:null;
  const officialPrevious=prior&&(!scope.device||scope.device==='ALL')&&!scope.country&&!scope.page&&totalsEnabled(previous)?previous!.property_total!:null;
  const total=metric(nowRows,true),oldTotal=prior?metric(oldRows,true):null,observed=pages.filter(p=>p.current),matched=observed.filter(p=>p.mapping==='matched'),unmapped=observed.filter(p=>p.mapping==='unmapped'),conflicts=observed.filter(p=>p.mapping==='conflict');
  const qs=selected(current.queries||[],scope),oldQs=selected(previous?.queries||[],scope),queryComparison=queryComplete(current)&&queryComplete(previous)&&prior;
  const nowQueries=groups(qs,r=>r.query),oldQueries=groups(oldQs,r=>r.query),productPattern=pattern(products.map(p=>fold(p.name)));
- const queries=[...nowQueries].map(([query,rows])=>{const now=metric(rows),before=metric(oldQueries.get(query)||[]);return {id:query,query,label:query,type:queryType(query,products,productPattern),...paired(now,before,queryComparison),opportunities:opportunityTypes(now),verified:queryComplete(current)};});
+ const queries=[...new Set([...nowQueries.keys(),...oldQueries.keys()])].map(query=>{const now=metric(nowQueries.get(query)||[]),before=metric(oldQueries.get(query)||[]),pair=paired(now,before,queryComparison);return {id:query,query,label:query,type:queryType(query,products,productPattern),...pair,status:!queryComparison?'Veri bekle':now&&before?'Devam eden':now?'Yeni görünen':'Artık görünmüyor · kayıp kesin değil',opportunities:[...opportunityTypes(now),...(pair.decision==='İncele'?['Gerileme']:[])],verified:queryComplete(current)};});
  return {month:current.month,previous_month:previous?.month||null,scope,catalog_verified:catalogVerified,complete:valid,comparison_available:complete,source:GSC,timezone:current.timezone||'America/Los_Angeles',
   products:grouped,pages,unmapped,conflicts,queries,query_comparison_available:queryComparison,observed_totals:total,totals:valid?total:null,previous_totals:oldTotal,
   counters:{pages:observed.length,matched:matched.length,unmapped:unmapped.length,conflicts:conflicts.length,click_coverage:total!.clicks?matched.reduce((n,p)=>n+p.current!.clicks,0)/total!.clicks:null},
@@ -86,7 +87,7 @@ export function insightIntent(question:string):InsightIntent|null{
 export function answerInsightQuestion(current:InsightMonth,previous:InsightMonth|undefined|null,products:ContextProduct[],question:string,intent:InsightIntent,scope:InsightScope={}){
  const data=buildInsights(current,previous,products,scope),query=intent==='protect-queries'||intent==='opportunities',refs=[...(current.evidence||[]),...(previous?.evidence||[])].filter(r=>r.scope===(query?'query':'page'));
  let rows:({label:string;current:Metric|null;delta?:number|null;decision?:string;opportunities?:string[]})[]=[],note='',decision='Veri bekle';
- if(intent==='unmapped'){rows=data.unmapped;note='URL’ler doğrulanmış katalogda birebir eşleşmiyor; ürün bağlantısı tahmin edilmedi. Ürün Tanımla yalnız taslak hazırlığıdır.';}
+ if(intent==='unmapped'){rows=data.unmapped;note='URL’ler doğrulanmış katalogda birebir eşleşmiyor; ürün bağlantısı tahmin edilmedi. Ürün Tanımla, kullanıcının açık seçimiyle doğrulanmış URL’yi kalıcı eşler.';}
  if(intent==='protect-products'){rows=data.products.filter(p=>p.decision==='Koru'&&p.current&&p.previous);decision=rows.length?'Koru':'Veri bekle';note='Aynı ürün/cihaz kapsamındaki yeterli iki dönem kanıtıyla çalışan sayfaları koruma adayları. Koru, düşüş olmadığı anlamına gelmez.';}
  if(intent==='declining-products'){rows=data.products.filter(p=>p.decision==='İncele');decision=rows.length?'İncele':data.comparison_available?'Koru':'Veri bekle';note='Önemli kayıp aynı GSC karar kuralıyla belirlendi. İncele, sayfayı değiştir demek değildir; kesin neden doğrulanmadı.';}
  if(intent==='protect-queries'){rows=data.queries.filter(p=>p.comparison_available&&p.current&&p.previous&&p.current.clicks>=10&&p.current.impressions>=100&&p.current.clicks>=p.previous.clicks&&p.current.position<=p.previous.position+.5);decision=rows.length?'Koru':'Veri bekle';note='Koruma adayı: en az 10 görünür tıklama/100 gösterim, tıklamalar gerilememiş ve konum 0,5 sıradan fazla kötüleşmemiş. Gizli sorgular tahmin edilmez; varyantlar birleştirilmez.';}

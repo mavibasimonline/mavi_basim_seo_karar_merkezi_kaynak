@@ -7,7 +7,7 @@ document.addEventListener('submit',async event=>{
  const message=document.getElementById('catalogDraftError'),button=form.querySelector('[type="submit"]');
  const urls=document.getElementById('draftProductUrls').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
  if(urls.length!==1){message.textContent='Kalıcı eşleme için bir doğrulanmış GSC sayfası seçin.';return;}
- if(!confirm('Bu URL’yi doğrulanmış ürün kataloğuna kalıcı olarak eklemek istiyor musunuz?'))return;
+
  button.disabled=true;message.textContent='Ürün eşlemesi kaydediliyor…';
  try{
   const catalogResponse=await fetch('/api/independent/catalog',{credentials:'same-origin',cache:'no-store'});
@@ -15,7 +15,7 @@ document.addEventListener('submit',async event=>{
   const catalog=await catalogResponse.json();
   if(!catalog.available||typeof catalog.source_hash!=='string')throw Error('Doğrulanmış katalog bulunamadı.');
   const response=await fetch('/api/independent/catalog',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-   base_hash:catalog.source_hash,month:document.getElementById('month').value,
+   base_hash:catalog.source_hash,catalog_revision:catalog.catalog_revision,product_id:document.getElementById('draftExistingProduct')?.value||undefined,month:document.getElementById('month').value,
    name:document.getElementById('draftProductName').value.trim(),
    category:document.getElementById('draftProductCategory').value,url:urls[0]
   })});

@@ -8,8 +8,8 @@ import {independentReport,independentAnswer,periodsOf,SheetRecord} from './indep
 import {readIndependentSnapshot,saveIndependentSnapshot,withVerifiedPreviousMonth,IndependentSnapshot} from './independent-snapshot';
 import {IndependentGscCollector} from './independent-gsc';
 import {collectPropertyTotal,readPropertyTotal} from './independent-gsc-totals';
-import {readCustomCatalog,addCustomProduct} from './independent-catalog';
-import {verifiedGscMonth,readVerifiedGscDay} from './independent-gsc-report';
+import {resolvedCatalog,addCustomProduct} from './independent-catalog';
+import {verifiedGscMonth,readVerifiedGscDay,verifiedGscSeries} from './independent-gsc-report';
 import {analyzeVerifiedGsc,answerVerifiedGsc} from './independent-gsc-analysis';
 import {cronTime,recordGscCron,gscCronProof} from './independent-cron-proof';
 import {validateIndependentContext,saveIndependentContext,readIndependentContext,independentContextStatus,answerContextQuestion} from './independent-context';
@@ -338,8 +338,8 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
   try{
    const url=new URL(request.url),path=url.pathname;
    if(path==='/api/independent/catalog'&&request.method==='GET'){
-     const context=await readIndependentContext(this.ctx.storage),custom=await readCustomCatalog(this.ctx.storage,this.key(),context);
-     return json({available:!!context,products:[...(context?.products.map(p=>({...p,category:categoryOf(p)}))||[]),...custom.products],category_source:'Kaynak katalog ve kullanıcı onaylı GSC sayfaları',catalog_revision:custom.revision,changes:context?.changes||[],snapshots:context?.snapshots||[],source:context?.source||null,source_hash:context?.source_hash||null,captured_at:context?.captured_at||null,coverage:context?.coverage||null,limitations:context?.limitations||[],read_only:false,d1_requests:0});
+     const context=await readIndependentContext(this.ctx.storage),custom=await resolvedCatalog(this.ctx.storage,this.key(),context);
+     return json({available:!!context,products:custom.products.map(p=>({...p,category:categoryOf(p)})),category_source:'Kaynak katalog ve kullanıcı onaylı GSC sayfaları',catalog_revision:custom.revision,changes:context?.changes||[],snapshots:context?.snapshots||[],source:context?.source||null,source_hash:context?.source_hash||null,captured_at:context?.captured_at||null,coverage:context?.coverage||null,limitations:context?.limitations||[],read_only:false,d1_requests:0});
     }
     if(path==='/api/independent/catalog'&&request.method==='POST'){
      const body=JSON.parse(await boundedText(new Response(request.body),4096)),context=await readIndependentContext(this.ctx.storage);
@@ -354,12 +354,17 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    if(path==='/api/independent/ga4-report'&&request.method==='GET')return json(await this.ga4().report(url.searchParams.get('month')||''));
    if(path==='/api/independent/change-history'&&request.method==='GET'){const context=await readIndependentContext(this.ctx.storage);return json({...answerContextQuestion(context,'Site değişiklik geçmişi',url.searchParams.get('month')||''),coverage:context?.coverage||null});}
    // Stored GSC evidence remains readable even if the unrelated Sheets source fails.
+   if(path==='/api/independent/gsc-series'&&request.method==='GET'){
+    const month=url.searchParams.get('month')||'',query=url.searchParams.get('query')||undefined,page=url.searchParams.get('page')||undefined,device=url.searchParams.get('device')||'ALL';
+    if(page&&!/^https?:\/\/(www\.)?mavibasim\.com(?:\/|$)/.test(page))return json({code:'GSC_SERIES_SCOPE_INVALID'},400);
+    return json(await verifiedGscSeries(this.ctx.storage,this.key(),month,{query,page,device}));
+   }
    if(request.method==='GET'&&(path==='/api/independent/gsc-month'||path==='/api/independent/gsc-analysis')){
     const month=url.searchParams.get('month');
     if(!month)return json({code:'INVALID_MONTH'},400);
     const gsc=await this.gscMonth(month);
-    const base=await readIndependentContext(this.ctx.storage).catch(()=>null),custom=await readCustomCatalog(this.ctx.storage,this.key(),base);
-    const products=[...(base?.products||[]),...custom.products],mappings=products.map(p=>({id:p.id,name:p.name,pages:[p.canonical_url]}));
+    const base=await readIndependentContext(this.ctx.storage).catch(()=>null),custom=await resolvedCatalog(this.ctx.storage,this.key(),base);
+    const products=custom.products,mappings=products.map(p=>({id:p.id,name:p.name,pages:p.urls||[p.canonical_url]}));
     const mapping_evidence=base?{source_hash:base.source_hash,captured_at:base.captured_at,coverage:base.coverage,catalog_revision:custom.revision}:null;
     const property_total=await readPropertyTotal(this.ctx.storage,this.key(),month);
     return json(path.endsWith('gsc-analysis')?{...analyzeVerifiedGsc(gsc,mappings),property_total,mapping_evidence}:{...gsc,property_total,mappings:products,mapping_evidence});
@@ -377,9 +382,9 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     const month=questionBody.month||latest.toISOString().slice(0,7);
     if(!/^20\d\d-(0[1-9]|1[0-2])$/.test(month))return json({code:'INVALID_MONTH'},400);
     const p=new Date(month+'-01T00:00:00Z');p.setUTCMonth(p.getUTCMonth()-1);const previousMonth=p.toISOString().slice(0,7);
-    const q=variantFamily(body.question),base=await readIndependentContext(this.ctx.storage).catch(()=>null),custom=await readCustomCatalog(this.ctx.storage,this.key(),base);
-    const context=base?{...base,products:[...base.products,...custom.products]}:null,product=questionProduct(context,body.question);
-    const mappings=context?.products.map(p=>({id:p.id,name:p.name,pages:[p.canonical_url]}))||[];
+    const q=variantFamily(body.question),base=await readIndependentContext(this.ctx.storage).catch(()=>null),custom=await resolvedCatalog(this.ctx.storage,this.key(),base);
+    const context=base?{...base,products:custom.products}:null,product=questionProduct(context,body.question);
+    const mappings=context?.products.map(p=>({id:p.id,name:p.name,pages:p.urls||[p.canonical_url]}))||[];
     const explicitGsc=path.endsWith('gsc-questions')||body.source==='gsc',manualGa4=body.source==='ga4'&&!explicitGsc;
     const exactPage=/https?:\/\//i.test(body.question),queryQuestion=/sorgu|anahtar|kelime/.test(q);
     const candidate=!exactPage&&!/[“”"]/.test(body.question)&&body.source!=='archive'?insightIntent(body.question):null;

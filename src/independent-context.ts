@@ -3,7 +3,7 @@ import {stable} from './drive-records';
 import {gscPageURL,variantFamily} from './urls';
 
 type Storage={get<T=unknown>(key:string):Promise<T|undefined>;put(key:string,value:unknown):Promise<unknown>};
-export type ContextProduct={id:string;name:string;canonical_url:string;url_verified_at:string};
+export type ContextProduct={id:string;name:string;canonical_url:string;url_verified_at:string;urls?:string[]};
 export type ContextCrawl={id:string;url:string;observed_at:string;content_hash:string;title:string;h1:string[];body_hash:string|null;status:number};
 export type ContextChange={id:string;url:string;previous_snapshot_id:string;next_snapshot_id:string;observed_from:string;observed_to:string;
  published_at:string|null;publication_evidence:{verified:true;source:'cms_log'|'deploy_log';ref:string}|null;changed_fields:string[];before:ContextCrawl;after:ContextCrawl};

@@ -9,8 +9,8 @@ export default {async fetch(request:Request,env:Probe){
  // Account-only browser acceptance of the actual published assets and read APIs.
  // The real admin key remains in Workers; the temporary preview key is local.
  if(!['/before','/accept'].includes(mode)){
-  const assets=['/','/index.html','/app.js','/app.css','/ui.js','/chart.js','/evidence.js','/modules.js','/gsc-review.js','/period.js','/icons.svg','/unified-seo.js','/seo/workspace.js','/seo/workspace.css'];
-  const allowed=request.method==='GET'&&(assets.includes(mode)||/^\/fonts\/[a-zA-Z0-9._-]+\.woff2$/.test(mode)||mode==='/api/session'||/^\/api\/independent\/(gsc-month|gsc-status|ga4-status|ga4-report|change-history|report|catalog)$/.test(mode))||request.method==='POST'&&/^\/api\/independent\/(questions|gsc-questions)$/.test(mode)||request.method==='DELETE'&&mode==='/api/session';
+  const assets=['/','/index.html','/app.js','/app.css','/ui.js','/chart.js','/evidence.js','/modules.js','/gsc-review.js','/period.js','/icons.svg','/unified-seo.js','/seo/workspace.js','/seo/workspace.css','/seo/tables.js','/seo/tables.css','/seo/catalog-sync.js'];
+  const allowed=request.method==='GET'&&(assets.includes(mode)||/^\/fonts\/[a-zA-Z0-9._-]+\.woff2$/.test(mode)||mode==='/api/session'||/^\/api\/independent\/(gsc-month|gsc-series|gsc-status|ga4-status|ga4-report|change-history|report|catalog)$/.test(mode))||request.method==='POST'&&/^\/api\/independent\/(questions|gsc-questions)$/.test(mode)||request.method==='DELETE'&&mode==='/api/session';
   if(!allowed||!env.ADMIN_TOKEN)return new Response(null,{status:404});
   const url=new URL(request.url),headers=new Headers({'Authorization':'Bearer '+env.ADMIN_TOKEN,Origin:ORIGIN,'Content-Type':'application/json'});
   return env.LIVE_APP.fetch(new Request(ORIGIN+mode+url.search,{method:request.method,headers,...(request.method==='POST'?{body:await request.text()}:{})}));
