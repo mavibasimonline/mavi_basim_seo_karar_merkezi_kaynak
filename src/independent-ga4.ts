@@ -33,6 +33,11 @@ function months(time:Date,zone:string){
  const d=new Date(cutoff(time,zone)+'T00:00:00Z');d.setUTCDate(1);
  return Array.from({length:3},(_,i)=>{const x=new Date(d);x.setUTCMonth(x.getUTCMonth()-i);return x.toISOString().slice(0,7);});
 }
+function historicalMonths(time:Date,zone:string){
+ // Never pre-empt recent months. Preserve source manifests; omit out-of-window dates.
+ const latest=cutoff(time,zone).slice(0,7),earliest=time.getTime()-400*86400000;
+ return ['2026-08','2026-07','2026-06'].filter(month=>month<=latest&&Date.parse(month+'-01T00:00:00Z')>=earliest);
+}
 export function ownStream(value:unknown):URL|null{
  // Admin accepts scheme-less defaultUri values. Normalize only an exact owned
  // authority; reject credentials, ports, other domains and URL parser shortcuts.
@@ -139,13 +144,13 @@ export class IndependentGa4 {
   const raw=new TextDecoder('utf-8',{fatal:true,ignoreBOM:false}).decode(bytes);check(at===bytes.length&&await hash(raw)===part.sha256,'GA4_HASH_MISMATCH');const rows=JSON.parse(raw);check(Array.isArray(rows)&&rows.length===part.count,'GA4_ROW_COUNT_INVALID');
   check(rows.every((r:any)=>Array.isArray(r.dimensions)&&r.dimensions.length===DIMS[job.kind].length&&r.dimensions.every((v:unknown)=>label(v))&&count(r.activeUsers)&&count(r.sessions)&&count(r.engagedSessions)&&r.engagedSessions<=r.sessions),'GA4_ROW_INVALID');return rows as Row[];
  }
- async tick(time=new Date()){
+ async tick(time=new Date(),historical=false){
   const property=await this.store.get<Property>(ROOT+'property');if(!property||!await this.store.get(ROOT+'oauth'))return {status:'unavailable',code:'GA4_CONNECTION_REQUIRED',d1_requests:0};
   const retry=await this.store.get<{until:number;code:string}>(ROOT+'retry');if(retry&&retry.until>time.getTime())return {status:'held',code:retry.code,d1_requests:0};
   let job=await this.store.get<Job>(ROOT+'active');
   try{
    if(!job){
-    select: for(const month of months(time,property.time_zone))for(const kind of ['total','cities','devices','pages'] as Kind[]){
+    select: for(const month of (historical?historicalMonths(time,property.time_zone):months(time,property.time_zone)))for(const kind of ['total','cities','devices','pages'] as Kind[]){
      const range=period(month,time,property.time_zone),old=await this.store.get<Manifest>(manifestKey(property.id,month,kind));
      if(old?.complete&&(old.closed||old.to===range.to))continue;
      job={property,month,kind,...range,generation:crypto.randomUUID(),cursor:0,pages:[],thresholded:false,other_rows:false};break select;

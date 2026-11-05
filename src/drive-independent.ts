@@ -204,7 +204,9 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     if(path==='/api/internal/ga4-tick'&&request.method==='POST'){
       const input=request.body?JSON.parse(await boundedText(new Response(request.body),1024)):{},scheduled=cronTime(input);
       if(scheduled){const old=await this.ctx.storage.get('ga4:cron:'+scheduled);if(old)return json(old);}
-      const ga4=this.ga4();await ga4.prepare();const result=await ga4.tick();
+      const ga4=this.ga4();await ga4.prepare();const time=new Date(),current=await ga4.tick(time);
+      // Natural Cron fills at most one old GA4 scope only after current months are idle.
+      const result=scheduled&&current.status==='idle'?await ga4.tick(time,true):current;
       if(scheduled){const receipt={...result,source:'cloudflare-cron',scheduled_at:scheduled,observed_at:new Date().toISOString()};await this.ctx.storage.put('ga4:cron:'+scheduled,receipt);await this.ctx.storage.put('ga4:last-cron',receipt);}
       return json(result);
     }
