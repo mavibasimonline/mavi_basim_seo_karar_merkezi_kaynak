@@ -7,11 +7,11 @@ from quota_observer_release import api,free_plan
 from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
-BASE='3668697af9209db0b7ed792439b801022f322559'
+BASE='788055bca107c48e3450020f3756c3eef9a63925'
 APP_SOURCE='bae95476734a411fd06b3f799fdb80deddf07037'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'src/browser/insights-workspace.js','public/seo/workspace.js','scripts/seo_answer_release.py','scripts/seo-answer-probe.ts'}
-PROTECTED=('src/index.ts', 'src/independent-gsc-analysis.ts', 'public/app.css', 'public/chart.js', 'src/independent-product-answer.ts', 'src/independent-session.ts', 'src/security.ts', 'src/independent-seo-model.ts', 'src/drive-broker.ts', 'src/independent-gsc.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc-bootstrap.ts', 'src/independent-ga4.ts', 'src/independent-context-bridge.ts', 'src/independent-cron-proof.ts', 'src/independent-refresh.ts', 'src/independent-snapshot.ts', 'src/drive-records.ts', 'src/d1-read-budget.ts', 'public/ui.js', 'public/period.js', 'public/independent-seo.js', 'public/independent-seo.html', 'deploy/wrangler.monthly-app.jsonc', 'deploy/wrangler.drive-archive.jsonc', 'src/independent-gsc-totals.ts', 'src/drive-independent.ts', 'src/independent-catalog.ts', 'src/independent-context.ts', 'src/independent-insights.ts', 'src/independent-gsc-report.ts', 'src/browser/unified-seo-panel.js', 'public/unified-seo.js', 'public/index.html', 'public/seo/catalog-sync.js', 'public/seo/tables.css', 'scripts/build-unified-panel.mjs', 'src/browser/evidence-detail.js', 'public/seo/tables.js', 'public/app.js')
+EXPECTED={'scripts/seo_answer_release.py'}
+PROTECTED=('src/index.ts', 'src/independent-gsc-analysis.ts', 'public/app.css', 'public/chart.js', 'src/independent-product-answer.ts', 'src/independent-session.ts', 'src/security.ts', 'src/independent-seo-model.ts', 'src/drive-broker.ts', 'src/independent-gsc.ts', 'src/independent-gsc-bridge.ts', 'src/independent-gsc-bootstrap.ts', 'src/independent-ga4.ts', 'src/independent-context-bridge.ts', 'src/independent-cron-proof.ts', 'src/independent-refresh.ts', 'src/independent-snapshot.ts', 'src/drive-records.ts', 'src/d1-read-budget.ts', 'public/ui.js', 'public/period.js', 'public/independent-seo.js', 'public/independent-seo.html', 'deploy/wrangler.monthly-app.jsonc', 'deploy/wrangler.drive-archive.jsonc', 'src/independent-gsc-totals.ts', 'src/drive-independent.ts', 'src/independent-catalog.ts', 'src/independent-context.ts', 'src/independent-insights.ts', 'src/independent-gsc-report.ts', 'src/browser/unified-seo-panel.js', 'public/unified-seo.js', 'public/index.html', 'public/seo/catalog-sync.js', 'public/seo/tables.css', 'scripts/build-unified-panel.mjs', 'src/browser/evidence-detail.js', 'public/seo/tables.js', 'public/app.js', 'src/browser/insights-workspace.js', 'public/seo/workspace.js', 'scripts/seo-answer-probe.ts')
 
 def browser_acceptance(key):
  # One mandatory live UI acceptance, outside the test suite. No source rows/logs.
@@ -43,7 +43,7 @@ try{
  await page.locator('#comparisonProduct').selectOption(product);await page.locator('#comparisonForm button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('#comparisonResult').textContent.includes('2/2 seçili ay doğrulandı'));
  if(await page.locator('#comparisonTable tbody tr').count()!==2||!await page.locator('#comparisonChart svg').count())throw Error();
- stage='queries-filter';await page.locator('#navigation [data-view=queries]').click();await page.locator('#queryProduct').selectOption(product);
+ stage='queries-filter';await page.locator('#navigation [data-view=queries]').click();await page.locator('#view-queries .advanced-filters summary').click();await page.locator('#queryProduct').selectOption(product);
  await page.waitForFunction(()=>document.querySelector('#queryTableActiveFilters')?.textContent.includes('Broşür'));
  stage='queries-table';const queryRows=await page.locator('#queryTable tbody button').count();
  if(queryRows){
@@ -145,9 +145,15 @@ def run():
     if health.get('deployment',{}).get('commit')==sha and health['deployment'].get('version_id')==app_after['version']:break
     time.sleep(2)
    else:raise ValueError('SEO_ANSWER_HTTP_SOURCE_MISMATCH')
-   for path in ('index.html','app.js','app.css','chart.js','unified-seo.js','seo/workspace.js','seo/workspace.css','seo/tables.js','seo/tables.css','seo/catalog-sync.js','seo/catalog-sync.js'):
-    status,body=http('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/'+path+'?release='+sha)
-    need(status==200 and body==(ROOT/'public'/path).read_bytes(),'SEO_ANSWER_ASSET_MISMATCH')
+   for path in ('index.html','app.js','app.css','chart.js','unified-seo.js','seo/workspace.js','seo/workspace.css','seo/tables.js','seo/tables.css','seo/catalog-sync.js'):
+    expected=(ROOT/'public'/path).read_bytes()
+    for attempt in range(10):
+     status,body=http('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/'+path+'?release='+sha+'&asset_check='+str(attempt))
+     if status==200 and body==expected:break
+     import hashlib
+     print(json.dumps({'seo_answer_asset_pending':{'path':path,'status':status,'actual_sha256':hashlib.sha256(body).hexdigest(),'expected_sha256':hashlib.sha256(expected).hexdigest(),'attempt':attempt+1}}),flush=True)
+     if attempt<9:time.sleep(2)
+    need(status==200 and body==expected,'SEO_ANSWER_ASSET_MISMATCH')
    for path in ('gsc-month?month=2026-10','ga4-report?month=2026-10','change-history?month=2026-10','catalog','gsc-series?month=2026-10&query=bro%C5%9F%C3%BCr'):
     status,_=http('https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/independent/'+path)
     need(status==401,'SEO_ANSWER_PUBLIC_DATA_EXPOSED')
