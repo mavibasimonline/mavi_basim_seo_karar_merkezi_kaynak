@@ -7,11 +7,11 @@ from quota_observer_release import api,free_plan
 from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,app_config,deploy,rollback,verify_active_source,url_json,http,need,git
 from login_access_release import live_acceptance
-BASE='b4640c53c43c78c733eb13afc1c6f254270beaf7'
-APP_SOURCE=BASE
+BASE='2c4ca013fcaddf8ff5bd8a97607d46bdbb9dad4e'
+APP_SOURCE='b4640c53c43c78c733eb13afc1c6f254270beaf7'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'src/independent-gsc-totals.ts','src/independent-catalog.ts','src/drive-independent.ts','src/independent-insights.ts','public/index.html','public/seo/catalog-sync.js','src/browser/insights-workspace.js','public/seo/workspace.js','scripts/seo_answer_release.py'}
-PROTECTED=('src/index.ts','src/independent-gsc-analysis.ts','src/browser/unified-seo-panel.js','public/unified-seo.js','public/app.css','public/app.js','public/chart.js','scripts/seo-answer-probe.ts','scripts/build-unified-panel.mjs','src/independent-gsc-report.ts','src/independent-product-answer.ts','src/independent-session.ts','src/security.ts','src/independent-seo-model.ts','src/drive-broker.ts','src/independent-gsc.ts','src/independent-gsc-bridge.ts','src/independent-gsc-bootstrap.ts','src/independent-ga4.ts','src/independent-context.ts','src/independent-context-bridge.ts','src/independent-cron-proof.ts','src/independent-refresh.ts','src/independent-snapshot.ts','src/drive-records.ts','src/d1-read-budget.ts','public/ui.js','public/period.js','public/independent-seo.js','public/independent-seo.html','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.drive-archive.jsonc')
+EXPECTED={'scripts/seo_answer_release.py','scripts/seo-answer-probe.ts'}
+PROTECTED=('src/drive-independent.ts','src/independent-gsc-totals.ts','src/independent-catalog.ts','src/independent-insights.ts','src/browser/insights-workspace.js','public/index.html','public/seo/workspace.js','public/seo/catalog-sync.js','src/index.ts','src/independent-gsc-analysis.ts','src/browser/unified-seo-panel.js','public/unified-seo.js','public/app.css','public/app.js','public/chart.js','scripts/build-unified-panel.mjs','src/independent-gsc-report.ts','src/independent-product-answer.ts','src/independent-session.ts','src/security.ts','src/independent-seo-model.ts','src/drive-broker.ts','src/independent-gsc.ts','src/independent-gsc-bridge.ts','src/independent-gsc-bootstrap.ts','src/independent-ga4.ts','src/independent-context.ts','src/independent-context-bridge.ts','src/independent-cron-proof.ts','src/independent-refresh.ts','src/independent-snapshot.ts','src/drive-records.ts','src/d1-read-budget.ts','public/ui.js','public/period.js','public/independent-seo.js','public/independent-seo.html','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.drive-archive.jsonc')
 
 def browser_acceptance(key):
  # One mandatory live UI acceptance, outside the test suite. No source rows/logs.
