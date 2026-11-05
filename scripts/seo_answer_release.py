@@ -6,11 +6,11 @@ from cloudflare_diagnostics import Cloudflare
 from quota_observer_release import api,free_plan
 from release_readiness import get_json,REPOSITORY
 from independent_seo_release import APP,ARCHIVE,ROOT,snapshot,deploy,rollback,verify_active_source,url_json,need,git
-BASE='c421e2dd2e582950e48730a119eaf540d94dbbde'
+BASE='067c0e6d593552766a00d731edab9ceeef63d279'
 APP_SOURCE='35121b40966707e107bde67dd2bcd8766ccb67d9'
 TITLE='release: verified GSC history bootstrap 20261104'
-EXPECTED={'.github/workflows/independent-seo-release.yml','src/independent-gsc-analysis.ts','src/independent-seo-model.ts','src/independent-product-answer.ts','src/drive-independent.ts','scripts/seo-answer-probe.ts','scripts/seo_answer_release.py'}
-PROTECTED=('src/index.ts','src/independent-session.ts','src/security.ts','src/drive-broker.ts','src/independent-gsc.ts','src/independent-gsc-bridge.ts','src/independent-gsc-bootstrap.ts','src/independent-gsc-report.ts','src/independent-ga4.ts','src/independent-context.ts','src/independent-context-bridge.ts','src/d1-read-budget.ts','public/app.js','public/independent-seo.js','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.drive-archive.jsonc')
+EXPECTED={'src/independent-gsc-analysis.ts','src/independent-product-answer.ts','scripts/seo-answer-probe.ts','scripts/seo_answer_release.py'}
+PROTECTED=('src/index.ts','src/independent-session.ts','src/security.ts','src/drive-independent.ts','src/independent-seo-model.ts','src/drive-broker.ts','src/independent-gsc.ts','src/independent-gsc-bridge.ts','src/independent-gsc-bootstrap.ts','src/independent-gsc-report.ts','src/independent-ga4.ts','src/independent-context.ts','src/independent-context-bridge.ts','src/d1-read-budget.ts','public/app.js','public/independent-seo.js','deploy/wrangler.monthly-app.jsonc','deploy/wrangler.drive-archive.jsonc')
 
 def run():
  sha=os.environ.get('GITHUB_SHA','')
@@ -18,12 +18,6 @@ def run():
  need(re.fullmatch('[a-f0-9]{40}',sha) and git('rev-parse','HEAD')==sha and git('log','-1','--format=%s')==TITLE,'SEO_ANSWER_SOURCE_REQUIRED')
  need(git('rev-parse','HEAD^')==BASE and set(git('diff','--name-only','HEAD^','HEAD').splitlines())==EXPECTED,'SEO_ANSWER_REVIEWED_SCOPE_REQUIRED')
  for path in PROTECTED:need(subprocess.check_output(['git','show',BASE+':'+path],cwd=ROOT)==(ROOT/path).read_bytes(),'SEO_ANSWER_PROTECTED_SOURCE_CHANGED')
- old_router=subprocess.check_output(['git','show',BASE+':src/drive-independent.ts'],cwd=ROOT).decode()
- new_router=(ROOT/'src/drive-independent.ts').read_text()
- imports="import {questionProduct,answerProductEvidence,answerGa4Product} from './independent-product-answer';\nimport {variantFamily} from './urls';\n"
- trimmed=new_router.replace(imports,'')
- marker='   let questionBody:';end='   const snapshot=await this.independentSnapshot();'
- need(old_router.split(marker,1)[0]==trimmed.split(marker,1)[0] and old_router.split(marker,1)[1].split(end,1)[1]==trimmed.split(marker,1)[1].split(end,1)[1],'SEO_ANSWER_COLLECTOR_ROUTER_CHANGED')
  need(get_json('https://api.github.com/repos/'+REPOSITORY+'/branches/main',os.environ.get('GITHUB_TOKEN')).get('commit',{}).get('sha')==sha,'SEO_ANSWER_MAIN_SUPERSEDED')
  runs=get_json('https://api.github.com/repos/'+REPOSITORY+'/actions/workflows/ci.yml/runs?head_sha='+sha+'&per_page=20',os.environ.get('GITHUB_TOKEN')).get('workflow_runs',[])
  need(any(r.get('head_sha')==sha and r.get('head_branch')=='main' and r.get('event')=='push' and r.get('conclusion')=='success' for r in runs),'SEO_ANSWER_GREEN_CI_REQUIRED')
