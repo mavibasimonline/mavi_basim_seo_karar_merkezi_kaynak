@@ -2,7 +2,8 @@
 import {comparisonDecision} from './independent-gsc-analysis';
 import type {MonthlyGscAnalysisInput,GscMetricRow} from './independent-gsc-analysis';
 import type {ContextProduct} from './independent-context';
-export type InsightMonth=MonthlyGscAnalysisInput&{source?:string;timezone?:string;property?:string;data_state?:string};
+import type {PropertyTotal} from './independent-gsc-totals';
+export type InsightMonth=MonthlyGscAnalysisInput&{source?:string;timezone?:string;property?:string;data_state?:string;property_total?:PropertyTotal|null};
 export type InsightScope={device?:string;country?:string;product?:string;page?:string};
 export type Metric={clicks:number;impressions:number;ctr:number;position:number};
 const GSC='GSC Search Analytics API',GA4='Google Analytics 4 Data API';
@@ -58,6 +59,9 @@ export function buildInsights(current:InsightMonth,previous:InsightMonth|null|un
  const grouped=products.map(p=>{const unique=index.get(p.canonical_url)?.length===1,now=unique?metric(nowPages.get(p.canonical_url)||[]):null,before=unique?metric(oldPages.get(p.canonical_url)||[]):null;
   return {...p,label:p.name,category:categoryOf(p),urls:[p.canonical_url],...paired(now,before,complete),opportunities:opportunityTypes(now),verified:valid,mapping_conflict:!unique};
  });
+ const totalsEnabled=(m:InsightMonth|null|undefined)=>!!m?.property_total&&m.property_total.property==='sc-domain:mavibasim.com'&&m.property_total.month===m.month&&m.property_total.from===m.month+'-01'&&m.property_total.data_state==='final';
+ const official=valid&&(!scope.device||scope.device==='ALL')&&!scope.country&&!scope.page&&totalsEnabled(current)?current.property_total!:null;
+ const officialPrevious=prior&&(!scope.device||scope.device==='ALL')&&!scope.country&&!scope.page&&totalsEnabled(previous)?previous!.property_total!:null;
  const total=metric(nowRows,true),oldTotal=prior?metric(oldRows,true):null,observed=pages.filter(p=>p.current),matched=observed.filter(p=>p.mapping==='matched'),unmapped=observed.filter(p=>p.mapping==='unmapped'),conflicts=observed.filter(p=>p.mapping==='conflict');
  const qs=selected(current.queries||[],scope),oldQs=selected(previous?.queries||[],scope),queryComparison=queryComplete(current)&&queryComplete(previous)&&prior;
  const nowQueries=groups(qs,r=>r.query),oldQueries=groups(oldQs,r=>r.query),productPattern=pattern(products.map(p=>fold(p.name)));
@@ -65,7 +69,8 @@ export function buildInsights(current:InsightMonth,previous:InsightMonth|null|un
  return {month:current.month,previous_month:previous?.month||null,scope,catalog_verified:catalogVerified,complete:valid,comparison_available:complete,source:GSC,timezone:current.timezone||'America/Los_Angeles',
   products:grouped,pages,unmapped,conflicts,queries,query_comparison_available:queryComparison,observed_totals:total,totals:valid?total:null,previous_totals:oldTotal,
   counters:{pages:observed.length,matched:matched.length,unmapped:unmapped.length,conflicts:conflicts.length,click_coverage:total!.clicks?matched.reduce((n,p)=>n+p.current!.clicks,0)/total!.clicks:null},
-  official_property_totals:null,reconciliation_delta:null,limitations:['GSC sayfa toplamı, ayrı doğrulanmış mülk toplamı değildir; resmi site toplamı/mutabakat verisi yoksa fark hesaplanmaz.','Eksik ay/sayfa/sorgu satırı sıfır kabul edilmez. Görünür sorgular anonimleştirme nedeniyle eksik olabilir.','Sorgu türleri metne dayalı sınıflandırmadır; arayanın gerçek konumu veya amacı kanıtlanmaz.','Fırsat etiketleri eşik temelli inceleme adaylarıdır; içerik değişikliği önerisi değildir.'],d1_requests:0};
+  official_property_totals:official?{current:official,previous:officialPrevious,click_delta:officialPrevious?official.clicks-officialPrevious.clicks:null}:null,
+   reconciliation_delta:official?{clicks:official.clicks-total!.clicks,impressions:official.impressions-total!.impressions,scope:'Aynı ay, tüm cihazlar ve ülkeler; resmî mülk toplamı eksi GSC sayfa toplamı'}:null,limitations:['GSC sayfa toplamı, ayrı doğrulanmış mülk toplamı değildir; resmi site toplamı/mutabakat verisi yoksa fark hesaplanmaz.','Eksik ay/sayfa/sorgu satırı sıfır kabul edilmez. Görünür sorgular anonimleştirme nedeniyle eksik olabilir.','Sorgu türleri metne dayalı sınıflandırmadır; arayanın gerçek konumu veya amacı kanıtlanmaz.','Fırsat etiketleri eşik temelli inceleme adaylarıdır; içerik değişikliği önerisi değildir.'],d1_requests:0};
 }
 export type InsightIntent='protect-products'|'declining-products'|'protect-queries'|'opportunities'|'unmapped'|'city-growth'|'city-decline';
 export function insightIntent(question:string):InsightIntent|null{
