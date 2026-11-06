@@ -22,7 +22,7 @@ export async function tayfunAiContext(storage:Store,secret:string,productId:stri
   for(const v of ledger.entries)if(allowed.has(v.url))versions.push(v);
  }
  versions.sort((a,b)=>a.created_at.localeCompare(b.created_at));
- const latest=versions.at(-1)||null,tracked=[...new Set(versions.flatMap(v=>v.keywords))];
+ const latest=versions.filter(v=>v.url===product.canonical_url).at(-1)||null,tracked=[...new Set(versions.flatMap(v=>v.keywords))];
  return {product:{id:product.id,name:product.name,category:(product as any).category||null,canonical_url:product.canonical_url,
   urls:[...allowed]},versions,latest_revision_id:latest?.id||null,tracked_keywords:tracked,
   oldest_recorded_at:versions[0]?.created_at||null,
