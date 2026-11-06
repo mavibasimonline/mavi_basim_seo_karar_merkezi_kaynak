@@ -19,10 +19,7 @@ const paired=(now,old,key)=>{
   return {key:k,current,previous,delta_clicks:current&&previous?current.clicks-previous.clicks:null,status:current&&previous?'karşılaştırılabilir':current?'yalnız güncel dönemde görünür':'yalnız önceki dönemde görünür'};
  });
 };
-const aggregate=(items,side='current')=>metric(items.flatMap(x=>x[side]||[]));
 const formatMetric=m=>m?m.clicks+' tıklama / '+m.impressions+' gösterim / CTR '+(m.ctr===null?'belirsiz':(m.ctr*100).toFixed(2)+'%')+' / konum '+(m.position===null?'belirsiz':m.position.toFixed(2)):'doğrulanmadı';
-const groupTop=(rows,order)=>rows.filter(r=>r.delta_clicks!==null&&r.delta_clicks*(order===1?1:-1)>0).sort((a,b)=>order*(b.delta_clicks-a.delta_clicks)).slice(0,15);
-const differences=rows=>rows.filter(r=>r.status!=='karşılaştırılabilir');
 const ga4Facets=report=>{
  if(!report)return null;
  const total=num(report.totals?.sessions);
@@ -33,15 +30,6 @@ const ga4Facets=report=>{
  }
  return {month:report.month,closed:report.closed===true,official:report.totals||null,facets};
 };
-function describePairs(rows,label){
- const ascending=rows.filter(r=>r.delta_clicks!==null).sort((a,b)=>a.delta_clicks-b.delta_clicks);
- const losers=ascending.filter(r=>r.delta_clicks<0).slice(0,12),gainers=ascending.filter(r=>r.delta_clicks>0).reverse().slice(0,12);
- const lines=[label+' — karşılaştırılabilir gözlemler'];
- for(const [kind,subset] of [['Kayıplar',losers],['Artışlar',gainers]]){
-  lines.push(kind+': '+(subset.length?subset.map(r=>r.key+' ('+r.previous.clicks+' → '+r.current.clicks+', '+(r.delta_clicks>0?'+':'')+r.delta_clicks+')').join('; '):'Önemli karşılaştırılabilir kayıt bulunmadı'));
- }
- return lines.join('\n');
-}
 function monthBundle(r,device){
  if(!r)return null;
  const filter=rows=>(rows||[]).filter(item=>device==='ALL'||item.device===device);
@@ -56,13 +44,71 @@ function monthBundle(r,device){
   pages:filter(r.pages),queries:filter(r.queries)
  };
 }
+
+// Categories are URL-based evidence scopes; a city landing page is not the same as a GA4 visitor city.
+const citySlugs=new Set(('adana adiyaman afyonkarahisar agri aksaray amasya ankara antalya ardahan artvin aydin balikesir bartin batman bayburt bilecik bingol bitlis bolu burdur bursa canakkale cankiri corum denizli diyarbakir duzce edirne elazig erzincan erzurum eskisehir gaziantep giresun gumushane hakkari hatay igdir isparta istanbul izmir kahramanmaras karabuk karaman kars kastamonu kayseri kirikkale kirklareli kirsehir kilis kocaeli konya kutahya malatya manisa mardin mersin mugla mus nevsehir nigde ordu osmaniye rize sakarya samsun sanliurfa siirt sinop sirnak sivas tekirdag tokat trabzon tunceli usak van yalova yozgat zonguldak').split(' '));
+const urlPath=u=>{try{return new URL(u,'https://mavibasim.com').pathname.toLowerCase().replace(/\/$/,'')||'/';}catch{return '';}};
+function classifySeoUrl(url,products){
+ const path=urlPath(url);
+ if(path==='/blog'||path.startsWith('/blog/'))return 'blog';
+ if(path==='/sektor'||path.startsWith('/sektor/'))return 'sektorel';
+ const product=products.find(p=>p.urls.some(u=>urlPath(u)===path));
+ if(product)return 'urun';
+ const slug=path.slice(1).split('-')[0];
+ if(citySlugs.has(slug)&&path.length>slug.length+1)return 'sehir';
+ if(citySlugs.has(slug)&&path==='/'+slug)return 'sehir';
+ return 'diger';
+}
+const byDevice=rows=>{
+ const values=groups(rows||[],r=>r.device||'BILINMIYOR');
+ return [...values.entries()].map(([device,records])=>({device,...metric(records)})).sort((a,b)=>a.device.localeCompare(b.device));
+};
+const labeledMetric=m=>m?m.clicks+' tıklama; '+m.impressions+' gösterim; CTR '+(m.ctr===null?'?':(100*m.ctr).toFixed(2)+'%')+'; konum '+(m.position===null?'?':m.position.toFixed(2)):'bu ay kayıt yok (sıfır olduğu kanıtlanmadı)';
+function categorySections(now,before,products){
+ const categories=[['urun','Ürün sayfaları'],['sehir','Şehir ve şehre özel baskı sayfaları'],['sektorel','Sektörel sayfalar'],['blog','Blog yazıları'],['diger','Diğer sayfalar']];
+ const sections=[],classCounts={},taxonomy={rules:'Kanonik ürün katalog URL’leri ürün; /blog/ blog; /sektor/ sektörel; il adıyla başlayan diğer URL’ler şehir; kalanlar diğer. GA4 ziyaretçi şehri, şehir SEO URL sınıfına girmez.',classification_version:'url-category-v1'};
+ for(const [id,title] of categories){
+  const pick=rows=>(rows||[]).filter(r=>classifySeoUrl(r.page,products)===id);
+  const currentRows=pick(now?.pages),priorRows=pick(before?.pages);
+  const currentQueries=pick(now?.queries),priorQueries=pick(before?.queries);
+  const pages=paired(currentRows,priorRows,r=>r.page);
+  const queries=paired(currentQueries,priorQueries,r=>r.page+' | '+r.query);
+  const totalNow=metric(currentRows),totalBefore=metric(priorRows);
+  const countNow=new Set(currentRows.map(r=>r.page)).size,countBefore=new Set(priorRows.map(r=>r.page)).size;
+  classCounts[id]={current_url_count:countNow,previous_url_count:countBefore,current_page_rows:currentRows.length,previous_page_rows:priorRows.length,not_all_indexed_urls:true};
+  const worst=pages.filter(r=>r.delta_clicks<0).sort((a,b)=>a.delta_clicks-b.delta_clicks).slice(0,8);
+  const best=pages.filter(r=>r.delta_clicks>0).sort((a,b)=>b.delta_clicks-a.delta_clicks).slice(0,8);
+  const queryLoss=queries.filter(r=>r.delta_clicks<0).sort((a,b)=>a.delta_clicks-b.delta_clicks).slice(0,5);
+  const queryGain=queries.filter(r=>r.delta_clicks>0).sort((a,b)=>b.delta_clicks-a.delta_clicks).slice(0,5);
+  const list=items=>items.length?items.map(x=>x.key+' ['+x.previous.clicks+' → '+x.current.clicks+'; '+(x.delta_clicks>0?'+':'')+x.delta_clicks+']').join('; '):'iki ayda ortak kayıtla doğrulanmış önemli değişim yok';
+  const devices=new Set([...byDevice(currentRows).map(x=>x.device),...byDevice(priorRows).map(x=>x.device)]);
+  const dBefore=Object.fromEntries(byDevice(priorRows).map(x=>[x.device,x])),dNow=Object.fromEntries(byDevice(currentRows).map(x=>[x.device,x]));
+  const deviceLines=[...devices].sort().map(d=>d+': '+labeledMetric(dBefore[d])+' → '+labeledMetric(dNow[d]));
+  sections.push('## '+title+' — URL bazlı GSC incelemesi',
+   'Kayıtlı URL sayısı: '+countBefore+' → '+countNow+' (dizindeki toplam URL sayısı değildir).',
+   'Kayıtlı sayfa kırılımı: '+labeledMetric(totalBefore)+' → '+labeledMetric(totalNow)+'. Resmî mülk toplamından ayrı tutulur.',
+   'Mobil / masaüstü / tablet URL kırılımı:\n'+(deviceLines.length?deviceLines.join('\n'):'GSC satırı bulunmuyor.'),
+   'Tıklama kaybeden URL’ler: '+list(worst),
+   'Tıklama kazanan URL’ler: '+list(best),
+   'Görünür kayıp sorgular: '+list(queryLoss),
+   'Görünür kazanan sorgular: '+list(queryGain),
+   'Tek ayda görünen URL/sorgu satırları diğer ayda sıfır sayılmaz; ham kaynak paketinde mevcuttur.'
+  );
+ }
+ const dailyTotals=r=>{
+  if(!r)return null;
+  return {month:r.month,verified_days:r.daily?.filter(d=>d.verified).length??null,expected_days:r.expected_days,
+   by_device:byDevice((r.daily||[]).filter(d=>d.verified).flatMap(d=>d.devices||[])),
+   caveat:'Günlük seri site geneli cihaz toplamlarından üretilmiştir. URL veya sorgunun gün bazlı hareketini göstermez.'};
+ };
+ return {sections,classification:{...taxonomy,counts:classCounts},daily_device_totals:{current:dailyTotals(now),previous:dailyTotals(before)}};
+}
+
 export function buildChatGptHandoff({month,device='ALL',current,previous,ga4,oldGa4,catalog,changes,status,ga4Status}){
  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('Devir için geçerli ay seçilmedi.');
  const prev=previousMonth(month),months=Array.isArray(current)?current:[],cur=months.find(r=>r?.month===month)||null;
  const old=previous?.month===prev?previous:months.find(r=>r?.month===prev)||null;
  const now=monthBundle(cur,device),before=monthBundle(old,device);
- const entries=paired(now?.pages,before?.pages,r=>r.page);
- const qEntries=paired(now?.queries,before?.queries,r=>r.page+' | '+r.query);
  const selectedPage=metric(now?.pages),priorPage=metric(before?.pages);
  const activeTotal=cur?.property_total||null,priorTotal=old?.property_total||null;
  const isAll=device==='ALL';
@@ -81,7 +127,9 @@ export function buildChatGptHandoff({month,device='ALL',current,previous,ga4,old
   before:e.before||null,after:e.after||null}));
  const inChanges=new Set(events.flatMap(e=>[e.before?.id,e.after?.id]).filter(Boolean));
  const uncoveredSnapshots=(catalog?.snapshots||[]).filter(s=>!inChanges.has(s.id));
+ const classified=categorySections(now,before,products);
  const data={
+  taxonomy:classified.classification,daily_device_totals:classified.daily_device_totals,
   format:'MAVI_BASIM_CHATGPT_SEO_DEVIR_V2',site:'https://mavibasim.com',generated_at:new Date().toISOString(),
   selected_month:month,previous_month:prev,device_filter:device,
   source_scope:{gsc:'GSC Search Analytics API, seçilen cihaz, tüm ülkeler',ga4:'GA4 Organic Search, tüm cihazlar ve ülkeler',timezone_gsc:'America/Los_Angeles'},
@@ -110,14 +158,14 @@ export function buildChatGptHandoff({month,device='ALL',current,previous,ga4,old
   'Resmî GSC mülk toplamı (tüm cihazlar): '+(priorTotal?formatMetric(priorTotal):'yok')+' → '+(activeTotal?formatMetric(activeTotal):'yok')+'. Bu tüm cihaz ölçümü, seçilen cihazın sayfa dökümü değildir.',
   'Dışa aktarılan GSC sayfa satırları: '+formatMetric(priorPage)+' → '+formatMetric(selectedPage)+'. Resmî mülk toplamıyla bir tutma.',
   'GA4 resmî Organic Search oturumları: '+(ga4Previous?.totals?.sessions??'doğrulanmadı')+' → '+(ga4Current?.totals?.sessions??'doğrulanmadı')+'. GSC tıklamasıyla eşit değil.',
-  describePairs(entries,'Sayfalar'),
-  describePairs(qEntries,'URL + görünür arama sorguları'),
+  ...classified.sections,
   'Önemli koruma kuralı: Önceki veya güncel ayda trafik getiren sorguları; artışları ve düşüşleri birlikte değerlendir. Özellikle gerilemiş olsa bile hâlâ trafik getirenleri koru.',
   '## Mutabakat ve veri sınırları',
   'GSC dışa aktarılan sayfa / resmî site (güncel): '+(selectedPage?.clicks??'yok')+' / '+(isAll?activeTotal?.clicks??'yok':'tüm-cihaz toplamıyla kıyaslanamaz')+'.',
   'GA4 güncel oturum / cihaz satır toplamı / şehir satır toplamı / sayfa satır toplamı: '+[ga4Current?.totals?.sessions,ga4Facets(ga4Current)?.facets?.devices?.sessions_sum,ga4Facets(ga4Current)?.facets?.cities?.sessions_sum,ga4Facets(ga4Current)?.facets?.pages?.sessions_sum].map(v=>v??'?').join(' / ')+'. Bu sayılar eşit olmayabilir; farkları saklama.',
   '## ChatGPT görevi',
   'Bu dosya tek başına yeterli bağlam olmalıdır. Önceki konuşma, hatıra veya yeniden CSV isteme. Varsa eksik kanıtı adıyla belirt.',
+  'Ürün, şehir sayfası, sektörel sayfa ve blog analizlerini birbirinden ayrı raporla; her grubun mobil/masaüstü performansını ve kazanan-kaybeden URL/sorgularını ele al. GA4 ziyaretçinin şehrini şehir sayfası trafiği sanma. Günlük cihaz toplamlarından günlük URL veya sorgu kaybı türetme.',
   'Her anlamlı ürün, URL, sorgu ve cihaz artış/kaybını değerlendir; nedeni kanıtlanmış olay ile olası açıklamayı ayır; yayın doğrulaması olmayan tarama aralığını kesin neden sayma.',
   'Kazanan/aktif sorguları koru. Her önemli aday için: Ne oldu? Tarihli kanıt? Alternatif neden? Ne kontrol edilmeli? Hangi doğrulanmış bulguda hangi sınırlı düzeltme yapılmalı? Sonraki ay hangi ölçümle izlenecek? sorularını yanıtla.',
   'Kullanıcının onayı olmadan canlı siteye değişiklik önerisi uygulanmaz. Gösterim artarken CTR düşmesini otomatik hata sayma.',

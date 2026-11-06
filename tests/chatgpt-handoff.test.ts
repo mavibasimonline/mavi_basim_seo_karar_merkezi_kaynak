@@ -61,3 +61,44 @@ it('does not compare device-scoped data to site-wide property totals',()=>{
  expect(data.ga4.current.totals.sessions).toBe(58);
 });
 it('rejects invalid month',()=>expect(()=>buildChatGptHandoff({...base,month:'2026-99'})).toThrow());
+
+it('separates city, sector, blog and product pages without repeating raw page records',()=>{
+ const p=(url:string,clicks:number,device='MOBILE')=>({page:url,device,country:'tur',clicks,impressions:100,position:12});
+ const cur={...monthly('2026-10',21),pages:[
+  p(page,21),p('https://mavibasim.com/istanbul-brosur-baski',7),
+  p('https://mavibasim.com/sektor/kuafor-kartvizit-baski',2),
+  p('https://mavibasim.com/blog/varak-baski-nedir',1),
+  p('https://mavibasim.com/iletisim',3)],
+  queries:[
+  {...p('https://mavibasim.com/istanbul-brosur-baski',7),query:'istanbul broşür baskı'},
+  {...p('https://mavibasim.com/sektor/kuafor-kartvizit-baski',2),query:'kuaför kartvizit'}]
+ };
+ const prev={...monthly('2026-09',31),pages:[
+  p(page,31),p('https://mavibasim.com/istanbul-brosur-baski',4),
+  p('https://mavibasim.com/sektor/kuafor-kartvizit-baski',3),
+  p('https://mavibasim.com/blog/varak-baski-nedir',2),
+  p('https://mavibasim.com/iletisim',3)]};
+ const md=buildChatGptHandoff({...base,current:[cur],previous:prev});
+ const data=unpack(md);
+ expect(data.taxonomy.counts.urun.current_url_count).toBe(1);
+ expect(data.taxonomy.counts.sehir.current_url_count).toBe(1);
+ expect(data.taxonomy.counts.sektorel.current_url_count).toBe(1);
+ expect(data.taxonomy.counts.blog.current_url_count).toBe(1);
+ expect(data.taxonomy.counts.diger.current_url_count).toBe(1);
+ expect(md).toContain('## Şehir ve şehre özel baskı sayfaları');
+ expect(md).toContain('## Sektörel sayfalar');
+ expect(md).toContain('## Blog yazıları');
+ expect(md).toContain('Mobil / masaüstü / tablet URL kırılımı:');
+ expect(data.gsc.current.pages).toHaveLength(5);
+ expect(data.taxonomy.counts.sehir.not_all_indexed_urls).toBe(true);
+});
+it('preserves daily device totals but does not claim daily URL-query series',()=>{
+ const data=unpack(buildChatGptHandoff(base));
+ expect(data.daily_device_totals.current.by_device[0].device).toBe('MOBILE');
+ expect(data.daily_device_totals.current.by_device[0].clicks).toBe(21);
+ expect(data.daily_device_totals.current.caveat).toContain('URL veya sorgunun gün bazlı');
+});
+it('keeps absent page in a month as missing, rather than a fabricated zero',()=>{
+ const md=buildChatGptHandoff({...base,current:[{...monthly('2026-10',21),pages:[]}],previous:monthly('2026-09',31)});
+ expect(md).toContain('bu ay kayıt yok (sıfır olduğu kanıtlanmadı)');
+});
