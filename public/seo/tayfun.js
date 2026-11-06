@@ -6,8 +6,9 @@ const pageName=u=>{try{const path=new URL(u).pathname;return path==='/'?'Ana Say
 const metric=rows=>{if(!rows?.length)return null;const clicks=rows.reduce((n,r)=>n+Number(r.clicks||0),0),impressions=rows.reduce((n,r)=>n+Number(r.impressions||0),0);return {clicks,impressions,ctr:impressions?100*clicks/impressions:null,position:impressions?rows.reduce((n,r)=>n+Number(r.position||0)*Number(r.impressions||0),0)/impressions:null};};
 const nfmt=v=>Number(v).toLocaleString('tr-TR',{maximumFractionDigits:2});
 const CONTROL=['title','description','h1','canonical','robots','keywords','headings','internal_links','structured_data','notes'];
-const LABELS={title:'SEO Title',description:'Meta açıklaması',h1:'H1',canonical:'Canonical',robots:'Robots',keywords:'Takip edilecek hedef sorgular (virgülle)',headings:'H2–H6 / başlıklar',internal_links:'İç bağlantılar',structured_data:'Yapılandırılmış veri / JSON-LD',notes:'Notlar ve yayın kanıtı'};
-const MAX={title:300,description:1000,h1:500,canonical:2048,robots:200,headings:2500,internal_links:2500,structured_data:5000,notes:2500,keywords:3000};
+const ADVANCED=['hreflang','images','open_graph','twitter_card','x_robots','viewport','lang','redirect','status_code','content_excerpt'];
+const LABELS={title:'SEO Title',description:'Meta açıklaması',h1:'H1',canonical:'Canonical',robots:'Robots',keywords:'Takip edilecek hedef sorgular (virgülle)',headings:'H2–H6 / başlıklar',internal_links:'İç bağlantılar',structured_data:'Yapılandırılmış veri / JSON-LD',notes:'Notlar ve yayın kanıtı',hreflang:'Hreflang',images:'Görseller ve ALT metinleri',open_graph:'Open Graph etiketleri',twitter_card:'Twitter/X Card etiketleri',x_robots:'X-Robots-Tag',viewport:'Viewport',lang:'HTML lang',redirect:'Yönlendirme URL',status_code:'HTTP durum kodu',content_excerpt:'Kaydedilmiş sayfa içerik özeti'};
+const MAX={title:300,description:1000,h1:500,canonical:2048,robots:200,headings:2500,internal_links:2500,structured_data:5000,notes:2500,keywords:3000,hreflang:2500,images:2500,open_graph:2500,twitter_card:2500,x_robots:200,viewport:500,lang:100,redirect:2048,status_code:100,content_excerpt:5000};
 export function createTayfunWorkspace({api,scope,notify}){
  const root=document.getElementById('tayfunApp');
  let generation=0,cache=new Map(),revision=-1,filter='',mode='groups';
@@ -55,6 +56,13 @@ export function createTayfunWorkspace({api,scope,notify}){
    if(!record&&seo){if(key==='title')value=seo.title||'';else if(key==='description')value=seo.description||'';else if(key==='h1')value=(seo.headings||[]).filter(h=>h.level===1).map(h=>h.text).join('; ')||'';else if(key==='canonical')value=seo.canonical||'';else if(key==='robots')value=seo.robots||'';else if(key==='headings')value=JSON.stringify(seo.headings||[]);else if(key==='internal_links')value=JSON.stringify(seo.links||[]);else if(key==='structured_data')value=JSON.stringify(seo.structured_data||'');}
    form.append(field(key,LABELS[key],value,['description','headings','internal_links','structured_data','notes'].includes(key)?'textarea':'text'));
   }
+  const extra=el('details','','tayfun-advanced');extra.append(el('summary','Ek SEO alanları (görseller, hreflang, sosyal meta, HTTP)'));
+  for(const key of ADVANCED){
+   let value=record?.[key]??'';
+   if(!record&&seo){const saved=seo[key];value=typeof saved==='string'?saved:JSON.stringify(saved||'');}
+   extra.append(field(key,LABELS[key],value,['hreflang','images','open_graph','twitter_card','content_excerpt'].includes(key)?'textarea':'text'));
+  }
+  form.append(extra);
   const status=el('select');status.name='status';
   for(const [key,label]of[['aktif','Aktif · takip adayı'],['pasif','Pasif · geçmişte sakla']])status.append(new Option(label,key));
   status.value=record?.status||'aktif';const statusLabel=el('label','SEO sürümünün takip durumu','tayfun-field');statusLabel.append(status);form.append(statusLabel);
