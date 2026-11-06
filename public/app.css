@@ -3365,15 +3365,12 @@ dialog::backdrop {
 
 #app .month-strip button{transition:none!important}
 
-/* SEO İşleri: Tayfun tarzı kategori düğmeleri */
-#seoWorkApp .seo-work-toolbar{display:flex;gap:10px;align-items:center}
-#seoWorkApp .seo-work-search{flex:0 0 205px}
-#seoWorkApp input{width:100%;padding:8px;border:1px solid #dae3ef;border-radius:9px}
-#seoWorkApp .seo-work-tabs{display:flex;gap:6px;overflow-x:auto;flex:1;padding:4px 0}
-#seoWorkApp button{border:1px solid #e5eaf3;background:#f4f6fa;color:#40516d;border-radius:9px;padding:8px 11px;white-space:nowrap;cursor:pointer}
-#seoWorkApp button[aria-pressed=true]{background:#2563eb;color:#fff;border-color:#2563eb}
-#seoWorkApp .seo-work-group{padding:12px 0;border-bottom:1px solid #e5eaf3}
-#seoWorkApp .seo-work-group h3{margin:0 0 10px}
-#seoWorkApp .seo-work-items{display:flex;flex-wrap:wrap;gap:8px}
-#seoWorkApp .seo-work-detail{margin-top:16px;padding:16px;background:#f8fafc;border-radius:9px}
-@media(max-width:740px){#seoWorkApp .seo-work-toolbar{flex-direction:column;align-items:stretch}#seoWorkApp .seo-work-search{flex:auto}}
+/* SEO İşleri kategori seçimi */
+#seoWorkApp .seo-work-toolbar,#seoWorkApp .seo-work-tabs,#seoWorkApp .seo-work-items{display:flex;gap:8px}
+#seoWorkApp .seo-work-tabs{overflow-x:auto}
+#seoWorkApp .seo-work-items{flex-wrap:wrap}
+#seoWorkApp button{padding:8px;border:1px solid #dbe4f1;border-radius:8px;cursor:pointer}
+#seoWorkApp button[aria-pressed=true]{background:#2563eb;color:white}
+#seoWorkApp .seo-work-group{padding:12px 0}
+#seoWorkApp .seo-work-search input{max-width:205px}
+@media(max-width:740px){#seoWorkApp .seo-work-toolbar{flex-wrap:wrap}}
