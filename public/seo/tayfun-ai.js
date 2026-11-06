@@ -208,6 +208,18 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
    if(!tracking.length)table.append(E('p','Bu ürün için görünür sorgu veya eski kelime kaydı bulunmadı; eksik veri sıfır değildir.'));
    keywordDetails.append(table);
    editor.append(keywordDetails);
+   const proposals=(history.versions||[]).flatMap(v=>(v.page_proposals||[]).map(candidate=>({...candidate,saved_at:v.created_at,version_id:v.id})));
+   const candidates=E('details','','tayfun-keyword-history');
+   candidates.append(E('summary','Yeni sayfa adayları · '+proposals.length+' arşivlenmiş öneri (siteye otomatik eklenmez)'));
+   const holder=E('div','','tayfun-candidates-list');
+   if(!proposals.length)holder.append(E('p','Bu ürün için kayıtlı yeni sayfa önerisi yok. Bir kelimenin yükselmesi tek başına yeni sayfa açma nedeni değildir.','source-note'));
+   for(const candidate of proposals){
+    const card=E('div','','tayfun-candidate');
+    card.append(E('strong',candidate.keyword),E('p','Önerilen URL: '+(candidate.url_suggestion||'URL henüz önerilmedi')),
+     E('p','Gerekçe: '+candidate.reason),E('small','Öneri tarihi: '+new Date(candidate.saved_at).toLocaleString('tr-TR')+' · Canlı siteye eklenmedi.'));
+    holder.append(card);
+   }
+   candidates.append(holder);editor.append(candidates);
    const urls=new Set(history.product.urls);
    const currentAuto=latestObservation(auto,new Set([product.canonical_url]));
    let observed=null;
@@ -258,8 +270,9 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
      if(!result.ok||result.entry?.product_id!==product.id)throw Error(result.code||'Ürün sürümü kaydedilemedi');
      preview.replaceChildren(E('strong','Yeni sürüm kaydedildi · '+new Date(result.entry.created_at).toLocaleString('tr-TR')),
       E('p','Arşiv kimliği: '+result.entry.id+' · Eski kayıtlar değişmedi. Canlı site değiştirilmedi.'));
-     notify(product.name+' SEO çalışması yeni tarihle kaydedildi. Önceki sürümler ve takip edilen kelimeler korundu.');
-     onSaved?.(); // invalidate cached month, do not remount the current editor.
+     notify(product.name+' SEO çalışması '+new Date(result.entry.created_at).toLocaleString('tr-TR')+' tarihinde kaydedildi. Eski sürümler ve kelimeler korundu.');
+     onSaved?.();
+     await loadProduct(editor,product); // reflect saved version, tracked words and proposal history immediately.
     }catch(error){preview.replaceChildren(E('p','Kayıt yapılamadı: '+error.message,'history-warning'));save.disabled=false;}
    };
    const promptArea=E('div','','tayfun-jobs-package');
