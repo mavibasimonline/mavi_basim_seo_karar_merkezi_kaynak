@@ -3,7 +3,7 @@ import {tayfunList,tayfunSave} from '../src/tayfun-ledger';
 const secret=btoa(String.fromCharCode(...new Uint8Array(32).fill(7)));
 function store(){
  const data=new Map<string,unknown>();
- return {data,get:async(key:string)=>data.get(key),put:async(key:string,value:unknown)=>{data.set(key,value);}};
+ return {data,get:async<T=unknown>(key:string)=>data.get(key) as T|undefined,put:async(key:string,value:unknown)=>{data.set(key,value);}};
 }
 const initial={month:'2026-10',url:'https://mavibasim.com/brosur',title:'Broşür fiyatları',description:'A5 / A4 broşür',h1:'Broşür baskı',canonical:'https://mavibasim.com/brosur',robots:'index,follow',headings:'A5, A4',internal_links:'/etiket',structured_data:'{}',notes:'GSC karşılaştırma hipotezi',keywords:['broşür fiyatları'],status:'aktif'};
 describe('Tayfun immutable monthly ledger',()=>{
