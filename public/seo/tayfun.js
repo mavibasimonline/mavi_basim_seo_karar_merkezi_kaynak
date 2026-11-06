@@ -160,6 +160,7 @@ export function createTayfunWorkspace({api,scope,notify}){
   return box;
  }
  async function render(){
+  mode=['groups','unmapped','jobs'].includes(root.dataset.requestedMode)?root.dataset.requestedMode:mode;
   const at=++generation,s=scope(),month=s.month,second=nextMonth(month);
   if(revision!==s.revision){cache.clear();revision=s.revision;}
   root.replaceChildren(el('p','Aylık SEO kayıtları hazırlanıyor…'));
@@ -180,9 +181,10 @@ export function createTayfunWorkspace({api,scope,notify}){
    const search=el('input');search.type='search';search.placeholder='Sayfa URL, ürün veya kategori ara…';search.value=filter;
    const filterWrap=el('div','','tayfun-search');filterWrap.append(search,el('span','Kayıtlı sayfalar · '+pages.length+' gözlenen URL; tüm sitemap sayfalarının eksiksiz listesi olduğu garanti edilmez.','source-note'));
    const tabs=el('div','','tayfun-tabs');
+   const overview=el('button','Genel Bakış','button secondary');overview.type='button';overview.setAttribute('aria-pressed','false');overview.onclick=()=>{location.hash='#overview';};
    const groups=el('button','Ürün Grupları','button secondary'),unmapped=el('button','Eşleşmemiş Sayfalar','button secondary'),seoJobs=el('button','SEO İşleri','button secondary');
    groups.type='button';unmapped.type='button';seoJobs.type='button';groups.onclick=()=>{mode='groups';paint();};unmapped.onclick=()=>{mode='unmapped';paint();};seoJobs.onclick=()=>{mode='jobs';paint();};
-   tabs.append(groups,unmapped,seoJobs);root.append(tabs,filterWrap);
+   tabs.append(overview,groups,unmapped,seoJobs);root.append(tabs,filterWrap);
    const place=el('div','','tayfun-months');root.append(place);
    root.append(el('p',sitemap?.urls?.length?'Site haritasından '+sitemap.urls.length+' URL eklendi. Kaynak: '+sitemap.source+(sitemap.stale?' · Son kayıt; anlık doğrulanmadı':''): 'Site haritası doğrulanamadı; ürün, GSC ve tarama kayıtlarından görünen URL’ler listeleniyor.','source-note'));
    const rawFirst=s.current?.find(r=>r.month===month)||s.previous?.month===month&&s.previous||null;
@@ -194,6 +196,7 @@ export function createTayfunWorkspace({api,scope,notify}){
     automaticCache.set(id,result);return result;
    }
    function paint(){
+    root.dataset.requestedMode=mode;
     place.replaceChildren();
     groups.setAttribute('aria-pressed',String(mode==='groups'));unmapped.setAttribute('aria-pressed',String(mode==='unmapped'));seoJobs.setAttribute('aria-pressed',String(mode==='jobs'));
     filterWrap.hidden=mode==='jobs';
