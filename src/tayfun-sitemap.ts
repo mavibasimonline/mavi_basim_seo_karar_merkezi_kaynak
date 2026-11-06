@@ -8,11 +8,11 @@ const locations=(xml:string)=>[...xml.matchAll(/<loc\b[^>]*>([^<]+)<\/loc>/gi)].
 export async function tayfunSitemap(storage:Store,fetcher:typeof fetch=fetch,now=new Date()){
  const saved=await storage.get<Saved>(KEY);
  if(saved&&now.getTime()-Date.parse(saved.captured_at)<12*3600000)return {...saved,stale:false,d1_requests:0};
- const urls=new Set<string>(),queue=[ORIGIN+'/sitemap.xml'];const visited=new Set<string>();
+ const urls=new Set<string>(),queue=[ORIGIN+'/sitemap.xml'];const visited=new Set<string>(),started=Date.now();
  try{
-  while(queue.length&&visited.size<6&&urls.size<2500){
+  while(queue.length&&visited.size<6&&urls.size<2500&&Date.now()-started<10000){
    const next=queue.shift()!;if(visited.has(next))continue;visited.add(next);
-   const response=await fetcher(next,{redirect:'manual',signal:AbortSignal.timeout(12000),headers:{Accept:'application/xml,text/xml'}});
+   const response=await fetcher(next,{redirect:'manual',signal:AbortSignal.timeout(Math.max(1000,Math.min(6000,10000-(Date.now()-started)))),headers:{Accept:'application/xml,text/xml'}});
    if(!response.ok||response.status>=300)throw Error('SITEMAP_HTTP_UNAVAILABLE');
    if(Number(response.headers.get('content-length')||0)>1500000)throw Error('SITEMAP_TOO_LARGE');
    const bytes=await response.arrayBuffer();if(bytes.byteLength>1500000)throw Error('SITEMAP_TOO_LARGE');
