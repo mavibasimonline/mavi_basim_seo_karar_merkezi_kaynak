@@ -13,7 +13,7 @@ const latestObservation=(auto,allowed)=>{
  const r=(auto?.observations||[]).filter(x=>allowed.has(x.url)).sort((a,b)=>b.observed_at.localeCompare(a.observed_at));
  return r[0]||null;
 };
-export function buildProductAiHandoff({product,month,device,report,previous,history,observed}){
+export function buildProductAiHandoff({product,month,device,report,previous,history,observed,legacyEvidence=null}){
  const urls=[...new Set(product.urls||[product.canonical_url])],allowed=new Set(urls);
  const scoped=r=>({
   month:r?.month||null,available:!!r?.available,verified_days:r?.days_verified??null,expected_days:r?.expected_days??null,
@@ -24,7 +24,7 @@ export function buildProductAiHandoff({product,month,device,report,previous,hist
  });
  const now=scoped(report),before=scoped(previous);
  const baseline=history.versions.filter(v=>v.url===product.canonical_url).at(-1)||null;
- const observedFields=observed?.seo||null;
+ const observedFields=observed?.seo||legacyEvidence?.fields||null;
  const seo={};
  for(const key of fields){
   const v=observedFields?.[key]??baseline?.[key]??'';
@@ -49,6 +49,7 @@ export function buildProductAiHandoff({product,month,device,report,previous,hist
    current_url_totals:metric(now.pages),previous_url_totals:metric(before.pages),
    note:'GSC sorguları anonim/gizli olabilir; kaydı olmayan sorguyu sıfır sayma. URL satırlarının toplamı resmî mülk toplamı değildir.'},
   seo:{latest_automatic_observation:observed?{id:observed.id,observed_at:observed.observed_at,source:observed.source,seo:observed.seo}:null,
+   archived_legacy_crawl:legacyEvidence?{id:legacyEvidence.id,observed_at:legacyEvidence.observed_at,source:'seo_snapshots',fields:legacyEvidence.fields,record_hash:legacyEvidence.record_hash||null}:null,
    recorded_versions:allowedDetails,oldest_recorded_at:history.oldest_recorded_at||null,
    old_versions_immutable:true,known_current_fields:seo},
   keywords:{ever_tracked:tracked,existing_history_keywords:history.tracked_keywords||[],do_not_delete:true},
@@ -211,10 +212,22 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
    const currentAuto=latestObservation(auto,new Set([product.canonical_url]));
    let observed=null;
    if(currentAuto)try{observed=await api('/api/independent/tayfun-auto/detail?id='+encodeURIComponent(currentAuto.id));}catch{/* Source missing is explicitly retained. */}
+   let legacyEvidence=null;
+   try{
+    const lastDay=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5)),0)).getUTCDate();
+    const end=month+'-'+String(lastDay).padStart(2,'0');
+    const source=await api('/api/independent/seo-history?'+new URLSearchParams({kind:'snapshot',url:product.canonical_url,to:end}));
+    const matches=(source.items||[]).filter(v=>v.url===product.canonical_url&&v.observed_at?.slice(0,7)<=month).sort((a,b)=>b.observed_at.localeCompare(a.observed_at));
+    if(matches.length){
+     const detail=await api('/api/independent/seo-history/detail?'+new URLSearchParams({kind:'snapshot',id:matches[0].id}));
+     if(detail.url===product.canonical_url&&detail.observed_at?.slice(0,7)<=month)legacyEvidence=detail;
+    }
+   }catch{/* Historical source is optional and must never be invented. */}
+
    const output=E('textarea','','tayfun-ai-output');output.readOnly=true;output.rows=11;
    const make=E('button','Bu ürünün yapay zekâ metnini oluştur','button primary'),copy=E('button','Metni kopyala','button secondary');
    copy.disabled=true;
-   make.onclick=()=>{const packageText=buildProductAiHandoff({product,month,device,report:current,previous,history,observed});output.value=packageText;copy.disabled=false;};
+   make.onclick=()=>{const packageText=buildProductAiHandoff({product,month,device,report:current,previous,history,observed,legacyEvidence});output.value=packageText;copy.disabled=false;};
    copy.onclick=async()=>{
     try{await navigator.clipboard.writeText(output.value);notify(product.name+' SEO devir metni kopyalandı. Yalnız bu ürünü ChatGPT’ye gönderin.');}
     catch{output.focus();output.select();notify('Kopyalama izni verilmedi; metni seçip Ctrl+C kullanabilirsiniz.');}
