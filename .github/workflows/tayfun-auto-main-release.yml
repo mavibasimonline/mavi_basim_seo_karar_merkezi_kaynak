@@ -50,7 +50,8 @@ jobs:
         if: steps.gate.outputs.ready == 'true'
         run: |
           python3 - <<'PY'
-          import os
+          import os,sys
+          sys.path.insert(0,'scripts')
           from cloudflare_diagnostics import Cloudflare
           from quota_observer_release import api,active_version,free_plan
           client=Cloudflare(os.environ['CLOUDFLARE_API_TOKEN'],os.environ['CLOUDFLARE_ACCOUNT_ID'])
@@ -63,7 +64,8 @@ jobs:
         if: steps.gate.outputs.ready == 'true'
         run: |
           python3 - <<'PY'
-          import os
+          import os,sys
+          sys.path.insert(0,'scripts')
           from cloudflare_diagnostics import Cloudflare
           from quota_observer_release import api,active_version
           client=Cloudflare(os.environ['CLOUDFLARE_API_TOKEN'],os.environ['CLOUDFLARE_ACCOUNT_ID'])
