@@ -6,7 +6,8 @@ type Store={get<T=unknown>(key:string):Promise<T|undefined>;put(key:string,value
 export type TayfunEntry={
  id:string;month:string;url:string;created_at:string;status:'aktif'|'pasif';kind:'manuel';source:'user-entry';
  title:string;description:string;h1:string;canonical:string;robots:string;keywords:string[];
- headings:string;internal_links:string;structured_data:string;notes:string; supersedes:string|null;
+ headings:string;internal_links:string;structured_data:string;notes:string;supersedes:string|null;
+ hreflang:string;images:string;open_graph:string;twitter_card:string;x_robots:string;viewport:string;lang:string;redirect:string;status_code:string;content_excerpt:string;
 };
 type StoreIndex={version:2;ids:string[];updated_at:string};
 const INDEX='tayfun:ledger:v2:index:',ROW='tayfun:ledger:v2:record:';
@@ -48,7 +49,9 @@ export async function tayfunSave(storage:Store,secret:string,input:unknown,time=
   title,description,h1,canonical,robots:text(r.robots||'',200),
   keywords:keywords.map((v:string)=>v.trim()).filter(Boolean),headings:text(r.headings||'',2500),
   internal_links:text(r.internal_links||'',2500),structured_data:text(r.structured_data||'',5000),
-  notes:text(r.notes||'',2500),supersedes};
+  notes:text(r.notes||'',2500),supersedes,
+  hreflang:text(r.hreflang||'',2500),images:text(r.images||'',2500),open_graph:text(r.open_graph||'',2500),twitter_card:text(r.twitter_card||'',2500),
+  x_robots:text(r.x_robots||'',200),viewport:text(r.viewport||'',500),lang:text(r.lang||'',100),redirect:text(r.redirect||'',2048),status_code:text(r.status_code||'',100),content_excerpt:text(r.content_excerpt||'',5000)};
  // Superseded version is not deleted or overwritten: current status is derived by latest successor.
  const next:StoreIndex={version:2,ids:[...saved.ids,entry.id],updated_at:now};
  await storage.put(ROW+entry.id,await encrypt(entry,secret));
