@@ -8,6 +8,7 @@
     <title>Mavi Basım · SEO Karar Merkezi</title>
     <link rel="stylesheet" href="/app.css" />
     <script type="module" src="/app.js"></script>
+    <script type="module" src="/seo/tayfun-overview-nav.js"></script>
     <script type="module" src="/seo/catalog-sync.js"></script>
       <link rel="stylesheet" href="/seo/tables.css" />
   </head>
@@ -235,6 +236,12 @@
             ></span>
             <p id="dataError" class="data-error" role="alert" hidden></p>
             <section id="view-overview" class="view" aria-label="Genel bakış">
+              <nav id="overviewTabs" class="tayfun-tabs" aria-label="Tayfun çalışma sekmeleri">
+                <button class="button secondary" type="button" aria-pressed="true">Genel Bakış</button>
+                <button class="button secondary" type="button" data-tayfun-mode="groups" aria-pressed="false">Ürün Grupları</button>
+                <button class="button secondary" type="button" data-tayfun-mode="unmapped" aria-pressed="false">Eşleşmemiş Sayfalar</button>
+                <button class="button secondary" type="button" data-tayfun-mode="jobs" aria-pressed="false">SEO İşleri</button>
+              </nav>
               <div
                 id="kpis"
                 class="kpi-grid"
@@ -594,7 +601,6 @@
                   <p>SEO kayıtları yükleniyor…</p>
                 </div>
               </div>
-              <div id="tayfunOverviewMount" hidden></div>
             </section>
             <section
               id="view-health"
