@@ -31,7 +31,7 @@ describe('Tayfun SEO İşleri single product AI handoff',()=>{
   const missing=rows.find((r:any)=>r.query==='kaybolan magnet sorgusu');
   expect(missing!.current_clicks).toBeNull();
   expect(missing!.delta_clicks).toBeNull();
-  expect(missing!.signal).toContain('Kayıt');
+  expect(missing!.signal).toContain('görünür sorgu satırı yok');
   const archive=rows.find((r:any)=>r.query==='eski takip kelimesi');
   expect(archive).toBeTruthy();
   expect(archive!.current_clicks).toBeNull();
