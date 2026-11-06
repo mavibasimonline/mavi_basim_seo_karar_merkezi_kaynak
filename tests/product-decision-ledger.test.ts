@@ -46,3 +46,28 @@ it('quarantines ambiguous URL mappings instead of double-counting traffic',()=>{
  expect(rows.find(r=>r.id==='brosur')?.priority).toBe('Veri bekle');
  expect(rows.find(r=>r.id==='product-2')?.priority).toBe('Veri bekle');
 });
+
+it('explains loss with dated evidence, target URL and safe final decision instead of just inspect',()=>{
+ const page='https://mavibasim.com/brosur';
+ const now=input('2026-10',[{...point(page,21,739),position:27.65,ctr:21/739}],[query(page,'broşür baskı',4)]);
+ const before=input('2026-09',[{...point(page,31,900),position:22,ctr:31/900}],[query(page,'broşür baskı',9)]);
+ const rows=buildProductDecisionLedger(now,before,null,null,catalog);
+ const row=rows.find(r=>r.id==='brosur')!;
+ expect(row.diagnosis.summary).toContain('31 → 21');
+ expect(row.diagnosis.summary).toContain('2026-09 → 2026-10');
+ expect(row.diagnosis.observed_mechanisms.some(s=>s.includes('Ortalama konum'))).toBe(true);
+ expect(row.diagnosis.target_url).toBe(page);
+ expect(row.diagnosis.top_loss_query).toBe('broşür baskı');
+ expect(row.diagnosis.decision).toContain('değiştirme');
+ expect(row.action).toContain('TESPİT VE KANIT:');
+ expect(row.action).toContain('KARAR:');
+ expect(row.content_change_recommended).toBe(false);
+});
+it('provides explicit preservation action for stable and insufficient data',()=>{
+ const page='https://mavibasim.com/brosur';
+ const same=buildProductDecisionLedger(input('2026-10',[point(page,30,500)]),input('2026-09',[point(page,29,490)]),null,null,catalog).find(r=>r.id==='brosur')!;
+ expect(same.diagnosis.decision).toContain('koru');
+ const missing=buildProductDecisionLedger(input('2026-10',[point(page,5,100)]),null,null,null,catalog).find(r=>r.id==='brosur')!;
+ expect(missing.diagnosis.confidence).toBe('veri_yetersiz');
+ expect(missing.diagnosis.decision).toContain('Şimdi SEO içeriğini değiştirme');
+});
