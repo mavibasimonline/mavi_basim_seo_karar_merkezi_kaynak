@@ -28,7 +28,10 @@ export function buildProductAiHandoff({product,month,device,report,previous,hist
  const seo={};
  for(const key of fields){
   const v=observedFields?.[key]??baseline?.[key]??'';
-  seo[key]=key==='h1'&&observedFields?.headings?observedFields.headings.filter(h=>h.level===1).map(h=>h.text).join(' | '):
+  seo[key]=key==='canonical'&&Array.isArray(observedFields?.canonical)?(observedFields.canonical[0]||''):
+   key==='robots'&&Array.isArray(observedFields?.robots)?observedFields.robots.join(', '):
+   key==='content_excerpt'&&observedFields?.excerpt?observedFields.excerpt:
+   key==='h1'&&observedFields?.headings?observedFields.headings.filter(h=>h.level===1).map(h=>h.text).join(' | '):
    key==='headings'&&observedFields?.headings?norm(observedFields.headings):
    key==='internal_links'&&observedFields?.links?norm(observedFields.links):
    key==='images'&&observedFields?.images?norm(observedFields.images):
@@ -153,7 +156,7 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
    const legend=E('p','Eski SEO kayıtları: '+history.versions.length+' · Bilinen en eski kayıt: '+(history.oldest_recorded_at?new Date(history.oldest_recorded_at).toLocaleString('tr-TR'):'Henüz yok')+' · Korunan kelime: '+history.tracked_keywords.length,'source-note');
    editor.append(legend);
    const urls=new Set(history.product.urls);
-   const currentAuto=latestObservation(auto,urls);
+   const currentAuto=latestObservation(auto,new Set([product.canonical_url]));
    let observed=null;
    if(currentAuto)try{observed=await api('/api/independent/tayfun-auto/detail?id='+encodeURIComponent(currentAuto.id));}catch{/* Source missing is explicitly retained. */}
    const output=E('textarea','','tayfun-ai-output');output.readOnly=true;output.rows=11;
