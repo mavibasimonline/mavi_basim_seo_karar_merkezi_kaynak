@@ -25,14 +25,22 @@ export function createTayfunWorkspace({api,scope,notify}){
    const urls=p.urls?.length?p.urls:[p.canonical_url];
    for(const url of urls||[])if(url)map.set(url,{url,product:p.name,category:p.category||'Ürünler'});
   }
+  const categoryFor=url=>{
+   try{
+    const path=new URL(url).pathname;
+    if(path.startsWith('/blog/'))return 'Blog Sayfaları';
+    if(path.startsWith('/sektor/'))return 'Sektörel Sayfalar';
+    if(/-matbaa(?:\/|$)|-baski(?:\/|$)/.test(path))return 'Şehir / Baskı Sayfaları';
+   }catch{}
+   return 'Eşleşmemiş sayfalar';
+  };
   for(const raw of [...s.current||[],s.previous].filter(Boolean))for(const r of raw.pages||[]){
-   if(!map.has(r.page))map.set(r.page,{url:r.page,product:pageName(r.page),category:'Eşleşmemiş sayfalar'});
+   if(!map.has(r.page))map.set(r.page,{url:r.page,product:pageName(r.page),category:categoryFor(r.page)});
   }
   for(const sn of s.catalog?.snapshots||[])if(sn.url&&!map.has(sn.url))map.set(sn.url,{url:sn.url,product:pageName(sn.url),category:'Tarama arşivi'});
   for(const url of sitemap){
    if(map.has(url))continue;
-   const path=new URL(url).pathname;
-   const category=path.startsWith('/blog/')?'Blog Sayfaları':path.startsWith('/sektor/')?'Sektörel Sayfalar':/-matbaa(?:\/|$)|-baski(?:\/|$)/.test(path)?'Şehir / Baskı Sayfaları':'Eşleşmemiş sayfalar';
+   const category=categoryFor(url);
    map.set(url,{url,product:pageName(url),category});
   }
   return [...map.values()].sort((a,b)=>a.category.localeCompare(b.category,'tr')||a.product.localeCompare(b.product,'tr'));
@@ -68,7 +76,7 @@ export function createTayfunWorkspace({api,scope,notify}){
   for(const [key,label]of[['aktif','Aktif · takip adayı'],['pasif','Pasif · geçmişte sakla']])status.append(new Option(label,key));
   status.value=record?.status||'aktif';const statusLabel=el('label','SEO sürümünün takip durumu','tayfun-field');statusLabel.append(status);form.append(statusLabel);
   const submit=el('button','Sürümü kaydet','button primary');submit.type='submit';
-  const cancel=el('button','Vazgeç','button secondary');cancel.type='button';cancel.onclick=()=>form.remove();
+  const cancel=el('button','Taslağı sil','button secondary');cancel.type='button';cancel.onclick=()=>form.remove();
   form.append(submit,cancel);
   form.onsubmit=async e=>{
    e.preventDefault();submit.disabled=true;
@@ -85,7 +93,7 @@ export function createTayfunWorkspace({api,scope,notify}){
  async function showEvidence(area,url,month){
   area.replaceChildren(el('p','Kaynak tarama kayıtları okunuyor…'));
   try{
-   const list=await api('/api/independent/seo-history?'+new URLSearchParams({kind:'snapshot',url}));
+   const list=await api('/api/independent/seo-history?'+new URLSearchParams({kind:'snapshot',url,to:month+'-'+new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5)),0)).getUTCDate().toString().padStart(2,'0')}));
    const allowed=(list.items||[]).filter(x=>x.observed_at?.slice(0,7)<=month).sort((a,b)=>b.observed_at.localeCompare(a.observed_at));
    if(!allowed.length){area.replaceChildren(el('p','Bu ay veya öncesi için arşivlenmiş SEO tarama sürümü bulunamadı. Eksik bilgi sıfır veya boş SEO anlamına gelmez.'));return null;}
    const detail=await api('/api/independent/seo-history/detail?'+new URLSearchParams({kind:'snapshot',id:allowed[0].id}));
