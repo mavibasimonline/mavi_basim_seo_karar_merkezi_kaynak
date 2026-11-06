@@ -178,6 +178,19 @@ export function createIndependentPanel({api,notify}){
  $('analyticsConnect').onclick=()=>connect('ga4');
  $('analyticsProperties').onclick=async()=>{try{const data=await api('/api/independent/ga4-properties');$('analyticsProperty').replaceChildren(...(data.properties||[]).map(p=>new Option(p.name+' ('+p.id+')',p.id)));$('analyticsSelect').hidden=false;}catch(e){notify(e.message);}};
  $('analyticsSelect').onsubmit=async e=>{e.preventDefault();const b=e.currentTarget.querySelector('button');b.disabled=true;try{await api('/api/independent/ga4-property',{method:'POST',body:JSON.stringify({property_id:$('analyticsProperty').value})});cache.clear();$('refresh').click();}catch(e){notify(e.message);}finally{b.disabled=false;}};
+ $('chatgptHandoff').addEventListener('click',async e=>{
+  e.preventDefault();
+  const button=$('chatgptHandoff');button.disabled=true;
+  try{
+   const {buildChatGptHandoff}=await import('./chatgpt-handoff.js');
+   const text=buildChatGptHandoff({month:target(),device:device(),current,previous,ga4,oldGa4,catalog,changes,status,ga4Status});
+   const url=URL.createObjectURL(new Blob(['\ufeff'+text],{type:'text/markdown;charset=utf-8'})),a=node('a');
+   a.href=url;a.download='Mavi_Basim_ChatGPT_SEO_Devir_'+target()+'_'+device()+'.md';a.click();
+   setTimeout(()=>URL.revokeObjectURL(url),1000);
+   notify('ChatGPT devir raporu indirildi. Dosyayı yeni ChatGPT sohbetine yükleyin; önceki sohbet veya CSV gerektirmez. Eksik kaynaklar raporda ayrıca belirtilir.');
+  }catch(error){notify('ChatGPT devir raporu hazırlanamadı: '+(error?.message||'Bilinmeyen hata'));}
+  finally{button.disabled=false;}
+ });
  $('export').addEventListener('click',e=>{
   e.preventDefault();const cells=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"';
   const rows=[['Kaynak','Dönem','Cihaz','Ürün','URL','Tıklama','Gösterim','CTR','Konum','Kapsam'],...productsData().map(p=>['GSC Search Analytics API',target(),device(),p.name,p.canonical_url,p.current?.clicks,p.current?.impressions,p.current?.ctr,p.current?.position,coverage()])];
