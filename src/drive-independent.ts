@@ -6,6 +6,7 @@ import {catchupTick,catchupStatus} from './gsc-catchup';
 import {DurableObject} from 'cloudflare:workers';
 import {historyStatus,claimHistory,saveHistoryPage,holdHistory,listHistory,historyDetail} from './seo-history';
 import {tayfunList,tayfunSave} from './tayfun-ledger';
+import {tayfunAiContext,tayfunAiSave} from './tayfun-ai';
 import {tayfunSitemap} from './tayfun-sitemap';
 import {tayfunAutoMonth,tayfunAutoDetail,tayfunAutoTick} from './tayfun-auto';
 import {historyIntent,historyImpact,answerHistory} from './seo-history-analysis';
@@ -355,7 +356,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     if(request.method==='POST'&&(path==='/api/drive-independent/start'||path==='/api/oauth/google/start'&&url.searchParams.get('purpose')==='drive'))return await this.start();
     if(request.method==='GET'&&(path==='/api/drive-independent/status'||path==='/api/drive/status'))return json({connected:!!await this.ctx.storage.get('oauth'),storage:'durable-object-sqlite',d1_requests:0,last_archive:await this.ctx.storage.get('last_archive')||null,last_error:await this.ctx.storage.get('last_error')||null,next_run:await this.ctx.storage.getAlarm(),scope:SCOPE});
     return json({error:'Bulunamadı.'},404);
-   }catch(error){return json({error:'Kaynak işlemi tamamlanamadı.',code:error instanceof ProviderError?error.code:error instanceof Error&&/^(GA4_|GSC_|INDEPENDENT_CONTEXT_|HISTORY_|PLANNER_)[A-Z0-9_]+$/.test(error.message)?error.message:'DRIVE_UNAVAILABLE'},400);}
+   }catch(error){return json({error:'Kaynak işlemi tamamlanamadı.',code:error instanceof ProviderError?error.code:error instanceof Error&&/^(GA4_|GSC_|INDEPENDENT_CONTEXT_|HISTORY_|PLANNER_|TAYFUN_)[A-Z0-9_]+$/.test(error.message)?error.message:'DRIVE_UNAVAILABLE'},400);}
   });
  }
  private async independentSnapshot(maxAgeMs=6*3600000){
@@ -388,9 +389,16 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     return record?json(record):json({code:'TAYFUN_AUTO_NOT_FOUND'},404);
    }
    if(path==='/api/independent/tayfun-pages'&&request.method==='GET')return json(await tayfunSitemap(this.ctx.storage));
+   if(path==='/api/independent/tayfun-ai/context'&&request.method==='GET')
+    return json(await tayfunAiContext(this.ctx.storage,this.key(),url.searchParams.get('product_id')||''));
+   if(path==='/api/independent/tayfun-ai'&&request.method==='POST'){
+    const input=JSON.parse(await boundedText(new Response(request.body),32000));
+    return json(await tayfunAiSave(this.ctx.storage,this.key(),input));
+   }
    if(path==='/api/independent/tayfun'&&request.method==='GET')return json(await tayfunList(this.ctx.storage,this.key(),url.searchParams.get('month')||''));
    if(path==='/api/independent/tayfun'&&request.method==='POST'){
     const body=JSON.parse(await boundedText(new Response(request.body),12000));
+    if(body.source==='ai-review')return json({code:'TAYFUN_AI_ROUTE_REQUIRED'},400);
     return json(await tayfunSave(this.ctx.storage,this.key(),body));
    }
    if(path==='/api/independent/planner-status'&&request.method==='GET')return json(await plannerStatus(this.ctx.storage));
