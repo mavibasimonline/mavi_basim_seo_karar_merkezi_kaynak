@@ -143,10 +143,19 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
  const intro=E('div','','tayfun-jobs-intro');intro.append(E('h3','SEO İşleri · Ürün bazlı yapay zekâ çalışması'),
  E('p','Ürünü seç → yalnız onun GSC, SEO ve kelime geçmişini tek metin olarak al → ChatGPT’ye gönder → cevabı incele ve yeni tarihli sürüm olarak kaydet. Eski kayıtlar silinmez.'));
  container.append(intro);
- const search=E('input','','tayfun-jobs-search');search.type='search';search.placeholder='Magnet, kartvizit, reklam ürünleri…';
- container.append(search);
+ const toolbar=E('div','','tayfun-jobs-toolbar');
+ const searchLabel=E('label','','tayfun-jobs-search-wrap');
+ searchLabel.setAttribute('aria-label','Ürün veya kategori ara');
+ const searchIcon=E('span','⌕','tayfun-jobs-search-icon');searchIcon.setAttribute('aria-hidden','true');
+ const search=E('input','','tayfun-jobs-search');
+ search.type='search';search.placeholder='Ürün veya kategori ara...';search.setAttribute('aria-label','Ürün veya kategori ara');
+ searchLabel.append(searchIcon,search);
+ const nav=E('div','','tayfun-jobs-category-scroll');
+ nav.setAttribute('role','group');nav.setAttribute('aria-label','SEO İşleri ürün kategorileri');
+ nav.tabIndex=0;
+ toolbar.append(searchLabel,nav);container.append(toolbar);
  const groups=E('div','','tayfun-jobs-groups');container.append(groups);
- let currentQuery='';
+ let currentQuery='',selectedCategory='Tüm Kategoriler';
  const categoryOrder=['Broşürler ve El İlanları','Reklam Ürünleri','Kurumsal Ürünler','Makbuz ve Formlar'];
  const grouped=new Map();
  for(const product of products){
@@ -154,31 +163,50 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
   if(!grouped.has(category))grouped.set(category,[]);
   grouped.get(category).push(product);
  }
- function renderGroups(){
-  groups.replaceChildren();
-  const entries=[...grouped.entries()].sort((a,b)=>{
-   const x=categoryOrder.indexOf(a[0]),y=categoryOrder.indexOf(b[0]);
-   return (x<0?99:x)-(y<0?99:y)||a[0].localeCompare(b[0],'tr');
-  });
-  for(const [category,items]of entries){
-   const matching=items.filter(p=>(p.name+' '+category).toLocaleLowerCase('tr-TR').includes(currentQuery));
-   if(!matching.length)continue;
-   const section=E('details','','tayfun-jobs-category');section.open=!!currentQuery||category==='Reklam Ürünleri';
-   section.append(E('summary',category+' · '+matching.length+' ürün'));
-   const contents=E('div','','tayfun-jobs-list');
-   for(const product of matching.sort((a,b)=>a.name.localeCompare(b.name,'tr'))){
-    const entry=E('details','','tayfun-jobs-product');
-    entry.append(E('summary',product.name+' · '+product.canonical_url));
-    entry.addEventListener('toggle',()=>{if(entry.open&&!entry.querySelector('.tayfun-jobs-editor')){
+ const categories=['Tüm Kategoriler',...categoryOrder.filter(x=>grouped.has(x)),...[...grouped.keys()].filter(x=>!categoryOrder.includes(x)).sort((a,b)=>a.localeCompare(b,'tr'))];
+ const categoryButtons=new Map();
+ function renderProductCards(target,items){
+  const contents=E('div','','tayfun-jobs-list');
+  for(const product of items.sort((a,b)=>a.name.localeCompare(b.name,'tr'))){
+   const entry=E('details','','tayfun-jobs-product');
+   entry.append(E('summary',product.name+' · '+product.canonical_url));
+   entry.addEventListener('toggle',()=>{
+    if(entry.open&&!entry.querySelector('.tayfun-jobs-editor')){
      const editor=E('div','','tayfun-jobs-editor');entry.append(editor);
      loadProduct(editor,product);
-    }});
-    contents.append(entry);
-   }
-   section.append(contents);groups.append(section);
+    }
+   });
+   contents.append(entry);
   }
+  target.append(contents);
  }
- search.oninput=()=>{currentQuery=search.value.toLocaleLowerCase('tr-TR').trim();renderGroups();};
+ function renderGroups(){
+  groups.replaceChildren();
+  const categoriesToDisplay=selectedCategory==='Tüm Kategoriler'?categories.slice(1):[selectedCategory];
+  let count=0;
+  for(const category of categoriesToDisplay){
+   const items=(grouped.get(category)||[]).filter(p=>(p.name+' '+category).toLocaleLowerCase('tr-TR').includes(currentQuery));
+   if(!items.length)continue;
+   count+=items.length;
+   const section=E('section','','tayfun-jobs-category');
+   section.append(E('h4',category+' · '+items.length+' ürün'));
+   renderProductCards(section,items);
+   groups.append(section);
+  }
+  if(!count)groups.append(E('p','Bu kategori ve aramada eşleşen ürün bulunamadı.','source-note'));
+ }
+ function selectCategory(category){
+  selectedCategory=category;
+  for(const [name,button] of categoryButtons)button.setAttribute('aria-pressed',String(name===category));
+  renderGroups();
+ }
+ for(const category of categories){
+  const button=E('button',category,'button tayfun-jobs-category-pill');
+  button.type='button';button.setAttribute('aria-pressed',String(category===selectedCategory));
+  button.addEventListener('click',()=>selectCategory(category));
+  nav.append(button);categoryButtons.set(category,button);
+ }
+ search.addEventListener('input',()=>{currentQuery=search.value.toLocaleLowerCase('tr-TR').trim();renderGroups();});
  renderGroups();
  async function loadProduct(editor,product){
   editor.replaceChildren(E('p','Yalnız '+product.name+' geçmişi hazırlanıyor…','source-note'));

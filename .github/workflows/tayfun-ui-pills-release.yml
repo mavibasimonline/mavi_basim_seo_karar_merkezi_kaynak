@@ -1,0 +1,84 @@
+name: Tayfun kategori butonları kontrollü arayüz yayını
+on:
+  workflow_run:
+    workflows: ["Test ve kabul denetimi"]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: tayfun-ui-pills-reviewed-release-20261106
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      VERIFIED_CI_SHA: ${{ github.event.workflow_run.head_sha }}
+      RELEASE_SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Validate reviewed source commit and only PR 95
+        id: gate
+        run: |
+          set -euo pipefail
+          test "$VERIFIED_CI_SHA" = "$(git rev-parse HEAD)" || exit 0
+          test "$(git log -1 --format=%s)" = "Tayfun SEO İşleri: görseldeki yatay kategori menüsü ve tüm panelde tutarlı buton tasarımı (#95)" || exit 0
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          node-version: '24'
+      - name: Install pinned dependencies and verify frontend
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          npm ci --ignore-scripts --no-fund
+          npm audit --audit-level=moderate
+          npm run check
+      - name: Pin current main Worker and check existing free plan
+        id: version
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          python3 - <<'PY'
+          import os,sys
+          sys.path.insert(0,'scripts')
+          from cloudflare_diagnostics import Cloudflare
+          from quota_observer_release import api,active_version,free_plan
+          client=Cloudflare(os.environ['CLOUDFLARE_API_TOKEN'],os.environ['CLOUDFLARE_ACCOUNT_ID'])
+          free_plan(api(client,'GET','/subscriptions'))
+          version=active_version(api(client,'GET','/workers/scripts/mavi-basim-seo-prod/deployments'))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:out.write('previous_version='+version+'\n')
+          print('Pinned unchanged existing deployment')
+          PY
+      - name: Read-only production guards and existing schema/source
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          EXPECTED_PREVIOUS_VERSION: ${{ steps.version.outputs.previous_version }}
+        run: |
+          python3 scripts/production_guard.py preflight
+          python3 scripts/release_checks.py --base HEAD
+          python3 scripts/production_guard.py verify-schema
+          python3 scripts/d1_quota_checkpoint.py
+      - name: Deploy reviewed UI only preserving current environment
+        id: publish
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          node scripts/run.mjs wrangler deploy --config deploy/wrangler.production.jsonc --keep-vars --var D1_READ_GUARD_ENABLED:true --var SYNC_MAX_PAGES_PER_TICK:1 --tag "$VERIFIED_CI_SHA" --message "Tayfun category pills and unified buttons $VERIFIED_CI_SHA"
+      - name: Confirm exact live commit and unchanged runtime bindings
+        if: steps.gate.outputs.ready == 'true'
+        run: python3 scripts/production_guard.py smoke
+      - name: Restore prior main Worker on failed post-deploy acceptance
+        if: failure() && steps.publish.outcome == 'success'
+        env:
+          PREVIOUS_VERSION: ${{ steps.version.outputs.previous_version }}
+        run: |
+          node scripts/run.mjs wrangler rollback "$PREVIOUS_VERSION" --config deploy/wrangler.production.jsonc --message "Restore previous SEO panel after Tayfun UI acceptance error" --yes
