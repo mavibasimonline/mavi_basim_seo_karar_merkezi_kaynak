@@ -5,6 +5,7 @@ import {plannerStatus,plannerLookup,plannerSyncPlan,verifyPlannerPage,holdPlanne
 import {catchupTick,catchupStatus} from './gsc-catchup';
 import {DurableObject} from 'cloudflare:workers';
 import {historyStatus,claimHistory,saveHistoryPage,holdHistory,listHistory,historyDetail} from './seo-history';
+import {tayfunList,tayfunSave} from './tayfun-ledger';
 import {historyIntent,historyImpact,answerHistory} from './seo-history-analysis';
 import {encrypt,decrypt,cookie,equalSecret} from './security';
 import {hash,json} from './types';
@@ -378,6 +379,11 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
  private async independentRoute(request:Request){
   try{
    const url=new URL(request.url),path=url.pathname;
+   if(path==='/api/independent/tayfun'&&request.method==='GET')return json(await tayfunList(this.ctx.storage,this.key(),url.searchParams.get('month')||''));
+   if(path==='/api/independent/tayfun'&&request.method==='POST'){
+    const body=JSON.parse(await boundedText(new Response(request.body),12000));
+    return json(await tayfunSave(this.ctx.storage,this.key(),body));
+   }
    if(path==='/api/independent/planner-status'&&request.method==='GET')return json(await plannerStatus(this.ctx.storage));
    if(path==='/api/independent/planner'&&request.method==='GET')return json({...await plannerLookup(url.searchParams.get('query')||'',url.searchParams.get('product')||''),d1_requests:0});
    if(path.startsWith('/api/independent/seo-history')&&request.method==='GET'){
