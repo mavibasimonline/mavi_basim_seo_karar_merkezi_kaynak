@@ -20,7 +20,7 @@ const base={
  ],snapshots:[{id:'snapshot1'},{id:'snapshot2'},{id:'orphan'}]},
  status:{connected:true},ga4Status:{connected:true}
 };
-const unpack=(markdown:string)=>JSON.parse(markdown.split('## Tekil ham kaynak paketi (JSON, tekrar içermeyen alanlar)\\n\\n')[1]);
+const unpack=(markdown:string)=>JSON.parse(markdown.split('## Tekil ham kaynak paketi (JSON, tekrar içermeyen alanlar)\n\n')[1]);
 it('exports stand-alone compact V2 report with prior/current data and audit events',()=>{
  const md=buildChatGptHandoff(base),data=unpack(md);
  expect(data.format).toBe('MAVI_BASIM_CHATGPT_SEO_DEVIR_V2');
