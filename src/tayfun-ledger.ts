@@ -48,20 +48,25 @@ export async function tayfunSave(storage:Store,secret:string,input:unknown,time=
  if(isAi){
   // AI handoffs can only create new revisions in today's real month, never backdate.
   fail(period===now.slice(0,7)&&typeof r.product_id==='string'&&r.product_id.length>0&&r.product_id.length<=100);
-  fail(!!supersedes===!!parent||!supersedes);
+  fail(!parent||parent.url===r.url);
  }
  const decisions=r.keyword_decisions??[],proposals=r.page_proposals??[];
- fail(Array.isArray(decisions)&&decisions.length<=80&&decisions.every((x:any)=>x&&typeof x.query==='string'&&x.query.length>0&&x.query.length<=120&&
+ fail(Array.isArray(decisions)&&decisions.length<=160&&decisions.every((x:any)=>x&&typeof x.query==='string'&&x.query.length>0&&x.query.length<=120&&
   ['koru','izle','yeni_sayfa_adayi'].includes(x.action)&&typeof x.reason==='string'&&x.reason.length<=500));
  fail(Array.isArray(proposals)&&proposals.length<=20&&proposals.every((x:any)=>x&&typeof x.keyword==='string'&&x.keyword.length>0&&x.keyword.length<=120&&typeof x.reason==='string'&&x.reason.length<=500&&typeof x.url_suggestion==='string'&&x.url_suggestion.length<=2048&&(!x.url_suggestion||owned(x.url_suggestion))));
 
  const title=text(r.title||'',300),description=text(r.description||'',1000),h1=text(r.h1||'',500);
  const canonical=text(r.canonical||'',2048);fail(!canonical||owned(canonical));
- const keywords=r.keywords||[];fail(Array.isArray(keywords)&&keywords.length<=50&&keywords.every(k=>typeof k==='string'&&k.length<=120));
+ const keywords=r.keywords||[];fail(Array.isArray(keywords)&&keywords.length<=500&&keywords.every(k=>typeof k==='string'&&k.length<=120));
  // Preserve all previously tracked keywords in the new revision, even if an AI omits them.
  const retained=[...new Set([...(parent?.keywords||[]),...keywords.map((x:string)=>x.trim()).filter(Boolean)])];
- fail(retained.length<=120);
+ fail(retained.length<=500);
  const status=r.status||'aktif';fail(status==='aktif'||status==='pasif');
+ // Status updates are append-only; omitted AI keyword decisions inherit the last known disposition.
+ const priorDecisions=new Map((parent?.keyword_decisions||[]).map(v=>[v.query.toLocaleLowerCase('tr-TR'),v]));
+ for(const decision of decisions as {query:string;action:'koru'|'izle'|'yeni_sayfa_adayi';reason:string}[])
+  priorDecisions.set(decision.query.toLocaleLowerCase('tr-TR'),decision);
+ fail(priorDecisions.size<=160);
  const entry:TayfunEntry={id:crypto.randomUUID(),month:period,url:r.url,created_at:now,status,kind:'manuel',source:isAi?'ai-review':'user-entry',
   title,description,h1,canonical,robots:text(r.robots||'',200),
   keywords:retained,headings:text(r.headings||'',2500),
@@ -69,7 +74,7 @@ export async function tayfunSave(storage:Store,secret:string,input:unknown,time=
   notes:text(r.notes||'',2500),supersedes,
   hreflang:text(r.hreflang||'',2500),images:text(r.images||'',2500),open_graph:text(r.open_graph||'',2500),twitter_card:text(r.twitter_card||'',2500),
   x_robots:text(r.x_robots||'',200),viewport:text(r.viewport||'',500),lang:text(r.lang||'',100),redirect:text(r.redirect||'',2048),status_code:text(r.status_code||'',100),content_excerpt:text(r.content_excerpt||'',5000),
-  keyword_decisions:decisions.map((x:any)=>({query:x.query,action:x.action,reason:x.reason})),
+  keyword_decisions:[...priorDecisions.values()].map(x=>({query:x.query,action:x.action,reason:x.reason})),
   page_proposals:proposals.map((x:any)=>({keyword:x.keyword,reason:x.reason,url_suggestion:x.url_suggestion})),
   product_id:isAi?String(r.product_id):null};
  // Superseded version is not deleted or overwritten: current status is derived by latest successor.
