@@ -81,7 +81,9 @@ test("real APIs preserve secure login, sources, evidence, questions and empty da
   await expect(page.locator("#radarResults")).toContainText(
     "Yeterli kanıtla belirlenen ürün yok.",
   );
-  await navigate(page, "Değişiklik Takvimi");
+  await navigate(page, "Tayfun");
+  await expect(page.locator("#tayfunApp")).toBeVisible();
+  await page.evaluate(() => {location.hash="#changes";});
   await expect(page.locator("#changeResults")).toContainText(
     "Bu tarihte doğrulanmış değişiklik tespiti yok.",
   );
@@ -270,7 +272,7 @@ test("keyboard navigation, responsive collapse and WCAG checks cover all real se
   for (const name of [
     "Ürün Performansı",
     "Arama Sorguları",
-    "Değişiklik Takvimi",
+    "Tayfun",
     "Veri Sağlığı",
   ]) {
     await navigate(page, name);
