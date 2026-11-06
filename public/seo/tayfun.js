@@ -178,11 +178,11 @@ export function createTayfunWorkspace({api,scope,notify}){
    if(!archiveReady)root.append(el('p','Tayfun arşiv hizmeti henüz güncel değil veya ulaşılamıyor. Sayfalar ve GSC verileri gösterilecek; arşiv düzeldiğinde SEO sürüm kayıtları kendiliğinden yüklenecek.','history-warning'));
    const heading=el('div','','tayfun-head');heading.append(el('h2','Tayfun · Aylık SEO Sürüm Defteri'),el('p','SEO bilgilerini ay ay kaydet, eskisini pasife al, geçmişi silmeden GSC performansını karşılaştır. Veri yalnız tarama ve kayıtlardan doğrulanır.'));root.append(heading);
    const search=el('input');search.type='search';search.placeholder='Sayfa URL, ürün veya kategori ara…';search.value=filter;
-   const filterWrap=el('div','','tayfun-search');filterWrap.append(search,el('span','Kayıtlı sayfalar · '+pages.length+' gözlenen URL; tüm sitemap sayfalarının eksiksiz listesi olduğu garanti edilmez.','source-note'));root.append(filterWrap);
+   const filterWrap=el('div','','tayfun-search');filterWrap.append(search,el('span','Kayıtlı sayfalar · '+pages.length+' gözlenen URL; tüm sitemap sayfalarının eksiksiz listesi olduğu garanti edilmez.','source-note'));
    const tabs=el('div','','tayfun-tabs');
    const groups=el('button','Ürün Grupları','button secondary'),unmapped=el('button','Eşleşmemiş Sayfalar','button secondary'),seoJobs=el('button','SEO İşleri','button secondary');
    groups.type='button';unmapped.type='button';seoJobs.type='button';groups.onclick=()=>{mode='groups';paint();};unmapped.onclick=()=>{mode='unmapped';paint();};seoJobs.onclick=()=>{mode='jobs';paint();};
-   tabs.append(groups,unmapped,seoJobs);root.append(tabs);
+   tabs.append(groups,unmapped,seoJobs);root.append(tabs,filterWrap);
    const place=el('div','','tayfun-months');root.append(place);
    root.append(el('p',sitemap?.urls?.length?'Site haritasından '+sitemap.urls.length+' URL eklendi. Kaynak: '+sitemap.source+(sitemap.stale?' · Son kayıt; anlık doğrulanmadı':''): 'Site haritası doğrulanamadı; ürün, GSC ve tarama kayıtlarından görünen URL’ler listeleniyor.','source-note'));
    const rawFirst=s.current?.find(r=>r.month===month)||s.previous?.month===month&&s.previous||null;
