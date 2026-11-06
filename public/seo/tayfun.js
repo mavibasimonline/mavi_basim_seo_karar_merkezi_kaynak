@@ -94,7 +94,7 @@ export function createTayfunWorkspace({api,scope,notify}){
    return detail.fields||null;
   }catch(err){area.replaceChildren(el('p','Arşiv kanıtı getirilemedi: '+err.message));return null;}
  }
- function pageDetail(month,item,record,raw,previousRaw,s,refresh,history=[]){
+ function pageDetail(month,item,record,raw,previousRaw,s,refresh,history=[],writable=true){
   const box=el('div','','tayfun-detail');
   const seoArea=el('section','','tayfun-proof'),recordArea=el('section','','tayfun-versions');
   box.append(seoArea,recordArea);
@@ -111,10 +111,11 @@ export function createTayfunWorkspace({api,scope,notify}){
    card.append(el('strong',(old?'Önceki sürüm · ':version.status==='pasif'?'Pasif · ':'Aktif takip · ')+new Date(version.created_at).toLocaleString('tr-TR')),el('p','Title: '+(version.title||'Kaydedilmemiş')),el('p','H1: '+(version.h1||'Kaydedilmemiş')),el('p','Hedef sorgular: '+version.keywords.join(', ')),el('p','Not: '+(version.notes||'—')));
    recordArea.append(card);
   }
+  if(!writable)recordArea.append(el('p','Şifreli arşiv API erişilebilir olmadığından kayıt oluşturma kapalı. Sayfa ve GSC verileri salt okunur gösteriliyor.','source-note'));
   const add=el('button',record?'Yeni SEO sürümü oluştur':'SEO kaydı ekle','button primary');add.type='button';
   add.onclick=()=>{const old=box.querySelector('.tayfun-form');old?.remove();box.append(formFor(month,item.url,record,scanned,refresh));};
-  recordArea.append(add);
-  if(record&&record.status==='aktif'){
+  if(writable)recordArea.append(add);
+  if(writable&&record&&record.status==='aktif'){
    const passive=el('button','Eski sürümü pasif olarak kaydet','button secondary');
    passive.type='button';passive.onclick=()=>{box.querySelector('.tayfun-form')?.remove();const form=formFor(month,item.url,record,scanned,refresh);form.querySelector('[name=status]').value='pasif';box.append(form);};
    recordArea.append(passive);
@@ -136,12 +137,14 @@ export function createTayfunWorkspace({api,scope,notify}){
   try{const result=await Promise.allSettled([getMonth(month),getMonth(second),api('/api/independent/gsc-month?month='+second),api('/api/independent/tayfun-pages')]);
    if(at!==generation)return;
    const [first,after,gsc,sitemapResult]=result;
-   if(first.status==='rejected')throw first.reason;
-   if(after.status==='rejected')throw after.reason;
+   const archiveReady=first.status==='fulfilled'&&after.status==='fulfilled';
+   const firstLedger=first.status==='fulfilled'?first.value:{entries:[],unavailable:true};
+   const afterLedger=after.status==='fulfilled'?after.value:{entries:[],unavailable:true};
    raw2=gsc.status==='fulfilled'?gsc.value:null;
    const sitemap=sitemapResult.status==='fulfilled'?sitemapResult.value:null;
    const pages=inventory(s,sitemap?.urls||[]);
    root.replaceChildren();
+   if(!archiveReady)root.append(el('p','Tayfun arşiv hizmeti henüz güncel değil veya ulaşılamıyor. Sayfalar ve GSC verileri gösterilecek; arşiv düzeldiğinde SEO sürüm kayıtları kendiliğinden yüklenecek.','history-warning'));
    const heading=el('div','','tayfun-head');heading.append(el('h2','Tayfun · Aylık SEO Sürüm Defteri'),el('p','SEO bilgilerini ay ay kaydet, eskisini pasife al, geçmişi silmeden GSC performansını karşılaştır. Veri yalnız tarama ve kayıtlardan doğrulanır.'));root.append(heading);
    const search=el('input');search.type='search';search.placeholder='Sayfa URL, ürün veya kategori ara…';search.value=filter;
    const filterWrap=el('div','','tayfun-search');filterWrap.append(search,el('span','Kayıtlı sayfalar · '+pages.length+' gözlenen URL; tüm sitemap sayfalarının eksiksiz listesi olduğu garanti edilmez.','source-note'));root.append(filterWrap);
@@ -152,7 +155,7 @@ export function createTayfunWorkspace({api,scope,notify}){
    const place=el('div','','tayfun-months');root.append(place);
    root.append(el('p',sitemap?.urls?.length?'Site haritasından '+sitemap.urls.length+' URL eklendi. Kaynak: '+sitemap.source+(sitemap.stale?' · Son kayıt; anlık doğrulanmadı':''): 'Site haritası doğrulanamadı; ürün, GSC ve tarama kayıtlarından görünen URL’ler listeleniyor.','source-note'));
    const rawFirst=s.current?.find(r=>r.month===month)||s.previous?.month===month&&s.previous||null;
-   const months=[[month,first.value,rawFirst],[second,after.value,raw2]];
+   const months=[[month,firstLedger,rawFirst],[second,afterLedger,raw2]];
    function paint(){
     place.replaceChildren();
     groups.setAttribute('aria-pressed',String(mode==='groups'));unmapped.setAttribute('aria-pressed',String(mode==='unmapped'));
@@ -173,13 +176,13 @@ export function createTayfunWorkspace({api,scope,notify}){
      for(const p of visible){
       const line=el('details','','tayfun-page'),head=el('summary','','tayfun-page-summary');
       const result=currentMetrics(period,p.url,s.device,raw);
-      const relevantEntries=period===month?ledger.entries:[...first.value.entries,...ledger.entries];
+      const relevantEntries=period===month?ledger.entries:[...firstLedger.entries,...ledger.entries];
       const previousVersion=recordFor(relevantEntries,p.url);
       const name=el('div','','tayfun-name');name.append(el('strong',p.product),el('small',p.url,'tayfun-url'));
       const complete=raw?.days_verified===raw?.expected_days;
       const label=previousVersion?(previousVersion.status==='aktif'?'Aktif takip':'Pasif'):'SEO kaydı yok';
       head.append(name,el('span',result?nfmt(result.clicks):'—'),el('span',result?nfmt(result.impressions):'—'),el('span',result?nfmt(result.ctr)+'%':'—'),el('span',result?nfmt(result.position):'—'),el('small',label+(complete?'':' · kısmi dönem')));
-      line.append(head);line.addEventListener('toggle',()=>{if(line.open&&!line.querySelector('.tayfun-detail'))line.append(pageDetail(period,p,previousVersion,raw,rawBefore,s,()=>render(),relevantEntries));});
+      line.append(head);line.addEventListener('toggle',()=>{if(line.open&&!line.querySelector('.tayfun-detail'))line.append(pageDetail(period,p,previousVersion,raw,rawBefore,s,()=>render(),relevantEntries,archiveReady));});
       section.append(line);
      }
      if(!visible.length)section.append(el('p','Bu aramada eşleşen URL yok.'));
