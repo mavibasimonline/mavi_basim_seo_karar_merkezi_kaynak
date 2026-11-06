@@ -3383,3 +3383,17 @@ dialog::backdrop {
 #app button:disabled,#loginScreen button:disabled{cursor:not-allowed}
 @media(prefers-reduced-motion:reduce){
  #app button,#loginScreen button{transition:none!important}}
+
+
+/* Month picker is an established data control: preserve its tested blue/white
+   focus and hover states even when using shared app button classes. */
+#app .month-strip button[aria-pressed="true"],
+#app .month-strip button[aria-pressed="true"]:hover,
+#app .month-strip button[aria-pressed="true"]:focus,
+#app .month-strip button[aria-pressed="true"]:focus-visible,
+#app .month-strip button[aria-pressed="true"]:active{
+  color:#fff;background:#275ce7;border-color:#275ce7;opacity:1;font-weight:700}
+#app .month-strip button[aria-pressed="true"]:hover{background:#214cb9}
+#app .month-strip button:not([aria-pressed="true"]):not(:disabled){background:#f8fafc;color:#40516d;border-color:#d9e0ea}
+#app .month-strip button:not([aria-pressed="true"]):not(:disabled):hover{background:#edf2ff;color:#40516d}
+#app .month-strip button:disabled{background:#f1f4f8;color:#758196;border-color:#e0e5ed;opacity:1}
