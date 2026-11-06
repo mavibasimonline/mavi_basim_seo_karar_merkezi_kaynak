@@ -3365,12 +3365,9 @@ dialog::backdrop {
 
 #app .month-strip button{transition:none!important}
 
-/* SEO İşleri kategori seçimi */
+/* SEO İşleri */
 #seoWorkApp .seo-work-toolbar,#seoWorkApp .seo-work-tabs,#seoWorkApp .seo-work-items{display:flex;gap:8px}
 #seoWorkApp .seo-work-tabs{overflow-x:auto}
 #seoWorkApp .seo-work-items{flex-wrap:wrap}
-#seoWorkApp button{padding:8px;border:1px solid #dbe4f1;border-radius:8px;cursor:pointer}
-#seoWorkApp button[aria-pressed=true]{background:#2563eb;color:white}
-#seoWorkApp .seo-work-group{padding:12px 0}
-#seoWorkApp .seo-work-search input{max-width:205px}
-@media(max-width:740px){#seoWorkApp .seo-work-toolbar{flex-wrap:wrap}}
+#seoWorkApp button{padding:8px;border:1px solid #dbe4f1;border-radius:8px}
+#seoWorkApp button[aria-pressed=true]{background:#2563eb;color:#fff}
