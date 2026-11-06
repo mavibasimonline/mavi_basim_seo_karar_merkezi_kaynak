@@ -118,9 +118,9 @@ export function createTayfunWorkspace({api,scope,notify}){
   const at=++generation,s=scope(),month=s.month,second=nextMonth(month);
   if(revision!==s.revision){cache.clear();revision=s.revision;}
   root.replaceChildren(el('p','Aylık SEO kayıtları hazırlanıyor…'));
-  const pages=inventory(s);
+
   let raw2=null;
-  try{const result=await Promise.allSettled([getMonth(month),getMonth(second),api('/api/independent/gsc-month?month='+second)]);
+  try{const result=await Promise.allSettled([getMonth(month),getMonth(second),api('/api/independent/gsc-month?month='+second),api('/api/independent/tayfun-pages')]);
    if(at!==generation)return;
    const [first,after,gsc,sitemapResult]=result;
    if(first.status==='rejected')throw first.reason;
