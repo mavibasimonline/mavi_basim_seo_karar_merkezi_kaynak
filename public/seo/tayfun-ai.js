@@ -67,7 +67,7 @@ export function buildProductAiHandoff({product,month,device,report,previous,hist
  };
  const instructions=[
   'Sen Mavi Basım için kanıt odaklı SEO analisti olarak SADECE "'+product.name+'" ürününü ve dosyadaki exact_allowed_urls listesini incele.',
-  'Başka ürünler, şehirler, farklı URL'ler ve site geneli hakkında SEO değişiklik önerme; bunların verisini uydurma.',
+  'Başka ürünler, şehirler, farklı URL adresleri ve site geneli hakkında SEO değişiklik önerme; bunların verisini uydurma.',
   'Önce kaynak kanıtını, sonra muhtemel açıklamayı, en son uygulanabilir öneriyi değerlendir. Korelasyon SEO değişiminin kesin nedeni değildir.',
   'Tıklama/gösterim kayıplarını iki tam dönem ve gerçek sorgu/URL kanıtına göre değerlendir. Küçük dalgalanmalarda çalışan metni KORU.',
   'Geçmişte başarılı olan veya önceki kayıtlarda yer alan anahtar kelimeleri SİLME. Her kelime için koru/izle/yeni_sayfa_adayi kararı ve gerekçe yaz; yeni kelimeleri ekleyebilirsin.',
