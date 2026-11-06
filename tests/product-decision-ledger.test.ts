@@ -128,3 +128,30 @@ it('audits all 29 displayed product decisions without inventing missing baseline
  expect(results.filter(r=>r.priority==='Koru')).toHaveLength(26);
  expect(results.filter(r=>r.priority==='Veri bekle')).toHaveLength(2);
 });
+
+it('protects an established traffic-bearing query even if clicks dipped, without calling it a winner',()=>{
+ const page='https://mavibasim.com/brosur';
+ const now=input('2026-10',[point(page,21,739)],[query(page,'broşür fiyatları',10),query(page,'broşür baskı',2)]);
+ const old=input('2026-09',[point(page,31,1000)],[query(page,'broşür fiyatları',12),query(page,'broşür baskı',5)]);
+ const row=buildProductDecisionLedger(now,old,null,null,catalog).find(r=>r.id==='brosur')!;
+ expect(row.queries.protected.some(q=>q.query==='broşür fiyatları'&&q.delta===-2)).toBe(true);
+ expect(row.queries.losses.some(q=>q.query==='broşür fiyatları')).toBe(true);
+ expect(row.diagnosis.decision).toContain('Trafik sağlayan');
+ expect(row.content_change_recommended).toBe(false);
+});
+it('does not attribute a month-boundary crawl interval to October without a dated publication',()=>{
+ const page='https://mavibasim.com/brosur';
+ const now=input('2026-10',[point(page,21,739)],[query(page,'broşür baskı',2)]);
+ const old=input('2026-09',[point(page,31,1000)],[query(page,'broşür baskı',5)]);
+ const changes=[
+  {id:'october',url:page,observed_from:'2026-10-24T17:52:59Z',observed_to:'2026-10-31T15:45:42Z',changed_fields:['body_hash']},
+  {id:'boundary',url:page,observed_from:'2026-10-31T15:45:42Z',observed_to:'2026-11-02T05:45:42Z',changed_fields:['body_hash','structured_data']},
+  {id:'november',url:page,observed_from:'2026-11-03T05:00:00Z',observed_to:'2026-11-05T05:00:00Z',changed_fields:['body_hash']}
+ ] as any;
+ const row=buildProductDecisionLedger(now,old,null,null,catalog,changes).find(r=>r.id==='brosur')!;
+ expect(row.seo_changes.overlapping.map(e=>e.id)).toEqual(['october']);
+ expect(row.seo_changes.boundary_uncertain.map(e=>e.id)).toEqual(['boundary']);
+ expect(row.diagnosis.decision).toContain('Dönem sınırını aşan');
+ expect(row.diagnosis.decision).not.toContain('2 tarama');
+ expect(row.cause_confirmed).toBe(false);
+});
