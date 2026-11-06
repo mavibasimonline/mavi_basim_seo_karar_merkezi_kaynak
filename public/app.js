@@ -1052,7 +1052,7 @@ function setView(view, focus = true) {
   state.view = view;
   for (const key of Object.keys(views)) $("view-" + key).hidden = key !== view;
   document.querySelectorAll("[data-view]").forEach((a) => {
-    if (a.dataset.view === view) a.setAttribute("aria-current", "page");
+    if (a.dataset.view === view || (view === "overview" && a.dataset.view === "tayfun")) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
   $("viewTitle").textContent = views[view];
