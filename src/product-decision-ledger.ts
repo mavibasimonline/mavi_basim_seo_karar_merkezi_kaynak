@@ -24,8 +24,10 @@ function querySignals(now:GscQuery[],old:GscQuery[],complete:boolean){
  }
  return {
   losses:paired.filter(q=>q.delta<0).sort((a,b)=>a.delta-b.delta||a.query.localeCompare(b.query)).slice(0,8),
-  protected:paired.filter(q=>q.current.clicks>=10&&q.current.impressions>=100&&q.current.clicks>=q.previous.clicks&&q.position_delta!==null&&q.position_delta<=.5)
-   .sort((a,b)=>b.current.clicks-a.current.clicks||a.query.localeCompare(b.query)).slice(0,8),
+  // Preserve both established traffic-bearing queries and smaller stable/improving
+  // queries. "Protected" is not a claim that their ranking improved.
+  protected:paired.filter(q=>(q.current.clicks>=5&&q.current.impressions>=50)||(q.current.clicks>=1&&q.delta>=0))
+   .sort((a,b)=>b.current.clicks-a.current.clicks||b.delta-a.delta||a.query.localeCompare(b.query)).slice(0,8),
   unpaired:new Set([...current.keys(),...previous.keys()]).size-paired.length
  };
 }
@@ -56,7 +58,11 @@ export function buildProductDecisionLedger(
   });
   const from=(data.previous_month||prior(data.month))+'-01',to=data.month+'-'+last(data.month).slice(-2);
   const events=changes.filter(e=>urlSet.has(e.url)).sort((a,b)=>b.observed_to.localeCompare(a.observed_to));
-  const overlapping=events.filter(e=>e.observed_from.slice(0,10)<=to&&e.observed_to.slice(0,10)>=from);
+  // A crawl interval crossing the final day of the month cannot establish that
+  // the change occurred during the compared month. Keep it in the full timeline,
+  // but do not imply it is an October-period edit.
+  const overlapping=events.filter(e=>e.observed_from.slice(0,10)<=to&&e.observed_to.slice(0,10)>=from&&e.observed_to.slice(0,10)<=to);
+  const boundaryUnknown=events.filter(e=>e.observed_from.slice(0,10)<=to&&e.observed_to.slice(0,10)>to);
   // GA4 is canonical-path-only, all-device/all-country, and never a query or group total.
   const ga4=productGa4(ga4Current,ga4Previous,p,current.month,'');
   const ga4Usable=ga4Allowed&&ga4.comparable&&!ga4.thresholded&&!ga4.other_rows&&
@@ -75,7 +81,8 @@ export function buildProductDecisionLedger(
   }
   if(bothDown)signalsText.push('Ana URL için GA4 Organic Search '+ga4.previous_sessions+' → '+ga4.current_sessions+' oturum; GSC tıklamasıyla eşit değildir.');
   if(!comparable)signalsText.push(!catalogVerified?'Doğrulanmış ürün eşlemesi bekleniyor.':!mappingValid?'URL eşleme çakışması var.':'Aynı URL için iki tam ve eşleşen dönem kaydı bulunmuyor.');
-  if(overlapping.length)signalsText.push('Karşılaştırma aralığına denk gelen '+overlapping.length+' SEO tarama değişikliği gözlendi; yayın veya neden kanıtı değildir.');
+  if(overlapping.length)signalsText.push('Karşılaştırma dönemi içinde sonlanan '+overlapping.length+' SEO tarama değişikliği aralığı gözlendi; yayın veya neden kanıtı değildir.');
+  if(boundaryUnknown.length)signalsText.push(boundaryUnknown.length+' tarama değişikliği aralığı dönem sınırını aşıyor; değişikliğin Ekim ayında gerçekleştiği doğrulanamaz.');
   const meaningfulDecline=priority==='İncele'||priority==='Öncelikli incele';
   const mainMetric=p.current||null,oldMetric=p.previous||null;
   const percentage=mainMetric&&oldMetric&&oldMetric.clicks>0
@@ -97,12 +104,12 @@ export function buildProductDecisionLedger(
    ?'GSC '+previous!.month+' → '+current.month+': '+oldMetric.clicks+' → '+mainMetric.clicks+' tıklama ('+(p.delta!>0?'+':'')+p.delta+', '+percentage+'); gösterim '+oldMetric.impressions+' → '+mainMetric.impressions+'; CTR %'+(oldMetric.ctr*100).toFixed(2)+' → %'+(mainMetric.ctr*100).toFixed(2)+'; ortalama sıra '+oldMetric.position.toFixed(2)+' → '+mainMetric.position.toFixed(2)+'.'
    :'İki tam ve aynı kapsamlı GSC dönemi veya tekil URL eşlemesi doğrulanmadı; eksik veri sıfır sayılamaz.';
   const investigation=meaningfulDecline
-   ?'Öncelik '+target+' URL’si. '+(topLoss?'İki ayda da görülen en büyük kayıp sorgu: "'+topLoss.query+'" ('+topLoss.previous.clicks+' → '+topLoss.current.clicks+' tıklama). ':'İki ayda birlikte görünen kayıp sorgu doğrulanmadı; sorgu tahmin etme. ')+(deviceLoss?'En büyük karşılaştırılabilir cihaz kaybı '+deviceLoss.device+' ('+deviceLoss.previous!.clicks+' → '+deviceLoss.current!.clicks+'). ':'Cihaz bazında kanıtlı kayıp saptanmadı. ')+(overlapping.length?'Aynı döneme denk gelen '+overlapping.length+' tarama değişikliği kaydı var; yayın tarihi veya sebep kanıtı değil. ':'Dönemle örtüşen kayıtlı SEO değişikliği yok; değişiklik yapılmadığı kanıtlanmaz. ')
+   ?'Öncelik '+target+' URL’si. '+(topLoss?'İki ayda da görülen en büyük kayıp sorgu: "'+topLoss.query+'" ('+topLoss.previous.clicks+' → '+topLoss.current.clicks+' tıklama). ':'İki ayda birlikte görünen kayıp sorgu doğrulanmadı; sorgu tahmin etme. ')+(deviceLoss?'En büyük karşılaştırılabilir cihaz kaybı '+deviceLoss.device+' ('+deviceLoss.previous!.clicks+' → '+deviceLoss.current!.clicks+'). ':'Cihaz bazında kanıtlı kayıp saptanmadı. ')+(overlapping.length?'Dönem içinde sonlanan '+overlapping.length+' tarama değişikliği kaydı var; yayın tarihi veya sebep kanıtı değil. ':'Dönemle örtüşen kayıtlı SEO değişikliği yok; değişiklik yapılmadığı kanıtlanmaz. ')
    :'Bu ürün için yüksek öncelikli düşüş soruşturması açma. '+(winner?'Korunacak görünür sorgu: "'+winner.query+'". ':'Yeni veya görünmeyen sorguları kayıp kabul etme. ');
   const conclusion=!comparable
    ?'KARAR: Şimdi SEO içeriğini değiştirme. Eksik karşılaştırma dönemi veya URL eşlemesi doğrulanınca aynı kapsamda yeniden değerlendir.'
    :meaningfulDecline
-    ?'KARAR: '+target+' sayfasının başlık, H1, fiyat, metin ve canonical alanlarını mevcut kanıtla değiştirme. '+(winner?'Başarılı "'+winner.query+'" sorgusunu koru. ':'Mevcut kazanan sorguları koru. ')+(overlapping.length?'Önce tarihlenmiş değişikliklerin önce/sonra içeriğini ve yayın kanıtını karşılaştır. ':'Kayda geçmiş SEO değişiklik nedeni doğrulanmadı. ')+'Bir sonraki kapanmış ayda aynı URL, cihaz ve görünür sorgunun kaybı sürerse yalnız doğrulanmış teknik/içerik sorununa yönelik sınırlı düzeltme planla.'
+    ?'KARAR: '+target+' sayfasının başlık, H1, fiyat, metin ve canonical alanlarını mevcut kanıtla değiştirme. '+(winner?'Trafik sağlayan "'+winner.query+'" sorgusunu koru; bu sorgunun da düşmüş olabileceğini dikkate al. ':'Mevcut trafik sağlayan ve istikrarlı sorguları koru. ')+(overlapping.length?'Dönem içinde sonlanan taramaların önce/sonra içeriğini ve yayın kanıtını karşılaştır. ':'Dönem içinde sonlanan doğrulanmış bir SEO değişiklik aralığı bulunmuyor. ')+(boundaryUnknown.length?'Dönem sınırını aşan taramaları kesin Ekim değişikliği olarak yorumlama. ':'')+'Bir sonraki kapanmış ayda aynı URL, cihaz ve görünür sorgunun kaybı sürerse yalnız doğrulanmış teknik/içerik sorununa yönelik sınırlı düzeltme planla.'
     :'KARAR: Mevcut sayfa içeriğini koru; küçük dalgalanma için müdahale etme. Bir sonraki kapanmış ayda aynı GSC kapsamını karşılaştır.';
   const action='TESPİT VE KANIT: '+evidenceSummary+' NEDEN ANALİZİ: '+(causes.length?causes.join(' '):'Önemli düşüş eşiği aşılmadı; kesin neden çıkarılmaz.')+' HEDEF VE İNCELEME: '+investigation+' '+conclusion;
   const diagnosis={target_url:meaningfulDecline?target:null,top_loss_query:topLoss?.query||null,most_affected_device:deviceLoss?.device||null,
@@ -114,7 +121,7 @@ export function buildProductDecisionLedger(
    gsc:{current:comparable?p.current:null,previous:comparable?p.previous:null,delta:comparable?p.delta:null,main_url:main?.url||p.canonical_url,main_current:main?.current||null,main_previous:main?.previous||null,dropping_pages:droppingPages},
    queries:{comparable:queryComplete&&mappingValid,losses:signals.losses,protected:signals.protected,unpaired_visible_queries:signals.unpaired,anonymous_queries_excluded:true},
    devices,ga4:{scope_comparable:ga4Usable,canonical_path:ga4.path,current_sessions:ga4Usable?ga4.current_sessions:null,previous_sessions:ga4Usable?ga4.previous_sessions:null,delta:ga4Usable?ga4.delta:null,cross_source_decline:bothDown,query_support:false},
-   seo_changes:{matching_events:events.length,overlapping:overlapping.slice(0,8).map(e=>({id:e.id,url:e.url,changed_fields:e.changed_fields,observed_from:e.observed_from,observed_to:e.observed_to,published_at:e.publication_evidence?e.published_at:null,publication_proven:!!e.publication_evidence})),coverage_limit:'Tarama arşivi son olaylarla sınırlı olabilir.'},
+   seo_changes:{matching_events:events.length,overlapping:overlapping.slice(0,8).map(e=>({id:e.id,url:e.url,changed_fields:e.changed_fields,observed_from:e.observed_from,observed_to:e.observed_to,published_at:e.publication_evidence?e.published_at:null,publication_proven:!!e.publication_evidence})),boundary_uncertain:boundaryUnknown.slice(0,8).map(e=>({id:e.id,url:e.url,changed_fields:e.changed_fields,observed_from:e.observed_from,observed_to:e.observed_to})),coverage_limit:'Tarama arşivi son olaylarla sınırlı olabilir; ay sonunu aşan taramalar değişiklik tarihi sayılmaz.'},
    signals:signalsText,action,diagnosis,content_change_recommended:false,cause_confirmed:false,
    evidence:{gsc_pages:globalPageRefs,gsc_queries:globalQueryRefs,ga4_pages:ga4Usable?ga4.evidence.filter(e=>e.kind==='pages'):[]},
    limitations:['URL grubu ve ana URL farklı kapsamlardır.','GSC görünür sorgular eksik ve anonimleştirilmiş olabilir; tek ayda görünmeyen satır sıfır değildir.','GA4 yalnız kanıtlı ana açılış sayfası ve tüm cihazlar kapsamındadır; GSC tıklaması ile karşılaştırılarak nedensellik çıkarılmaz.','Tarihli tarama aralığı kesin yayın tarihi veya sıralama etkisi değildir.'],
