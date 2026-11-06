@@ -71,3 +71,60 @@ it('provides explicit preservation action for stable and insufficient data',()=>
  expect(missing.diagnosis.confidence).toBe('veri_yetersiz');
  expect(missing.diagnosis.decision).toContain('Şimdi SEO içeriğini değiştirme');
 });
+
+/*
+ * October screen regression: all 29 product rows transcribed from the user's
+ * 2026-10 / 2026-09 view. Only October clicks, impressions and click deltas
+ * are observations; prior impressions/positions below are neutral synthetic
+ * controls. This does NOT claim to read live D1 or reconstruct full GSC history.
+ */
+it('audits all 29 displayed product decisions without inventing missing baselines',()=>{
+ const observed:[string,number,number,number|null][]=[
+  ['Broşür',21,739,-10],['Katalog',14,588,3],['Magnet',8,185,3],
+  ['Etiket',4,504,-1],['Kutu',3,51,-2],['Oto Paspas',3,43,1],
+  ['Dosya',3,133,3],['Afiş',2,51,1],['Yağ Kartı',2,31,1],
+  ['Tahsilat Makbuzu',1,110,-1],['Amerikan Servis',1,89,0],
+  ['Para Makbuzu',1,70,0],['Ambalaj',1,47,1],
+  ['Karton Çanta',1,56,1],['Küp Bloknot',1,63,1],
+  ['Tediye Makbuzu',0,20,-4],['Gider Makbuzu',0,19,-2],
+  ['Bloknot',0,80,-1],['Kartvizit',0,151,-1],
+  ['Adisyon',0,13,0],['Antetli Kağıt',0,98,0],
+  ['Araç Kiralama',0,1,0],['El İlanı',0,6,0],
+  ['Kitap Ayracı',0,10,0],['Reçete',0,10,0],
+  ['Sipariş Fişi',0,84,0],['Zarf',0,90,0],
+  ['Sigorta Poliçeleri',0,2,null],['Sözleşme Baskı',0,12,null]
+ ];
+ const catalog29=observed.map(([name],i)=>({
+  id:'screen-'+i,name,canonical_url:'https://mavibasim.com/test-audit-'+i,
+  urls:['https://mavibasim.com/test-audit-'+i],url_verified_at:'2026-10-01T00:00:00Z'
+ }));
+ const now=observed.map(([,clicks,impressions],i)=>point(catalog29[i].canonical_url,clicks,impressions));
+ const before=observed.flatMap(([,clicks,impressions,diff],i)=>diff===null?[]:[
+  point(catalog29[i].canonical_url,clicks-diff,impressions)
+ ]);
+ const results=buildProductDecisionLedger(input('2026-10',now),input('2026-09',before),null,null,catalog29);
+ expect(results).toHaveLength(29);
+ expect(new Set(results.map(r=>r.id)).size).toBe(29);
+ for(const [i,[name,clicks,,diff]] of observed.entries()){
+  const row=results.find(r=>r.id==='screen-'+i)!;
+  expect(row.name).toBe(name);
+  expect(row.content_change_recommended).toBe(false);
+  expect(row.cause_confirmed).toBe(false);
+  expect(row.diagnosis.decision).toContain('KARAR:');
+  if(diff===null){
+   expect(row.priority).toBe('Veri bekle');
+   expect(row.comparison_available).toBe(false);
+   expect(row.diagnosis.confidence).toBe('veri_yetersiz');
+  }else{
+   expect(row.gsc.delta).toBe(diff);
+   expect(row.gsc.current?.clicks).toBe(clicks);
+   expect(row.comparison_available).toBe(true);
+   if(name==='Broşür')expect(row.priority).toBe('İncele');
+   else expect(row.priority).toBe('Koru');
+   if(diff<0&&name!=='Broşür')expect(row.diagnosis.decision).toContain('müdahale etme');
+  }
+ }
+ expect(results.filter(r=>r.priority==='İncele')).toHaveLength(1);
+ expect(results.filter(r=>r.priority==='Koru')).toHaveLength(26);
+ expect(results.filter(r=>r.priority==='Veri bekle')).toHaveLength(2);
+});
