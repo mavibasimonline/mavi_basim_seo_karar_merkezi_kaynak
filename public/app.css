@@ -3368,3 +3368,4 @@ dialog::backdrop {
 #seoWorkApp .seo-work-tabs{overflow-x:auto}
 #seoWorkApp .seo-work-items{flex-wrap:wrap}
 #seoWorkApp button[aria-pressed=true]{background:#2563eb;color:#fff}
+#app .month-strip button{transition:none!important}
