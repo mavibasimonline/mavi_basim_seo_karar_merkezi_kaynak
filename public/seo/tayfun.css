@@ -32,3 +32,14 @@
 .tayfun-kpi small{font-size:.76rem;color:#64748b}
 .tayfun-kpi strong{font-size:1.2rem;word-break:break-word}
 @media(max-width:640px){.tayfun-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.tayfun-table-header,.tayfun-page-summary{display:grid;grid-template-columns:minmax(180px,2.2fr) repeat(4,minmax(65px,.62fr)) minmax(105px,1.2fr);gap:9px;align-items:center}
+.tayfun-table-header{background:#f1f5f9;padding:10px 9px;font-size:.75rem;color:#475569;font-weight:700}
+.tayfun-page-summary{padding:12px 9px}
+.tayfun-page-summary>span:not(:first-child){font-variant-numeric:tabular-nums}
+.tayfun-name{min-width:0;display:flex;flex-direction:column;gap:6px}
+.tayfun-name strong{font-size:.95rem}.tayfun-name small{font-size:.78rem}
+.tayfun-advanced{border:1px solid #cbd5e1;padding:12px;border-radius:8px;display:grid;gap:10px}
+.tayfun-advanced>summary{cursor:pointer;font-weight:700}
+.tayfun-advanced[open]{display:grid;gap:12px}
+@media(max-width:820px){.tayfun-table-header{display:none}.tayfun-page-summary{grid-template-columns:1fr 1fr;gap:6px}.tayfun-page-summary .tayfun-name{grid-column:1/-1}.tayfun-page-summary>span:nth-child(2):before{content:"Tıklama: ";color:#64748b}.tayfun-page-summary>span:nth-child(3):before{content:"Gösterim: ";color:#64748b}.tayfun-page-summary>span:nth-child(4):before{content:"CTR: ";color:#64748b}.tayfun-page-summary>span:nth-child(5):before{content:"Konum: ";color:#64748b}}
