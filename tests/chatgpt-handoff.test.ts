@@ -1,9 +1,10 @@
 import {it,expect} from 'vitest';
+// @ts-expect-error Browser module is deliberately plain JavaScript.
 import {buildChatGptHandoff} from '../src/browser/chatgpt-handoff.js';
 
 const page='https://mavibasim.com/brosur';
-const row=(clicks,device='MOBILE')=>({page,query:'broşür fiyatları',device,country:'tur',clicks,impressions:100,position:12});
-const monthly=(month,clicks)=>({
+const row=(clicks:number,device='MOBILE')=>({page,query:'broşür fiyatları',device,country:'tur',clicks,impressions:100,position:12});
+const monthly=(month:string,clicks:number)=>({
  month,available:true,source:'GSC Search Analytics API',days_verified:month==='2026-10'?31:30,
  query_days_verified:month==='2026-10'?31:30,expected_days:month==='2026-10'?31:30,
  pages:[row(clicks)],queries:[row(clicks)],daily:[{day:month+'-01',verified:true,devices:[row(clicks)],fetched_at:'2026-11-05T00:00:00Z'}],
