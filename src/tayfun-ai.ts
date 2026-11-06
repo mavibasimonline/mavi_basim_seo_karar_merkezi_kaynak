@@ -24,7 +24,7 @@ export async function tayfunAiContext(storage:Store,secret:string,productId:stri
  versions.sort((a,b)=>a.created_at.localeCompare(b.created_at));
  const latest=versions.filter(v=>v.url===product.canonical_url).at(-1)||null,tracked=[...new Set(versions.flatMap(v=>v.keywords))];
  return {product:{id:product.id,name:product.name,category:(product as any).category||null,canonical_url:product.canonical_url,
-  urls:[...allowed]},versions,latest_revision_id:latest?.id||null,tracked_keywords:tracked,
+  urls:[...allowed]},versions,latest_revision_id:latest?.id||null,tracked_keywords:tracked,save_month:dateMonth(time),
   oldest_recorded_at:versions[0]?.created_at||null,
   source:'Immutable Tayfun SEO revision archive',read_only_site:true,d1_requests:0,
   caveat:'İlk kayıt geçmişteki gerçek SEO başlangıcını kanıtlamaz; kayıt tarihi asla değiştirilmez.'};
@@ -42,13 +42,13 @@ export async function tayfunAiSave(storage:Store,secret:string,input:unknown,tim
  reject(seo&&typeof seo==='object'&&!Array.isArray(seo));
  const fields=seo as Record<string,unknown>;
  const tracked=x.keywords??[];
- reject(Array.isArray(tracked)&&tracked.length<=80&&tracked.every(v=>typeof v==='string'&&v.length<=120));
+ reject(Array.isArray(tracked)&&tracked.length<=500&&tracked.every(v=>typeof v==='string'&&v.length<=120));
  const decisions=x.keyword_decisions??[];
- reject(Array.isArray(decisions)&&decisions.length<=80);
+ reject(Array.isArray(decisions)&&decisions.length<=160);
  const proposal=x.page_proposals??[];
  reject(Array.isArray(proposal)&&proposal.length<=20);
  const union=[...new Set([...ctx.tracked_keywords,...tracked])];
- reject(union.length<=120);
+ reject(union.length<=500);
  // Full old SEO text is never deleted, even when the new AI proposal omits it:
  // the previous immutable revision remains available for before/after comparison.
  const allowedFields=['title','description','h1','canonical','robots','headings','internal_links','structured_data','notes',
