@@ -85,6 +85,39 @@ export function buildProductAiHandoff({product,month,device,report,previous,hist
   '```json',JSON.stringify(template,null,2),'```'
  ].join('\n');
 }
+export function productKeywordTracking({product,current,previous,history,device='ALL'}){
+ const allowed=new Set(product.urls||[product.canonical_url]);
+ const gather=raw=>{
+  const map=new Map();
+  for(const r of raw?.queries||[]){
+   if(!allowed.has(r.page)||(device!=='ALL'&&r.device!==device))continue;
+   const key=r.query.toLocaleLowerCase('tr-TR').trim(),item=map.get(key)||{query:r.query,clicks:0,impressions:0};
+   item.clicks+=Number(r.clicks)||0;item.impressions+=Number(r.impressions)||0;map.set(key,item);
+  }
+  return map;
+ };
+ const before=gather(previous),now=gather(current);
+ const statusByKeyword=new Map();
+ for(const v of history.versions||[])for(const decision of v.keyword_decisions||[])
+  statusByKeyword.set(decision.query.toLocaleLowerCase('tr-TR'),decision.action);
+ const all=new Map();
+ for(const [key,value] of before)all.set(key,value.query);
+ for(const [key,value] of now)all.set(key,value.query);
+ for(const keyword of history.tracked_keywords||[])all.set(keyword.toLocaleLowerCase('tr-TR'),keyword);
+ const rows=[...all].map(([key,query])=>{
+  const a=now.get(key)||null,b=before.get(key)||null,delta=a&&b?a.clicks-b.clicks:null;
+  const rising=delta!==null&&delta>=3&&a.impressions>=30&&a.clicks>=3;
+  const reawakening=rising&&b.clicks===0;
+  const signal=reawakening?'Canlanıyor · araştır':rising?'Yükseliyor · araştır':
+   !a&&b?'Bu ay görünür sorgu satırı yok':a&&!b?'Yeni görünür · önceki ay yok':
+   a&&b&&delta<0?'Düşüş · eğilim kontrolü':'İzle';
+  return {query,current_clicks:a?.clicks??null,previous_clicks:b?.clicks??null,
+   current_impressions:a?.impressions??null,previous_impressions:b?.impressions??null,
+   delta_clicks:delta,signal,saved_decision:statusByKeyword.get(key)||null};
+ });
+ return rows.sort((a,b)=>(b.delta_clicks??-99999)-(a.delta_clicks??-99999)|| (b.current_impressions??0)-(a.current_impressions??0)||a.query.localeCompare(b.query,'tr'));
+}
+
 function parseAiAnswer(raw){
  let text=raw.trim();
  if(text.startsWith('```'))text=text.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
@@ -155,6 +188,25 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
    editor.replaceChildren();
    const legend=E('p','Eski SEO kayıtları: '+history.versions.length+' · Bilinen en eski kayıt: '+(history.oldest_recorded_at?new Date(history.oldest_recorded_at).toLocaleString('tr-TR'):'Henüz yok')+' · Korunan kelime: '+history.tracked_keywords.length,'source-note');
    editor.append(legend);
+   const tracking=productKeywordTracking({product,current,previous,history,device});
+   const keywordDetails=E('details','','tayfun-keyword-history');
+   keywordDetails.append(E('summary','Silinmeyen kelime takibi · '+tracking.length+' görünür/geçmiş sorgu'));
+   const table=E('div','','tayfun-keyword-table');
+   const headings=E('div','','tayfun-keyword-row tayfun-keyword-header');
+   for(const label of ['Kelime','Önce','Şimdi','Değişim','Takip durumu'])headings.append(E('strong',label));
+   table.append(headings);
+   for(const keyword of tracking){
+    const row=E('div','','tayfun-keyword-row');
+    const previousText=keyword.previous_clicks===null?'Kayıt yok':String(keyword.previous_clicks);
+    const currentText=keyword.current_clicks===null?'Kayıt yok':String(keyword.current_clicks);
+    const delta=keyword.delta_clicks===null?'Belirsiz':(keyword.delta_clicks>0?'+':'')+keyword.delta_clicks;
+    const label=(keyword.saved_decision?keyword.saved_decision+' · ':'')+keyword.signal;
+    for(const value of [keyword.query,previousText,currentText,delta,label])row.append(E('span',String(value)));
+    table.append(row);
+   }
+   if(!tracking.length)table.append(E('p','Bu ürün için görünür sorgu veya eski kelime kaydı bulunmadı; eksik veri sıfır değildir.'));
+   keywordDetails.append(table);
+   editor.append(keywordDetails);
    const urls=new Set(history.product.urls);
    const currentAuto=latestObservation(auto,new Set([product.canonical_url]));
    let observed=null;
