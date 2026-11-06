@@ -52,12 +52,14 @@ export function createEvidenceDetails({scope,read,table,evidence,ask,notify,mode
   section.append(node('h3','Görünür arama sorgusu kayıpları'),node('p','Yalnız iki ayda da görünen GSC sorguları karşılaştırılır. Anonim/eksik sorgular sıfır değildir.'),q);
   const k=node('div',null,'table-scroll');
   table(k,['Korunacak görünür sorgu','Güncel tıklama','Önceki tıklama'],row.queries.protected.map(r=>[r.query,number(r.current.clicks),number(r.previous.clicks)]));
-  section.append(node('h3','Korunacak anahtar kelimeler'),node('p','Kazanan görünür sorguları ve başarılı sayfa içeriğini koru.'),k);
+  section.append(node('h3','Korunacak trafik sağlayan sorgular'),node('p','Aktif trafik getiren veya istikrarlı sorguları koru. Bazıları gerilemiş olabilir; bu liste yükseliş kanıtı değildir.'),k);
   const d=node('div',null,'table-scroll');table(d,['Cihaz','Önceki tıklama','Güncel tıklama','Fark'],row.devices.map(r=>[r.device,number(r.previous?.clicks),number(r.current?.clicks),difference(r.delta)]));
   section.append(node('h3','GSC cihaz bazlı karşılaştırma'),d);
   section.append(node('h3','GA4 organik oturum desteği'),node('p',row.ga4.scope_comparable?row.ga4.canonical_path+': '+number(row.ga4.previous_sessions)+' → '+number(row.ga4.current_sessions)+' oturum. '+(row.ga4.cross_source_decline?'Ana URL’de GSC ve GA4 ayrı ayrı geriliyor.':'İki kaynaklı düşüş kanıtı yok.'):'GA4 aynı kapsamda iki tam dönem ana açılış yolu kanıtı yok veya cihaz/ülke filtresi seçilmiş; eksik değer sıfır değildir.'));
-  section.append(node('h3','Tarihli SEO değişiklikleri'),node('p',row.seo_changes.overlapping.length+' değişiklik kaydı karşılaştırma dönemine denk geliyor; tarama tarihi kesin yayın veya neden kanıtı değildir.'));
+  section.append(node('h3','Tarihli SEO değişiklikleri'),node('p',row.seo_changes.overlapping.length+' tarama değişikliği aralığı dönem içinde sonlandı; tarama tarihi kesin yayın veya neden kanıtı değildir.'));
   for(const e of row.seo_changes.overlapping)section.append(node('p',e.url+' · '+e.observed_from+' – '+e.observed_to+' · '+e.changed_fields.join(', ')));
+  if(row.seo_changes.boundary_uncertain?.length)section.append(node('p',row.seo_changes.boundary_uncertain.length+' tarama aralığı ay sonunu aşıyor; Ekim ayındaki değişiklik olarak sayılamaz.'));
+  for(const e of row.seo_changes.boundary_uncertain||[])section.append(node('p',e.url+' · '+e.observed_from+' – '+e.observed_to+' · '+e.changed_fields.join(', ')+' · Sınır tarihi belirsiz.'));
   section.append(node('p','Nedensellik kanıtlanmadı; otomatik içerik veya canlı site değişikliği yok.'));
   return section;
  }
