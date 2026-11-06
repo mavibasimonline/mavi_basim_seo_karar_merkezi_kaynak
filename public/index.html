@@ -8,6 +8,7 @@
     <title>Mavi Basım · SEO Karar Merkezi</title>
     <link rel="stylesheet" href="/app.css" />
     <script type="module" src="/app.js"></script>
+    <script type="module" src="/seo-work.js"></script>
     <script type="module" src="/seo/catalog-sync.js"></script>
       <link rel="stylesheet" href="/seo/tables.css" />
   </head>
@@ -114,6 +115,7 @@
             ><svg class="icon" aria-hidden="true">
               <use href="/icons.svg#calendar" /></svg
             ><span class="nav-label">Tayfun</span></a
+          ><a href="#seo-work" data-view="seo-work" aria-label="SEO İşleri"><svg class="icon" aria-hidden="true"><use href="/icons.svg#search" /></svg><span class="nav-label">SEO İşleri</span></a
           ><a href="#health" data-view="health" aria-label="Veri Sağlığı"
             ><svg class="icon" aria-hidden="true">
               <use href="/icons.svg#shield" /></svg
@@ -590,6 +592,14 @@
                   <p class="empty-message">
                     Değişiklik tespitlerini görmek için bir gün seçin.
                   </p>
+                </div>
+              </div>
+            </section>
+            <section id="view-seo-work" class="view" hidden aria-label="SEO İşleri">
+              <div class="panel"><div class="panel-heading" data-actions-slot><div><h2>SEO İşleri</h2><p>Ürün grupları ve ürün bazında SEO çalışma alanı</p></div></div>
+                <div id="seoWorkApp" class="padded">
+                  <div class="seo-work-toolbar"><label class="seo-work-search"><span class="sr-only">Ürün veya kategori ara</span><input id="seoWorkSearch" type="search" placeholder="⌕  Ürün veya kategori ara..." autocomplete="off"></label><div id="seoWorkCategories" class="seo-work-tabs" role="group" aria-label="Ürün kategorileri"></div></div>
+                  <div id="seoWorkProducts" class="seo-work-products"></div><div id="seoWorkDetail" class="seo-work-detail" hidden></div>
                 </div>
               </div>
             </section>
