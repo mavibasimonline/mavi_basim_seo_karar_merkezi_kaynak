@@ -104,7 +104,7 @@ export function buildProductDecisionLedger(
    :meaningfulDecline
     ?'KARAR: '+target+' sayfasının başlık, H1, fiyat, metin ve canonical alanlarını mevcut kanıtla değiştirme. '+(winner?'Başarılı "'+winner.query+'" sorgusunu koru. ':'Mevcut kazanan sorguları koru. ')+(overlapping.length?'Önce tarihlenmiş değişikliklerin önce/sonra içeriğini ve yayın kanıtını karşılaştır. ':'Kayda geçmiş SEO değişiklik nedeni doğrulanmadı. ')+'Bir sonraki kapanmış ayda aynı URL, cihaz ve görünür sorgunun kaybı sürerse yalnız doğrulanmış teknik/içerik sorununa yönelik sınırlı düzeltme planla.'
     :'KARAR: Mevcut sayfa içeriğini koru; küçük dalgalanma için müdahale etme. Bir sonraki kapanmış ayda aynı GSC kapsamını karşılaştır.';
-  const action='TESPİT VE KANIT: '+evidenceSummary+' NEDEN ANALİZİ: '+(causes.length?causes.join(' '):'Önemli düşüş eşiği aşılmadı; kesin neden çıkarılmaz.')+' ')+'HEDEF VE İNCELEME: '+investigation+' '+conclusion;
+  const action='TESPİT VE KANIT: '+evidenceSummary+' NEDEN ANALİZİ: '+(causes.length?causes.join(' '):'Önemli düşüş eşiği aşılmadı; kesin neden çıkarılmaz.')+' HEDEF VE İNCELEME: '+investigation+' '+conclusion;
   const diagnosis={target_url:meaningfulDecline?target:null,top_loss_query:topLoss?.query||null,most_affected_device:deviceLoss?.device||null,
    observed_mechanisms:causes,summary:evidenceSummary,investigation,decision:conclusion,confidence:!comparable?'veri_yetersiz':meaningfulDecline?'gozlemsel_kanit':'koruma_karari',
    cause_confirmed:false,content_change_recommended:false};
