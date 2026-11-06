@@ -10,7 +10,7 @@ export type TayfunEntry={
 };
 type StoreIndex={version:2;ids:string[];updated_at:string};
 const INDEX='tayfun:ledger:v2:index:',ROW='tayfun:ledger:v2:record:';
-const fail=(ok:unknown):asserts ok=>{if(!ok)throw Error('TAYFUN_INPUT_INVALID');};
+const fail:(ok:unknown)=>asserts ok=(ok)=>{if(!ok)throw Error('TAYFUN_INPUT_INVALID');};
 const owned=(url:unknown):url is string=>typeof url==='string'&&url.length<=2048&&gscPageURL(url)===url;
 const text=(v:unknown,max:number)=>{fail(typeof v==='string'&&v.length<=max&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v));return v as string;};
 const month=(v:unknown)=>{fail(typeof v==='string'&&/^20\d\d-(0[1-9]|1[0-2])$/.test(v));return v as string;};
