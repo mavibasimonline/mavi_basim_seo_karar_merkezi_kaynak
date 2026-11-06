@@ -43,3 +43,35 @@
 .tayfun-advanced>summary{cursor:pointer;font-weight:700}
 .tayfun-advanced[open]{display:grid;gap:12px}
 @media(max-width:820px){.tayfun-table-header{display:none}.tayfun-page-summary{grid-template-columns:1fr 1fr;gap:6px}.tayfun-page-summary .tayfun-name{grid-column:1/-1}.tayfun-page-summary>span:nth-child(2):before{content:"Tıklama: ";color:#64748b}.tayfun-page-summary>span:nth-child(3):before{content:"Gösterim: ";color:#64748b}.tayfun-page-summary>span:nth-child(4):before{content:"CTR: ";color:#64748b}.tayfun-page-summary>span:nth-child(5):before{content:"Konum: ";color:#64748b}}
+
+
+/* SEO İşleri keeps AI handoffs isolated per verified product. */
+.tayfun-jobs-intro{border-bottom:1px solid #e2e8f0;padding-bottom:12px}
+.tayfun-jobs-intro h3{margin:0 0 7px;color:#0f172a}
+.tayfun-jobs-intro p{color:#475569;margin:0;line-height:1.6}
+.tayfun-jobs-search{width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:9px;font:inherit}
+.tayfun-jobs-groups{display:grid;gap:14px}
+.tayfun-jobs-category{border:1px solid #e2e8f0;background:#fff;border-radius:10px;overflow:hidden}
+.tayfun-jobs-category>summary{cursor:pointer;font-size:1rem;font-weight:750;color:#0f172a;background:#f8fafc;padding:17px}
+.tayfun-jobs-list{display:grid;gap:0;padding:0 15px}
+.tayfun-jobs-product{border-top:1px solid #e2e8f0}
+.tayfun-jobs-product>summary{cursor:pointer;padding:14px 8px;color:#1d4ed8;font-weight:650;overflow-wrap:anywhere}
+.tayfun-jobs-editor{display:grid;gap:16px;background:#f8fafc;padding:18px;border-radius:9px;margin:4px 0 15px}
+.tayfun-jobs-package,.tayfun-jobs-import{display:flex;align-items:flex-start;flex-wrap:wrap;gap:10px}
+.tayfun-jobs-package h4,.tayfun-jobs-import h4{width:100%;margin:0}
+.tayfun-ai-output,.tayfun-ai-answer{font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:#0f172a;padding:12px;
+ width:100%;min-width:0;min-height:170px;border:1px solid #cbd5e1;border-radius:8px;background:white;white-space:pre;resize:vertical}
+.tayfun-ai-output{background:#f1f5f9}
+.tayfun-ai-preview{width:100%;overflow-wrap:anywhere}
+.tayfun-ai-preview>*{margin:7px 0}
+.tayfun-jobs-editor button{max-width:100%}
+@media(max-width:670px){.tayfun-jobs-editor{padding:10px}.tayfun-jobs-category>summary{padding:12px}}
+
+
+.tayfun-keyword-history{border:1px solid #dbeafe;border-radius:9px;background:white;min-width:0}
+.tayfun-keyword-history>summary{padding:12px;font-weight:700;color:#1e40af;cursor:pointer}
+.tayfun-keyword-table{overflow:auto;max-height:380px;font-size:.81rem}
+.tayfun-keyword-row{display:grid;grid-template-columns:minmax(170px,2fr) 70px 70px 75px minmax(180px,1.5fr);gap:10px;
+ min-width:590px;padding:9px 13px;border-top:1px solid #e2e8f0;align-items:center}
+.tayfun-keyword-header{background:#eff6ff}
+.tayfun-keyword-row span{overflow-wrap:anywhere}
