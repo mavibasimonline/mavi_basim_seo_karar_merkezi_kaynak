@@ -193,7 +193,13 @@ export function createIndependentPanel({api,notify}){
   try{
    const {buildChatGptHandoff}=await import('./chatgpt-handoff.js');
    const months=[prior(target()),target(),nextMonth(target())],records=await Promise.allSettled(months.map(month=>api('/api/independent/tayfun?month='+month)));
-   const tayfunLedger={available:records.every(r=>r.status==='fulfilled'),months:records.flatMap((r,i)=>r.status==='fulfilled'?[{month:months[i],entries:r.value.entries||[],updated_at:r.value.updated_at}]:[]),missing_months:records.flatMap((r,i)=>r.status==='rejected'?[months[i]]:[]),limitations:['Manuel SEO kaydı yayına alındığını kanıtlamaz; yayın ve Google tarama tarihleri bağımsız doğrulanır.','İlk taramadan önceki gerçek SEO tarihi bilinmiyor.']};
+   const automatic=await Promise.allSettled(months.map(month=>api('/api/independent/tayfun-auto?month='+month)));
+   const tayfunLedger={available:records.every(r=>r.status==='fulfilled'),
+    months:records.flatMap((r,i)=>r.status==='fulfilled'?[{month:months[i],entries:r.value.entries||[],updated_at:r.value.updated_at}]:[]),
+    automatic_months:automatic.flatMap((r,i)=>r.status==='fulfilled'?[{month:months[i],observations:r.value.observations||[],updated_at:r.value.updated_at,full_site_verified:r.value.full_site_verified}]:[]),
+    missing_months:records.flatMap((r,i)=>r.status==='rejected'?[months[i]]:[]),
+    unavailable_automatic_months:automatic.flatMap((r,i)=>r.status==='rejected'?[months[i]]:[]),
+    limitations:['Manuel SEO kaydı canlıya uygulanmış sayılmaz; tarama ile doğrulanmalıdır.','Otomatik kayıtlar gözlem zamanı, URL, başlık, SEO hash ve sürüm referansı içerir. Detaylı kayıtlar güvenli arşivde saklanır.','İlk taramadan önceki gerçek SEO tarihi bilinmiyor.']};
    const text=buildChatGptHandoff({month:target(),device:device(),current,previous,ga4,oldGa4,catalog,changes,status,ga4Status,tayfunLedger});
    const url=URL.createObjectURL(new Blob(['\ufeff'+text],{type:'text/markdown;charset=utf-8'})),a=node('a');
    a.href=url;a.download='Mavi_Basim_ChatGPT_SEO_Devir_'+target()+'_'+device()+'.md';a.click();
