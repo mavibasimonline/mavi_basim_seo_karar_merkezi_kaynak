@@ -17,6 +17,7 @@ async function login(page: Page) {
   await expect(page.locator("#app")).toBeVisible();
 }
 async function navigate(page: Page, name: string) {
+  if (name === "Genel Bakış") { await page.locator("#sidebar .brand").click(); return; }
   if (
     (await page.locator("#sidebarToggle").getAttribute("aria-label")) ===
     "Menüyü aç"
