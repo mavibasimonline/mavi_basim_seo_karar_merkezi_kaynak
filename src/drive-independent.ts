@@ -7,6 +7,7 @@ import {DurableObject} from 'cloudflare:workers';
 import {historyStatus,claimHistory,saveHistoryPage,holdHistory,listHistory,historyDetail} from './seo-history';
 import {tayfunList,tayfunSave} from './tayfun-ledger';
 import {tayfunSitemap} from './tayfun-sitemap';
+import {tayfunAutoMonth,tayfunAutoDetail,tayfunAutoTick} from './tayfun-auto';
 import {historyIntent,historyImpact,answerHistory} from './seo-history-analysis';
 import {encrypt,decrypt,cookie,equalSecret} from './security';
 import {hash,json} from './types';
@@ -203,6 +204,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
       await this.ctx.storage.put(key,{attempts:active?saved!.attempts+1:1,window:active?saved!.window:time});
       return json({allowed:false,locked:false,d1_requests:0});
     }
+    if(path==='/api/internal/tayfun-tick'&&request.method==='POST')return json(await tayfunAutoTick(this.ctx.storage,this.key()));
     if(path==='/api/internal/ga4-status'&&request.method==='GET')return json(await this.ga4().status());
     if(path==='/api/internal/ga4-inspect'&&request.method==='POST'){const ga4=this.ga4(),inspection=await ga4.inspectExisting();if(inspection.available)await ga4.prepare();return json({...inspection,...await ga4.status()});}
     if(path==='/api/internal/ga4-tick'&&request.method==='POST'){
@@ -380,6 +382,11 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
  private async independentRoute(request:Request){
   try{
    const url=new URL(request.url),path=url.pathname;
+   if(path==='/api/independent/tayfun-auto'&&request.method==='GET')return json(await tayfunAutoMonth(this.ctx.storage,url.searchParams.get('month')||''));
+   if(path==='/api/independent/tayfun-auto/detail'&&request.method==='GET'){
+    const record=await tayfunAutoDetail(this.ctx.storage,this.key(),url.searchParams.get('id')||'');
+    return record?json(record):json({code:'TAYFUN_AUTO_NOT_FOUND'},404);
+   }
    if(path==='/api/independent/tayfun-pages'&&request.method==='GET')return json(await tayfunSitemap(this.ctx.storage));
    if(path==='/api/independent/tayfun'&&request.method==='GET')return json(await tayfunList(this.ctx.storage,this.key(),url.searchParams.get('month')||''));
    if(path==='/api/independent/tayfun'&&request.method==='POST'){
