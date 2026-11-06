@@ -5,6 +5,7 @@ import {parseHTML} from './crawler';
 import {boundedText} from './google';
 import {encrypt,decrypt} from './security';
 import {siteURL} from './urls';
+import robotsParser from 'robots-parser';
 import {tayfunSitemap} from './tayfun-sitemap';
 
 type Storage={get<T=unknown>(key:string):Promise<T|undefined>;put(key:string,value:unknown):Promise<unknown>};
@@ -56,17 +57,12 @@ export async function tayfunAutoTick(storage:Storage,secret:string,fetcher:typeo
    if(response.ok)robotsText=await boundedText(response,100_000);
    await storage.put(ROOT+'robots',{at:now.toISOString(),text:robotsText});
   }
-  // Conservative rule for the bot's own User-agent group; sitemap URLs are not permission to ignore robots.
-  const lines=robotsText.split(/\r?\n/).map(x=>x.replace(/#.*/,'').trim()).filter(Boolean);
-  let applicable=false,disabled=false;
-  for(const line of lines){
-   if(/^user-agent:/i.test(line)){applicable=/^(user-agent:\s*)(\*|MaviBasimSeoBot)$/i.test(line);continue;}
-   if(applicable&&/^disallow:/i.test(line)){
-    const path=line.slice(line.indexOf(':')+1).trim();
-    if(path&&new URL(url).pathname.startsWith(path)){disabled=true;break;}
-   }
+  // RFC 9309 matching, including wildcard and longest-match Allow/Disallow rules.
+  // If robots is unavailable without a verified cached copy, hold rather than crawling unapproved paths.
+  if(!robotsText){await advance('ROBOTS_UNAVAILABLE');return {status:'held',code:'ROBOTS_UNAVAILABLE',month,url,site_writes:0,d1_requests:0};}
+  if(robotsParser('https://mavibasim.com/robots.txt',robotsText).isAllowed(url,'MaviBasimSeoBot')===false){
+   await advance('ROBOTS_DISALLOW');return {status:'skipped',code:'ROBOTS_DISALLOW',month,url,site_writes:0,d1_requests:0};
   }
-  if(disabled){await advance('ROBOTS_DISALLOW');return {status:'skipped',code:'ROBOTS_DISALLOW',month,url,site_writes:0,d1_requests:0};}
   const response=await fetcher(url,{redirect:'manual',signal:AbortSignal.timeout(10000),headers:{Accept:'text/html','User-Agent':'MaviBasimSeoBot'}});
   if(response.status!==200){await advance('HTTP_'+response.status);return {status:'held',code:'HTTP_'+response.status,url,month,site_writes:0,d1_requests:0};}
   if(!/text\/html/i.test(response.headers.get('content-type')||'')){await advance('NON_HTML_RESPONSE');return {status:'skipped',code:'NON_HTML_RESPONSE',url,month,site_writes:0,d1_requests:0};}
