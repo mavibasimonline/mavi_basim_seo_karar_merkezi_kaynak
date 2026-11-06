@@ -34,6 +34,10 @@ def config_errors(config, ready=False, bootstrap=False):
     bindings = config.get('d1_databases', [])
     if len(bindings) != 1 or bindings[0].get('binding') != 'DB':
         errors.append('UNEXPECTED_D1_BINDING')
+    # A production Worker must preserve the live Drive archive service binding.
+    services = config.get('services', [])
+    if services != [{'binding': 'DRIVE_ARCHIVE_SERVICE', 'service': 'mavi-basim-drive-archive'}]:
+        errors.append('DRIVE_ARCHIVE_SERVICE_BINDING_REQUIRED')
     variables = config.get('vars', {})
     if any(key in variables for key in ('ADMIN_TOKEN', 'TOKEN_ENCRYPTION_KEY', 'GOOGLE_CLIENT_SECRET', 'BACKUP_ENCRYPTION_KEY')):
         errors.append('SECRET_IN_CONFIG')
