@@ -104,7 +104,7 @@ function categorySections(now,before,products){
  return {sections,classification:{...taxonomy,counts:classCounts},daily_device_totals:{current:dailyTotals(now),previous:dailyTotals(before)}};
 }
 
-export function buildChatGptHandoff({month,device='ALL',current,previous,ga4,oldGa4,catalog,changes,status,ga4Status}){
+export function buildChatGptHandoff({month,device='ALL',current,previous,ga4,oldGa4,catalog,changes,status,ga4Status,tayfunLedger=null}){
  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('Devir için geçerli ay seçilmedi.');
  const prev=previousMonth(month),months=Array.isArray(current)?current:[],cur=months.find(r=>r?.month===month)||null;
  const old=previous?.month===prev?previous:months.find(r=>r?.month===prev)||null;
@@ -142,6 +142,7 @@ export function buildChatGptHandoff({month,device='ALL',current,previous,ga4,old
   catalog:{products,source_hash:catalog?.source_hash||null,captured_at:catalog?.captured_at||null,coverage:catalog?.coverage||null,limitations:catalog?.limitations||[]},
   ga4:{current:ga4Current,previous:ga4Previous},
   seo_change_history:{events,other_snapshots:uncoveredSnapshots,full_history_guaranteed:false,source_answer:changes?.answer||null},
+  tayfun_manual_seo_versions:tayfunLedger||{available:false,reason:'Sürüm defteri aktarılmadı.'},
   caveats:['Eksik satır ve görünmeyen arama sorgusu sıfır değildir. Yalnız iki dönemde de görünen sorguların tıklama farkı kesin karşılaştırmadır.',
    'GSC resmî mülk toplamı, kayıtlı sayfa/sorgu toplamı ve GA4 oturumları farklı ölçümler/kapsamlardır; toplanmaz.',
    'GA4 şehir/cihaz/sayfa kırılımları resmî toplama eşit olmayabilir; her birini ayrı mutabakatla değerlendir.',
@@ -163,6 +164,8 @@ export function buildChatGptHandoff({month,device='ALL',current,previous,ga4,old
   '## Mutabakat ve veri sınırları',
   'GSC dışa aktarılan sayfa / resmî site (güncel): '+(selectedPage?.clicks??'yok')+' / '+(isAll?activeTotal?.clicks??'yok':'tüm-cihaz toplamıyla kıyaslanamaz')+'.',
   'GA4 güncel oturum / cihaz satır toplamı / şehir satır toplamı / sayfa satır toplamı: '+[ga4Current?.totals?.sessions,ga4Facets(ga4Current)?.facets?.devices?.sessions_sum,ga4Facets(ga4Current)?.facets?.cities?.sessions_sum,ga4Facets(ga4Current)?.facets?.pages?.sessions_sum].map(v=>v??'?').join(' / ')+'. Bu sayılar eşit olmayabilir; farkları saklama.',
+  '## Tayfun · Aylık SEO sürüm defteri',
+  'Kullanıcı SEO kayıtları: '+(tayfunLedger?.months?.map(m=>m.month+' · '+m.entries?.length+' sürüm').join(' / ')||'kayıt aktarımı yok')+'. Aktif/pasif etiketi canlı sitede yayınlandığını kanıtlamaz; GSC karşılaştırmasını URL, dönem ve cihaz bazında ayrı yap.',
   '## ChatGPT görevi',
   'Bu dosya tek başına yeterli bağlam olmalıdır. Önceki konuşma, hatıra veya yeniden CSV isteme. Varsa eksik kanıtı adıyla belirt.',
   'Ürün, şehir sayfası, sektörel sayfa ve blog analizlerini birbirinden ayrı raporla; her grubun mobil/masaüstü performansını ve kazanan-kaybeden URL/sorgularını ele al. GA4 ziyaretçinin şehrini şehir sayfası trafiği sanma. Günlük cihaz toplamlarından günlük URL veya sorgu kaybı türetme.',

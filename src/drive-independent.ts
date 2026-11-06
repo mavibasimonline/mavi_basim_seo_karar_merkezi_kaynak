@@ -5,6 +5,8 @@ import {plannerStatus,plannerLookup,plannerSyncPlan,verifyPlannerPage,holdPlanne
 import {catchupTick,catchupStatus} from './gsc-catchup';
 import {DurableObject} from 'cloudflare:workers';
 import {historyStatus,claimHistory,saveHistoryPage,holdHistory,listHistory,historyDetail} from './seo-history';
+import {tayfunList,tayfunSave} from './tayfun-ledger';
+import {tayfunSitemap} from './tayfun-sitemap';
 import {historyIntent,historyImpact,answerHistory} from './seo-history-analysis';
 import {encrypt,decrypt,cookie,equalSecret} from './security';
 import {hash,json} from './types';
@@ -378,6 +380,12 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
  private async independentRoute(request:Request){
   try{
    const url=new URL(request.url),path=url.pathname;
+   if(path==='/api/independent/tayfun-pages'&&request.method==='GET')return json(await tayfunSitemap(this.ctx.storage));
+   if(path==='/api/independent/tayfun'&&request.method==='GET')return json(await tayfunList(this.ctx.storage,this.key(),url.searchParams.get('month')||''));
+   if(path==='/api/independent/tayfun'&&request.method==='POST'){
+    const body=JSON.parse(await boundedText(new Response(request.body),12000));
+    return json(await tayfunSave(this.ctx.storage,this.key(),body));
+   }
    if(path==='/api/independent/planner-status'&&request.method==='GET')return json(await plannerStatus(this.ctx.storage));
    if(path==='/api/independent/planner'&&request.method==='GET')return json({...await plannerLookup(url.searchParams.get('query')||'',url.searchParams.get('product')||''),d1_requests:0});
    if(path.startsWith('/api/independent/seo-history')&&request.method==='GET'){
@@ -510,8 +518,8 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    return json({code:'INDEPENDENT_ROUTE_UNSUPPORTED'},404);
   }catch(error){
    const reason=error instanceof Error?error.message:'INDEPENDENT_SOURCE_UNAVAILABLE';
-   const invalid=reason==='INVALID_MONTH'||reason==='INVALID_QUESTION';
-   const safeCode=/^(GA4_|GSC_|INDEPENDENT_|SOURCE_|SHEETS_|ARCHIVE_RESPONSE_)[A-Z0-9_]+$/.test(reason)?reason:'INDEPENDENT_SOURCE_UNAVAILABLE';
+   const invalid=reason==='INVALID_MONTH'||reason==='INVALID_QUESTION'||reason==='TAYFUN_INPUT_INVALID';
+   const safeCode=/^(GA4_|GSC_|INDEPENDENT_|SOURCE_|SHEETS_|ARCHIVE_RESPONSE_|TAYFUN_|SITEMAP_)[A-Z0-9_]+$/.test(reason)?reason:'INDEPENDENT_SOURCE_UNAVAILABLE';
    return json({error:invalid?'İstek geçersiz.':reason.startsWith('GA4_')?'GA4 bağlantısı veya kaynak verisi doğrulanamadı. '+safeCode:'Doğrulanmış bağımsız kaynak henüz okunamıyor. Geçmiş SEO kayıtları korunuyor.',code:invalid?reason:safeCode},invalid?400:503);
   }
  }

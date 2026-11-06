@@ -6,6 +6,7 @@ import {comparisonDecision} from '../independent-gsc-analysis';
 
 const label=m=>new Date(m+'-01T00:00:00Z').toLocaleDateString('tr-TR',{month:'long',year:'numeric',timeZone:'UTC'});
 const prior=(m,n=1)=>{const d=new Date(m+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()-n);return d.toISOString().slice(0,7);};
+const nextMonth=m=>{const d=new Date(m+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);return d.toISOString().slice(0,7);};
 const closedMonth=()=>{const d=new Date(Date.now()-3*86400000);d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-1);return d.toISOString().slice(0,7);};
 const stamp=s=>s?new Date(s).toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'}):'Doğrulanmadı';
 function sum(rows,zero=false){
@@ -30,7 +31,7 @@ export function createIndependentPanel({api,notify}){
  document.querySelector('[data-view="products"]').setAttribute('aria-label','Ürün & Canlı Sayfa Analizi');
  document.querySelector('[data-view="products"] .nav-label').textContent='Ürün & Canlı Sayfa Analizi';
  $('leadersTitle').textContent='İlk 5 Lider Ürün';
- let current=[],previous=null,ga4=null,oldGa4=null,status=null,ga4Status=null,planner=null,changes=null,archive=null,catalog=null,workspace=null,workspacePromise=null,history=null,historyPromise=null,activeView='overview',errors=[],revision=0,queryPage=1,first=true,metric='clicks',sort={key:'clicks',direction:'desc'};
+ let current=[],previous=null,ga4=null,oldGa4=null,status=null,ga4Status=null,planner=null,changes=null,archive=null,catalog=null,workspace=null,workspacePromise=null,history=null,historyPromise=null,tayfun=null,tayfunPromise=null,activeView='overview',errors=[],revision=0,queryPage=1,first=true,metric='clicks',sort={key:'clicks',direction:'desc'};
  const cache=new Map();
  const target=()=>$('month').value,device=()=>$('device').value;
  const selectedRows=raw=>(raw?.pages||[]).filter(r=>device()==='ALL'||r.device===device());
@@ -39,6 +40,13 @@ export function createIndependentPanel({api,notify}){
   if(!workspacePromise){const css=node('link');css.rel='stylesheet';css.href='/seo/workspace.css';document.head.append(css);
    workspacePromise=import('./seo/workspace.js').then(({createInsightsWorkspace})=>workspace=createInsightsWorkspace({api,read,table,evidence,openProduct,ask,notify,scope:()=>({current,previous,ga4,oldGa4,status,ga4Status,changes,catalog,month:target(),device:device(),revision})})).catch(()=>{workspacePromise=null;throw Error('Analiz ekranı şu an yüklenemedi. Yenilemeyi deneyin.');});
   }return workspacePromise;
+ }
+ function tayfunModule(){
+  if(!tayfunPromise){
+   const css=node('link');css.rel='stylesheet';css.href='/seo/tayfun.css';document.head.append(css);
+   tayfunPromise=import('/seo/tayfun.js').then(({createTayfunWorkspace})=>tayfun=createTayfunWorkspace({api,notify,scope:()=>({catalog,current,previous,month:target(),device:device(),revision})})).catch(error=>{tayfunPromise=null;throw error;});
+  }
+  return tayfunPromise;
  }
  function historyModule(){if(!historyPromise)historyPromise=import('./seo/history.js').then(({createHistoryWorkspace})=>history=createHistoryWorkspace({read,notify,evidence,scope:()=>({catalog,month:target(),device:device(),revision})})).catch(()=>{historyPromise=null;throw Error('Geçmiş ekranı yüklenemedi.');});return historyPromise;}
  const complete=()=>current.length===Number($('rangeMonths').value)&&current.every(r=>r.available);
@@ -134,6 +142,7 @@ export function createIndependentPanel({api,notify}){
   $('export').hidden=['comparison','products','opportunities','impact'].includes(name);
   if(['comparison','products','opportunities','impact'].includes(name)){const at=revision;workspaceModule().then(w=>{if(at===revision&&activeView===name&&!$('app').hidden)return w.render(name);}).catch(e=>notify(e.message));}
   $('scopeLabel').textContent=name==='changes'?'Doğrulanmış tarama aralıkları · UTC':name==='health'?'GSC · GA4 · Arşiv sağlığı':'GSC arama performansı · GA4 ziyaret ölçümleri';
+  if(name==='tayfun'){const at=revision;tayfunModule().then(w=>{if(at===revision&&activeView==='tayfun'&&!$('app').hidden)return w.render();}).catch(e=>notify('Tayfun yüklenemedi: '+e.message));}
   if(name==='queries')queries();if(name==='radar')radar();if(name==='changes')calendar();if(name==='health'){
    health();const at=revision;historyModule().then(w=>{if(at===revision&&activeView==='health'&&!$('app').hidden)return w.render('health');}).catch(e=>notify(e.message));if(!archive){const at=revision,month=target();read('report?month='+month).then(value=>{if(at===revision){archive=value;health();}}).catch(e=>{if(at===revision)$('summary').textContent='Eski aylık arşiv şu an okunamadı: '+e.message+'. GSC/GA4 ölçümleri ayrı gösteriliyor.';});}
   }
@@ -155,7 +164,7 @@ export function createIndependentPanel({api,notify}){
  async function load(signal){
   const at=++revision;if(first){first=false;if(target()>closedMonth())$('month').value=closedMonth();}
   const month=target(),n=Number($('rangeMonths').value),months=Array.from({length:n},(_,i)=>prior(month,n-i-1));
-  workspace?.clear();history?.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;planner=null;changes=null;archive=null;catalog=null;errors=[];queryPage=1;
+  workspace?.clear();history?.clear();tayfun?.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;planner=null;changes=null;archive=null;catalog=null;errors=[];queryPage=1;
   $('groupFilter').hidden=true;$('groupFilter').value='';$('pilot').hidden=true;$('loadGscReview').closest('section').hidden=true;$('questionSourceLabel').hidden=false;
   $('freshness').replaceChildren(node('span',null,'status-dot'),node('span','Doğrulanmış kaynaklar okunuyor'));
   const jobs=[...months,...(n===1?[prior(month)]:[])],results=[];
@@ -171,7 +180,7 @@ export function createIndependentPanel({api,notify}){
   $('export').hidden=false;$('export').href='#';$('exportLabel').textContent='GSC ölçümlerini indir';
   products();kpis();chart();organic();health();notify();
  }
- function clear(){revision++;workspace?.clear();history?.clear();cache.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;planner=null;changes=null;archive=null;catalog=null;$('organicTable').replaceChildren();$('organicSummary').replaceChildren();}
+ function clear(){revision++;workspace?.clear();history?.clear();tayfun?.clear();cache.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;planner=null;changes=null;archive=null;catalog=null;$('organicTable').replaceChildren();$('organicSummary').replaceChildren();}
  $('organicFacet').addEventListener('change',organic);
  for(const [id,delta] of [['queryPrevious',-1],['queryNext',1]])$(id).addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();queries(Math.max(1,Number($('queryPage').dataset.page||queryPage)+delta));},true);
  for(const [id,handler] of [['showChanges',()=>calendar($('changeDay').value)],['runDataAudit',()=>{cache.clear();$('refresh').click();}]])$(id).addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();handler();},true);
@@ -183,7 +192,9 @@ export function createIndependentPanel({api,notify}){
   const button=$('chatgptHandoff');button.disabled=true;
   try{
    const {buildChatGptHandoff}=await import('./chatgpt-handoff.js');
-   const text=buildChatGptHandoff({month:target(),device:device(),current,previous,ga4,oldGa4,catalog,changes,status,ga4Status});
+   const months=[prior(target()),target(),nextMonth(target())],records=await Promise.allSettled(months.map(month=>api('/api/independent/tayfun?month='+month)));
+   const tayfunLedger={available:records.every(r=>r.status==='fulfilled'),months:records.flatMap((r,i)=>r.status==='fulfilled'?[{month:months[i],entries:r.value.entries||[],updated_at:r.value.updated_at}]:[]),missing_months:records.flatMap((r,i)=>r.status==='rejected'?[months[i]]:[]),limitations:['Manuel SEO kaydı yayına alındığını kanıtlamaz; yayın ve Google tarama tarihleri bağımsız doğrulanır.','İlk taramadan önceki gerçek SEO tarihi bilinmiyor.']};
+   const text=buildChatGptHandoff({month:target(),device:device(),current,previous,ga4,oldGa4,catalog,changes,status,ga4Status,tayfunLedger});
    const url=URL.createObjectURL(new Blob(['\ufeff'+text],{type:'text/markdown;charset=utf-8'})),a=node('a');
    a.href=url;a.download='Mavi_Basim_ChatGPT_SEO_Devir_'+target()+'_'+device()+'.md';a.click();
    setTimeout(()=>URL.revokeObjectURL(url),1000);
