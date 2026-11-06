@@ -17,12 +17,12 @@ async function login(page: Page) {
   await expect(page.locator("#app")).toBeVisible();
 }
 async function navigate(page: Page, name: string) {
-  if (name === "Genel Bakış") { await page.locator("#sidebar .brand").click(); return; }
   if (
     (await page.locator("#sidebarToggle").getAttribute("aria-label")) ===
     "Menüyü aç"
   )
     await page.locator("#sidebarToggle").click();
+  if (name === "Genel Bakış") { await page.locator("#sidebar .brand").click(); return; }
   await page
     .getByRole("navigation", { name: "Ana menü" })
     .getByRole("link", { name, exact: true })
