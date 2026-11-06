@@ -38,6 +38,7 @@ const views = {
   queries: "Arama Sorguları",
   radar: "SEO Fırsat Radarı",
   changes: "Değişiklik Takvimi",
+  tayfun: "Tayfun · Aylık SEO Sürüm Defteri",
   health: "Veri Sağlığı",
   questions: "SEO Soru-Cevap",
 };
