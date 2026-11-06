@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           test "$VERIFIED_CI_SHA" = "$(git rev-parse HEAD)" || exit 0
           title="$(git log -1 --format=%s)"
-          if [ "$title" != "fix: release Tayfun private archive backend" ] && ! [[ "$title" =~ ^fix:\ release\ Tayfun\ private\ archive\ backend\ \(\#[0-9]+\)$ ]]; then exit 0; fi
+          if [ "$title" != "fix: release Tayfun private archive backend" ] && ! [[ "$title" =~ ^fix:\ release\ Tayfun\ private\ archive\ backend\ \(\#[0-9]+\)$ ]] && [ "$title" != "Tayfun: sitemap sayfalarının aylık otomatik SEO arşivi ve sürüm karşılaştırması (#93)" ]; then exit 0; fi
           echo 'ready=true' >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         if: steps.gate.outputs.ready == 'true'
