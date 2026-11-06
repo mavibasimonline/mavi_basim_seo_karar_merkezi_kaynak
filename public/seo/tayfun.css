@@ -66,3 +66,12 @@
 .tayfun-ai-preview>*{margin:7px 0}
 .tayfun-jobs-editor button{max-width:100%}
 @media(max-width:670px){.tayfun-jobs-editor{padding:10px}.tayfun-jobs-category>summary{padding:12px}}
+
+
+.tayfun-keyword-history{border:1px solid #dbeafe;border-radius:9px;background:white;min-width:0}
+.tayfun-keyword-history>summary{padding:12px;font-weight:700;color:#1e40af;cursor:pointer}
+.tayfun-keyword-table{overflow:auto;max-height:380px;font-size:.81rem}
+.tayfun-keyword-row{display:grid;grid-template-columns:minmax(170px,2fr) 70px 70px 75px minmax(180px,1.5fr);gap:10px;
+ min-width:590px;padding:9px 13px;border-top:1px solid #e2e8f0;align-items:center}
+.tayfun-keyword-header{background:#eff6ff}
+.tayfun-keyword-row span{overflow-wrap:anywhere}
