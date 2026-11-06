@@ -1,0 +1,83 @@
+name: Tayfun otomatik SEO paneli kontrollü ana Worker yayını
+on:
+  workflow_run:
+    workflows: ["Test ve kabul denetimi"]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: mavi-production-deployment
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      VERIFIED_CI_SHA: ${{ github.event.workflow_run.head_sha }}
+      RELEASE_SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Exact CI and single reviewed Tayfun release
+        id: gate
+        run: |
+          set -euo pipefail
+          test "$VERIFIED_CI_SHA" = "$(git rev-parse HEAD)" || exit 0
+          test "$(git log -1 --format=%s)" = "Tayfun: sitemap sayfalarının aylık otomatik SEO arşivi ve sürüm karşılaştırması (#93)" || exit 0
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-fund
+        if: steps.gate.outputs.ready == 'true'
+      - run: npm audit --audit-level=moderate
+        if: steps.gate.outputs.ready == 'true'
+      - run: npm run check
+        if: steps.gate.outputs.ready == 'true'
+      - name: Read-only active Worker version, free plan, and unchanged bindings
+        id: version
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          python3 - <<'PY'
+          import os
+          from cloudflare_diagnostics import Cloudflare
+          from quota_observer_release import api,active_version,free_plan
+          client=Cloudflare(os.environ['CLOUDFLARE_API_TOKEN'],os.environ['CLOUDFLARE_ACCOUNT_ID'])
+          free_plan(api(client,'GET','/subscriptions'))
+          version=active_version(api(client,'GET','/workers/scripts/mavi-basim-seo-prod/deployments'))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:output.write('previous_version='+version+'\n')
+          print('Read-only production version pinned')
+          PY
+      - name: Preflight old version, source counts, D1 quota and immutable configuration
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          EXPECTED_PREVIOUS_VERSION: ${{ steps.version.outputs.previous_version }}
+        run: |
+          python3 scripts/production_guard.py preflight
+          python3 scripts/release_checks.py --base HEAD
+          python3 scripts/production_guard.py verify-schema
+          python3 scripts/d1_quota_checkpoint.py
+      - name: Deploy only reviewed app code, preserving tokens, D1 and service bindings
+        id: publish
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          node scripts/run.mjs wrangler deploy --config deploy/wrangler.production.jsonc --keep-vars --var D1_READ_GUARD_ENABLED:true --var SYNC_MAX_PAGES_PER_TICK:1 --tag "$VERIFIED_CI_SHA" --message "Tayfun auto crawl reviewed source $VERIFIED_CI_SHA"
+      - name: Verify exact live commit, 100% Worker version and safety guards
+        if: steps.gate.outputs.ready == 'true'
+        run: python3 scripts/production_guard.py smoke
+      - name: Roll back app only if this exact deployment fails after publishing
+        if: failure() && steps.publish.outcome == 'success'
+        env:
+          PREVIOUS_VERSION: ${{ steps.version.outputs.previous_version }}
+        run: |
+          node scripts/run.mjs wrangler rollback "$PREVIOUS_VERSION" --config deploy/wrangler.production.jsonc --message "Rollback incomplete Tayfun auto release" --yes
