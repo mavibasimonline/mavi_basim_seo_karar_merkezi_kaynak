@@ -4,3 +4,51 @@
 #app button[aria-pressed="true"]:not(.month-strip button),#app button[aria-pressed="true"]:not(.month-strip button):hover,#app button[aria-pressed="true"]:not(.month-strip button):focus-visible,#app button[aria-selected="true"],#app button[data-state="active"]{background:#2563eb;color:#fff;border-color:#2563eb;opacity:1}
 #app .tayfun-tabs{display:flex;gap:10px;flex-wrap:wrap;align-items:center;min-height:42px}
 #app .tayfun-tabs>button{white-space:nowrap}
+
+/* Mavi Basım shared luminous button system. Month selection, text-only, icon-only, and table-sort controls retain their dedicated behavior. */
+#app :is(button,a.button):where(:not(.month-strip button,.table-sort,.icon-button,.text-button,.danger,.destructive)):not(:is(.primary,[aria-pressed="true"],[aria-selected="true"],[data-state="active"],.active,.selected)),
+#loginScreen :is(button,a.button):where(:not(.icon-button,.text-button,.danger)):not(.primary),
+#navigation a:not([aria-current="page"]){
+  background:linear-gradient(180deg,#f8faff 0%,#e3eaf4 100%);
+  border:1px solid #9fb3d1;
+  border-radius:6px;
+  color:#1c304d;
+  box-shadow:0 2px 5px #1e41721d,inset 0 1px 0 #ffffffdc;
+  text-decoration:none;
+  transition:background-color .14s ease,box-shadow .14s ease,border-color .14s ease,transform .14s ease;
+}
+#app :is(button,a.button):where(:not(.month-strip button,.table-sort,.icon-button,.text-button,.danger,.destructive)):not(:is(.primary,[aria-pressed="true"],[aria-selected="true"],[data-state="active"],.active,.selected)):hover:not(:disabled),
+#loginScreen :is(button,a.button):where(:not(.icon-button,.text-button,.danger)):not(.primary):hover:not(:disabled),
+#navigation a:not([aria-current="page"]):hover{
+  background:linear-gradient(180deg,#ffffff,#dce8fb);
+  border-color:#7da0d1;
+  color:#163663;
+  box-shadow:0 2px 9px #285ed02e,inset 0 1px 0 #fff;
+}
+#app :is(button,a.button):is(.primary,[aria-pressed="true"],[aria-selected="true"],[data-state="active"],.active,.selected):where(:not(.month-strip button,.table-sort,.icon-button,.text-button,.danger,.destructive)),
+#loginScreen :is(button,a.button).primary,
+#navigation a[aria-current="page"]{
+  background:linear-gradient(180deg,#3473f4 0%,#2860e3 100%);
+  border:1px solid #2257cb;
+  border-radius:6px;
+  color:#fff;
+  box-shadow:0 2px 8px #2056d640,0 0 0 1px #83afff45,inset 0 1px 0 #ffffff40;
+  text-decoration:none;
+}
+#app :is(button,a.button):is(.primary,[aria-pressed="true"],[aria-selected="true"],[data-state="active"],.active,.selected):where(:not(.month-strip button,.table-sort,.icon-button,.text-button,.danger,.destructive)):hover:not(:disabled),
+#app :is(button,a.button):is(.primary,[aria-pressed="true"],[aria-selected="true"],[data-state="active"],.active,.selected):where(:not(.month-strip button,.table-sort,.icon-button,.text-button,.danger,.destructive)):focus-visible,
+#loginScreen :is(button,a.button).primary:hover:not(:disabled),
+#navigation a[aria-current="page"]:hover{
+  background:linear-gradient(180deg,#2c68ef,#2054d4);
+  border-color:#194dc0;
+  color:#fff;
+  box-shadow:0 3px 10px #1f58dd55,0 0 0 1px #81abff55,inset 0 1px 0 #ffffff3a;
+}
+#app :is(button,a.button):where(:not(.month-strip button,.table-sort,.icon-button,.text-button,.danger,.destructive)):active:not(:disabled),
+#navigation a:active{transform:translateY(1px)}
+#app :is(button,a.button):where(:not(.month-strip button,.table-sort,.icon-button,.text-button,.danger,.destructive)):focus-visible,
+#navigation a:focus-visible{outline:2px solid #84abff;outline-offset:2px}
+#app :is(button,a.button):where(:not(.month-strip button,.table-sort,.icon-button,.text-button,.danger,.destructive)):not(:is(.primary,[aria-pressed="true"],[aria-selected="true"],[data-state="active"],.active,.selected)) .icon{color:#2865e6}
+#app :is(button,a.button):is(.primary,[aria-pressed="true"],[aria-selected="true"],[data-state="active"],.active,.selected) .icon{color:#fff}
+#app .month-strip button{box-shadow:0 1px 3px #1b3a6414}
+@media(prefers-reduced-motion:reduce){#app button,#app a.button,#navigation a,#loginScreen button{transition:none!important;transform:none!important}}
