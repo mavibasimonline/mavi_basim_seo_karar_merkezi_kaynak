@@ -171,7 +171,7 @@ test("core navigation workspaces remain accessible after redundant menu cleanup"
     ["Genel Bakış", "overview", "#kpis"],
     ["Ürün Performansı", "products", "#productSearch"],
     ["Arama Sorguları", "queries", "#querySearch"],
-    ["Değişiklik Takvimi", "changes", "#changeDay"],
+    ["Tayfun", "tayfun", "#tayfunApp"],
     ["Veri Sağlığı", "health", "#dataAuditResults"],
   ]) {
     await view(page, name);
