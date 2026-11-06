@@ -1,5 +1,6 @@
 // Independent Drive OAuth + serialized archive storage. Intentionally no DB/D1 binding.
 import {productSourceContext} from './product-source-context';
+import {appendProductActionDiagnostic} from './product-action-diagnostic';
 import {plannerStatus,plannerLookup,plannerSyncPlan,verifyPlannerPage,holdPlanner} from './independent-planner';
 import {catchupTick,catchupStatus} from './gsc-catchup';
 import {DurableObject} from 'cloudflare:workers';
@@ -482,7 +483,12 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
      const answer=answerVerifiedGsc(current,previous,body.question,mappings);
      if(product&&context&&!explicitGsc&&!answer.filters.query&&!/anahtar|kelime|sorgu|hangi arama/.test(q)){
       const ga4Current=await this.ga4().report(month).catch(()=>null),ga4Previous=await this.ga4().report(previousMonth).catch(()=>null);
-      const evaluated=answerProductEvidence(answer,ga4Current,ga4Previous,context,product,body.question);return json(body.include_source_context===true?await productSourceContext(evaluated,current,previous,product):evaluated);
+      const evaluated=answerProductEvidence(answer,ga4Current,ga4Previous,context,product,body.question);
+       if(body.include_source_context!==true)return json(evaluated);
+       const withContext=await productSourceContext(evaluated,current,previous,product);
+       const diagnosed=await appendProductActionDiagnostic(withContext,current,previous,product,context,
+        (period,filter)=>verifiedGscSeries(this.ctx.storage,this.key(),period,filter));
+       return json(diagnosed);
      }
      return json({...answer,mapping_evidence:context?{source_hash:context.source_hash,captured_at:context.captured_at}:null});
     }

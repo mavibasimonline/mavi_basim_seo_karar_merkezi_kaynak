@@ -67,6 +67,15 @@ export default {async fetch(request:Request,env:Probe){
   need(three.intent==='top-product-priorities'&&three.requested_count===3&&three.items.length===Math.min(3,three.total_candidates),'SEO_ANSWER_THREE_PRODUCTS_MISSING');
   need(three.items.every((item:any)=>item.product_id&&item.task&&item.cause_confirmed===false&&item.content_change_recommended===false),'SEO_ANSWER_THREE_PRODUCTS_UNVERIFIED');
   need(three.evidence_refs?.some((ref:any)=>ref.scope==='page')&&three.d1_requests===0,'SEO_ANSWER_THREE_PRODUCTS_EVIDENCE_MISSING');
+  const explanation=await call('Broşür mobilde neden düştü?');
+  need(explanation.diagnostic?.page==='https://mavibasim.com/brosur'&&explanation.diagnostic?.device==='MOBILE'&&
+   explanation.diagnostic?.steps?.length===3&&explanation.answer.includes('SONUCA GÖTÜREN OTOMATİK İNCELEME')&&
+   explanation.answer.includes('1) Sorun nerede?')&&explanation.answer.includes('2) Hangi kelime ve ne zaman?')&&
+   explanation.answer.includes('3) SEO değişikliğine bakıldı mı?')&&explanation.answer.includes('SONUÇ:')&&
+   explanation.diagnostic.cause_confirmed===false&&explanation.diagnostic.content_change_recommended===false&&
+   explanation.d1_requests===0,'SEO_ANSWER_ACTION_DIAGNOSTIC_MISSING');
+  need(explanation.diagnostic.daily_query_coverage.length===2&&explanation.diagnostic.daily_query_coverage.every((m:any)=>
+   m.verified_days===m.expected_days&&m.daily_absence_is_zero===false),'SEO_ANSWER_DAILY_QUERY_SCOPE_INVALID');
   const visitor=await call('Broşür organik ziyaretçileri neden düşüyor?'),unsupported=await call('Broşür anahtar kelimeleri neden düşüyor?','ga4');
   const read=async(path:string)=>{const r=await env.LIVE_APP.fetch(ORIGIN+path,{headers:{Authorization:'Bearer '+env.ADMIN_TOKEN}});if(path.endsWith('/catalog')&&r.status===404)throw Error('SEO_ANSWER_RUNTIME_PENDING');need(r.ok,'SEO_ANSWER_PANEL_READ_FAILED');return r.json<any>();};
   const session=await read('/api/session'),month=await read('/api/independent/gsc-month?month=2026-10');
