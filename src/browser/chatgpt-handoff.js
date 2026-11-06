@@ -80,7 +80,7 @@ function categorySections(now,before,products){
   const best=pages.filter(r=>r.delta_clicks>0).sort((a,b)=>b.delta_clicks-a.delta_clicks).slice(0,8);
   const queryLoss=queries.filter(r=>r.delta_clicks<0).sort((a,b)=>a.delta_clicks-b.delta_clicks).slice(0,5);
   const queryGain=queries.filter(r=>r.delta_clicks>0).sort((a,b)=>b.delta_clicks-a.delta_clicks).slice(0,5);
-  const list=items=>items.length?items.map(x=>x.key+' ['+x.previous.clicks+'→'+x.current.clicks+'; '+(x.delta_clicks>0?'+':'')+x.delta_clicks+']').join('; '):'iki ayda ortak kayıtla doğrulanmış önemli değişim yok';
+  const list=items=>items.length?items.map(x=>x.key+' ['+x.previous.clicks+' → '+x.current.clicks+'; '+(x.delta_clicks>0?'+':'')+x.delta_clicks+']').join('; '):'iki ayda ortak kayıtla doğrulanmış önemli değişim yok';
   const devices=new Set([...byDevice(currentRows).map(x=>x.device),...byDevice(priorRows).map(x=>x.device)]);
   const dBefore=Object.fromEntries(byDevice(priorRows).map(x=>[x.device,x])),dNow=Object.fromEntries(byDevice(currentRows).map(x=>[x.device,x]));
   const deviceLines=[...devices].sort().map(d=>d+': '+labeledMetric(dBefore[d])+' → '+labeledMetric(dNow[d]));
