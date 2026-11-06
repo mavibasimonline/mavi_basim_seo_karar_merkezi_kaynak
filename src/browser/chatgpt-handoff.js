@@ -19,10 +19,7 @@ const paired=(now,old,key)=>{
   return {key:k,current,previous,delta_clicks:current&&previous?current.clicks-previous.clicks:null,status:current&&previous?'karşılaştırılabilir':current?'yalnız güncel dönemde görünür':'yalnız önceki dönemde görünür'};
  });
 };
-const aggregate=(items,side='current')=>metric(items.flatMap(x=>x[side]||[]));
 const formatMetric=m=>m?m.clicks+' tıklama / '+m.impressions+' gösterim / CTR '+(m.ctr===null?'belirsiz':(m.ctr*100).toFixed(2)+'%')+' / konum '+(m.position===null?'belirsiz':m.position.toFixed(2)):'doğrulanmadı';
-const groupTop=(rows,order)=>rows.filter(r=>r.delta_clicks!==null&&r.delta_clicks*(order===1?1:-1)>0).sort((a,b)=>order*(b.delta_clicks-a.delta_clicks)).slice(0,15);
-const differences=rows=>rows.filter(r=>r.status!=='karşılaştırılabilir');
 const ga4Facets=report=>{
  if(!report)return null;
  const total=num(report.totals?.sessions);
@@ -33,15 +30,6 @@ const ga4Facets=report=>{
  }
  return {month:report.month,closed:report.closed===true,official:report.totals||null,facets};
 };
-function describePairs(rows,label){
- const ascending=rows.filter(r=>r.delta_clicks!==null).sort((a,b)=>a.delta_clicks-b.delta_clicks);
- const losers=ascending.filter(r=>r.delta_clicks<0).slice(0,12),gainers=ascending.filter(r=>r.delta_clicks>0).reverse().slice(0,12);
- const lines=[label+' — karşılaştırılabilir gözlemler'];
- for(const [kind,subset] of [['Kayıplar',losers],['Artışlar',gainers]]){
-  lines.push(kind+': '+(subset.length?subset.map(r=>r.key+' ('+r.previous.clicks+' → '+r.current.clicks+', '+(r.delta_clicks>0?'+':'')+r.delta_clicks+')').join('; '):'Önemli karşılaştırılabilir kayıt bulunmadı'));
- }
- return lines.join('\n');
-}
 function monthBundle(r,device){
  if(!r)return null;
  const filter=rows=>(rows||[]).filter(item=>device==='ALL'||item.device===device);
@@ -121,8 +109,6 @@ export function buildChatGptHandoff({month,device='ALL',current,previous,ga4,old
  const prev=previousMonth(month),months=Array.isArray(current)?current:[],cur=months.find(r=>r?.month===month)||null;
  const old=previous?.month===prev?previous:months.find(r=>r?.month===prev)||null;
  const now=monthBundle(cur,device),before=monthBundle(old,device);
- const entries=paired(now?.pages,before?.pages,r=>r.page);
- const qEntries=paired(now?.queries,before?.queries,r=>r.page+' | '+r.query);
  const selectedPage=metric(now?.pages),priorPage=metric(before?.pages);
  const activeTotal=cur?.property_total||null,priorTotal=old?.property_total||null;
  const isAll=device==='ALL';
