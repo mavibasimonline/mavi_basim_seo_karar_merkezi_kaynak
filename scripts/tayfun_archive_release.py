@@ -4,6 +4,7 @@ import json
 import os
 import re
 import sys
+import subprocess
 from pathlib import Path
 from cloudflare_diagnostics import Cloudflare
 from quota_observer_release import api, active_version, cron_rows, free_plan
@@ -73,10 +74,29 @@ def postflight():
  print(json.dumps({'postflight':'passed','archive_version':after['version'],'previous_archive_version':saved['archive']['version'],
   'bindings_preserved':True,'main_worker_preserved':True,'secret_rotations':0,'d1_requests':0,'site_writes':0}))
 
+def rollback():
+ need(STATE.exists(),'ARCHIVE_PREFLIGHT_REQUIRED')
+ saved=json.loads(STATE.read_text())
+ client=Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID'))
+ current=inspect(client,ARCHIVE)
+ previous=saved['archive']['version']
+ need(inspect(client,APP)==saved['app'],'MAIN_WORKER_CHANGED_NO_ROLLBACK')
+ if current['version']==previous:
+  print(json.dumps({'rollback':'not_needed'}));return
+ version=api(client,'GET',base(ARCHIVE)+'/versions/'+current['version'])
+ need(version.get('annotations',{}).get('workers/tag')==saved['commit'],'FOREIGN_ARCHIVE_VERSION_NO_ROLLBACK')
+ result=subprocess.run(['node','scripts/run.mjs','wrangler','rollback',previous,'--config',str(CONFIG),
+  '--message','Restore previous encrypted archive after Tayfun release failure','--yes'],cwd=ROOT)
+ need(result.returncode==0,'ARCHIVE_ROLLBACK_FAILED')
+ after=inspect(client,ARCHIVE)
+ need(after['version']==previous,'ARCHIVE_ROLLBACK_NOT_VERIFIED')
+ need(after['bindings']==saved['archive']['bindings'],'ARCHIVE_ROLLBACK_BINDINGS_CHANGED')
+ print(json.dumps({'rollback':'verified','previous_version_restored':previous,'main_worker_unchanged':True}))
+
 if __name__=='__main__':
  try:
-  if len(sys.argv)!=2 or sys.argv[1] not in ('preflight','postflight'):raise ValueError('ARCHIVE_MODE_INVALID')
-  {'preflight':preflight,'postflight':postflight}[sys.argv[1]]()
+  if len(sys.argv)!=2 or sys.argv[1] not in ('preflight','postflight','rollback'):raise ValueError('ARCHIVE_MODE_INVALID')
+  {'preflight':preflight,'postflight':postflight,'rollback':rollback}[sys.argv[1]]()
  except Exception as error:
   message=str(error)
   code=message if isinstance(error,ValueError) and re.fullmatch('[A-Z0-9_]+',message) else type(error).__name__
