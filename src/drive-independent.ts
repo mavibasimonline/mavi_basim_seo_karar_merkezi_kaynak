@@ -518,8 +518,8 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    return json({code:'INDEPENDENT_ROUTE_UNSUPPORTED'},404);
   }catch(error){
    const reason=error instanceof Error?error.message:'INDEPENDENT_SOURCE_UNAVAILABLE';
-   const invalid=reason==='INVALID_MONTH'||reason==='INVALID_QUESTION';
-   const safeCode=/^(GA4_|GSC_|INDEPENDENT_|SOURCE_|SHEETS_|ARCHIVE_RESPONSE_)[A-Z0-9_]+$/.test(reason)?reason:'INDEPENDENT_SOURCE_UNAVAILABLE';
+   const invalid=reason==='INVALID_MONTH'||reason==='INVALID_QUESTION'||reason==='TAYFUN_INPUT_INVALID';
+   const safeCode=/^(GA4_|GSC_|INDEPENDENT_|SOURCE_|SHEETS_|ARCHIVE_RESPONSE_|TAYFUN_|SITEMAP_)[A-Z0-9_]+$/.test(reason)?reason:'INDEPENDENT_SOURCE_UNAVAILABLE';
    return json({error:invalid?'İstek geçersiz.':reason.startsWith('GA4_')?'GA4 bağlantısı veya kaynak verisi doğrulanamadı. '+safeCode:'Doğrulanmış bağımsız kaynak henüz okunamıyor. Geçmiş SEO kayıtları korunuyor.',code:invalid?reason:safeCode},invalid?400:503);
   }
  }
