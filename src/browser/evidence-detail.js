@@ -32,7 +32,17 @@ export function createEvidenceDetails({scope,read,table,evidence,ask,notify,mode
   const {data}=model(),row=data.product_decisions?.find(x=>x.id===p.id),section=node('section');
   section.append(node('h3','Kanıtlı ürün kararı · '+(row?.priority||'Veri bekle')));
   if(!row){section.append(node('p','Doğrulanmış karar kaydı bulunamadı.'));return section;}
-  section.append(node('p','Karşılaştırma: '+row.previous_month+' → '+row.month+' · GSC '+deviceName(scope().device)+'. '+row.action),node('h3','Gözlenen değişimler'));
+  section.append(node('p','Karşılaştırma: '+row.previous_month+' → '+row.month+' · GSC '+deviceName(scope().device)+'.'));
+  if(row.diagnosis){
+   section.append(node('h3','Ne oldu? · Sayısal kanıt'),node('p',row.diagnosis.summary));
+   section.append(node('h3','Neden olmuş olabilir?'));
+   for(const reason of row.diagnosis.observed_mechanisms)section.append(node('p',reason));
+   if(!row.diagnosis.observed_mechanisms.length)section.append(node('p','Önemli düşüş kanıtlanmadı veya karşılaştırma için yeterli veri yok.'));
+   section.append(node('h3','Tam olarak neyi kontrol etmeliyiz?'),node('p',row.diagnosis.investigation));
+   section.append(node('h3','Son SEO kararı · Şimdi ne yapmalı?'),node('p',row.diagnosis.decision));
+   section.append(node('p','Güven düzeyi: '+row.diagnosis.confidence+'. Kanıtlanmış neden: hayır. Otomatik site değişikliği: yok.'));
+  }else section.append(node('p',row.action));
+  section.append(node('h3','Gözlenen değişimler'));
   if(row.signals.length)for(const signal of row.signals)section.append(node('p',signal));else section.append(node('p','Karşılaştırılabilir önemli değişim kanıtı bulunmadı.'));
   const u=node('div',null,'table-scroll');
   table(u,['Kaybeden URL','Önceki tıklama','Güncel tıklama','Fark'],row.gsc.dropping_pages.map(r=>[r.url,number(r.previous.clicks),number(r.current.clicks),difference(r.delta)]));
@@ -48,7 +58,7 @@ export function createEvidenceDetails({scope,read,table,evidence,ask,notify,mode
   section.append(node('h3','GA4 organik oturum desteği'),node('p',row.ga4.scope_comparable?row.ga4.canonical_path+': '+number(row.ga4.previous_sessions)+' → '+number(row.ga4.current_sessions)+' oturum. '+(row.ga4.cross_source_decline?'Ana URL’de GSC ve GA4 ayrı ayrı geriliyor.':'İki kaynaklı düşüş kanıtı yok.'):'GA4 aynı kapsamda iki tam dönem ana açılış yolu kanıtı yok veya cihaz/ülke filtresi seçilmiş; eksik değer sıfır değildir.'));
   section.append(node('h3','Tarihli SEO değişiklikleri'),node('p',row.seo_changes.overlapping.length+' değişiklik kaydı karşılaştırma dönemine denk geliyor; tarama tarihi kesin yayın veya neden kanıtı değildir.'));
   for(const e of row.seo_changes.overlapping)section.append(node('p',e.url+' · '+e.observed_from+' – '+e.observed_to+' · '+e.changed_fields.join(', ')));
-  section.append(node('p','SEO kararı: '+row.action+' Nedensellik kanıtlanmadı; otomatik içerik veya canlı site değişikliği yok.'));
+  section.append(node('p','Nedensellik kanıtlanmadı; otomatik içerik veya canlı site değişikliği yok.'));
   return section;
  }
  function product(input){const {data,catalog}=model(),p=data.products.find(p=>p.id===input.id)||input,urls=p.urls||[p.canonical_url];start(p.name);root().append(productDecision(p),plannerSection('',p.id));root().append(node('h3','Ürün grubu toplamı · '+urls.length+' doğrulanmış URL'),kpis(p.verified?p.current:null,p.comparison_available?p.previous:null),badge(p.decision),node('p','Grup tıklama farkı: '+difference(p.delta)+'. Ürün grubu toplamı yalnız ana URL performansı değildir. İçerik değişikliği için kanıtlı neden gerekir.'));
