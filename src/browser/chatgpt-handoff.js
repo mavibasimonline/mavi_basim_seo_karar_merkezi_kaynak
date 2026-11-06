@@ -59,7 +59,7 @@ function monthBundle(r,device){
 
 // Categories are URL-based evidence scopes; a city landing page is not the same as a GA4 visitor city.
 const citySlugs=new Set(('adana adiyaman afyonkarahisar agri aksaray amasya ankara antalya ardahan artvin aydin balikesir bartin batman bayburt bilecik bingol bitlis bolu burdur bursa canakkale cankiri corum denizli diyarbakir duzce edirne elazig erzincan erzurum eskisehir gaziantep giresun gumushane hakkari hatay igdir isparta istanbul izmir kahramanmaras karabuk karaman kars kastamonu kayseri kirikkale kirklareli kirsehir kilis kocaeli konya kutahya malatya manisa mardin mersin mugla mus nevsehir nigde ordu osmaniye rize sakarya samsun sanliurfa siirt sinop sirnak sivas tekirdag tokat trabzon tunceli usak van yalova yozgat zonguldak').split(' '));
-const urlPath=u=>{try{return new URL(u,'https://mavibasim.com').pathname.toLowerCase().replace(/\\/$/,'')||'/';}catch{return '';}};
+const urlPath=u=>{try{return new URL(u,'https://mavibasim.com').pathname.toLowerCase().replace(/\/$/,'')||'/';}catch{return '';}};
 function classifySeoUrl(url,products){
  const path=urlPath(url);
  if(path==='/blog'||path.startsWith('/blog/'))return 'blog';
@@ -99,7 +99,7 @@ function categorySections(now,before,products){
   sections.push('## '+title+' — URL bazlı GSC incelemesi',
    'Kayıtlı URL sayısı: '+countBefore+' → '+countNow+' (dizindeki toplam URL sayısı değildir).',
    'Kayıtlı sayfa kırılımı: '+labeledMetric(totalBefore)+' → '+labeledMetric(totalNow)+'. Resmî mülk toplamından ayrı tutulur.',
-   'Mobil / masaüstü / tablet URL kırılımı:\\n'+(deviceLines.length?deviceLines.join('\\n'):'GSC satırı bulunmuyor.'),
+   'Mobil / masaüstü / tablet URL kırılımı:\n'+(deviceLines.length?deviceLines.join('\n'):'GSC satırı bulunmuyor.'),
    'Tıklama kaybeden URL’ler: '+list(worst),
    'Tıklama kazanan URL’ler: '+list(best),
    'Görünür kayıp sorgular: '+list(queryLoss),
