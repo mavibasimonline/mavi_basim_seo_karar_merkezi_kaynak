@@ -2,6 +2,7 @@
 const el=(tag,text='',className='')=>{const n=document.createElement(tag);if(text)n.textContent=text;if(className)n.className=className;return n;};
 const dateMonth=m=>'01.'+m.slice(5)+'.'+m.slice(0,4);
 const nextMonth=m=>{const d=new Date(m+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);return d.toISOString().slice(0,7);};
+const previousMonth=m=>{const d=new Date(m+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()-1);return d.toISOString().slice(0,7);};
 const pageName=u=>{try{const path=new URL(u).pathname;return path==='/'?'Ana Sayfa':decodeURIComponent(path.slice(1)).replaceAll('-',' ').replace(/\b\p{L}/gu,s=>s.toLocaleUpperCase('tr-TR'));}catch{return u;}};
 const metric=rows=>{if(!rows?.length)return null;const clicks=rows.reduce((n,r)=>n+Number(r.clicks||0),0),impressions=rows.reduce((n,r)=>n+Number(r.impressions||0),0);return {clicks,impressions,ctr:impressions?100*clicks/impressions:null,position:impressions?rows.reduce((n,r)=>n+Number(r.position||0)*Number(r.impressions||0),0)/impressions:null};};
 const nfmt=v=>Number(v).toLocaleString('tr-TR',{maximumFractionDigits:2});
@@ -93,7 +94,7 @@ export function createTayfunWorkspace({api,scope,notify}){
    return detail.fields||null;
   }catch(err){area.replaceChildren(el('p','Arşiv kanıtı getirilemedi: '+err.message));return null;}
  }
- function pageDetail(month,item,record,raw,s,refresh,history=[]){
+ function pageDetail(month,item,record,raw,previousRaw,s,refresh,history=[]){
   const box=el('div','','tayfun-detail');
   const seoArea=el('section','','tayfun-proof'),recordArea=el('section','','tayfun-versions');
   box.append(seoArea,recordArea);
@@ -118,8 +119,12 @@ export function createTayfunWorkspace({api,scope,notify}){
    passive.type='button';passive.onclick=()=>{box.querySelector('.tayfun-form')?.remove();const form=formFor(month,item.url,record,scanned,refresh);form.querySelector('[name=status]').value='pasif';box.append(form);};
    recordArea.append(passive);
   }
-  const rowsCurrent=currentMetrics(month,item.url,s.device,raw),previous=record?.month?null:null;
+  const rowsCurrent=currentMetrics(month,item.url,s.device,raw),rowsPrevious=currentMetrics(previousMonth(month),item.url,s.device,previousRaw);
   if(rowsCurrent)recordArea.append(el('p','Aylık GSC: '+nfmt(rowsCurrent.clicks)+' tıklama · '+nfmt(rowsCurrent.impressions)+' gösterim · '+nfmt(rowsCurrent.position)+' sıra. Bu değer SEO değişiminin nedeni değildir.','source-note'));
+  if(rowsCurrent&&rowsPrevious&&raw?.days_verified===raw?.expected_days&&previousRaw?.days_verified===previousRaw?.expected_days){
+   const delta=rowsCurrent.clicks-rowsPrevious.clicks;
+   recordArea.append(el('p',previousMonth(month)+' → '+month+' · Aynı URL ve cihaz için '+nfmt(rowsPrevious.clicks)+' → '+nfmt(rowsCurrent.clicks)+' GSC tıklama ('+(delta>0?'+':'')+nfmt(delta)+'). Trafik korelasyonu, SEO sürümünün etkisini kanıtlamaz.','source-note'));
+  }else recordArea.append(el('p','İki tam ve karşılaştırılabilir aylık GSC sayfa kırılımı yok. Kısmi ayı tam ayla kıyaslayıp başarı kararı verilmez.','source-note'));
   return box;
  }
  async function render(){
@@ -160,13 +165,21 @@ export function createTayfunWorkspace({api,scope,notify}){
      for(const [label,value] of [['Tıklama',aggregate?nfmt(aggregate.clicks):'Veri yok'],['Gösterim',aggregate?nfmt(aggregate.impressions):'Veri yok'],['CTR',aggregate?nfmt(aggregate.ctr)+'%':'—'],['Ortalama konum',aggregate?nfmt(aggregate.position):'—']]){
       const card=el('div','','tayfun-kpi');card.append(el('small',label),el('strong',value));cards.append(card);
      }section.append(cards);
+     const rawBefore=period===month?(s.current?.find(r=>r.month===previousMonth(month))||s.previous?.month===previousMonth(month)&&s.previous||null):rawFirst;
+     visible.sort((a,b)=>(currentMetrics(period,b.url,s.device,raw)?.clicks||0)-(currentMetrics(period,a.url,s.device,raw)?.clicks||0));
+     const columnHeading=el('div','','tayfun-table-header');
+     for(const label of ['Ürün / Sayfa','Tıklama','Gösterim','CTR','Ort. sıra','Durum'])columnHeading.append(el('span',label));
+     section.append(columnHeading);
      for(const p of visible){
       const line=el('details','','tayfun-page'),head=el('summary','','tayfun-page-summary');
       const result=currentMetrics(period,p.url,s.device,raw);
       const relevantEntries=period===month?ledger.entries:[...first.value.entries,...ledger.entries];
       const previousVersion=recordFor(relevantEntries,p.url);
-      head.append(el('strong',p.product),el('span',p.url,'tayfun-url'),el('small',p.category+' · '+(result?nfmt(result.clicks)+' tık / '+nfmt(result.impressions)+' gösterim':'GSC kayıt yok; 0 varsayma')+' · '+(previousVersion?previousVersion.status+' sürüm':'SEO sürümü bekleniyor')));
-      line.append(head);line.addEventListener('toggle',()=>{if(line.open&&!line.querySelector('.tayfun-detail'))line.append(pageDetail(period,p,previousVersion,raw,s,()=>render(),relevantEntries));});
+      const name=el('div','','tayfun-name');name.append(el('strong',p.product),el('small',p.url,'tayfun-url'));
+      const complete=raw?.days_verified===raw?.expected_days;
+      const label=previousVersion?(previousVersion.status==='aktif'?'Aktif takip':'Pasif'):'SEO kaydı yok';
+      head.append(name,el('span',result?nfmt(result.clicks):'—'),el('span',result?nfmt(result.impressions):'—'),el('span',result?nfmt(result.ctr)+'%':'—'),el('span',result?nfmt(result.position):'—'),el('small',label+(complete?'':' · kısmi dönem')));
+      line.append(head);line.addEventListener('toggle',()=>{if(line.open&&!line.querySelector('.tayfun-detail'))line.append(pageDetail(period,p,previousVersion,raw,rawBefore,s,()=>render(),relevantEntries));});
       section.append(line);
      }
      if(!visible.length)section.append(el('p','Bu aramada eşleşen URL yok.'));
