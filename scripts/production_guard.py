@@ -30,7 +30,7 @@ def verify_schema(client,config,migrations_dir=None):
  if len(names)!=len(set(names)) or names!=expected:raise ValueError('EXISTING_SCHEMA_MISMATCH')
  return {'verified':True,'migrations':names,'database_queries':1,'rows_returned':len(rows),'rows_read':result.get('rows_read'),'schema_changes':False,'migration_application_started':False}
 
-def preflight(client,config,expected):
+def preflight(client,config,expected,allow_held_cron=False):
  errors=config_errors(config)
  if errors:raise ValueError('PRODUCTION_CONFIG_REJECTED')
  if datetime.now(timezone.utc)<NOT_BEFORE:raise ValueError('D1_QUOTA_RESET_REQUIRED')
@@ -59,7 +59,7 @@ def preflight(client,config,expected):
   if plain.get(name,'')!=config['vars'].get(name,''):raise ValueError('RUNTIME_CONFIG_DRIFT')
  rows=schedules['result'].get('schedules',[]) if isinstance(schedules['result'],dict) else schedules['result']
  crons=[r['cron'] for r in rows]
- if crons not in (['*/15 * * * *'],['* * * * *']):raise ValueError('UNEXPECTED_CURRENT_CRON')
+ if crons not in (['*/15 * * * *'],['* * * * *']) and not (allow_held_cron and crons==[]):raise ValueError('UNEXPECTED_CURRENT_CRON')
  if config['vars'].get('CATCHUP_ENABLED')=='true':
   day=datetime.now(timezone.utc).date().isoformat();budget=int(config['vars']['SYNC_INITIAL_WRITE_LIMIT'] if day==config['vars']['SYNC_INITIAL_BUDGET_DAY'] else config['vars']['SYNC_DAILY_WRITE_LIMIT'])
   if not usage['ok'] or usage.get('hours',0)==0:raise ValueError('D1_QUOTA_READ_REQUIRED')
@@ -75,12 +75,26 @@ def preflight(client,config,expected):
   projected=max(usage['rows_written'],spent)+remaining
   if projected+20_000>90_000 or usage['rows_read']>3_500_000:raise ValueError('D1_DAILY_BUDGET_UNAVAILABLE')
   usage={**usage,'sync_daily_limit':budget,'sync_reserved_writes':spent,'sync_remaining_allowance':remaining,'projected_writes':projected,'migration_write_reserve':20000,'total_projected_writes':projected+20000}
- return {'worker':'mavi-basim-seo-prod','previous_version':expected,'previous_crons':crons,'binding_names':sorted(names),'source_counts':source['rows'][0],'schema_changes':False,'secret_changes':False,'daily_d1_usage':usage}
+ return {'worker':'mavi-basim-seo-prod','previous_version':expected,'previous_crons':crons,'cron_held':crons==[],'binding_names':sorted(names),'source_counts':source['rows'][0],'schema_changes':False,'secret_changes':False,'daily_d1_usage':usage}
 
 def restore_cron(client,saved):
  if saved.get('worker')!='mavi-basim-seo-prod' or saved.get('previous_crons') not in (['*/15 * * * *'],['* * * * *']):raise ValueError('INVALID_ROLLBACK_RECORD')
  result=client.request('PUT',f'/accounts/{client.account}/workers/scripts/mavi-basim-seo-prod/schedules',[{'cron':c} for c in saved['previous_crons']])
  if not result['ok']:raise ValueError('CRON_ROLLBACK_FAILED')
+
+def resume_verified_cron(client,saved):
+ # Resuming a held schedule is permitted only after exact-version HTTP smoke,
+ # intact D1/auth/service bindings, and account-wide free quota verification.
+ if saved.get('worker')!='mavi-basim-seo-prod' or saved.get('previous_crons')!=[] or saved.get('cron_held') is not True:
+  raise ValueError('INVALID_CRON_RECOVERY_RECORD')
+ path=f'/accounts/{client.account}/workers/scripts/mavi-basim-seo-prod/schedules'
+ target=[{'cron':'*/15 * * * *'}]
+ result=client.request('PUT',path,target)
+ if not result.get('ok'):raise ValueError('CRON_RESUME_FAILED')
+ verified=client.request('GET',path)
+ if not verified.get('ok'):raise ValueError('CRON_RESUME_FAILED')
+ rows=verified['result'].get('schedules',[]) if isinstance(verified['result'],dict) else verified['result']
+ if [r.get('cron') for r in rows]!=['*/15 * * * *']:raise ValueError('CRON_RESUME_FAILED')
 
 def pause_cron(client):
  path=f'/accounts/{client.account}/workers/scripts/mavi-basim-seo-prod/schedules'
@@ -128,11 +142,13 @@ def converged_smoke(client,commit,previous,opener=None,wait=time.sleep):
 def postflight(client,config,saved,commit,opener=None):
  deployment=converged_smoke(client,commit,saved.get('previous_version'),opener)
  # HTTP identity must match the actual 100% Worker deployment and preserved D1/auth bindings.
- verified=preflight(client,config,deployment.get('version_id'))
+ verified=preflight(client,config,deployment.get('version_id'),allow_held_cron=True)
  settings=client.request('GET',f'/accounts/{client.account}/workers/scripts/mavi-basim-seo-prod/settings')
  plain={b['name']:b.get('text','') for b in settings.get('result',{}).get('bindings',[]) if b.get('type')=='plain_text'}
  if plain.get('D1_READ_GUARD_ENABLED')!='true' or plain.get('SYNC_MAX_PAGES_PER_TICK')!='1':raise ValueError('D1_READ_GUARD_NOT_ACTIVE')
  if not set(saved['binding_names']).issubset(verified['binding_names']):raise ValueError('EXISTING_BINDING_REMOVED')
+ if saved.get('cron_held') is True:
+  resume_verified_cron(client,saved)
  return {'deployment':deployment,'source_counts':verified['source_counts'],'existing_bindings_preserved':True}
 
 if __name__=='__main__':
@@ -141,7 +157,7 @@ if __name__=='__main__':
   client=Cloudflare(os.environ.get('CLOUDFLARE_API_TOKEN'),os.environ.get('CLOUDFLARE_ACCOUNT_ID'))
   mode=sys.argv[1];path=Path('.local/production-before.json');path.parent.mkdir(exist_ok=True)
   if mode=='preflight':
-   result=preflight(client,json.loads(CONFIG.read_text()),os.environ.get('EXPECTED_PREVIOUS_VERSION'));path.write_text(json.dumps(result,indent=2));print(json.dumps(result))
+   result=preflight(client,json.loads(CONFIG.read_text()),os.environ.get('EXPECTED_PREVIOUS_VERSION'),allow_held_cron=True);path.write_text(json.dumps(result,indent=2));print(json.dumps(result))
    if os.environ.get('GITHUB_OUTPUT'):
     with open(os.environ['GITHUB_OUTPUT'],'a') as out:out.write('previous_version='+result['previous_version']+'\n')
   elif mode=='verify-schema':
