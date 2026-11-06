@@ -24,3 +24,11 @@
 .tayfun-field textarea{min-height:75px}
 .tayfun-form>.button{justify-self:start}
 @media(max-width:750px){.tayfun-page-summary{grid-template-columns:1fr;gap:4px}.tayfun-month{padding:12px}.tayfun-detail{padding:9px}}
+
+.tayfun-tabs{display:flex;gap:10px;flex-wrap:wrap}
+.tayfun-tabs button[aria-pressed="true"]{background:#2563eb;color:#fff;border-color:#2563eb}
+.tayfun-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0 18px}
+.tayfun-kpi{border:1px solid #cbd5e1;background:#f8fafc;border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:7px}
+.tayfun-kpi small{font-size:.76rem;color:#64748b}
+.tayfun-kpi strong{font-size:1.2rem;word-break:break-word}
+@media(max-width:640px){.tayfun-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
