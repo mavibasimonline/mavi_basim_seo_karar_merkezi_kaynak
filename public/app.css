@@ -3364,3 +3364,23 @@ dialog::backdrop {
 :root{--mb-button-blue:#2563eb;--mb-button-blue-hover:#1d4ed8;--mb-button-border:#dbe4f1;--mb-button-ink:#425673}#app button:not(.icon-button):not(.text-button),#loginScreen button:not(.icon-button):not(.text-button){border-radius:8px;transition:background-color .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease}#app .button.primary,#loginScreen .button.primary{background:var(--mb-button-blue);border-color:var(--mb-button-blue);color:#fff;box-shadow:0 2px 5px #2563eb17}#app .button.primary:hover:not(:disabled),#loginScreen .button.primary:hover:not(:disabled){background:var(--mb-button-blue-hover);border-color:var(--mb-button-blue-hover)}#app .button.secondary,#loginScreen .button.secondary{background:#f8fafc;border-color:var(--mb-button-border);color:var(--mb-button-ink);box-shadow:none}#app .button.secondary:hover:not(:disabled),#loginScreen .button.secondary:hover:not(:disabled){background:#eef2f8;border-color:#c9d6e8;color:#254575}#app .segmented button[aria-pressed="true"],#app .quick-sort button[aria-pressed="true"]{background:#2563eb;color:#fff;border-color:#2563eb;box-shadow:0 1px 4px #2563eb16}#app button:focus-visible,#loginScreen button:focus-visible{outline:2px solid #80acff;outline-offset:2px}#app button:disabled,#loginScreen button:disabled{cursor:not-allowed}@media(prefers-reduced-motion:reduce){#app button,#loginScreen button{transition:none!important}}#app .month-strip button[aria-pressed="true"],#app .month-strip button[aria-pressed="true"]:hover,#app .month-strip button[aria-pressed="true"]:focus,#app .month-strip button[aria-pressed="true"]:focus-visible,#app .month-strip button[aria-pressed="true"]:active{color:#fff;background:#275ce7;border-color:#275ce7;opacity:1;font-weight:700}#app .month-strip button[aria-pressed="true"]:hover{background:#214cb9}#app .month-strip button:not([aria-pressed="true"]):not(:disabled){background:#f8fafc;color:#40516d;border-color:#d9e0ea}#app .month-strip button:not([aria-pressed="true"]):not(:disabled):hover{background:#edf2ff;color:#40516d}#app .month-strip button:disabled{background:#f1f4f8;color:#758196;border-color:#e0e5ed;opacity:1}
 
 #app .month-strip button{transition:none!important}
+
+
+/* Unified Tayfun-style controls and horizontal SEO product navigation. */
+#app button:not(.icon-button):not(.text-button),#app .button,#loginScreen button:not(.icon-button){border-radius:9px}
+#app button[aria-pressed="true"]:not(.icon-button):not(.text-button){background:#245cf4;color:#fff;border-color:#245cf4}
+#app button[aria-pressed="false"]:not(.icon-button):not(.text-button):not(.primary){background:#f4f6fa;color:#3c506d;border-color:#e7edf5}
+#seoWorkApp .seo-work-toolbar{display:flex;align-items:center;gap:10px;min-width:0;padding:4px 0 14px}
+#seoWorkApp .seo-work-search{display:block;flex:0 0 205px;margin:0}
+#seoWorkApp .seo-work-search input{height:33px;width:100%;min-width:0;border:1px solid #dbe4ef;border-radius:11px;background:#f8fafc;padding:0 12px;color:#334155;font-size:12px}
+#seoWorkApp .seo-work-tabs{display:flex;flex:1;align-items:center;gap:6px;min-width:0;overflow-x:auto;padding:3px 2px 8px;scrollbar-width:thin;white-space:nowrap}
+#seoWorkApp .seo-work-pill,#seoWorkApp .seo-work-product{border:1px solid #e8edf5;background:#f3f5f9;color:#334766;border-radius:9px;padding:8px 12px;white-space:nowrap;font:inherit;font-size:12px;cursor:pointer}
+#seoWorkApp .seo-work-pill[aria-pressed="true"],#seoWorkApp .seo-work-product[aria-pressed="true"]{background:#2058f5;color:#fff;border-color:#2058f5}
+#seoWorkApp .seo-work-products{padding:6px 0}
+#seoWorkApp .seo-work-group{padding:12px 0;border-bottom:1px solid #edf1f5}
+#seoWorkApp .seo-work-group h3{margin:0 0 10px;font-size:15px;color:#26364e}
+#seoWorkApp .seo-work-items{display:flex;flex-wrap:wrap;gap:8px}
+#seoWorkApp .seo-work-detail{margin-top:16px;padding:16px;border:1px solid #e3eaf4;border-radius:12px;background:#f8fafc}
+#seoWorkApp .seo-work-detail h3{margin:0 0 7px}
+#seoWorkApp .seo-work-link{display:inline-flex;margin-top:10px;text-decoration:none}
+@media(max-width:740px){#seoWorkApp .seo-work-toolbar{align-items:stretch;flex-direction:column}#seoWorkApp .seo-work-search{flex:auto;width:100%}}
