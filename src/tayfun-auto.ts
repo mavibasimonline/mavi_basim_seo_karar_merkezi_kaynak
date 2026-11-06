@@ -70,19 +70,23 @@ export async function tayfunAutoTick(storage:Storage,secret:string,fetcher:typeo
   const html=await boundedText(response,MAX_HTML);
   const seo=await parseHTML(html,url,200,response.headers);
   // Extra head tags that the site's existing crawl parser did not extract.
-  const social:Record<string,string>={},twitter:Record<string,string>={},meta:Record<string,string>={};
+  const social:Record<string,string>={},twitter:Record<string,string>={},meta:Record<string,string>={},all_meta:Record<string,string>={};
   await new HTMLRewriter().on('meta',{element(e){
    const key=e.getAttribute('property')||e.getAttribute('name')||'',value=e.getAttribute('content')||'';
+   if(key&&Object.keys(all_meta).length<120)all_meta[key.slice(0,100)]=value.slice(0,2000);
    if(key.startsWith('og:')&&Object.keys(social).length<40)social[key]=value.slice(0,2000);
    else if(key.startsWith('twitter:')&&Object.keys(twitter).length<40)twitter[key]=value.slice(0,2000);
    else if(['keywords','author','googlebot','theme-color'].includes(key.toLowerCase()))meta[key.toLowerCase()]=value.slice(0,2000);
   }}).transform(new Response(html)).text();
-  const details={...seo,open_graph:social,twitter_card:twitter,other_meta:meta};
+  const details={...seo,open_graph:social,twitter_card:twitter,other_meta:meta,all_meta,
+   response_headers:{content_language:response.headers.get('content-language'),last_modified:response.headers.get('last-modified'),etag:response.headers.get('etag'),link:response.headers.get('link')?.slice(0,2000)||null}};
   const hash=await sha(JSON.stringify(details)),urlHash=await idFor(url);
   const before=await storage.get<{id:string;hash:string}>(LATEST+urlHash);
   const monthState=await monthIndex(storage,month);
-  const already=monthState.observations.some(r=>r.url===url&&r.hash===hash);
-  if(already||(before?.hash===hash&&monthState.observations.some(r=>r.url===url))){
+  // A→B→A is three genuine versions: compare to the latest observed state,
+  // not to any earlier hash in the month.
+  const latestInMonth=[...monthState.observations].reverse().find(r=>r.url===url);
+  if(latestInMonth?.hash===hash){
    await advance(null);return {status:'unchanged',month,url,observed_at:now.toISOString(),stored:false,site_writes:0,d1_requests:0};
   }
   if(monthState.observations.length>=MAX_PER_MONTH){await advance('TAYFUN_MONTH_ARCHIVE_LIMIT');return {status:'held',code:'TAYFUN_MONTH_ARCHIVE_LIMIT',month,site_writes:0,d1_requests:0};}
