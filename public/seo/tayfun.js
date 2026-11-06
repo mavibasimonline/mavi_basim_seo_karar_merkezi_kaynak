@@ -1,3 +1,4 @@
+import {renderSeoJobs} from './tayfun-ai.js';
 // Tayfun monthly SEO evidence notebook: the source site and historical records are never changed.
 const el=(tag,text='',className='')=>{const n=document.createElement(tag);if(text)n.textContent=text;if(className)n.className=className;return n;};
 const dateMonth=m=>'01.'+m.slice(5)+'.'+m.slice(0,4);
@@ -179,9 +180,9 @@ export function createTayfunWorkspace({api,scope,notify}){
    const search=el('input');search.type='search';search.placeholder='Sayfa URL, ürün veya kategori ara…';search.value=filter;
    const filterWrap=el('div','','tayfun-search');filterWrap.append(search,el('span','Kayıtlı sayfalar · '+pages.length+' gözlenen URL; tüm sitemap sayfalarının eksiksiz listesi olduğu garanti edilmez.','source-note'));root.append(filterWrap);
    const tabs=el('div','','tayfun-tabs');
-   const groups=el('button','Ürün Grupları','button secondary'),unmapped=el('button','Eşleşmemiş Sayfalar','button secondary');
-   groups.type='button';unmapped.type='button';groups.onclick=()=>{mode='groups';paint();};unmapped.onclick=()=>{mode='unmapped';paint();};
-   tabs.append(groups,unmapped);root.append(tabs);
+   const groups=el('button','Ürün Grupları','button secondary'),unmapped=el('button','Eşleşmemiş Sayfalar','button secondary'),seoJobs=el('button','SEO İşleri','button secondary');
+   groups.type='button';unmapped.type='button';seoJobs.type='button';groups.onclick=()=>{mode='groups';paint();};unmapped.onclick=()=>{mode='unmapped';paint();};seoJobs.onclick=()=>{mode='jobs';paint();};
+   tabs.append(groups,unmapped,seoJobs);root.append(tabs);
    const place=el('div','','tayfun-months');root.append(place);
    root.append(el('p',sitemap?.urls?.length?'Site haritasından '+sitemap.urls.length+' URL eklendi. Kaynak: '+sitemap.source+(sitemap.stale?' · Son kayıt; anlık doğrulanmadı':''): 'Site haritası doğrulanamadı; ürün, GSC ve tarama kayıtlarından görünen URL’ler listeleniyor.','source-note'));
    const rawFirst=s.current?.find(r=>r.month===month)||s.previous?.month===month&&s.previous||null;
@@ -194,7 +195,14 @@ export function createTayfunWorkspace({api,scope,notify}){
    }
    function paint(){
     place.replaceChildren();
-    groups.setAttribute('aria-pressed',String(mode==='groups'));unmapped.setAttribute('aria-pressed',String(mode==='unmapped'));
+    groups.setAttribute('aria-pressed',String(mode==='groups'));unmapped.setAttribute('aria-pressed',String(mode==='unmapped'));seoJobs.setAttribute('aria-pressed',String(mode==='jobs'));
+    filterWrap.hidden=mode==='jobs';
+    if(mode==='jobs'){
+     const priorRaw=s.current?.find(r=>r.month===previousMonth(month))||s.previous?.month===previousMonth(month)&&s.previous||null;
+     renderSeoJobs(place,{products:s.catalog?.products||[],month,device:s.device,current:rawFirst,previous:priorRaw,
+      auto:autoFirst.status==='fulfilled'?autoFirst.value:null,api,notify,onSaved:()=>cache.delete(new Date().toISOString().slice(0,7))});
+     return;
+    }
     for(const [period,ledger,raw,auto] of months){
      const section=el('section','','panel tayfun-month');section.append(el('h3',dateMonth(period)+' · SEO kayıt paneli'));
      const visible=pages.filter(p=>(mode==='groups'?p.category!=='Eşleşmemiş sayfalar':p.category==='Eşleşmemiş sayfalar')&&(p.url+' '+p.product+' '+p.category).toLocaleLowerCase('tr-TR').includes(filter.toLocaleLowerCase('tr-TR')));
