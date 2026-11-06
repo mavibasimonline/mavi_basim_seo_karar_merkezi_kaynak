@@ -156,7 +156,7 @@ test("responsive month toolbar preserves equal-width months and visible fixed co
     }
   }
 });
-test("all seven workspaces start with data, filters or the question field; actions follow the workspace and details stay accessible", async ({
+test("core navigation workspaces remain accessible after redundant menu cleanup", async ({
   page,
 }) => {
   await login(page);
@@ -171,10 +171,8 @@ test("all seven workspaces start with data, filters or the question field; actio
     ["Genel Bakış", "overview", "#kpis"],
     ["Ürün Performansı", "products", "#productSearch"],
     ["Arama Sorguları", "queries", "#querySearch"],
-    ["SEO Fırsat Radarı", "radar", "#radarResults"],
     ["Değişiklik Takvimi", "changes", "#changeDay"],
     ["Veri Sağlığı", "health", "#dataAuditResults"],
-    ["SEO Soru-Cevap", "questions", "#questionText"],
   ]) {
     await view(page, name);
     await expect(page.locator(target)).toBeVisible();
@@ -366,7 +364,8 @@ test("3, 6, 12 month modes and device load matching real APIs and survive tabs a
   await expect(page.locator("#chartPeriod")).toContainText("Masaüstü");
   await view(page, "Arama Sorguları");
   await expect(page.locator("#queryNote")).toContainText("01 Kas 2025");
-  await view(page, "SEO Fırsat Radarı");
+  await expect(page.getByRole("navigation", {name:"Ana menü"}).getByRole("link",{name:"SEO Fırsat Radarı"})).toHaveCount(0);
+  await page.evaluate(() => {location.hash="#radar";});
   await expect(page.locator("#radarResults")).toContainText("2025-11-01");
   await page.reload();
   await expect(page.locator("#view-radar")).toBeVisible();

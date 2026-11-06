@@ -73,7 +73,8 @@ test("real APIs preserve secure login, sources, evidence, questions and empty da
   await expect(page.locator("#productDialog")).not.toBeVisible();
   await page.getByLabel("Ürün veya URL ara").fill("");
   await expect(page.locator(".product")).toHaveCount(29);
-  await navigate(page, "SEO Fırsat Radarı");
+  await expect(page.getByRole("navigation", {name:"Ana menü"}).getByRole("link",{name:"SEO Fırsat Radarı"})).toHaveCount(0);
+  await page.evaluate(() => {location.hash="#radar";});
   await expect(page.locator("#radarResults")).toContainText(
     "Veri yetersizliği nedeniyle izlenenler",
   );
@@ -103,7 +104,8 @@ test("real APIs preserve secure login, sources, evidence, questions and empty da
     "Bu kapsamda doğrulanmış sorgu yok",
   );
   await expect(page.locator("#queryNote")).toContainText("Anonimleştirilmiş");
-  await navigate(page, "SEO Soru-Cevap");
+  await expect(page.getByRole("navigation", {name:"Ana menü"}).getByRole("link",{name:"SEO Soru-Cevap"})).toHaveCount(0);
+  await page.evaluate(() => {location.hash="#questions";});
   await page
     .getByPlaceholder("Broşür mobilde neden düştü?")
     .fill("Broşür mobilde neden düştü?");
@@ -268,10 +270,8 @@ test("keyboard navigation, responsive collapse and WCAG checks cover all real se
   for (const name of [
     "Ürün Performansı",
     "Arama Sorguları",
-    "SEO Fırsat Radarı",
     "Değişiklik Takvimi",
     "Veri Sağlığı",
-    "SEO Soru-Cevap",
   ]) {
     await navigate(page, name);
     await expect(page.locator("#mainContent")).toBeFocused();
