@@ -1,4 +1,3 @@
-// SEO İşleri: ürün filtreleme arayüzü. Mevcut kanıt geçmişini değiştirmez.
 const groups = [
   {name:"Broşürler ve El İlanları",products:["Broşür","El İlanı","Afiş"]},
   {name:"Reklam Ürünleri",products:["Magnet","Kitap Ayracı","Yağ Kartı","Etiket","Amerikan Servis","Oto Paspas","Kutu","Ambalaj"]},
@@ -33,12 +32,12 @@ if(root){
       matches.forEach(p=>{const b=document.createElement("button");b.type="button";b.className="seo-work-product";b.textContent=p;b.setAttribute("aria-pressed",String(product===p));b.addEventListener("click",()=>{product=p;render();});chips.append(b);});
       section.append(chips);items.append(section);
     }
-    if(!count){const p=document.createElement("p");p.textContent="Aramayla eşleşen ürün bulunamadı.";items.append(p);}
+    if(!count){const p=document.createElement("p");p.textContent="Ürün bulunamadı.";items.append(p);}
     detail.replaceChildren();
     if(product){
-      const h=document.createElement("h3");h.textContent=product+" · SEO çalışması";
-      const p=document.createElement("p");p.textContent="Bu seçim yalnız görüntüleme amaçlıdır; önceki SEO kayıtları ve tarihleri değiştirilmez. Kanıtlı SEO geçmişini Tayfun bölümünden inceleyin.";
-      const a=document.createElement("a");a.href="#tayfun";a.className="button secondary seo-work-link";a.textContent="Tayfun kayıtlarına git";a.addEventListener("click",()=>document.querySelector('[data-view="tayfun"]')?.click());
+      const h=document.createElement("h3");h.textContent=product+" · SEO";
+      const p=document.createElement("p");p.textContent="Bu seçim kayıtları değiştirmez. SEO geçmişini Tayfun bölümünde inceleyin.";
+      const a=document.createElement("a");a.href="#tayfun";a.className="button secondary seo-work-link";a.textContent="Tayfun'a git";a.addEventListener("click",()=>document.querySelector('[data-view="tayfun"]')?.click());
       detail.append(h,p,a);detail.hidden=false;
     }else detail.hidden=true;
   }
