@@ -6,6 +6,7 @@ import {comparisonDecision} from '../independent-gsc-analysis';
 
 const label=m=>new Date(m+'-01T00:00:00Z').toLocaleDateString('tr-TR',{month:'long',year:'numeric',timeZone:'UTC'});
 const prior=(m,n=1)=>{const d=new Date(m+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()-n);return d.toISOString().slice(0,7);};
+const nextMonth=m=>{const d=new Date(m+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);return d.toISOString().slice(0,7);};
 const closedMonth=()=>{const d=new Date(Date.now()-3*86400000);d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-1);return d.toISOString().slice(0,7);};
 const stamp=s=>s?new Date(s).toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'}):'Doğrulanmadı';
 function sum(rows,zero=false){
@@ -191,7 +192,9 @@ export function createIndependentPanel({api,notify}){
   const button=$('chatgptHandoff');button.disabled=true;
   try{
    const {buildChatGptHandoff}=await import('./chatgpt-handoff.js');
-   const text=buildChatGptHandoff({month:target(),device:device(),current,previous,ga4,oldGa4,catalog,changes,status,ga4Status});
+   const months=[prior(target()),target(),nextMonth(target())],records=await Promise.allSettled(months.map(month=>api('/api/independent/tayfun?month='+month)));
+   const tayfunLedger={available:records.every(r=>r.status==='fulfilled'),months:records.flatMap((r,i)=>r.status==='fulfilled'?[{month:months[i],entries:r.value.entries||[],updated_at:r.value.updated_at}]:[]),missing_months:records.flatMap((r,i)=>r.status==='rejected'?[months[i]]:[]),limitations:['Manuel SEO kaydı yayına alındığını kanıtlamaz; yayın ve Google tarama tarihleri bağımsız doğrulanır.','İlk taramadan önceki gerçek SEO tarihi bilinmiyor.']};
+   const text=buildChatGptHandoff({month:target(),device:device(),current,previous,ga4,oldGa4,catalog,changes,status,ga4Status,tayfunLedger});
    const url=URL.createObjectURL(new Blob(['\ufeff'+text],{type:'text/markdown;charset=utf-8'})),a=node('a');
    a.href=url;a.download='Mavi_Basim_ChatGPT_SEO_Devir_'+target()+'_'+device()+'.md';a.click();
    setTimeout(()=>URL.revokeObjectURL(url),1000);
