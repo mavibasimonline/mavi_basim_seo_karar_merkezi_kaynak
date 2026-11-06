@@ -258,7 +258,7 @@ small {
 .text-button:hover {
   text-decoration: underline;
 }
-/* Shared workspace shell */
+
 .app-shell {
   min-height: 100vh;
 }
@@ -685,7 +685,7 @@ small {
   width: 5px;
   height: 5px;
 }
-/* Analytics and evidence */
+
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1106,7 +1106,7 @@ small {
   color: var(--muted);
   margin-top: 4px;
 }
-/* Tables */
+
 .table-toolbar {
   display: flex;
   gap: 10px;
@@ -1372,7 +1372,7 @@ td.numeric {
 .mobile-cell-label {
   display: none;
 }
-/* Existing evidence, radar, calendar and audit modules */
+
 .module-results {
   min-width: 0;
   color: #61728a;
@@ -1693,7 +1693,7 @@ dialog::backdrop {
     transform: rotate(360deg);
   }
 }
-/* Authentication */
+
 .login-screen {
   min-height: 100dvh;
   background:
@@ -2427,7 +2427,7 @@ dialog::backdrop {
   background: #fff;
   max-height: 180px;
 }
-/* Product controls and progressive disclosure share the visual system. */
+
 .quick-sort button {
   font: inherit;
   font-size: 12px;
@@ -2668,7 +2668,7 @@ dialog::backdrop {
     font-size: 10px;
   }
 }
-/* Keep fixed controls visible; only the months scroll when space narrows. */
+
 .topbar {
   display: flex;
   flex-wrap: nowrap;
@@ -2773,7 +2773,7 @@ dialog::backdrop {
   border-color: #e0e5ed;
   opacity: 1;
 }
-/* Explicit button specificity outranks the normal hover/not-disabled rule. */
+
 .month-strip button[aria-pressed="true"],
 .month-strip button[aria-pressed="true"]:hover,
 .month-strip button[aria-pressed="true"]:focus,
@@ -3127,7 +3127,7 @@ dialog::backdrop {
     flex-basis: 24px;
   }
 }
-/* Product density is scoped: query/evidence tables keep their own layout. */
+
 .product-controls {
   display: flex;
   align-items: flex-start;
@@ -3330,10 +3330,10 @@ dialog::backdrop {
   }
 }
 
-/* Accessible link to the D1-independent verified evidence screen. */
+
 .sidebar-bottom .independent-seo-link{display:block;margin-bottom:12px;padding:10px 12px;border:1px solid #6881a8;border-radius:9px;background:#203858;color:#f4f8ff;text-decoration:none;font-size:14px;font-weight:700;line-height:1.4}
 .sidebar-bottom .independent-seo-link:hover,.sidebar-bottom .independent-seo-link:focus-visible{color:#ffffff;background:#355783;outline-offset:2px}
-/* Independent evidence uses the original dashboard palette and components. */
+
 #navigation .nav-label { white-space: normal; line-height: 1.35; }
 .leader-list { display: grid; gap: 10px; padding: 0 20px 20px; }
 .leader-item { padding: 12px; border: 1px solid var(--border); border-radius: 10px; display: grid; gap: 6px; }
@@ -3363,7 +3363,7 @@ dialog::backdrop {
 
 :root{--mb-button-blue:#2563eb;--mb-button-blue-hover:#1d4ed8;--mb-button-border:#dbe4f1;--mb-button-ink:#425673}#app button:not(.icon-button):not(.text-button),#loginScreen button:not(.icon-button):not(.text-button){border-radius:8px;transition:background-color .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease}#app .button.primary,#loginScreen .button.primary{background:var(--mb-button-blue);border-color:var(--mb-button-blue);color:#fff;box-shadow:0 2px 5px #2563eb17}#app .button.primary:hover:not(:disabled),#loginScreen .button.primary:hover:not(:disabled){background:var(--mb-button-blue-hover);border-color:var(--mb-button-blue-hover)}#app .button.secondary,#loginScreen .button.secondary{background:#f8fafc;border-color:var(--mb-button-border);color:var(--mb-button-ink);box-shadow:none}#app .button.secondary:hover:not(:disabled),#loginScreen .button.secondary:hover:not(:disabled){background:#eef2f8;border-color:#c9d6e8;color:#254575}#app .segmented button[aria-pressed="true"],#app .quick-sort button[aria-pressed="true"]{background:#2563eb;color:#fff;border-color:#2563eb;box-shadow:0 1px 4px #2563eb16}#app button:focus-visible,#loginScreen button:focus-visible{outline:2px solid #80acff;outline-offset:2px}#app button:disabled,#loginScreen button:disabled{cursor:not-allowed}@media(prefers-reduced-motion:reduce){#app button,#loginScreen button{transition:none!important}}#app .month-strip button[aria-pressed="true"],#app .month-strip button[aria-pressed="true"]:hover,#app .month-strip button[aria-pressed="true"]:focus,#app .month-strip button[aria-pressed="true"]:focus-visible,#app .month-strip button[aria-pressed="true"]:active{color:#fff;background:#275ce7;border-color:#275ce7;opacity:1;font-weight:700}#app .month-strip button[aria-pressed="true"]:hover{background:#214cb9}#app .month-strip button:not([aria-pressed="true"]):not(:disabled){background:#f8fafc;color:#40516d;border-color:#d9e0ea}#app .month-strip button:not([aria-pressed="true"]):not(:disabled):hover{background:#edf2ff;color:#40516d}#app .month-strip button:disabled{background:#f1f4f8;color:#758196;border-color:#e0e5ed;opacity:1}
 
-/* SEO İşleri */
+
 #seoWorkApp .seo-work-toolbar,#seoWorkApp .seo-work-tabs,#seoWorkApp .seo-work-items{display:flex;gap:8px}
 #seoWorkApp .seo-work-tabs{overflow-x:auto}
 #seoWorkApp .seo-work-items{flex-wrap:wrap}
