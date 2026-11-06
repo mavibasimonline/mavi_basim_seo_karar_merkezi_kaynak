@@ -13,18 +13,21 @@ import production_guard as guard
 VERSION='12345678-1234-1234-1234-123456789abc'
 class Fake:
  account='a'*32
- def __init__(self,config):self.config=config;self.changed=False;self.db_mismatch=False;self.calls=[]
+ def __init__(self,config):self.config=config;self.changed=False;self.db_mismatch=False;self.calls=[];self.crons=['*/15 * * * *']
  def query(self,database,sql):return {'ok':True,'rows':[{'products':29,'csv_files':521,'csv_rows':9075}]} if sql==guard.QUERIES['source_counts'] else {'ok':True,'rows':[]}
  def daily_usage(self):return {'ok':True,'hours':1,'rows_written':1000,'rows_read':1000}
  def request(self,method,path,body=None):
   self.calls.append((method,path,body))
+  if method=='PUT' and path.endswith('/schedules'):
+   self.crons=[r['cron'] for r in body];return {'ok':True,'result':[]}
   if method=='PUT':return {'ok':True,'result':[]}
   if path.endswith('/deployments'):return {'ok':True,'result':{'deployments':[{'created_on':'2026-10-24','versions':[{'version_id':VERSION if not self.changed else 'other','percentage':100}]}]}}
   if '/versions/' in path:return {'ok':True,'result':{'annotations':{'workers/tag':'c'*40}}}
-  if path.endswith('/schedules'):return {'ok':True,'result':{'schedules':[{'cron':'*/15 * * * *'}]}}
+  if path.endswith('/schedules'):return {'ok':True,'result':{'schedules':[{'cron':cron} for cron in self.crons]}}
   bindings=[{'name':name,'type':'plain_text','text':value} for name,value in self.config['vars'].items()]
   bindings += [{'name':name,'type':'secret_text'} for name in ('ADMIN_TOKEN','TOKEN_ENCRYPTION_KEY','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET')]
   bindings += [{'name':'DB','type':'d1','id':'other' if self.db_mismatch else self.config['d1_databases'][0]['database_id']}]
+  bindings += [{'name':'DRIVE_ARCHIVE_SERVICE','type':'service','service':'mavi-basim-drive-archive'}]
   return {'ok':True,'result':{'bindings':bindings}}
 class ProductionGuardTests(unittest.TestCase):
  def setUp(self):
@@ -35,6 +38,22 @@ class ProductionGuardTests(unittest.TestCase):
   self.config=json.loads((ROOT/'deploy/wrangler.production.jsonc').read_text());self.client=Fake(self.config)
  def test_preflight_is_read_only_and_records_a_usable_rollback(self):
   r=guard.preflight(self.client,self.config,VERSION);self.assertEqual(r['previous_version'],VERSION);self.assertEqual(r['previous_crons'],['*/15 * * * *']);self.assertFalse(r['schema_changes']);self.assertTrue(all(c[0]=='GET' for c in self.client.calls));self.assertNotIn('secret_value',json.dumps(r))
+ def test_production_config_cannot_omit_live_drive_binding(self):
+  self.assertEqual(self.config['services'],[{'binding':'DRIVE_ARCHIVE_SERVICE','service':'mavi-basim-drive-archive'}])
+  config={**self.config,'services':[]}
+  with self.assertRaisesRegex(ValueError,'PRODUCTION_CONFIG_REJECTED'):guard.preflight(self.client,config,VERSION)
+ def test_held_cron_can_resume_only_after_verified_postflight(self):
+  self.client.crons=[]
+  with self.assertRaisesRegex(ValueError,'UNEXPECTED_CURRENT_CRON'):guard.preflight(self.client,self.config,VERSION)
+  saved=guard.preflight(self.client,self.config,VERSION,allow_held_cron=True)
+  self.assertTrue(saved['cron_held'])
+  self.assertEqual(self.client.crons,[])
+  commit='c'*40
+  class Opener:
+   def open(self,req,timeout):return io.BytesIO(json.dumps({'deployment':{'version_id':VERSION,'commit':commit,'runtime_revision':'gsc-catchup-v1','read_guard_revision':'d1-account-reads-v1'}}).encode())
+  guard.postflight(self.client,self.config,saved,commit,Opener())
+  self.assertEqual(self.client.crons,['*/15 * * * *'])
+
  def test_concurrent_operator_version_change_blocks_deployment(self):
   self.client.changed=True
   with self.assertRaisesRegex(ValueError,'VERSION_CHANGED'):guard.preflight(self.client,self.config,VERSION)
