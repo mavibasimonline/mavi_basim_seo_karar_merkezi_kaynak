@@ -28,7 +28,7 @@ function series(value:string,query:string,allVerified=true){
 }
 it('investigates an observed query loss using two full daily month series, giving an actionable but noncausal conclusion',async()=>{
  const read=vi.fn(async(m:string,f:{query:string})=>series(m,f.query));
- const result=await appendProductActionDiagnostic(answer,month('2026-10'),month('2026-09'),product,context,read);
+ const result=await appendProductActionDiagnostic(answer as any,month('2026-10') as any,month('2026-09') as any,product as any,context as any,read as any);
  expect(result.diagnostic?.mechanism).toBe('Sıralama ile gösterim birlikte kötüleşmiş');
  expect(result.diagnostic?.top_visible_query?.query).toBe('broşür fiyatları');
  expect(result.diagnostic?.daily_query_coverage).toHaveLength(2);
@@ -43,7 +43,7 @@ it('investigates an observed query loss using two full daily month series, givin
 });
 it('does not claim an onset or zero when a daily archive is incomplete',async()=>{
  const read=vi.fn(async(m:string,f:{query:string})=>series(m,f.query,m!=='2026-10'));
- const result=await appendProductActionDiagnostic(answer,month('2026-10'),month('2026-09'),product,context,read);
+ const result=await appendProductActionDiagnostic(answer as any,month('2026-10') as any,month('2026-09') as any,product as any,context as any,read as any);
  expect(result.diagnostic?.daily_query_coverage).toHaveLength(0);
  expect(result.answer).toContain('Günlük sorgu kapsamı veya kayıtların bütünlüğü doğrulanamadı');
  expect(result.diagnostic?.cause_confirmed).toBe(false);
@@ -51,14 +51,14 @@ it('does not claim an onset or zero when a daily archive is incomplete',async()=
 it('returns unchanged answer on an important growth rather than forcing a fall diagnosis',async()=>{
  const source={...answer,comparison:{...answer.comparison,delta:18},decision:'Koru'};
  const read=vi.fn();
- const result=await appendProductActionDiagnostic(source,month('2026-10'),month('2026-09'),product,context,read);
+ const result=await appendProductActionDiagnostic(source as any,month('2026-10') as any,month('2026-09') as any,product as any,context as any,read as any);
  expect(result).toBe(source);expect(read).not.toHaveBeenCalled();
 });
 it('does not guess a missing query baseline',async()=>{
  const current=month('2026-10');current.queries=[metric(3,100,19,'yeni sorgu')];
  const old=month('2026-09');old.queries=[metric(9,190,13,'eski sorgu')];
  const read=vi.fn();
- const result=await appendProductActionDiagnostic(answer,current,old,product,context,read);
+ const result=await appendProductActionDiagnostic(answer as any,current as any,old as any,product as any,context as any,read as any);
  expect(result.diagnostic?.top_visible_query).toBe(null);
  expect(result.answer).toContain('sorgu adı veya kayıp sayısı tahmin edilmedi');
  expect(read).not.toHaveBeenCalled();
