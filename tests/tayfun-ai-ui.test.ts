@@ -26,15 +26,15 @@ describe('Tayfun SEO İşleri single product AI handoff',()=>{
  it('tracks revived or rising words and never equates absent query rows with zero traffic',()=>{
   const rows=productKeywordTracking({product,current,previous:before,history,device:'ALL'});
   const rising=rows.find((r:any)=>r.query==='magnet fiyatları');
-  expect(rising.signal).toContain('Yükseliyor');
-  expect(rising.delta_clicks).toBe(4);
+  expect(rising!.signal).toContain('Yükseliyor');
+  expect(rising!.delta_clicks).toBe(4);
   const missing=rows.find((r:any)=>r.query==='kaybolan magnet sorgusu');
-  expect(missing.current_clicks).toBeNull();
-  expect(missing.delta_clicks).toBeNull();
-  expect(missing.signal).toContain('Kayıt');
+  expect(missing!.current_clicks).toBeNull();
+  expect(missing!.delta_clicks).toBeNull();
+  expect(missing!.signal).toContain('Kayıt');
   const archive=rows.find((r:any)=>r.query==='eski takip kelimesi');
   expect(archive).toBeTruthy();
-  expect(archive.current_clicks).toBeNull();
+  expect(archive!.current_clicks).toBeNull();
   expect(rows.some((r:any)=>r.query==='broşür özel ticaret sırrı')).toBe(false);
  });
 });
