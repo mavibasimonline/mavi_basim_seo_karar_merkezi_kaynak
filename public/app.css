@@ -3365,22 +3365,15 @@ dialog::backdrop {
 
 #app .month-strip button{transition:none!important}
 
-
-/* Unified Tayfun-style controls and horizontal SEO product navigation. */
-#app button:not(.icon-button):not(.text-button),#app .button,#loginScreen button:not(.icon-button){border-radius:9px}
-#app button[aria-pressed="true"]:not(.icon-button):not(.text-button){background:#245cf4;color:#fff;border-color:#245cf4}
-#app button[aria-pressed="false"]:not(.icon-button):not(.text-button):not(.primary){background:#f4f6fa;color:#3c506d;border-color:#e7edf5}
-#seoWorkApp .seo-work-toolbar{display:flex;align-items:center;gap:10px;min-width:0;padding:4px 0 14px}
-#seoWorkApp .seo-work-search{display:block;flex:0 0 205px;margin:0}
-#seoWorkApp .seo-work-search input{height:33px;width:100%;min-width:0;border:1px solid #dbe4ef;border-radius:11px;background:#f8fafc;padding:0 12px;color:#334155;font-size:12px}
-#seoWorkApp .seo-work-tabs{display:flex;flex:1;align-items:center;gap:6px;min-width:0;overflow-x:auto;padding:3px 2px 8px;scrollbar-width:thin;white-space:nowrap}
-#seoWorkApp .seo-work-pill,#seoWorkApp .seo-work-product{border:1px solid #e8edf5;background:#f3f5f9;color:#334766;border-radius:9px;padding:8px 12px;white-space:nowrap;font:inherit;font-size:12px;cursor:pointer}
-#seoWorkApp .seo-work-pill[aria-pressed="true"],#seoWorkApp .seo-work-product[aria-pressed="true"]{background:#2058f5;color:#fff;border-color:#2058f5}
-#seoWorkApp .seo-work-products{padding:6px 0}
-#seoWorkApp .seo-work-group{padding:12px 0;border-bottom:1px solid #edf1f5}
-#seoWorkApp .seo-work-group h3{margin:0 0 10px;font-size:15px;color:#26364e}
+/* SEO İşleri: Tayfun tarzı kategori düğmeleri */
+#seoWorkApp .seo-work-toolbar{display:flex;gap:10px;align-items:center}
+#seoWorkApp .seo-work-search{flex:0 0 205px}
+#seoWorkApp input{width:100%;padding:8px;border:1px solid #dae3ef;border-radius:9px}
+#seoWorkApp .seo-work-tabs{display:flex;gap:6px;overflow-x:auto;flex:1;padding:4px 0}
+#seoWorkApp button{border:1px solid #e5eaf3;background:#f4f6fa;color:#40516d;border-radius:9px;padding:8px 11px;white-space:nowrap;cursor:pointer}
+#seoWorkApp button[aria-pressed=true]{background:#2563eb;color:#fff;border-color:#2563eb}
+#seoWorkApp .seo-work-group{padding:12px 0;border-bottom:1px solid #e5eaf3}
+#seoWorkApp .seo-work-group h3{margin:0 0 10px}
 #seoWorkApp .seo-work-items{display:flex;flex-wrap:wrap;gap:8px}
-#seoWorkApp .seo-work-detail{margin-top:16px;padding:16px;border:1px solid #e3eaf4;border-radius:12px;background:#f8fafc}
-#seoWorkApp .seo-work-detail h3{margin:0 0 7px}
-#seoWorkApp .seo-work-link{display:inline-flex;margin-top:10px;text-decoration:none}
-@media(max-width:740px){#seoWorkApp .seo-work-toolbar{align-items:stretch;flex-direction:column}#seoWorkApp .seo-work-search{flex:auto;width:100%}}
+#seoWorkApp .seo-work-detail{margin-top:16px;padding:16px;background:#f8fafc;border-radius:9px}
+@media(max-width:740px){#seoWorkApp .seo-work-toolbar{flex-direction:column;align-items:stretch}#seoWorkApp .seo-work-search{flex:auto}}
