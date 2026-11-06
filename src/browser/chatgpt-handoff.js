@@ -6,7 +6,7 @@ const grouped=(rows,key)=>{const out=new Map();for(const row of rows||[]){const 
 function deltaTable(now,old,key){const a=grouped(now,key),b=grouped(old,key),keys=[...new Set([...a.keys(),...b.keys()])];return keys.map(k=>{const current=metric(a.get(k)),previous=metric(b.get(k));return {key:k,current,previous,delta_clicks:current&&previous?current.clicks-previous.clicks:null,status:current&&previous?'her_iki_ayda_gorunur':current?'yalniz_guncel_ayda_gorunur':'yalniz_onceki_ayda_gorunur'};}).sort((x,y)=>(x.delta_clicks??0)-(y.delta_clicks??0)||x.key.localeCompare(y.key,'tr'));}
 
 export function buildChatGptHandoff({month,device='ALL',current,previous,ga4,oldGa4,catalog,changes,status,ga4Status}){
- if(!/^\\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('Devir için geçerli ay seçilmedi.');
+ if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('Devir için geçerli ay seçilmedi.');
  const expectedPrevious=dateBefore(month);
  const months=Array.isArray(current)?current:[];
  const end=months.find(r=>r?.month===month)||null;
@@ -43,5 +43,5 @@ export function buildChatGptHandoff({month,device='ALL',current,previous,ga4,old
   '## Bağımsız kaynak paketi (JSON)',
   JSON.stringify(packageData,null,2)
  ];
- return instructions.join('\\n\\n');
+ return instructions.join('\n\n');
 }
