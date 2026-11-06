@@ -222,6 +222,16 @@ export default {
       // gates daily collection or reads from a user-facing GSC report.
       await independentContextCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);
       try{await syncSeoHistory(env,'Cloudflare Cron',time.toISOString());}catch{/* History never gates existing collection. */}
+      // One robots-aware page per Cron; Tayfun writes only to the private archive Worker.
+      // Does not block GSC/GA4/D1 and cannot change the live website.
+      try{
+        const archive=(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE;
+        if(typeof archive?.fetch==='function'){
+          const result=await archive.fetch('https://archive.private/api/internal/tayfun-tick',{method:'POST'});
+          if(!result.ok)console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_PRIVATE_ARCHIVE_UNAVAILABLE'}));
+        }
+      }catch{console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_AUTO_TICK_UNAVAILABLE'}));}
+
       try{await syncPlanner(env,true);}catch{/* Planner verification never gates existing collection. */}
       const result=await tick(env,fetch,time,'cron');
       if(time.getUTCMinutes()%15!==0)return;
