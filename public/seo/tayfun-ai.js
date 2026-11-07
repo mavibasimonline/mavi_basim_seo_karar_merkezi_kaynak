@@ -382,6 +382,66 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
    editor.replaceChildren();
    const legend=E('p','Arşivdeki tarihli SEO sürümleri: '+history.versions.length+' · Bilinen en eski kayıt: '+(history.oldest_recorded_at?new Date(history.oldest_recorded_at).toLocaleString('tr-TR'):'Henüz yok')+' · Korunan kelime: '+history.tracked_keywords.length,'source-note');
    editor.append(legend);
+   // The encrypted archive already returns complete immutable revisions.
+   // Surface those saved records instead of showing counts without the actual SEO data.
+   const revisions=[...(history.versions||[])].sort((a,b)=>b.created_at.localeCompare(a.created_at));
+   const versionSection=E('details','','tayfun-saved-versions');versionSection.open=true;
+   versionSection.append(E('summary','Kaydedilen SEO verileri · '+revisions.length+' tarihli sürüm'));
+   const versionList=E('div','','tayfun-saved-versions-list');
+   const field=(name,value)=>{const node=E('div','','tayfun-saved-field');
+    node.append(E('strong',name),E('span',String(value??'')||'—'));return node;};
+   const pretty=value=>{if(typeof value!=='string')return String(value??'');
+    try{return JSON.stringify(JSON.parse(value),null,2);}catch{return value;}};
+   const section=(name,body,open=false)=>{const fold=E('details','','tayfun-saved-extra');fold.open=open;
+    fold.append(E('summary',name),body);return fold;};
+   for(const [index,version] of revisions.entries()){
+    const ai=version.source==='ai-review',date=version.created_at?new Date(version.created_at).toLocaleString('tr-TR'):'Tarih doğrulanamadı';
+    const card=E('details','','tayfun-saved-version');card.open=index===0;
+    card.append(E('summary',(ai?'Yapay zekâ SEO analizi':'Temel / manuel SEO kaydı')+' · '+date+' · '+(version.title||'Başlık kaydı yok')));
+    const body=E('div','','tayfun-saved-version-body');
+    body.append(E('p',ai?'Bu kayıt yapay zekâ analizinin arşiv sürümüdür; canlı sitede yayınlandığı anlamına gelmez.':'Bu kayıt temel SEO sürümüdür; tarih, canlı sitenin yayın tarihi değildir.','source-note'));
+    const main=E('div','','tayfun-saved-primary');
+    for(const [key,value] of [['SEO Title',version.title],['Meta Description',version.description],['H1',version.h1],
+      ['Canonical',version.canonical],['Robots',version.robots],['Kaydetme tarihi',date],
+      ['Önceki sürüm kimliği',version.supersedes||'İlk kayıt'],['Sürüm kimliği',version.id],
+      ['SEO notları / karar',version.notes]])
+     main.append(field(key,value));
+    body.append(main);
+    const keywordBox=E('div','','tayfun-saved-detail-body');
+    const keywords=Array.isArray(version.keywords)?version.keywords:[];
+    keywordBox.append(E('p','Kaydedilen kelimeler: '+(keywords.length?keywords.join(' · '):'Bu sürümde anahtar kelime listesi yok.')));
+    const decisions=Array.isArray(version.keyword_decisions)?version.keyword_decisions:[];
+    if(decisions.length){
+     const decisionsList=E('div','','tayfun-saved-decisions');
+     for(const d of decisions){const item=E('p','','tayfun-saved-decision');
+      item.append(E('strong',(d.action||'izle')+' · '+d.query),E('span',d.reason||''));decisionsList.append(item);}
+     keywordBox.append(decisionsList);
+    }
+    body.append(section('Anahtar kelimeler ve kararları · '+keywords.length+' kelime / '+decisions.length+' karar',keywordBox));
+    const headingsBox=E('pre',pretty(version.headings||''),'tayfun-saved-json');
+    body.append(section('Kaydedilen H1–H6 başlık yapısı',headingsBox));
+    const linksBox=E('pre',pretty(version.internal_links||''),'tayfun-saved-json');
+    body.append(section('Sayfa iç bağlantıları',linksBox));
+    const proposals=Array.isArray(version.page_proposals)?version.page_proposals:[];
+    if(proposals.length){
+     const proposed=E('div','','tayfun-saved-detail-body');
+     for(const p of proposals)proposed.append(field(p.keyword||'Yeni sayfa adayı',(p.reason||'')+' · '+(p.url_suggestion||'URL önerilmedi')));
+     body.append(section('Yeni sayfa önerileri · '+proposals.length,proposed));
+    }
+    const technical=E('div','','tayfun-saved-primary');
+    for(const [label,key] of [['Schema / JSON-LD','structured_data'],['Görseller / ALT','images'],['Hreflang','hreflang'],
+     ['Open Graph','open_graph'],['Twitter Card','twitter_card'],['X-Robots','x_robots'],
+     ['Viewport','viewport'],['Dil','lang'],['Yönlendirme','redirect'],['HTTP durum kodu','status_code'],
+     ['Sayfa içeriği özeti','content_excerpt']]){
+     const holder=E('div','','tayfun-saved-field');
+     holder.append(E('strong',label),E('pre',pretty(version[key]||''),'tayfun-saved-json'));
+     technical.append(holder);
+    }
+    body.append(section('Diğer teknik SEO verileri · Schema, görseller, sosyal etiketler',technical));
+    card.append(body);versionList.append(card);
+   }
+   if(!revisions.length)versionList.append(E('p','Bu ürün için henüz kayıtlı SEO sürümü yok.','source-note'));
+   versionSection.append(versionList);editor.append(versionSection);
    const tracking=productKeywordTracking({product,current,previous,history,device});
    const keywordDetails=E('details','','tayfun-keyword-history');
    keywordDetails.append(E('summary','Silinmeyen kelime takibi · '+tracking.length+' görünür/geçmiş sorgu'));
