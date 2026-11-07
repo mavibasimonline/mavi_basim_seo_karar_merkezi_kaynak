@@ -1,0 +1,3 @@
+Tayfun SEO İşleri masaüstü arayüzünde 1 ve 2 adımları yan yana iki sütun, mobilde tek sütun. Ürün seçimi için yalnız üstteki kategoriler ve arama var. Alt tekrar eden seçili kategori açılır kutusu kaldırıldı.
+Afiş için JSON boyut hatası önleyici özel arşiv sürümü: a361a79b42fdbc695af27786e32a2cfc0173c9b7.
+Ürünler product_id + canonical URL doğrulanır; eski SEO kayıtları korunur. Siteye SEO değişikliği yapılmaz.
