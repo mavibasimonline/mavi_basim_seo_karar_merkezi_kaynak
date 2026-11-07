@@ -72,7 +72,7 @@ jobs:
           base='/workers/scripts/mavi-basim-drive-archive'
           v=active_version(api(client,'GET',base+'/deployments'))
           record=api(client,'GET',base+'/versions/'+v)
-          assert record.get('annotations',{}).get('workers/tag')=='89aed9b6aea56c0b9d2eab6b06f5e5daab0e48ab','TAYFUN_VERIFIED_ARCHIVE_REQUIRED'
+          assert record.get('annotations',{}).get('workers/tag')=='305221e4979883b981cf38f96569688f71e428cc','TAYFUN_VERIFIED_ARCHIVE_REQUIRED'
           print('Private archive source and current version verified')
           PY
       - name: Preflight old version, source counts, D1 quota and immutable configuration
