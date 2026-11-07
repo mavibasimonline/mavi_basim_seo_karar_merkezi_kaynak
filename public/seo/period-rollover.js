@@ -28,3 +28,8 @@ export const monthLabel=value=>new Intl.DateTimeFormat("tr-TR",{month:"long",yea
  .format(new Date(value+"-01T12:00:00Z")).replace(/^./,s=>s.toLocaleUpperCase("tr-TR"));
 export function readPeriodPreference(key){try{return JSON.parse(localStorage.getItem(key)||"{}")||{};}catch{return {};}}
 export function savePeriodPreference(key,value){try{localStorage.setItem(key,JSON.stringify(value));}catch{}}
+
+export const currentMonth=()=>{
+ const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Istanbul",year:"numeric",month:"2-digit"}).formatToParts(new Date());
+ return p.find(x=>x.type==="year").value+"-"+p.find(x=>x.type==="month").value;
+};
