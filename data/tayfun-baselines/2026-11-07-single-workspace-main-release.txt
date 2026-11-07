@@ -1,0 +1,5 @@
+Tayfun SEO İşleri tek merkezli toplu veri devri ve JSON importu.
+Kullanıcı onayı: tek alanda seçilen ürün/kategorinin SEO kanıtını hazırla, tek JSON yapıştır, her kaydı product_id ve canonical_url üzerinden kendi ürünüyle eşleştir.
+Önce doğrula, aynı ürün iki kez gelemez, yanlış URL veya eski expected_latest_id reddedilir.
+Kayıtlar bağımsız şifreli append-only arşivde, önceden saklanan veriler silinmez. Canlı matbaa sitesi değişmez.
+Eski tekrarlı ürün-başı JSON editörleri kaldırıldı; ürün altında sadece kelime ve öneri geçmişi tutulur.
