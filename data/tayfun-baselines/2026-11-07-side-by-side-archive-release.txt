@@ -1,0 +1,3 @@
+Tayfun SEO İşleri kullanıcı talebi: Tek veri alma ve JSON verme panelleri masaüstünde yan yana; tekrarlı ürün/kategori seçim kutusu kaldırıldı.
+Özel arşiv API JSON limiti 128 KiB; mevcut SEO heading, internal link ve structured data alanları güvenli limitlerde kesilmeden saklanır.
+Yalnız şifreli Tayfun arşivine yeni sürüm ekler; mevcut sürümleri, eski kelimeleri, siteyi değiştirmez.
