@@ -184,17 +184,14 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
  importPanel.append(E('h4','2. ChatGPT JSON yanıtını tek seferde yapıştır'));
  const answer=E('textarea','','tayfun-ai-answer');answer.rows=13;
  answer.placeholder='Tek ürün JSON, JSON nesneleri dizisi veya MAVI_BASIM_TAYFUN_AI_BATCH_V1 items dizisi…';
- const inspect=E('button','Tüm ürünleri doğrula','button secondary');
- const save=E('button','Doğrulanan ürünleri tek işlemde kaydet','button primary');save.disabled=true;
+ const save=E('button','SEO Analizini Kaydet','button primary');save.disabled=true;
  const preview=E('div','','tayfun-ai-preview');
- const importRow=E('div','','tayfun-ai-workspace-actions');importRow.append(inspect,save);
+ const importRow=E('div','','tayfun-ai-workspace-actions');importRow.append(save);
  importPanel.append(answer,importRow,preview);
  work.append(exportPanel,importPanel);toolbar.after(work);
- let verifiedBatch=null;
  const knownById=new Map(products.map(p=>[p.id,p]));
  const knownByUrl=new Map(products.map(p=>[p.canonical_url,p]));
- function resetBatch(){verifiedBatch=null;save.disabled=true;preview.replaceChildren();}
- answer.addEventListener('input',resetBatch);
+ answer.addEventListener('input',()=>{save.disabled=!answer.value.trim();preview.replaceChildren();});
  function available(){const collection=(selectedCategory==='Tüm Kategoriler'?products:grouped.get(selectedCategory)||[])
   .filter(p=>(p.name+' '+(p.category||'')).toLocaleLowerCase('tr-TR').includes(currentQuery));
   return collection.slice().sort((a,b)=>a.name.localeCompare(b.name,'tr'));}
@@ -261,46 +258,52 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
   if(value?.format==='MAVI_BASIM_TAYFUN_AI_PRODUCT_V1')return [value];
   throw Error('Bir ürün JSON’u veya format MAVI_BASIM_TAYFUN_AI_BATCH_V1 içeren items dizisi bekleniyor.');
  }
- inspect.onclick=async()=>{
-  resetBatch();
+ save.onclick=async()=>{
+  if(!answer.value.trim())return;
+  save.disabled=true;save.textContent='Kontrol ediliyor…';preview.replaceChildren();
   let items;
   try{items=unpack(parseAiAnswer(answer.value));}
-  catch(error){preview.append(E('p','JSON biçimi hatalı: '+error.message,'history-warning'));return;}
-  if(!items.length||items.length>29){preview.append(E('p','1–29 ürün içeren JSON bekleniyor.','history-warning'));return;}
-  inspect.disabled=true;const checked=[],seen=new Set(),errors=[];
+  catch(error){
+   preview.append(E('p','JSON okunamadı: '+error.message,'history-warning'));
+   save.textContent='SEO Analizini Kaydet';save.disabled=false;return;
+  }
+  if(!items.length||items.length>29){
+   preview.append(E('p','1–29 ürün içeren JSON gerekli. Hiçbir kayıt değiştirilmedi.','history-warning'));
+   save.textContent='SEO Analizini Kaydet';save.disabled=false;return;
+  }
+  // Validate the entire batch before touching any stored version.
+  const checked=[],seen=new Set(),errors=[];
   for(const item of items){
    const product=knownById.get(item?.product_id),urlProduct=knownByUrl.get(item?.url);
-   if(!product||product!==urlProduct){errors.push('Bilinmeyen veya başka ürüne ait product_id / URL: '+String(item?.product_id||item?.url));continue;}
-   if(seen.has(product.id)){errors.push('Aynı ürün JSON içinde iki kez var: '+product.name);continue;}
+   if(!product||product!==urlProduct){errors.push('Ürün veya URL eşleşmedi: '+String(item?.product_id||item?.url));continue;}
+   if(seen.has(product.id)){errors.push('Aynı ürün iki kez gönderildi: '+product.name);continue;}
    seen.add(product.id);
    try{
     const history=await api('/api/independent/tayfun-ai/context?product_id='+encodeURIComponent(product.id));
     checked.push({product,data:ensureValidOutput(item,product,history)});
    }catch(error){errors.push(product.name+': '+error.message);}
   }
-  inspect.disabled=false;
-  if(errors.length){preview.append(E('strong','Kayıt yapılmadı. '+errors.length+' doğrulama hatası.'));for(const e of errors)preview.append(E('p',e,'history-warning'));return;}
-  verifiedBatch=checked;save.disabled=false;
-  preview.append(E('strong','Doğrulandı: '+checked.length+' ürün · Her biri kendi URL ve sürüm geçmişine eşleşti.'));
-  for(const v of checked)preview.append(E('p',v.product.name+' · '+v.product.canonical_url+' · '+v.data.seo.title,'source-note'));
-  preview.append(E('p','Kaydetme yeni tarihli sürümler oluşturur; eski sürümleri ve kelimeleri silmez, canlı siteyi değiştirmez.','source-note'));
- };
- save.onclick=async()=>{
-  if(!verifiedBatch)return;
-  save.disabled=true;inspect.disabled=true;const saved=[],errors=[];
-  for(const {product,data} of verifiedBatch){
+  if(errors.length){
+   preview.append(E('strong','Hiçbir kayıt yapılmadı · '+errors.length+' doğrulama hatası'));
+   for(const error of errors)preview.append(E('p',error,'history-warning'));
+   save.textContent='SEO Analizini Kaydet';save.disabled=false;return;
+  }
+  save.textContent='Kaydediliyor…';
+  const saved=[],failed=[];
+  for(const {product,data} of checked){
    try{
     const response=await api('/api/independent/tayfun-ai',{method:'POST',body:JSON.stringify(data)});
-    if(!response.ok||response.entry?.product_id!==product.id||response.entry?.url!==product.canonical_url)throw Error(response.code||'Arşiv yanıtı doğrulanamadı');
+    if(!response.ok||response.entry?.product_id!==product.id||response.entry?.url!==product.canonical_url)
+     throw Error(response.code||'Arşiv yanıtı doğrulanamadı');
     saved.push(product.name);
-   }catch(error){errors.push(product.name+': '+error.message);}
+   }catch(error){failed.push(product.name+': '+error.message);}
   }
-  inspect.disabled=false;verifiedBatch=null;
-  preview.replaceChildren(E('strong',saved.length+' ürün kaydedildi · '+errors.length+' hata'));
+  preview.replaceChildren(E('strong',saved.length+' ürün kaydedildi · '+failed.length+' hata'));
   for(const name of saved)preview.append(E('p','Kaydedildi: '+name,'source-note'));
-  for(const error of errors)preview.append(E('p','Kaydedilmedi: '+error,'history-warning'));
-  if(saved.length)onSaved?.();
-  notify(saved.length+' ürünün SEO sürümü saklandı. Hatalı ürünler otomatik kaydedilmiş sayılmaz.');
+  for(const error of failed)preview.append(E('p','Kaydedilemedi: '+error,'history-warning'));
+  if(saved.length){onSaved?.();notify(saved.length+' ürünün SEO analizi kaydedildi. Eski sürümler korundu.');}
+  if(failed.length)notify(failed.length+' ürün kaydedilemedi; başarılı olanlar tekrar kaydedilmemeli.');
+  save.textContent='SEO Analizini Kaydet';save.disabled=false;
  };
 
  const groups=E('div','','tayfun-jobs-groups');container.append(groups);
