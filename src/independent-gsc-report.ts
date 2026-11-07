@@ -1,5 +1,7 @@
 // Read encrypted daily evidence independently from Sheets. Missing days and hidden
 // queries are never manufactured as zeros or treated as complete query coverage.
+// The current-month read and Tayfun trend endpoints run in the separate private archive Worker;
+// releasing only the public app does not upgrade these private read rules.
 import {decrypt} from './security';
 import {gscRowIssue,GscRow} from './providers';
 import {DailyProof,GscStorage} from './independent-gsc';
