@@ -13,7 +13,8 @@ const LABELS={title:'SEO Title',description:'Meta açıklaması',h1:'H1',canonic
 const MAX={title:300,description:1000,h1:500,canonical:2048,robots:200,headings:2500,internal_links:2500,structured_data:5000,notes:2500,keywords:3000,hreflang:2500,images:2500,open_graph:2500,twitter_card:2500,x_robots:200,viewport:500,lang:100,redirect:2048,status_code:100,content_excerpt:5000};
 export function createTayfunWorkspace({api,scope,notify}){
  const root=document.getElementById('tayfunApp');
- let generation=0,cache=new Map(),revision=-1,filter='',mode='groups';
+ let generation=0,cache=new Map(),revision=-1,filter='',mode='groups',paintCurrent=null;
+ root.addEventListener('tayfun-mode-change',()=>{const requested=root.dataset.requestedMode;if(['groups','unmapped','jobs'].includes(requested)){mode=requested;paintCurrent?.();}});
  async function getMonth(m){
   if(cache.has(m))return cache.get(m);
   const data=await api('/api/independent/tayfun?month='+m);
@@ -160,6 +161,7 @@ export function createTayfunWorkspace({api,scope,notify}){
   return box;
  }
  async function render(){
+  paintCurrent=null;
   mode=['groups','unmapped','jobs'].includes(root.dataset.requestedMode)?root.dataset.requestedMode:mode;
   const at=++generation,s=scope(),month=s.month,second=nextMonth(month);
   if(revision!==s.revision){cache.clear();revision=s.revision;}
@@ -180,11 +182,7 @@ export function createTayfunWorkspace({api,scope,notify}){
    const heading=el('div','','tayfun-head');heading.append(el('h2','Tayfun · Aylık SEO Sürüm Defteri'),el('p','SEO bilgilerini ay ay kaydet, eskisini pasife al, geçmişi silmeden GSC performansını karşılaştır. Veri yalnız tarama ve kayıtlardan doğrulanır.'));root.append(heading);
    const search=el('input');search.type='search';search.placeholder='Sayfa URL, ürün veya kategori ara…';search.value=filter;
    const filterWrap=el('div','','tayfun-search');filterWrap.append(search,el('span','Kayıtlı sayfalar · '+pages.length+' gözlenen URL; tüm sitemap sayfalarının eksiksiz listesi olduğu garanti edilmez.','source-note'));
-   const tabs=el('div','','tayfun-tabs');
-   const overview=el('button','Genel Bakış','button secondary');overview.type='button';overview.setAttribute('aria-pressed','false');overview.onclick=()=>{location.hash='#overview';};
-   const groups=el('button','Ürün Grupları','button secondary'),unmapped=el('button','Eşleşmemiş Sayfalar','button secondary'),seoJobs=el('button','SEO İşleri','button secondary');
-   groups.type='button';unmapped.type='button';seoJobs.type='button';groups.onclick=()=>{mode='groups';paint();};unmapped.onclick=()=>{mode='unmapped';paint();};seoJobs.onclick=()=>{mode='jobs';paint();};
-   tabs.append(overview,groups,unmapped,seoJobs);root.append(tabs,filterWrap);
+   root.append(filterWrap);
    const place=el('div','','tayfun-months');root.append(place);
    root.append(el('p',sitemap?.urls?.length?'Site haritasından '+sitemap.urls.length+' URL eklendi. Kaynak: '+sitemap.source+(sitemap.stale?' · Son kayıt; anlık doğrulanmadı':''): 'Site haritası doğrulanamadı; ürün, GSC ve tarama kayıtlarından görünen URL’ler listeleniyor.','source-note'));
    const rawFirst=s.current?.find(r=>r.month===month)||s.previous?.month===month&&s.previous||null;
@@ -198,7 +196,6 @@ export function createTayfunWorkspace({api,scope,notify}){
    function paint(){
     root.dataset.requestedMode=mode;
     place.replaceChildren();
-    groups.setAttribute('aria-pressed',String(mode==='groups'));unmapped.setAttribute('aria-pressed',String(mode==='unmapped'));seoJobs.setAttribute('aria-pressed',String(mode==='jobs'));
     filterWrap.hidden=mode==='jobs';
     if(mode==='jobs'){
      const priorRaw=s.current?.find(r=>r.month===previousMonth(month))||s.previous?.month===previousMonth(month)&&s.previous||null;
@@ -245,8 +242,8 @@ export function createTayfunWorkspace({api,scope,notify}){
      place.append(section);
     }
    }
-   search.oninput=()=>{filter=search.value;paint();};paint();
+   search.oninput=()=>{filter=search.value;paint();};paintCurrent=paint;paint();
   }catch(err){if(at===generation)root.replaceChildren(el('p','Tayfun kayıtları yüklenemedi: '+err.message));}
  }
- return {render,clear(){generation++;root.replaceChildren();cache.clear();revision=-1;}};
+ return {render,clear(){generation++;paintCurrent=null;root.replaceChildren();cache.clear();revision=-1;}};
 }
