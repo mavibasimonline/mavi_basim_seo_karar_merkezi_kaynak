@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {evaluateSeoMonitor} from '../src/tayfun-monitor';
+import {evaluateSeoMonitor,seoRevisionTimeline} from '../src/tayfun-monitor';
 import type {TayfunEntry} from '../src/tayfun-ledger';
 const product={id:'magnet',name:'Magnet',canonical_url:'https://mavibasim.com/magnet',urls:['https://mavibasim.com/magnet']};
 const entry={id:'version-1',source:'ai-review',url:product.canonical_url,created_at:'2026-09-09T08:00:00Z',keywords:['magnet fiyatları','eski silinmeyen kelime']} as TayfunEntry;
@@ -63,6 +63,32 @@ describe('Tayfun SEO Takibi read-only monthly monitoring',()=>{
   expect(result.revisions).toBe(2);
   expect(result.tracked_keywords).toContain('eski silinmeyen kelime');
   expect(result.latest_seo?.version_id).toBe('version-2');
+ });
+
+ it('displays the exact recording day and explicitly compares changed Title Meta and H1/H2 while preserving old version',()=>{
+  const original={...entry,id:'old-2026',month:'2026-10',created_at:'2026-11-07T12:30:00.000Z',source:'user-entry' as const,
+   title:'Afiş fiyatları',description:'Eski meta',h1:'Afiş baskı',
+   headings:'[{"level":2,"text":"Eski başlık"}]',canonical:product.canonical_url,robots:'index,follow',
+   keywords:['eski afiş fiyatları'],supersedes:null} as unknown as TayfunEntry;
+  const newer={...original,id:'new-2026',month:'2026-11',created_at:'2026-11-07T15:49:48.000Z',
+   source:'ai-review' as const,title:'Afiş Baskı Fiyatları 2026',description:'Yeni meta',
+   h1:'Afiş fiyatları ve ölçüler',headings:'[{"level":2,"text":"Yeni başlık"}]',
+   keywords:['eski afiş fiyatları','büyük afiş fiyatları'],supersedes:original.id};
+  const timeline=seoRevisionTimeline([newer,original]);
+  expect(timeline.map(x=>x.created_at)).toEqual([original.created_at,newer.created_at]);
+  expect(timeline[0]).toMatchObject({month:'2026-10',edit_is_live:false,previous_version_id:null});
+  expect(timeline[1].changed_fields).toEqual(expect.arrayContaining([
+   'SEO Title','Meta Description','H1','H2–H6 başlıkları']));
+  expect(timeline[1].added_keywords).toContain('büyük afiş fiyatları');
+  expect(timeline[0].title).toBe('Afiş fiyatları');
+  expect(timeline[1].title).toBe('Afiş Baskı Fiyatları 2026');
+  const result=evaluateSeoMonitor(product,[newer,original],month('2026-11',4,30,false),month('2026-10',5,70));
+  expect(result.first_recorded_at).toBe(original.created_at);
+  expect(result.last_recorded_at).toBe(newer.created_at);
+  expect(result.archive_count).toBe(2);
+  expect(result.revision_timeline).toHaveLength(2);
+  expect(result.tracked_keywords).toContain('eski afiş fiyatları');
+  expect(result.tracked_keywords).toContain('büyük afiş fiyatları');
  });
 
 });
