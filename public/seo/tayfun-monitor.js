@@ -19,7 +19,7 @@ const productGroups={
  'Kurumsal Ürünler':['Antetli Kağıt','Bloknot','Dosya','Karton Çanta','Kartvizit','Katalog','Küp Bloknot','Zarf'],
  'Makbuz ve Formlar':['Adisyon','Araç Kiralama','Gider Makbuzu','Para Makbuzu','Reçete','Sigorta Poliçeleri','Sipariş Fişi','Sözleşme Baskı','Tahsilat Makbuzu','Tediye Makbuzu']
 };
-const categoryOf=product=>product.category||Object.entries(productGroups).find(([,names])=>names.includes(product.name))?.[0]||'Diğer Ürünler';
+const categoryOf=product=>categoryNames.includes(product.category)?product.category:Object.entries(productGroups).find(([,names])=>names.includes(product.name))?.[0]||product.category||'Diğer Ürünler';
 const sortValue=(a,b,dir=1)=>{
  if(a===null||a===undefined)return b===null||b===undefined?0:1;
  if(b===null||b===undefined)return -1;
@@ -211,16 +211,33 @@ export async function renderSeoMonitor(root,{month,device,api,notify}){
       if(current!==generation||!root.isConnected||root.dataset.monitorRequest!==token)return;
       const grid=el('div','','tayfun-monitor-series-table');
       const header=el('div','','tayfun-monitor-series-row tayfun-monitor-series-head');
-      for(const v of ['Ay','Sorgu tıklama','Gösterim','CTR','Ort. sıra','Sayfa tıklama','GSC kapsamı','SEO sürümü'])header.append(el('strong',v));
-      grid.append(header);
-      for(const m of response.months||[]){
+      const cols=[['Ay',m=>m.month],['Sorgu tıklama',m=>m.query?.clicks],
+       ['Gösterim',m=>m.query?.impressions],['CTR',m=>m.query?.ctr],
+       ['Ort. sıra',m=>m.query?.position],['Sayfa tıklama',m=>m.page?.clicks],
+       ['GSC kapsamı',m=>m.coverage?.page_days_verified],['SEO sürümü',m=>m.seo?.recorded_at]];
+      const sortButtons=[];let sortColumn=0,sortDirection=-1;
+      const tableRows=(response.months||[]).map(m=>{
        const row=el('div','','tayfun-monitor-series-row');
        for(const value of [m.month,val(m.query?.clicks),val(m.query?.impressions),percent(m.query?.ctr),pos(m.query?.position),
         val(m.page?.clicks),m.error?'Kaynak okunamadı':coverage(m.coverage),m.seo?.recorded_at?
          m.seo.recorded_at.slice(0,7)+' · '+(m.seo.source==='ai-review'?'AI':'Temel'):'SEO kaydı yok'])
         row.append(el('span',value));
-       grid.append(row);
+       return {m,row};
+      });
+      function sortSeries(){
+       for(const [i,button] of sortButtons.entries()){
+        button.textContent=cols[i][0]+(i===sortColumn?(sortDirection===1?' ↑':' ↓'):'');
+       }
+       const ordered=[...tableRows].sort((a,b)=>sortValue(cols[sortColumn][1](a.m),cols[sortColumn][1](b.m),sortDirection)
+        ||a.m.month.localeCompare(b.m.month,'tr'));
+       grid.replaceChildren(header,...ordered.map(r=>r.row));
       }
+      for(const [i,[label]] of cols.entries()){
+       const button=el('button',label,'tayfun-monitor-series-sort');button.type='button';button.title=label+' sütununu sırala';
+       button.onclick=()=>{if(sortColumn===i)sortDirection*=-1;else{sortColumn=i;sortDirection=i===0?-1:-1;}sortSeries();};
+       header.append(button);sortButtons.push(button);
+      }
+      sortSeries();
       series.replaceChildren(grid,note(response.caveat));
      }catch(error){
       if(current===generation)series.replaceChildren(note('Aylık geçmiş okunamadı: '+error.message+'. Eski kayıtlar korunuyor.'));
