@@ -1,0 +1,4 @@
+Kullanıcı isteği 7 Kasım 2026: Tayfun SEO İşleri'nde 'Tüm ürünleri doğrula' ve 'Doğrulanan ürünleri tek işlemde kaydet' butonları birleştirildi.
+Tek buton: SEO Analizini Kaydet.
+Buton JSON'u, tüm ürün-ID/URL eşleşmelerini ve güncel sürüm kimliklerini otomatik kontrol eder; tüm ön doğrulamalar başarılıysa şifreli arşive ürün bazlı yeni tarihli sürümler oluşturur. Eski sürümleri ve kelimeleri korur, canlı matbaa sitesine dokunmaz.
+Arşiv Worker mevcut doğrulanmış sürümde kalır: a361a79b42fdbc695af27786e32a2cfc0173c9b7.
