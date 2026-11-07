@@ -3369,3 +3369,35 @@ dialog::backdrop {
 #seoWorkApp .seo-work-items{flex-wrap:wrap}
 #seoWorkApp button[aria-pressed=true]{background:#2563eb;color:#fff}
 #app .month-strip button{transition:none!important}
+
+/* Reference-inspired Mavi Basım overview: clear blue metrics, soft warning chips and full-width product leaders. */
+#view-overview .kpi-grid{gap:18px}
+#view-overview .kpi-card{position:relative;padding:20px 21px 16px;border:1px solid #dbe4f1;border-radius:10px;box-shadow:none;min-height:147px}
+#view-overview .kpi-card:first-child{border-top:2px solid #2462ee}
+#view-overview .kpi-label{color:#203b66;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.02em}
+#view-overview .kpi-value{font-size:25px;letter-spacing:-.2px;margin:9px 0 6px;font-weight:800;color:#101b30}
+#view-overview .kpi-caption{min-height:24px;margin:0 0 5px;color:#526481;flex-wrap:wrap}
+#view-overview .kpi-caption .delta{border-radius:18px;border:1px solid #b9e7d4;background:#eefbf5;color:#147a4b;font-size:11px;padding:3px 8px;box-shadow:none}
+#view-overview .kpi-caption .delta.down{background:#fff1f3;color:#dc2748;border-color:#ffcad4}
+#view-overview .kpi-previous{font-size:11px;color:#273f65;line-height:1.45;margin:0}
+#view-overview .analytics-grid{grid-template-columns:minmax(0,1fr);gap:18px}
+#view-overview .analytics-grid>.leaders-panel{margin:0;width:100%;max-width:none}
+#view-overview .leaders-panel{padding:0 0 16px}
+#view-overview .leaders-panel .panel-heading{padding:18px 24px 11px;align-items:center;gap:10px;flex-wrap:wrap}
+#view-overview .leaders-panel #leadersTitle{font-size:18px;color:#111c32}
+#view-overview .leaders-panel #leadersNote{color:#657790}
+#view-overview .leaders-panel .table-scroll{max-height:none;overflow-x:auto}
+#view-overview .leader-list{padding:0 24px;display:grid;gap:9px}
+#view-overview .leader-item{display:grid;grid-template-columns:38px minmax(0,1fr) 85px 130px 110px;align-items:center;gap:12px;padding:11px 16px;min-height:62px;border:1px solid #dbe5f2;border-radius:9px;background:#fff}
+#view-overview .leader-rank{font-size:12px;font-weight:800;padding:9px 7px;text-align:center;border:1px solid #c8d8eb;border-radius:6px;color:#173054;background:#f1f5fa}
+#view-overview .leader-identity{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+#view-overview .leader-name{font-size:13px;color:#071936}
+#view-overview .leader-category{border:1px solid #e8d0ff;border-radius:14px;padding:3px 9px;background:#fbf4ff;color:#8538bd;font-size:10px;white-space:nowrap}
+#view-overview .leader-metric{display:grid;gap:4px;justify-items:end;color:#205df0}
+#view-overview .leader-metric small{font-size:10px;letter-spacing:.04em;color:#44628f;text-align:right}
+#view-overview .leader-metric strong{font-size:15px;color:#1558de}
+#view-overview .leader-track{height:4px;background:#e8eff7;border-radius:5px;width:52px;overflow:hidden}
+#view-overview .leader-fill{display:block;background:#2563eb;height:100%}
+#view-overview .leader-item .button{justify-self:end;width:auto;min-width:98px;min-height:36px;font-size:12px;font-weight:700;background:#2563eb;color:#fff;border-color:#2563eb}
+@media(max-width:800px){#view-overview .leader-item{grid-template-columns:36px minmax(0,1fr) 72px 84px;gap:8px}#view-overview .leader-share{display:none}#view-overview .leader-item .button{min-width:86px}}
+@media(max-width:520px){#view-overview .leader-list{padding:0 12px}#view-overview .leader-item{grid-template-columns:30px minmax(0,1fr) 70px;gap:7px;padding:9px}#view-overview .leader-item .button{grid-column:2/4;justify-self:end}#view-overview .leader-rank{padding:8px 2px}#view-overview .leader-identity{gap:3px}#view-overview .leader-category{white-space:normal}}
