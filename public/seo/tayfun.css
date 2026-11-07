@@ -247,3 +247,6 @@
 .tayfun-monitor-compare-values .tayfun-monitor-seo-field{background:#f8fafc}
 .tayfun-monitor-compare-values .tayfun-monitor-seo-field span{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:720px){.tayfun-monitor-compare-values{grid-template-columns:minmax(0,1fr)}}
+
+/* Keep first/last immutable SEO save dates visible beneath each product even on narrow screens. */
+.tayfun-monitor-product>summary small:last-child{flex:0 0 100%;margin-left:0;color:#475569;font-size:11px;line-height:1.5;font-variant-numeric:tabular-nums}
