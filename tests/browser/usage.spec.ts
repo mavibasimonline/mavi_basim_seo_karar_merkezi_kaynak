@@ -560,11 +560,14 @@ test("Tayfun top tabs expose original overview and keep SEO sections in one plac
   await expect(page.getByRole("navigation", { name: "Ana menü" }).getByRole("link", { name: "Genel Bakış", exact: true })).toHaveCount(0);
   const tabs=page.locator("#tayfunWorkspaceTabs");
   await expect(tabs).toBeVisible();
-  await expect(tabs.locator("button")).toHaveText(["Genel Bakış","Ürün Grupları","Eşleşmemiş Sayfalar","SEO İşleri"]);
+  await expect(tabs.locator("button")).toHaveText(["Genel Bakış","Ürün Grupları","Eşleşmemiş Sayfalar","SEO İşleri","SEO Takibi"]);
   await tabs.locator('[data-tayfun-target="jobs"]').click();
   await expect(page.locator("#view-tayfun")).toBeVisible();
   await expect(tabs.locator('[data-tayfun-target="jobs"]')).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#tayfunApp .tayfun-tabs")).toHaveCount(0);
+  await tabs.locator('[data-tayfun-target="monitor"]').click();
+  await expect(tabs.locator('[data-tayfun-target="monitor"]')).toHaveAttribute("aria-pressed","true");
+  await expect(page.locator("#tayfunApp")).toContainText("SEO Takibi");
   await tabs.locator('[data-tayfun-target="overview"]').click();
   await expect(page.locator("#view-overview")).toBeVisible();
   await expect(page.locator("#kpis")).toBeVisible();
