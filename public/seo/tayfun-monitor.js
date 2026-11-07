@@ -11,20 +11,69 @@ const openable=(name,cls='',open=false)=>{const details=el('details','',cls);det
 const pretty=v=>{try{return JSON.stringify(JSON.parse(v),null,2);}catch{return String(v||'');}};
 const clearMonthData=scope=>scope.page_complete?'Doğrulanmış tam sayfa ayı':'Kısmi / eksik sayfa ayı';
 const coverage=scope=>scope.page_days_verified+'/'+scope.expected_days+' gün sayfa; '+scope.query_days_verified+'/'+scope.expected_days+' gün görünür sorgu';
+
+const categoryNames=['Tüm Kategoriler','Broşürler ve El İlanları','Reklam Ürünleri','Kurumsal Ürünler','Makbuz ve Formlar'];
+const productGroups={
+ 'Broşürler ve El İlanları':['Afiş','Broşür','El İlanı'],
+ 'Reklam Ürünleri':['Ambalaj','Amerikan Servis','Etiket','Kitap Ayracı','Kutu','Magnet','Oto Paspas','Yağ Kartı'],
+ 'Kurumsal Ürünler':['Antetli Kağıt','Bloknot','Dosya','Karton Çanta','Kartvizit','Katalog','Küp Bloknot','Zarf'],
+ 'Makbuz ve Formlar':['Adisyon','Araç Kiralama','Gider Makbuzu','Para Makbuzu','Reçete','Sigorta Poliçeleri','Sipariş Fişi','Sözleşme Baskı','Tahsilat Makbuzu','Tediye Makbuzu']
+};
+const categoryOf=product=>product.category||Object.entries(productGroups).find(([,names])=>names.includes(product.name))?.[0]||'Diğer Ürünler';
+const sortValue=(a,b,dir=1)=>{
+ if(a===null||a===undefined)return b===null||b===undefined?0:1;
+ if(b===null||b===undefined)return -1;
+ return (typeof a==='number'&&typeof b==='number'?a-b:String(a).localeCompare(String(b),'tr',{numeric:true}))*dir;
+};
+
 export async function renderSeoMonitor(root,{month,device,api,notify}){
  const token=root.dataset.monitorRequest;
- root.replaceChildren(el('h3','SEO Takibi · Ürün, Kelime ve Tarihli SEO Arşivi'),
-  note('GSC tıklaması müşteri veya sipariş değildir. Gerçek müşteri dönüşümü için uygun GA4 dönüşüm olayı gerekir. GSC sorguları Google tarafından anonimleştirilebilir.'));
- const status=note('Aylık GSC gözlemleri ve SEO sürümleri okunuyor…');root.append(status);
+ root.replaceChildren();
+ const status=note('SEO takibi yükleniyor…');root.append(status);
  try{
   const result=await api('/api/independent/tayfun-ai/monitor?'+new URLSearchParams({month,device}));
   if(!root.isConnected||root.dataset.monitorRequest!==token)return;
-  status.textContent='Karşılaştırma: '+result.previous_month+' → '+result.month+' · Cihaz: '+(device==='ALL'?'Tüm cihazlar':device)+' · Kısmi ayın görünen değerleri gösterilir; kesin düşüş kararı verilmez.';
+  status.remove();
+  const toolbar=el('div','','tayfun-jobs-toolbar tayfun-monitor-toolbar');
+  const searchWrap=el('div','','tayfun-jobs-search-wrap');
+  const searchIcon=el('span','⌕','tayfun-jobs-search-icon');searchIcon.setAttribute('aria-hidden','true');
+  const search=el('input','','tayfun-jobs-search');search.type='search';
+  search.placeholder='Ürün veya kategori ara...';search.setAttribute('aria-label','SEO Takibi ürün veya kategori ara');
+  searchWrap.append(searchIcon,search);
+  const categoryScroll=el('div','','tayfun-jobs-category-scroll');
+  const categoryButtons=new Map();
+  let selectedCategory='Tüm Kategoriler';
+  for(const category of categoryNames){
+   const btn=el('button',category,'tayfun-jobs-category-pill');
+   btn.type='button';btn.setAttribute('aria-pressed',String(category===selectedCategory));
+   btn.addEventListener('click',()=>{
+    selectedCategory=category;
+    for(const [name,b] of categoryButtons)b.setAttribute('aria-pressed',String(name===selectedCategory));
+    applyFilters();
+   });
+   categoryButtons.set(category,btn);categoryScroll.append(btn);
+  }
+  toolbar.append(searchWrap,categoryScroll);root.prepend(toolbar);
+  const matches=[];
+  const list=el('div','','tayfun-monitor-products');
+  const empty=note('Bu kategori veya aramada eşleşen ürün bulunamadı.');empty.hidden=true;
+  function applyFilters(){
+   const term=search.value.toLocaleLowerCase('tr-TR').trim();
+   let count=0;
+   for(const {product,article} of matches){
+    const matchCategory=selectedCategory==='Tüm Kategoriler'||categoryOf(product)===selectedCategory;
+    const matchQuery=!term||(product.name+' '+categoryOf(product)+' '+product.url).toLocaleLowerCase('tr-TR').includes(term);
+    article.hidden=!(matchCategory&&matchQuery);
+    if(!article.hidden)count++;
+   }
+   empty.hidden=count>0;
+  }
+  search.addEventListener('input',applyFilters);
   const stats=el('div','','tayfun-monitor-summary');
   for(const [n,label,cls] of [[result.warning_count,'Kanıtlı önemli düşüş','down'],[result.rising_count,'Kanıtlı yükseliş','up'],[result.waiting_count,'İzleme / tam veri bekliyor','wait']]){
    const stat=el('div','','tayfun-monitor-stat '+cls);stat.append(el('strong',String(n)),el('span',label));stats.append(stat);
   }
-  root.append(stats,note(result.limitation));
+  root.append(stats,list,empty);
   const sorted=[...(result.products||[])].sort((a,b)=>({dusuyor:0,yukseliyor:1,izle:2,bekle:3}[a.status]??4)-({dusuyor:0,yukseliyor:1,izle:2,bekle:3}[b.status]??4)||a.name.localeCompare(b.name,'tr'));
   for(const product of sorted){
    const article=openable('', 'tayfun-monitor-product '+product.status);
@@ -154,7 +203,8 @@ export async function renderSeoMonitor(root,{month,device,api,notify}){
     range.addEventListener('change',()=>{if(history.open)loadSeries();});
     detail.append(history);
    }
-   article.append(detail);root.append(article);
+   article.append(detail);list.append(article);matches.push({product,article});
   }
- }catch(error){if(root.dataset.monitorRequest===token)status.textContent='SEO Takibi verisi okunamadı: '+error.message+'. Önceki kayıtlar korunuyor.';}
+  applyFilters();
+ }catch(error){if(root.dataset.monitorRequest===token){status.textContent='SEO Takibi verisi okunamadı: '+error.message+'. Önceki kayıtlar korunuyor.';root.prepend(status);}}
 }
