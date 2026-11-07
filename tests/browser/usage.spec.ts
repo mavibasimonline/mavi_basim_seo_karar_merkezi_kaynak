@@ -183,7 +183,7 @@ test("core navigation workspaces remain accessible after redundant menu cleanup"
     await expect(page.locator("#refresh")).toBeVisible();
     const box = (await page.locator(target).boundingBox())!;
     positions[id] = box.y;
-    expect(box.y).toBeLessThan(220);
+    expect(box.y).toBeLessThan(["overview", "tayfun"].includes(id) ? 380 : 220);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
@@ -195,7 +195,15 @@ test("core navigation workspaces remain accessible after redundant menu cleanup"
       animations: "disabled",
     });
   }
-  expect(positions.overview).toBeLessThan(260);
+  // The unified Tayfun navigation intentionally occupies one row above overview metrics.
+  const tabLayout = await page.evaluate(() => {
+    const tabs = document.getElementById("tayfunWorkspaceTabs")!;
+    const rects = [...tabs.querySelectorAll("button")].map((b) => b.getBoundingClientRect());
+    return { height: tabs.getBoundingClientRect().height, oneRow: rects.every((r) => Math.abs(r.top - rects[0].top) < 2) };
+  });
+  expect(tabLayout.height).toBeLessThan(70);
+  expect(tabLayout.oneRow).toBe(true);
+  expect(positions.overview).toBeLessThan(380);
   // Fixed controls remain visible while only the month area scrolls.
   for (const selector of [
     "#pickerYear",
