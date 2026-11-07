@@ -229,6 +229,12 @@ export default {
         if(typeof archive?.fetch==='function'){
           const result=await archive.fetch('https://archive.private/api/internal/tayfun-tick',{method:'POST'});
           if(!result.ok)console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_PRIVATE_ARCHIVE_UNAVAILABLE'}));
+          // Approved initial SEO baselines run against real snapshot evidence only.
+          // The private archive deduplicates entries; unavailable snapshots stay pending.
+          try{
+            const baseline=await archive.fetch('https://archive.private/api/internal/tayfun-approved-baseline',{method:'POST'});
+            if(!baseline.ok)console.log(JSON.stringify({event:'tayfun-approved-baseline',status:'held',code:'TAYFUN_VERIFIED_BASELINE_UNAVAILABLE'}));
+          }catch{console.log(JSON.stringify({event:'tayfun-approved-baseline',status:'held',code:'TAYFUN_BASELINE_REQUEST_UNAVAILABLE'}));}
         }
       }catch{console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_AUTO_TICK_UNAVAILABLE'}));}
 
