@@ -37,7 +37,25 @@ export async function tayfunAiSave(storage:Store,secret:string,input:unknown,tim
  const product=ctx.product,nowMonth=dateMonth(time);
  reject(x.url===product.canonical_url&&gscPageURL(x.url)===x.url&&x.month===nowMonth);
  // The client must have read this product's latest revision; a concurrent edit cannot be overwritten.
- reject((x.expected_latest_id??null)===ctx.latest_revision_id);
+ if((x.expected_latest_id??null)!==ctx.latest_revision_id){
+  const latest=ctx.versions.find(v=>v.id===ctx.latest_revision_id);
+  const seo=x.seo as Record<string,unknown>|null;
+  const oldId=x.expected_latest_id??null;
+  const fields=['title','description','h1','canonical','robots','headings','internal_links','structured_data','notes',
+   'hreflang','images','open_graph','twitter_card','x_robots','viewport','lang','redirect','status_code','content_excerpt'];
+  const sameFields=!!seo&&typeof seo==='object'&&!Array.isArray(seo)&&
+   fields.every(key=>typeof seo[key]==='string'&&seo[key]===latest?.[key as keyof TayfunEntry]);
+  const incomingKeywords=x.keywords;
+  const sameKeywords=Array.isArray(incomingKeywords)&&incomingKeywords.every(word=>typeof word==='string'&&latest?.keywords.includes(word));
+  const sameDecisions=JSON.stringify(x.keyword_decisions??[])===JSON.stringify(latest?.keyword_decisions??[]);
+  const sameProposals=JSON.stringify(x.page_proposals??[])===JSON.stringify(latest?.page_proposals??[]);
+  if(latest?.source==='ai-review'&&latest.product_id===product.id&&latest.supersedes===oldId&&
+    sameFields&&sameKeywords&&sameDecisions&&sameProposals)
+   return {ok:true,already_saved:true,entry:latest,product_id:product.id,previous_revision_id:oldId,
+    original_records_unchanged:true,site_mutations:0,publication_verified:false,
+    response:'Aynı SEO analizi zaten arşivde mevcut. Yeni sürüm oluşturulmadı.'};
+  reject(false);
+ }
  const seo=x.seo;
  reject(seo&&typeof seo==='object'&&!Array.isArray(seo));
  const fields=seo as Record<string,unknown>;
