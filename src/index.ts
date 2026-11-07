@@ -208,6 +208,19 @@ export default {
   async scheduled(_event:ScheduledController,env:Env,context:ExecutionContext){if(env.AUTOMATION_ENABLED!=='true')return;context.waitUntil((async()=>{
     try{
       const time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
+      // Keep user-approved SEO baseline capture independent from all Google and D1 workflows.
+      // A failure in GSC, GA4 or quota checks must not starve the three baseline records.
+      try{
+        const archive=(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE;
+        if(typeof archive?.fetch==='function'){
+          const response=await archive.fetch('https://archive.private/api/internal/tayfun-approved-baseline',{method:'POST'});
+          if(!response.ok){console.log(JSON.stringify({event:'tayfun-approved-baseline',status:'held',code:'BASELINE_ARCHIVE_HTTP_ERROR'}));}
+          else{
+            const payload=await response.json<{ok:boolean;items:{url:string;status:string}[]}>();
+            console.log(JSON.stringify({event:'tayfun-approved-baseline',status:payload.ok?'ok':'partial',items:payload.items.map(x=>({url:x.url,status:x.status})),d1_requests:0}));
+          }
+        }
+      }catch{console.log(JSON.stringify({event:'tayfun-approved-baseline',status:'held',code:'BASELINE_ARCHIVE_UNAVAILABLE',d1_requests:0}));}
       if(independentRefreshDue(time)){
         // Keep the source refresh outside the quota-limited legacy D1 tick.
         try{await refreshIndependentSheets(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);}
@@ -229,12 +242,7 @@ export default {
         if(typeof archive?.fetch==='function'){
           const result=await archive.fetch('https://archive.private/api/internal/tayfun-tick',{method:'POST'});
           if(!result.ok)console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_PRIVATE_ARCHIVE_UNAVAILABLE'}));
-          // Approved initial SEO baselines run against real snapshot evidence only.
-          // The private archive deduplicates entries; unavailable snapshots stay pending.
-          try{
-            const baseline=await archive.fetch('https://archive.private/api/internal/tayfun-approved-baseline',{method:'POST'});
-            if(!baseline.ok)console.log(JSON.stringify({event:'tayfun-approved-baseline',status:'held',code:'TAYFUN_VERIFIED_BASELINE_UNAVAILABLE'}));
-          }catch{console.log(JSON.stringify({event:'tayfun-approved-baseline',status:'held',code:'TAYFUN_BASELINE_REQUEST_UNAVAILABLE'}));}
+
         }
       }catch{console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_AUTO_TICK_UNAVAILABLE'}));}
 
