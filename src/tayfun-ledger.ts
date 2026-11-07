@@ -69,8 +69,8 @@ export async function tayfunSave(storage:Store,secret:string,input:unknown,time=
  fail(priorDecisions.size<=160);
  const entry:TayfunEntry={id:crypto.randomUUID(),month:period,url:r.url,created_at:now,status,kind:'manuel',source:isAi?'ai-review':'user-entry',
   title,description,h1,canonical,robots:text(r.robots||'',200),
-  keywords:retained,headings:text(r.headings||'',2500),
-  internal_links:text(r.internal_links||'',2500),structured_data:text(r.structured_data||'',5000),
+  keywords:retained,headings:text(r.headings||'',20000),
+  internal_links:text(r.internal_links||'',20000),structured_data:text(r.structured_data||'',65536),
   notes:text(r.notes||'',2500),supersedes,
   hreflang:text(r.hreflang||'',2500),images:text(r.images||'',2500),open_graph:text(r.open_graph||'',2500),twitter_card:text(r.twitter_card||'',2500),
   x_robots:text(r.x_robots||'',200),viewport:text(r.viewport||'',500),lang:text(r.lang||'',100),redirect:text(r.redirect||'',2048),status_code:text(r.status_code||'',100),content_excerpt:text(r.content_excerpt||'',5000),
