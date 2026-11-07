@@ -79,7 +79,7 @@ export function evaluateSeoMonitor(product:{id:string;name:string;category?:stri
    previous:priorScope.page_days_verified,previous_expected:priorScope.expected_days},
   scopes:{selected:currentScope,previous:priorScope},
   observed_previous:priorObserved,observed_current:currentObserved,keywords,
-  note:'GSC tıklaması müşteri/sipariş değildir. Google sorguları anonimleştirilebilir. SEO sürümü canlıya uygulama veya nedensellik kanıtı değildir.'};
+  note:'GSC tıklaması müşteri/sipariş değildir. Google sorguları anonimleştirilebilir. SEO sürümü yayına alınmış değişiklik kanıtı değildir; GSC değişimleri nedensellik kanıtı değildir.'};
  const waiting=(reason:string)=>({...base,status:'bekle',label:'İzleme bekliyor',reason,
   previous_clicks:null,current_clicks:null,click_delta:null,change_percent:null});
  if(!latest)return waiting('Yapay zekâ SEO taslağı henüz kaydedilmedi; doğrulanmış sorgu gözlemleri varsa aşağıda gösterilir.');
