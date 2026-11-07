@@ -1,5 +1,6 @@
 import { $, node } from "./ui.js";
-import {staleStoredMonth,installRollover} from "./seo/period-rollover.js";
+import {staleStoredMonth,installRollover,monthLabel,readPeriodPreference,savePeriodPreference} from "./seo/period-rollover.js";
+export {monthLabel} from "./seo/period-rollover.js";
 const KEY = "mavi-dashboard-preferences",
   devices = ["ALL", "MOBILE", "DESKTOP", "TABLET"];
 export const currentMonth = () => {
@@ -14,14 +15,6 @@ export const currentMonth = () => {
     p.find((x) => x.type === "month").value
   );
 };
-export const monthLabel = (value) =>
-  new Intl.DateTimeFormat("tr-TR", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  })
-    .format(new Date(value + "-01T12:00:00Z"))
-    .replace(/^./, (s) => s.toLocaleUpperCase("tr-TR"));
 export const scopeParams = () =>
   new URLSearchParams({
     month: $("month").value,
@@ -38,10 +31,7 @@ export function setupPeriod(viewNames, onChange) {
     $("month").append(new Option(monthLabel(v), v));
   }
   const allowed = () => [...$("month").options].map((o) => o.value);
-  let pref = {};
-  try {
-    pref = JSON.parse(localStorage.getItem(KEY) || "{}") || {};
-  } catch {}
+  const pref = readPeriodPreference(KEY);
   $("rangeMonths").value = ["1", "3", "6", "12"].includes(
     String(pref.rangeMonths),
   )
@@ -59,18 +49,11 @@ export function setupPeriod(viewNames, onChange) {
   const years = [...new Set(allowed().map((v) => v.slice(0, 4)))];
   $("pickerYear").replaceChildren(...years.map((v) => new Option(v, v)));
   function remember(view) {
-    try {
-      localStorage.setItem(
-        KEY,
-        JSON.stringify({
-          month: $("month").value,
-          calendarMonth: currentMonth(),
-          rangeMonths: $("rangeMonths").value,
-          device: $("device").value,
-          view: viewNames.includes(view) ? view : "overview",
-        }),
-      );
-    } catch {}
+    savePeriodPreference(KEY,{
+      month: $("month").value,calendarMonth:currentMonth(),
+      rangeMonths:$("rangeMonths").value,device:$("device").value,
+      view:viewNames.includes(view)?view:"overview",
+    });
   }
   function draw() {
     $("pickerYear").value = String(year);
