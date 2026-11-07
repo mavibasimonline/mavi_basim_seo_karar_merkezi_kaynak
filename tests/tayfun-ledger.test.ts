@@ -34,4 +34,27 @@ describe('Tayfun immutable monthly ledger',()=>{
   await expect(tayfunSave(s,secret,{...initial,supersedes:'made-up'},new Date('2026-11-06'))).rejects.toThrow('TAYFUN_INPUT_INVALID');
   expect((await tayfunList(s,secret,'2026-10')).entries).toHaveLength(1);
  });
+ it('stores a changed December Title and H1 as a new dated row while preserving October and November SEO and all keywords',async()=>{
+  const s=store(),oct=await tayfunSave(s,secret,initial,new Date('2026-11-07T12:00:00Z'));
+  const november=await tayfunSave(s,secret,{...initial,month:'2026-11',title:'Kasım Broşür SEO Title',
+   description:'Kasım meta',h1:'Kasım H1',headings:'H2 Kasım',
+   keywords:['broşür yeni sorgu'],supersedes:oct.entry.id},new Date('2026-11-07T15:49:48Z'));
+  const december=await tayfunSave(s,secret,{...initial,month:'2026-12',title:'Aralık 2026 Yeni Başlık',
+   description:'Aralık meta',h1:'Aralık yeni H1',headings:'H2 Aralık',
+   keywords:['aralık broşür kelimesi'],supersedes:november.entry.id},new Date('2026-12-05T09:20:00Z'));
+  const old=(await tayfunList(s,secret,'2026-10')).entries;
+  const middle=(await tayfunList(s,secret,'2026-11')).entries;
+  const newer=(await tayfunList(s,secret,'2026-12')).entries;
+  expect(old).toHaveLength(1);expect(middle).toHaveLength(1);expect(newer).toHaveLength(1);
+  expect(old[0].title).toBe('Broşür fiyatları');
+  expect(middle[0]).toMatchObject({title:'Kasım Broşür SEO Title',h1:'Kasım H1',
+   created_at:'2026-11-07T15:49:48.000Z'});
+  expect(newer[0]).toMatchObject({title:'Aralık 2026 Yeni Başlık',h1:'Aralık yeni H1',
+   created_at:'2026-12-05T09:20:00.000Z',supersedes:november.entry.id});
+  expect(newer[0].keywords).toEqual(['broşür fiyatları','broşür yeni sorgu','aralık broşür kelimesi']);
+  expect(middle[0].keywords).toEqual(['broşür fiyatları','broşür yeni sorgu']);
+  expect(old[0].keywords).toEqual(['broşür fiyatları']);
+  expect(s.data.size).toBe(6);
+ });
+
 });
