@@ -21,6 +21,7 @@ import {IndependentGscCollector} from './independent-gsc';
 import {collectPropertyTotal,readPropertyTotal,collectPropertyHistory,readPropertyDays} from './independent-gsc-totals';
 import {resolvedCatalog,addCustomProduct} from './independent-catalog';
 import {verifiedGscMonth,readVerifiedGscDay,verifiedGscSeries} from './independent-gsc-report';
+import {monthlyGscHealth} from './gsc-monthly-health';
 import {analyzeVerifiedGsc,answerVerifiedGsc} from './independent-gsc-analysis';
 import {cronTime,recordGscCron,gscCronProof} from './independent-cron-proof';
 import {validateIndependentContext,saveIndependentContext,readIndependentContext,independentContextStatus,answerContextQuestion} from './independent-context';
@@ -327,7 +328,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     }
     if(path==='/api/internal/gsc-coverage'&&request.method==='GET'){
       const collector=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
-      return json({...await collector.status(),catchup:await catchupStatus(this.ctx.storage),cron:await gscCronProof(this.ctx.storage),connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')});
+      return json({...await collector.status(),monthly_health:await monthlyGscHealth(this.ctx.storage),catchup:await catchupStatus(this.ctx.storage),cron:await gscCronProof(this.ctx.storage),connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')});
     }
     if(path.startsWith('/api/internal/seo-history/')){
      const action=path.split('/').at(-1);
@@ -448,7 +449,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    }
    if(request.method==='GET'&&path==='/api/independent/gsc-status'){
     const collector=new IndependentGscCollector(this.ctx.storage,this.key(),async()=>{throw Error('GSC_STATUS_ONLY');});
-    return json({...await collector.status(),catchup:await catchupStatus(this.ctx.storage),cron:await gscCronProof(this.ctx.storage),connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')});
+    return json({...await collector.status(),monthly_health:await monthlyGscHealth(this.ctx.storage),catchup:await catchupStatus(this.ctx.storage),cron:await gscCronProof(this.ctx.storage),connected:!!await this.ctx.storage.get('gsc:oauth'),reauthorization_required:!!await this.ctx.storage.get('gsc:oauth-reconnect')});
    }
    let questionBody:{question:string;month?:string;source?:unknown}|undefined;
    if(request.method==='POST'&&(path==='/api/independent/questions'||path==='/api/independent/gsc-questions')){
