@@ -3,11 +3,12 @@ const el=(tag,text='',cls='')=>{const node=document.createElement(tag);if(text!=
 const number=n=>Number(n).toLocaleString('tr-TR',{maximumFractionDigits:1});
 const display=n=>n===null||n===undefined?'Veri bekleniyor':number(n);
 export async function renderSeoMonitor(root,{month,device,api,notify}){
+ const requestToken=root.dataset.monitorRequest;
  root.replaceChildren(el('h3','SEO Takibi · Düşen ve Yükselen Çalışmalar'),el('p','SEO İşleri’nde kaydettiğiniz sürümlerin ardından ürün ve kelime GSC değişimlerini izler. Sadece tam, doğrulanmış ve aynı cihaz kapsamındaki aylar karşılaştırılır.','source-note'));
  const status=el('p','Tarihli SEO sürümleri ve doğrulanmış GSC verileri kontrol ediliyor…','source-note');root.append(status);
  try{
   const result=await api('/api/independent/tayfun-ai/monitor?'+new URLSearchParams({month,device}));
-  if(!root.isConnected)return;
+  if(!root.isConnected||root.dataset.monitorRequest!==requestToken)return;
   status.textContent='Karşılaştırma: '+result.previous_month+' → '+result.month+' · Cihaz: '+(device==='ALL'?'Tüm cihazlar':device)+' · Siteye değişiklik yapılmaz.';
   const summary=el('div','','tayfun-monitor-summary');
   for(const [count,label,kind] of [[result.warning_count,'Düşüş uyarısı','down'],[result.rising_count,'Yükseliş','up'],[result.waiting_count,'Veri / yeni sürüm bekliyor','wait']]){
@@ -36,5 +37,5 @@ export async function renderSeoMonitor(root,{month,device,api,notify}){
    }else detail.append(el('p',product.revisions?'Kelime karşılaştırması için iki tam ay bekleniyor.':'Yapay zekâ SEO sürümü henüz kaydedilmedi.','source-note'));
    article.append(detail);root.append(article);
   }
- }catch(error){status.textContent='SEO Takibi verisi okunamadı: '+error.message+'. Önceki kayıtlar korunuyor.';}
+ }catch(error){if(root.dataset.monitorRequest===requestToken)status.textContent='SEO Takibi verisi okunamadı: '+error.message+'. Önceki kayıtlar korunuyor.';}
 }
