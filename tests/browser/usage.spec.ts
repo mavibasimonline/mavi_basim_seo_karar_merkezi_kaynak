@@ -393,6 +393,7 @@ test("3, 6, 12 month modes and device load matching real APIs and survive tabs a
     JSON.parse(localStorage.getItem("mavi-dashboard-preferences")!),
   );
   expect(Object.keys(saved).sort()).toEqual([
+    "calendarMonth",
     "device",
     "month",
     "rangeMonths",
