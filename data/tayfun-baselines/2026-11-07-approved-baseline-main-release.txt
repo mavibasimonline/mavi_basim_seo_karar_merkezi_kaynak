@@ -1,0 +1,5 @@
+Tayfun kullanıcısı tarafından onaylanan Broşür, El İlanı ve Afiş gerçek SEO başlangıç kaydı zamanlanmış üretim yayını.
+Özel arşiv doğrulanmış commit: 89aed9b6aea56c0b9d2eab6b06f5e5daab0e48ab.
+Ana Worker yalnız mevcut 15 dakikalık Cron üzerinden özel arşivi tetikler.
+22 Ekim 2026 referans tarihidir, tarama/yayın tarihi değildir.
+Yalnız gerçek SEO kaynak verisi kullanılır, çift kayıt yapılmaz, canlı matbaa sitesi etkilenmez.
