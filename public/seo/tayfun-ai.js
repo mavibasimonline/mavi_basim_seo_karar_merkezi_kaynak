@@ -143,6 +143,21 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
  const intro=E('div','','tayfun-jobs-intro');intro.append(E('h3','SEO İşleri · Ürün bazlı yapay zekâ çalışması'),
  E('p','Ürünü seç → yalnız onun GSC, SEO ve kelime geçmişini tek metin olarak al → ChatGPT’ye gönder → cevabı incele ve yeni tarihli sürüm olarak kaydet. Eski kayıtlar silinmez.'));
  container.append(intro);
+ // Read actual encrypted ledger state; do not confuse AI proposal counts with baseline observations.
+ const baselineStatus=E('div','Broşür, El İlanı ve Afiş kanıtlı başlangıç kayıtları kontrol ediliyor…','source-note');
+ container.append(baselineStatus);
+ api('/api/independent/tayfun/approved-baseline/status').then(state=>{
+  baselineStatus.replaceChildren();
+  baselineStatus.append(E('strong','22 Ekim 2026 referanslı gerçek SEO temel kayıtları: '+state.saved_count+'/3'));
+  for(const item of state.items||[]){
+   const name=item.url.endsWith('/brosur')?'Broşür':item.url.endsWith('/el-ilani')?'El İlanı':'Afiş';
+   const label=item.status==='saved'?'Kaydedildi · '+new Date(item.created_at).toLocaleString('tr-TR'):
+    item.status==='awaiting_verified_crawl'?'Gerçek tarama bekleniyor':
+    item.status==='held'?'Kayıt başarısız · tarama/izin durumunu kontrol et':'Henüz kayıt doğrulanmadı';
+   baselineStatus.append(E('p',name+': '+label,'source-note'));
+  }
+  baselineStatus.append(E('p','Bu kayıtlar gerçek tarama sürümleridir; aşağıdaki SEO Takibi yalnız AI SEO taslaklarını sayar.','source-note'));
+ }).catch(()=>{baselineStatus.textContent='Gerçek SEO temel kayıtları okunamadı; veritabanında kayıt varmış gibi gösterilmez.';});
  const toolbar=E('div','','tayfun-jobs-toolbar');
  const searchLabel=E('label','','tayfun-jobs-search-wrap');
  searchLabel.setAttribute('aria-label','Ürün veya kategori ara');
@@ -215,7 +230,7 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
    if(history.product?.id!==product.id||history.product?.canonical_url!==product.canonical_url)
     throw Error('Ürün kaynağı eşleşmedi.');
    editor.replaceChildren();
-   const legend=E('p','Eski SEO kayıtları: '+history.versions.length+' · Bilinen en eski kayıt: '+(history.oldest_recorded_at?new Date(history.oldest_recorded_at).toLocaleString('tr-TR'):'Henüz yok')+' · Korunan kelime: '+history.tracked_keywords.length,'source-note');
+   const legend=E('p','Arşivdeki tarihli SEO sürümleri: '+history.versions.length+' · Bilinen en eski kayıt: '+(history.oldest_recorded_at?new Date(history.oldest_recorded_at).toLocaleString('tr-TR'):'Henüz yok')+' · Korunan kelime: '+history.tracked_keywords.length,'source-note');
    editor.append(legend);
    const tracking=productKeywordTracking({product,current,previous,history,device});
    const keywordDetails=E('details','','tayfun-keyword-history');
