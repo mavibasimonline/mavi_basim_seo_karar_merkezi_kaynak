@@ -1,6 +1,6 @@
 // Monthly GSC completeness audit. Derived from existing immutable daily manifests:
 // no Google calls, no D1, no writes and no fabricated zero-traffic days.
-import {collectedGscProof,type DailyProof,type GscStorage} from './independent-gsc';
+import {collectedGscProof,type DailyProof} from './independent-gsc';
 
 export type MonthHealth={
  month:string;month_closed:boolean;eligible_days:number;verified_page_days:number;
@@ -11,7 +11,7 @@ const monthBefore=(m:string)=>{const d=new Date(m+'-01T12:00:00Z');d.setUTCMonth
 const utcDay=(time:Date)=>time.toISOString().slice(0,10);
 
 export async function monthlyGscHealth(
- storage:Pick<GscStorage,'get'>,time=new Date(),count=3
+ storage:{get<T=unknown>(key:string):Promise<T|undefined>},time=new Date(),count=3
 ):Promise<{checked_at:string;latest_eligible_day:string;months:MonthHealth[];overdue_count:number;note:string}>{
  const cutoff=new Date(Date.UTC(time.getUTCFullYear(),time.getUTCMonth(),time.getUTCDate()-3));
  const latest=utcDay(cutoff),overdue=utcDay(new Date(cutoff.getTime()-86400000));
