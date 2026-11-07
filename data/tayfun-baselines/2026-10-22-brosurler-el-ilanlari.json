@@ -4,11 +4,11 @@
   "reference_date_requested": "2026-10-22",
   "reference_date_kind": "user-specified baseline date; NOT verified historical crawl/publish date",
   "observed_date": "2026-11-07",
-  "source": "Public page search snapshots (not verified raw HTML): URL paths established, SEO fields below are candidate descriptions requiring live verification",
+  "source": "Tayfun SEO Karar Merkezi tarama kanıtı (kullanıcının 7 Kasım 2026 tarihli ekran dökümü); Broşür için 6 Kasım 2026 tarihli seo_snapshots kaydı",
   "verified_2026_10_22_state": false,
   "live_app_imported": false,
   "site_mutations": 0,
-  "notes": "Kaynak kontrolü 7 Kasım'da yapıldı fakat canlı HTML head doğrulanamadı. Title/H1/H2 ve metin parçaları tarihsel veya teknik olarak doğrulanmış kabul edilmemelidir; yalnız aday çalışma metnidir. 22 Ekim kullanıcı referans tarihidir, tarama veya yayın tarihi değildir. Tayfun Durable Object manuel sürümüne yazılmadı.",
+  "notes": "22 Ekim 2026 yalnız kullanıcı tarafından seçilen referans tarihidir. Broşür için doğrulanmış teknik gözlem 6 Kasım 2026 UTC; 22 Ekim tarihli durumu kanıtlamaz. Afiş ve El İlanı mevcut aday alanları bağımsız tarama kaydı gösterilmediğinden doğrulanmamıştır. Tayfun canlı manuel sürüm arşivine aktarılmadı; site değiştirilmedi.",
   "pages": [
     {
       "url": "https://mavibasim.com/brosur",
@@ -23,11 +23,22 @@
       ],
       "visible_text_excerpt": "Broşür fiyatları için 115 gr, 130 gr ve 200 gr kuşe seçeneklerini mevcut fiyat listemizden karşılaştırabilirsiniz. A4, A5, A3 ve katlamalı broşür basımı hizmetini İstanbul Topkapı 2. Matbaacılar Sitesi üzerinden Türkiye geneline sunuyoruz.",
       "source_url": "https://mavibasim.com/brosur",
-      "field_verification": "unverified_candidates_only",
-      "title_verified": false,
-      "h1_verified": false,
-      "heading_structure_verified": false,
-      "content_verified": false
+      "field_verification": "tayfun-seo-snapshot-2026-11-06",
+      "title_verified": true,
+      "h1_verified": true,
+      "heading_structure_verified": true,
+      "content_verified": true,
+      "description": "A4, A5 ve A3 broşür baskı fiyatlarını; 115, 130 ve 200 gr kuşe seçeneklerini inceleyin. Katlama, ölçü ve baskı dosyası bilgilerini öğrenin.",
+      "canonical": "https://mavibasim.com/brosur",
+      "http_status": 200,
+      "observed_at": "2026-11-06T15:45:45.595Z",
+      "snapshot_store": "seo_snapshots",
+      "snapshot_id": "705f493bc85e91dffa05d164b7ccad7e7a8522fcbd7c89406c846662c941c6d2",
+      "body_hash": "a6281f5d8469a7b47c384eb7489c0a008fff07f31f7b02012d30170c121a9b8f",
+      "heading_count": 72,
+      "internal_link_count": 46,
+      "source_evidence": "Kullanıcının Tayfun ekranında açtığı 'Tarihli SEO tarama kaydını aç' bölümü",
+      "history_2026_10_22_verified": false
     },
     {
       "url": "https://mavibasim.com/el-ilani",
@@ -63,16 +74,13 @@
     }
   ],
   "unverified_fields": [
-    "meta_description",
-    "canonical",
     "robots",
-    "all_headings",
     "schema_json_ld",
     "open_graph",
     "twitter_card",
     "hreflang",
     "image_alt",
-    "status_code",
-    "historical_state_as_of_2026_10_22"
+    "historical_state_as_of_2026_10_22",
+    "afis_ve_el_ilani_teknik_seo_alanlari"
   ]
 }
