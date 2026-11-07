@@ -129,9 +129,37 @@ export async function renderSeoMonitor(root,{month,device,api,notify}){
      if(!root.isConnected||root.dataset.monitorRequest!==token)return;
      if(data.product?.id!==product.product_id||data.product?.canonical_url!==product.url)throw Error('Ürün arşivi uyuşmadı.');
      versionsBody.replaceChildren();
-     for(const [i,v] of [...(data.versions||[])].sort((a,b)=>b.created_at.localeCompare(a.created_at)).entries()){
-      const entry=openable(v.month+' · '+date(v.created_at)+' · '+(v.source==='ai-review'?'AI analizi':'Temel kayıt'),'tayfun-monitor-version',i===0);
+     const archive=[...(data.versions||[])].sort((a,b)=>b.created_at.localeCompare(a.created_at));
+     const byId=new Map(archive.map(v=>[v.id,v]));
+     for(const [i,v] of archive.entries()){
+      const previous=(v.supersedes&&byId.get(v.supersedes))||archive[i+1]||null;
+      const entry=openable('Kaydedildi: '+date(v.created_at)+' · Kayıt ayı '+v.month+' · '+(v.source==='ai-review'?'AI analizi':'Temel kayıt'),'tayfun-monitor-version',i===0);
       const inside=el('div','','tayfun-monitor-version-fields');
+      inside.append(textField('Arşivde oluşturulma günü ve saati',date(v.created_at)),
+       textField('Kayıt ayı',v.month),textField('Canlı siteye uygulama','Bu kayıt siteye uygulanmış değişiklik kanıtı değildir.'));
+      if(previous){
+       const compare=openable('Önceki sürüme göre Title, Meta ve H başlıkları · '+date(previous.created_at)+' → '+date(v.created_at),'tayfun-monitor-compare',true);
+       const compareBody=el('div','','tayfun-monitor-compare-body');
+       const fields=[
+        ['title','SEO Title'],['description','Meta Description'],['h1','H1'],
+        ['headings','H1–H6 başlık yapısı'],['canonical','Canonical'],['robots','Robots'],
+        ['internal_links','İç bağlantılar'],['structured_data','Schema / JSON-LD'],
+        ['images','Görseller ve ALT'],['open_graph','Open Graph'],
+        ['hreflang','Hreflang'],['twitter_card','Twitter Card']
+       ];
+       const changed=fields.filter(([key])=>String(previous[key]??'')!==String(v[key]??''));
+       compareBody.append(note(changed.length?changed.length+' SEO alanının kayıtlı değeri değişti. Eski ve yeni metinler aşağıdadır.':
+        'SEO başlığı, meta, H başlıkları ve karşılaştırılan teknik alanlar önceki kayıttakiyle aynı. Her iki sürüm ayrı saklanıyor.'));
+       for(const [key,label] of fields){
+        const row=el('div','','tayfun-monitor-compare-row');
+        row.append(el('strong',label+' · '+(previous[key]===v[key]?'Aynı':'Değişti')));
+        const values=el('div','','tayfun-monitor-compare-values');
+        values.append(textField('Önceki · '+date(previous.created_at),previous[key]||'—'),
+         textField('Yeni kayıt · '+date(v.created_at),v[key]||'—'));
+        row.append(values);compareBody.append(row);
+       }
+       compare.append(compareBody);inside.append(compare);
+      }else inside.append(note('Bu ürünün ilk arşiv sürümü. Kayıttan önceki SEO değerleri doğrulanmış değildir.'));
       for(const [label,value] of [['Title',v.title],['Meta Description',v.description],['H1',v.h1],
        ['Canonical',v.canonical],['Robots',v.robots],['Sürüm kimliği',v.id],['Önceki sürüm',v.supersedes||'İlk kayıt'],
        ['Anahtar kelimeler ('+(v.keywords||[]).length+')',(v.keywords||[]).join(' · ')],['Notlar',v.notes]])
