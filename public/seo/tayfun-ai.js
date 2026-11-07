@@ -280,6 +280,17 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
    seen.add(product.id);
    try{
     const history=await api('/api/independent/tayfun-ai/context?product_id='+encodeURIComponent(product.id));
+    // A previously saved analysis may be pasted again. Let the archive check for
+    // an exact duplicate; do not silently rebase a stale version or overwrite history.
+    if(item.month!==history.save_month)throw Error('Kayıt ayı değişmiş. Güncel ürün verisi gerekli.');
+    if(item.expected_latest_id!==(history.latest_revision_id||null)){
+     const latest=history.versions?.find(v=>v.id===history.latest_revision_id);
+     if(latest?.source!=='ai-review'||latest?.supersedes!==(item.expected_latest_id??null))
+      throw Error('Ürünün SEO sürümü değişmiş; eski JSON ile farklı içerik kaydedilemez.');
+     if(item.format!=='MAVI_BASIM_TAYFUN_AI_PRODUCT_V1'||item.product_id!==product.id||
+        item.url!==product.canonical_url)throw Error('Yanıt yanlış ürüne ait.');
+     checked.push({product,data:item});continue;
+    }
     checked.push({product,data:ensureValidOutput(item,product,history)});
    }catch(error){errors.push(product.name+': '+error.message);}
   }
