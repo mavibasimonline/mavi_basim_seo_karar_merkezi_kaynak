@@ -351,7 +351,7 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
  function selectCategory(category){
   selectedCategory=category;
   for(const [name,button] of categoryButtons)button.setAttribute('aria-pressed',String(name===category));
-  renderGroups();
+  renderGroups();updateScope();
  }
  for(const category of categories){
   const button=E('button',category,'button tayfun-jobs-category-pill');
