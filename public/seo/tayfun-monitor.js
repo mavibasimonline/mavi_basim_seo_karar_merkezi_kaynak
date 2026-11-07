@@ -4,7 +4,7 @@ const number=n=>Number(n).toLocaleString('tr-TR',{maximumFractionDigits:1});
 const display=n=>n===null||n===undefined?'Veri bekleniyor':number(n);
 export async function renderSeoMonitor(root,{month,device,api,notify}){
  const requestToken=root.dataset.monitorRequest;
- root.replaceChildren(el('h3','SEO Takibi · Düşen ve Yükselen Çalışmalar'),el('p','SEO İşleri’nde kaydettiğiniz sürümlerin ardından ürün ve kelime GSC değişimlerini izler. Sadece tam, doğrulanmış ve aynı cihaz kapsamındaki aylar karşılaştırılır.','source-note'));
+ root.replaceChildren(el('h3','SEO Takibi · Düşen ve Yükselen Çalışmalar'),el('p','SEO İşleri’nde yapay zekâ ile kaydettiğiniz SEO taslaklarının ardından ürün ve kelime GSC değişimlerini izler. Gerçek tarama temel kayıtları burada AI taslağı sayılmaz. Sadece tam, doğrulanmış ve aynı cihaz kapsamındaki aylar karşılaştırılır.','source-note'));
  const status=el('p','Tarihli SEO sürümleri ve doğrulanmış GSC verileri kontrol ediliyor…','source-note');root.append(status);
  try{
   const result=await api('/api/independent/tayfun-ai/monitor?'+new URLSearchParams({month,device}));
@@ -20,7 +20,7 @@ export async function renderSeoMonitor(root,{month,device,api,notify}){
   const sorted=[...(result.products||[])].sort((a,b)=>({dusuyor:0,yukseliyor:1,izle:2,bekle:3}[a.status]??4)-({dusuyor:0,yukseliyor:1,izle:2,bekle:3}[b.status]??4)||a.name.localeCompare(b.name,'tr'));
   for(const product of sorted){
    const article=el('details','','tayfun-monitor-product '+product.status);
-   const summary=el('summary');summary.append(el('strong',product.name),el('span',product.label,'tayfun-monitor-state '+product.status),el('small',product.revisions+' SEO sürümü'));
+   const summary=el('summary');summary.append(el('strong',product.name),el('span',product.label,'tayfun-monitor-state '+product.status),el('small',product.revisions+' AI SEO taslağı'));
    article.append(summary);
    const detail=el('div','','tayfun-monitor-details');
    detail.append(el('p','İlk kayıt: '+(product.first_saved_at?new Date(product.first_saved_at).toLocaleString('tr-TR'):'Henüz yok')+' · Son sürüm: '+(product.latest_saved_at?new Date(product.latest_saved_at).toLocaleString('tr-TR'):'Henüz yok')));
