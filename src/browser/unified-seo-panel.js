@@ -50,8 +50,9 @@ export function createIndependentPanel({api,notify}){
  }
  function historyModule(){if(!historyPromise)historyPromise=import('./seo/history.js').then(({createHistoryWorkspace})=>history=createHistoryWorkspace({read,notify,evidence,scope:()=>({catalog,month:target(),device:device(),revision})})).catch(()=>{historyPromise=null;throw Error('Geçmiş ekranı yüklenemedi.');});return historyPromise;}
  const complete=()=>current.length===Number($('rangeMonths').value)&&current.every(r=>r.available);
+ const observed=()=>current.length===Number($('rangeMonths').value)&&current.some(r=>r.days_verified>0);
  const productsData=()=>mappings().map(p=>{
-  const now=complete()?sum(current.flatMap(selectedRows).filter(r=>(p.urls||[p.canonical_url]).includes(r.page))):null;
+  const now=observed()?sum(current.flatMap(selectedRows).filter(r=>(p.urls||[p.canonical_url]).includes(r.page))):null;
   const before=complete()&&previous?.available?sum(selectedRows(previous).filter(r=>(p.urls||[p.canonical_url]).includes(r.page))):null;
   return {...p,current:now,previous:before,delta:now&&before?now.clicks-before.clicks:null,decision:comparisonDecision(now,before)};
  });
@@ -77,14 +78,14 @@ export function createIndependentPanel({api,notify}){
   $('chartCoverage').textContent=coverage();
  }
  function kpis(){
-  const now=complete()?sum(current.flatMap(selectedRows),true):null,before=complete()&&previous?.available?sum(selectedRows(previous),true):null;
+  const now=observed()?sum(current.flatMap(selectedRows),true):null,before=complete()&&previous?.available?sum(selectedRows(previous),true):null;
   $('kpis').replaceChildren(...[['clicks','Toplam tıklama','click'],['impressions','Toplam gösterim','eye'],['ctr','Ortalama CTR','percent'],['position','Ortalama konum','rank']].map(([key,title,kind])=>{
-   const card=node('article',null,'kpi-card'),head=node('div',null,'kpi-label');head.append(node('span',title));
+   const card=node('article',null,'kpi-card'+(!complete()?' partial':'')),head=node('div',null,'kpi-label');head.append(node('span',title));
    card.append(head,node('div',key==='ctr'?percent(now?.[key]):number(now?.[key]),'kpi-value'+(!now?' no-data':'')));
    const caption=node('div',null,'kpi-caption');
    if(now&&before&&before[key]>0){const rate=(now[key]-before[key])/before[key],change=now[key]-before[key],better=key==='position'?change<=0:change>=0;caption.append(node('span',(change<0?'▼ ':'▲ ')+(key==='ctr'?number(change*100)+' puan':key==='position'?number(change)+' sıra':(rate>0?'+':'')+percent(rate)),'delta'+(better?'':' down')));}
-   else caption.append(node('span','Karşılaştırılabilir dönem bekleniyor'));
-   card.append(caption,node('p',before?'Önceki: '+(key==='ctr'?percent(before?.[key]):number(before?.[key])):'Önceki: karşılaştırma bekleniyor','kpi-previous'));if(!now)card.append(node('small','Kısmi ay veya eksik GSC günü · toplam kesinleşmedi','kpi-previous'));return card;
+   else caption.append(node('span',!complete()?'Kısmi gözlem · tam aylık toplam değil':'Karşılaştırılabilir dönem bekleniyor'));
+   card.append(caption,node('p',before?'Önceki: '+(key==='ctr'?percent(before?.[key]):number(before?.[key])):'Önceki: karşılaştırma bekleniyor','kpi-previous'));if(!complete())card.append(node('small','GSC kapsamı: '+current.reduce((n,r)=>n+(r.days_verified||0),0)+' doğrulanmış gün · eksik günler sıfır değildir','kpi-previous'));return card;
   }));
  }
  function productRows(items){return items.map(p=>{
@@ -99,7 +100,7 @@ export function createIndependentPanel({api,notify}){
   rows.sort((a,b)=>{const key=sort.key,av=key==='name'?a.name:key==='decision'?a.decision:key==='change'?Math.abs(a.delta??0):a.current?.[key]??-1,bv=key==='name'?b.name:key==='decision'?b.decision:key==='change'?Math.abs(b.delta??0):b.current?.[key]??-1;return (typeof av==='string'?av.localeCompare(bv,'tr'):av-bv)*(sort.direction==='asc'?1:-1);});
   table($('products'),['Ürün / doğrulanmış URL','Tıklama','Gösterim','CTR','Ort. konum','Önceki aya fark','Karar'],productRows(rows));
   $('productCount').textContent=number(rows.length);$('productPeriod').textContent=coverage();
-  const leaders=productsData().filter(p=>p.current).sort((a,b)=>b.current.clicks-a.current.clicks).slice(0,5),total=complete()?sum(current.flatMap(selectedRows),true)?.clicks:null;
+  const leaders=productsData().filter(p=>p.current).sort((a,b)=>b.current.clicks-a.current.clicks).slice(0,5),total=observed()?sum(current.flatMap(selectedRows),true)?.clicks:null;
   $('leadersTable').replaceChildren();const leaderList=node('div',null,'leader-list');
   for(const [index,p] of leaders.entries()){
    const card=node('article',null,'leader-item'),rank=node('span','#'+(index+1),'leader-rank'),name=node('strong',p.name,'leader-name'),category=node('small',p.category||'Kategori doğrulanmadı','leader-category');
@@ -110,7 +111,7 @@ export function createIndependentPanel({api,notify}){
    const button=node('button','Ürüne Git →','button primary');button.onclick=()=>openProduct(p);
    card.append(rank,identity,clicks,share,button);leaderList.append(card);
   }
-  $('leadersTable').append(leaderList);$('leadersNote').textContent='Tıklamaya göre ilk 5 · pay, doğrulanmış GSC sayfa toplamına göredir.';
+  $('leadersTable').append(leaderList);$('leadersNote').textContent=complete()?'Tıklamaya göre ilk 5 · pay, doğrulanmış GSC sayfa toplamına göredir.':'Kısmi gözlenen tıklamalara göre geçici liderler · tam aylık sıralama değildir.';
   const keep=productsData().filter(p=>p.decision==='Koru');$('protect').textContent=keep.length?keep.map(p=>p.name).join(', ')+': önemli olumsuz kanıt yok; çalışan sayfaları koruyun.':'Kapsam veya örneklem yeterli olmadan sayfa değişikliği önermiyoruz.';
   const review=productsData().filter(p=>p.decision==='İncele');$('attentionPanel').hidden=!review.length;$('priorities').textContent=review.map(p=>p.name).join(', ')+': inceleme adayı. İncele, sayfayı değiştir kararı değildir.';
   if(workspace&&activeView==='products')workspace.products(next);
