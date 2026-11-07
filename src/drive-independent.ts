@@ -8,7 +8,7 @@ import {historyStatus,claimHistory,saveHistoryPage,holdHistory,listHistory,histo
 import {tayfunList,tayfunSave} from './tayfun-ledger';
 import {tayfunSaveVerifiedSnapshot,tayfunApplyApprovedBaseline,tayfunApprovedBaselineStatus} from './tayfun-verified-baseline';
 import {tayfunAiContext,tayfunAiSave} from './tayfun-ai';
-import {tayfunMonitor} from './tayfun-monitor';
+import {tayfunMonitor,tayfunKeywordTrends} from './tayfun-monitor';
 import {tayfunSitemap} from './tayfun-sitemap';
 import {tayfunAutoMonth,tayfunAutoDetail,tayfunAutoTick} from './tayfun-auto';
 import {historyIntent,historyImpact,answerHistory} from './seo-history-analysis';
@@ -393,6 +393,11 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     return record?json(record):json({code:'TAYFUN_AUTO_NOT_FOUND'},404);
    }
    if(path==='/api/independent/tayfun-pages'&&request.method==='GET')return json(await tayfunSitemap(this.ctx.storage));
+   if(path==='/api/independent/tayfun-ai/trends'&&request.method==='GET')
+    return json(await tayfunKeywordTrends(this.ctx.storage,this.key(),
+     url.searchParams.get('product_id')||'',url.searchParams.get('month')||'',
+     url.searchParams.get('device')||'ALL',Number(url.searchParams.get('span')||3),
+     url.searchParams.get('query')||'',m=>this.gscMonth(m)));
    if(path==='/api/independent/tayfun-ai/monitor'&&request.method==='GET')
     return json(await tayfunMonitor(this.ctx.storage,this.key(),url.searchParams.get('month')||'',url.searchParams.get('device')||'ALL',m=>this.gscMonth(m)));
    if(path==='/api/independent/tayfun-ai/context'&&request.method==='GET')
