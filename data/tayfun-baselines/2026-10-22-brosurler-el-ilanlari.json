@@ -1,0 +1,63 @@
+{
+  "schema": "mavi-basim-seo-baseline-v1",
+  "category": "Broşürler & El İlanları",
+  "reference_date_requested": "2026-10-22",
+  "reference_date_kind": "user-specified baseline date; NOT verified historical crawl/publish date",
+  "observed_date": "2026-11-07",
+  "source": "live public page textual extraction via web, not authenticated raw HTML",
+  "verified_2026_10_22_state": false,
+  "live_app_imported": false,
+  "site_mutations": 0,
+  "notes": "Bu dosya GitHub kaynak arşividir. Tayfun Durable Object içindeki manuel SEO kayıtlarıyla eşdeğer değildir. HTML head meta description, robots, canonical, schema, OG gibi alanlar tam ham HTML alınamadığı için doğrulanmadan doldurulmadı. Eski SEO kayıtları değiştirilmedi.",
+  "pages": [
+    {
+      "url": "https://mavibasim.com/brosur",
+      "title": "Broşür Baskı Fiyatları | A4, A5 ve Katlamalı Broşür",
+      "h1": "Broşür Baskı Fiyatları ve Ölçüleri",
+      "visible_h2": [
+        "Güncel Broşür Baskı Fiyat Listesi"
+      ],
+      "visible_h3": [
+        "115 gr. Kuşe Broşürler (Ekonomik Tiraj)",
+        "130 gr. Kuşe Broşürler (Standart Kurumsal)"
+      ],
+      "visible_text_excerpt": "Broşür fiyatları için 115 gr, 130 gr ve 200 gr kuşe seçeneklerini mevcut fiyat listemizden karşılaştırabilirsiniz. A4, A5, A3 ve katlamalı broşür basımı hizmetini İstanbul Topkapı 2. Matbaacılar Sitesi üzerinden Türkiye geneline sunuyoruz.",
+      "source_url": "https://mavibasim.com/brosur"
+    },
+    {
+      "url": "https://mavibasim.com/el-ilani",
+      "title": "El İlanı Baskı Fiyatları | A3, A4, A5 ve Dar Ebat",
+      "h1": "El İlanı Baskı Fiyatları ve Ölçüleri",
+      "visible_h2": [
+        "Güncel El İlanı Fiyat Listesi",
+        "Fiyat Listesinde Olmayan El İlanı Seçenekleri"
+      ],
+      "visible_text_excerpt": "Kurumsal tanıtım ve bölgesel dağıtım projeleriniz için 105 gr kuşe başta olmak üzere tek ve çift yön el ilanı baskı seçeneklerimizi inceleyebilirsiniz.",
+      "source_url": "https://mavibasim.com/el-ilani"
+    },
+    {
+      "url": "https://mavibasim.com/afis",
+      "title": "Afiş Baskı Fiyatları | 35x50 - 50x70 - 70x100 cm",
+      "h1": "Afiş Baskı Fiyatları ve Poster Ölçüleri",
+      "visible_h2": [
+        "Güncel Afiş Baskı Fiyatları Listesi",
+        "Afiş Ölçüleri ve Kullanım Alanları"
+      ],
+      "visible_text_excerpt": "35x50 cm, 50x70 cm ve 70x100 cm ebatlarında 105 gr, 135 gr, 170 gr kuşe ve Blueback afiş poster baskı seçenekleri.",
+      "source_url": "https://mavibasim.com/afis"
+    }
+  ],
+  "unverified_fields": [
+    "meta_description",
+    "canonical",
+    "robots",
+    "all_headings",
+    "schema_json_ld",
+    "open_graph",
+    "twitter_card",
+    "hreflang",
+    "image_alt",
+    "status_code",
+    "historical_state_as_of_2026_10_22"
+  ]
+}
