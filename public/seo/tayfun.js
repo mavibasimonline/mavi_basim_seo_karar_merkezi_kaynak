@@ -201,7 +201,6 @@ export function createTayfunWorkspace({api,scope,notify}){
    const pages=inventory(s,sitemap?.urls||[]);
    root.replaceChildren();
    if(!archiveReady)root.append(el('p','Tayfun arşiv hizmeti henüz güncel değil veya ulaşılamıyor. Sayfalar ve GSC verileri gösterilecek; arşiv düzeldiğinde SEO sürüm kayıtları kendiliğinden yüklenecek.','history-warning'));
-   const heading=el('div','','tayfun-head');heading.append(el('h2','Tayfun · Aylık SEO Sürüm Defteri'),el('p','SEO bilgilerini ay ay kaydet, eskisini pasife al, geçmişi silmeden GSC performansını karşılaştır. Veri yalnız tarama ve kayıtlardan doğrulanır.'));root.append(heading);
    const search=el('input');search.type='search';search.placeholder='Sayfa URL, ürün veya kategori ara…';search.value=filter;
    const filterWrap=el('div','','tayfun-search');filterWrap.append(search,el('span','Kayıtlı sayfalar · '+pages.length+' gözlenen URL; tüm sitemap sayfalarının eksiksiz listesi olduğu garanti edilmez.','source-note'));
    root.append(filterWrap);
