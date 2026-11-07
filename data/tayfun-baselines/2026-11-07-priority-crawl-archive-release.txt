@@ -1,0 +1,4 @@
+7 Kasım 2026: doğrulanmış üç sayfalık Tayfun SEO başlangıç kayıtları ve eksik sayfayı öncelikli canlı tarama.
+Kapsam Broşür, El İlanı, Afiş; kullanıcı referansı 22 Ekim 2026.
+Sadece sitemap içindeki kendi URL'ler, robots.txt, HTML 200 ve kanıtlı veriler.
+Tekrarsız şifreli sürümler; eski içerik ve web sitesi değişmez.
