@@ -1,4 +1,5 @@
 import { Env, json, nowISO } from './types';
+import {requestBodyLimit} from './request-body-limit';
 import { authenticated, login, safeOrigin, securityHeaders } from './security';
 import { oauthCallback, oauthStart, ProviderError, boundedText, verifyGscAccess } from './google';
 import { analyze, lastCompleteMonth, saveAnalysis, monthPeriod, AnalysisReport, ENGINE_VERSION, AnalysisOptions } from './analysis';
@@ -190,10 +191,11 @@ async function tickWork(env:Env,fetcher:typeof fetch,time:Date,source:'manual'|'
 export default {
   async fetch(request:Request,env:Env):Promise<Response>{
     try{
-      if(Number(request.headers.get('content-length'))>16_384)return securityHeaders(json({error:'İstek çok büyük.'},413));
+      const bodyLimit=requestBodyLimit(request);
+      if(Number(request.headers.get('content-length'))>bodyLimit)return securityHeaders(json({error:'İstek çok büyük.'},413));
       if(request.body){
         let body:string;
-        try{body=await boundedText(new Response(request.body),16_384);}catch(error){if(error instanceof ProviderError&&error.code==='RESPONSE_TOO_LARGE')return securityHeaders(json({error:'İstek çok büyük.'},413));throw error;}
+        try{body=await boundedText(new Response(request.body),bodyLimit);}catch(error){if(error instanceof ProviderError&&error.code==='RESPONSE_TOO_LARGE')return securityHeaders(json({error:'İstek çok büyük.'},413));throw error;}
         request=new Request(request.url,{method:request.method,headers:request.headers,body});
       }
       return securityHeaders(await route(request,env));
