@@ -1,7 +1,7 @@
 // Create a dated, immutable Tayfun tracking revision only from an existing verified SEO snapshot.
 // The user's reference date is a label, never a claim about when the page was published or crawled.
 import {historyDetail,listHistory} from './seo-history';
-import {tayfunAutoDetail,tayfunAutoMonth} from './tayfun-auto';
+import {tayfunAutoDetail,tayfunAutoMonth,tayfunAutoTick} from './tayfun-auto';
 import {tayfunList,tayfunSave} from './tayfun-ledger';
 import {gscPageURL} from './urls';
 type Storage={get<T=unknown>(key:string):Promise<T|undefined>;put(key:string,value:unknown):Promise<unknown>;list<T=unknown>(options:{prefix?:string;start?:string;startAfter?:string;limit?:number;reverse?:boolean;end?:string}):Promise<Map<string,T>>};
@@ -77,7 +77,16 @@ export async function tayfunApplyApprovedBaseline(storage:Storage,secret:string,
     }
    }
    // Independent HTML crawl observations are equally real dated evidence; never infer an October crawl.
-   const candidates=(automatic.observations||[]).filter(r=>r.url===url&&r.status===200).sort((a,b)=>b.observed_at.localeCompare(a.observed_at));
+   let candidates=(automatic.observations||[]).filter(r=>r.url===url&&r.status===200).sort((a,b)=>b.observed_at.localeCompare(a.observed_at));
+   // No archived observation yet: crawl only this approved page, honoring the sitemap and robots.txt.
+   // Never generate a revision when the live fetch fails or returns non-HTML.
+   if(!candidates.length){
+    const crawl=await tayfunAutoTick(storage,secret,fetch,now,url);
+    if(crawl.status==='archived'||crawl.status==='unchanged'){
+     const refreshed=await tayfunAutoMonth(storage,period);
+     candidates=(refreshed.observations||[]).filter(r=>r.url===url&&r.status===200).sort((a,b)=>b.observed_at.localeCompare(a.observed_at));
+    }
+   }
    const candidate=candidates[0];
    if(!candidate){result.push({url,status:'awaiting_verified_crawl'});continue;}
    const item=await tayfunAutoDetail(storage,secret,candidate.id);
