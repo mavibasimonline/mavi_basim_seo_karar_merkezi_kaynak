@@ -52,7 +52,7 @@ export function createIndependentPanel({api,notify}){
  const complete=()=>current.length===Number($('rangeMonths').value)&&current.every(r=>r.available);
  const productsData=()=>mappings().map(p=>{
   const now=complete()?sum(current.flatMap(selectedRows).filter(r=>(p.urls||[p.canonical_url]).includes(r.page))):null;
-  const before=previous?.available?sum(selectedRows(previous).filter(r=>(p.urls||[p.canonical_url]).includes(r.page))):null;
+  const before=complete()&&previous?.available?sum(selectedRows(previous).filter(r=>(p.urls||[p.canonical_url]).includes(r.page))):null;
   return {...p,current:now,previous:before,delta:now&&before?now.clicks-before.clicks:null,decision:comparisonDecision(now,before)};
  });
  async function read(path,signal){
@@ -77,14 +77,14 @@ export function createIndependentPanel({api,notify}){
   $('chartCoverage').textContent=coverage();
  }
  function kpis(){
-  const now=complete()?sum(current.flatMap(selectedRows),true):null,before=previous?.available?sum(selectedRows(previous),true):null;
+  const now=complete()?sum(current.flatMap(selectedRows),true):null,before=complete()&&previous?.available?sum(selectedRows(previous),true):null;
   $('kpis').replaceChildren(...[['clicks','Toplam tıklama','click'],['impressions','Toplam gösterim','eye'],['ctr','Ortalama CTR','percent'],['position','Ortalama konum','rank']].map(([key,title,kind])=>{
-   const card=node('article',null,'kpi-card'),head=node('div',null,'kpi-label');head.append(node('span',title),icon(kind));
+   const card=node('article',null,'kpi-card'),head=node('div',null,'kpi-label');head.append(node('span',title));
    card.append(head,node('div',key==='ctr'?percent(now?.[key]):number(now?.[key]),'kpi-value'+(!now?' no-data':'')));
    const caption=node('div',null,'kpi-caption');
-   if(now&&before&&before[key]>0){const rate=(now[key]-before[key])/before[key],change=now[key]-before[key],better=key==='position'?change<=0:change>=0;caption.append(node('span',key==='ctr'?number(change*100)+' puan':key==='position'?number(change)+' sıra':(rate>0?'+':'')+percent(rate),'delta'+(better?'':' down')),node('span','önceki aya göre'));}
+   if(now&&before&&before[key]>0){const rate=(now[key]-before[key])/before[key],change=now[key]-before[key],better=key==='position'?change<=0:change>=0;caption.append(node('span',(change<0?'▼ ':'▲ ')+(key==='ctr'?number(change*100)+' puan':key==='position'?number(change)+' sıra':(rate>0?'+':'')+percent(rate)),'delta'+(better?'':' down')));}
    else caption.append(node('span','Karşılaştırılabilir dönem bekleniyor'));
-   card.append(caption,node('p','Önceki dönem: '+(key==='ctr'?percent(before?.[key]):number(before?.[key])),'kpi-previous'),node('small',now?'GSC verisi doğrulandı':'GSC kapsamı bekleniyor','kpi-previous'));return card;
+   card.append(caption,node('p',before?'Önceki: '+(key==='ctr'?percent(before?.[key]):number(before?.[key])):'Önceki: karşılaştırma bekleniyor','kpi-previous'));if(!now)card.append(node('small','Kısmi ay veya eksik GSC günü · toplam kesinleşmedi','kpi-previous'));return card;
   }));
  }
  function productRows(items){return items.map(p=>{
@@ -101,7 +101,15 @@ export function createIndependentPanel({api,notify}){
   $('productCount').textContent=number(rows.length);$('productPeriod').textContent=coverage();
   const leaders=productsData().filter(p=>p.current).sort((a,b)=>b.current.clicks-a.current.clicks).slice(0,5),total=complete()?sum(current.flatMap(selectedRows),true)?.clicks:null;
   $('leadersTable').replaceChildren();const leaderList=node('div',null,'leader-list');
-  for(const p of leaders){const card=node('article',null,'leader-item'),button=node('button','Ürüne Git','button secondary');button.onclick=()=>openProduct(p);card.append(node('strong',p.name),node('small',p.category||'Kategori doğrulanmadı'),node('span',number(p.current.clicks)+' tıklama'),node('small','GSC sayfa tıklama payı: '+(total?percent(p.current.clicks/total):'Doğrulanmadı')),button);leaderList.append(card);}
+  for(const [index,p] of leaders.entries()){
+   const card=node('article',null,'leader-item'),rank=node('span','#'+(index+1),'leader-rank'),name=node('strong',p.name,'leader-name'),category=node('small',p.category||'Kategori doğrulanmadı','leader-category');
+   const identity=node('div',null,'leader-identity');identity.append(name,category);
+   const clicks=node('div',null,'leader-metric');clicks.append(node('small','TIKLAMA'),node('strong',number(p.current.clicks)));
+   const share=node('div',null,'leader-metric leader-share');share.append(node('small','SİTE TIKLAMA PAYI'),node('strong',total?percent(p.current.clicks/total):'—'));
+   if(total){const track=node('div',null,'leader-track'),fill=node('span',null,'leader-fill');fill.style.width=Math.max(0,Math.min(100,100*p.current.clicks/total))+'%';track.append(fill);share.append(track);}
+   const button=node('button','Ürüne Git →','button primary');button.onclick=()=>openProduct(p);
+   card.append(rank,identity,clicks,share,button);leaderList.append(card);
+  }
   $('leadersTable').append(leaderList);$('leadersNote').textContent='Tıklamaya göre ilk 5 · pay, doğrulanmış GSC sayfa toplamına göredir.';
   const keep=productsData().filter(p=>p.decision==='Koru');$('protect').textContent=keep.length?keep.map(p=>p.name).join(', ')+': önemli olumsuz kanıt yok; çalışan sayfaları koruyun.':'Kapsam veya örneklem yeterli olmadan sayfa değişikliği önermiyoruz.';
   const review=productsData().filter(p=>p.decision==='İncele');$('attentionPanel').hidden=!review.length;$('priorities').textContent=review.map(p=>p.name).join(', ')+': inceleme adayı. İncele, sayfayı değiştir kararı değildir.';
@@ -162,7 +170,7 @@ export function createIndependentPanel({api,notify}){
   try{const data=await api('/api/independent/'+kind+'-oauth/start',{method:'POST'}),url=new URL(data.authorization_url);if(url.origin!=='https://accounts.google.com')throw Error('Güvenli Google adresi doğrulanamadı.');location.assign(url.href);}catch(e){notify(e.message);}
  }
  async function load(signal){
-  const at=++revision;if(first){first=false;if(target()>closedMonth())$('month').value=closedMonth();}
+  const at=++revision;if(first){first=false;/* Keep the explicitly selected current month, including November partial data. */}
   const month=target(),n=Number($('rangeMonths').value),months=Array.from({length:n},(_,i)=>prior(month,n-i-1));
   workspace?.clear();history?.clear();tayfun?.clear();current=[];previous=null;ga4=null;oldGa4=null;status=null;ga4Status=null;planner=null;changes=null;archive=null;catalog=null;errors=[];queryPage=1;
   $('groupFilter').hidden=true;$('groupFilter').value='';$('pilot').hidden=true;$('loadGscReview').closest('section').hidden=true;$('questionSourceLabel').hidden=false;
