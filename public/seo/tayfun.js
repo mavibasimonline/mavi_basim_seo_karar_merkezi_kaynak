@@ -196,6 +196,7 @@ export function createTayfunWorkspace({api,scope,notify}){
    }
    function paint(){
     root.dataset.requestedMode=mode;
+    place.dataset.monitorRequest=String((Number(place.dataset.monitorRequest)||0)+1);
     place.replaceChildren();
     filterWrap.hidden=mode==='jobs'||mode==='monitor';
     if(mode==='monitor'){
