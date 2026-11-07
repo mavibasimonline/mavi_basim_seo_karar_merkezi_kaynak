@@ -50,4 +50,17 @@ describe('Tayfun immutable monthly keyword history',()=>{
   await expect(tayfunKeywordTrends(s,secret,'magnet','2026-11','ALL',3,'afiş fiyatları',gsc,time))
    .rejects.toThrow('TAYFUN_TRENDS_UNKNOWN_PRODUCT');
  });
+ it('lets a newly visible query with impressions enter history without fabricating old zeros',async()=>{
+  const {s,gsc}=await setup();
+  const extended=async(m:string)=>{
+   const result=await gsc(m);
+   if(m==='2026-11')result.queries.push({page:url,device:'MOBILE',query:'yeni afiş sorgusu',clicks:0,impressions:5,position:16});
+   return result;
+  };
+  const r=await tayfunKeywordTrends(s,secret,'afis','2026-11','ALL',3,'yeni afiş sorgusu',extended,time);
+  expect(r.months[0].query.clicks).toBeNull();
+  expect(r.months[1].query.clicks).toBeNull();
+  expect(r.months[2].query).toMatchObject({clicks:0,impressions:5,position:16});
+ });
+
 });
