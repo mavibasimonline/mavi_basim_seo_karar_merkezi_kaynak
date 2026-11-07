@@ -1,4 +1,5 @@
 import { $, node } from "./ui.js";
+import {staleStoredMonth,installRollover} from "./seo/period-rollover.js";
 const KEY = "mavi-dashboard-preferences",
   devices = ["ALL", "MOBILE", "DESKTOP", "TABLET"];
 export const currentMonth = () => {
@@ -48,15 +49,11 @@ export function setupPeriod(viewNames, onChange) {
     : "1";
   // A remembered previous month must never trap the dashboard after a calendar rollover.
   // Keep intentionally selected historical months when they were chosen in the current calendar month.
-  const lastMonth = new Date(today + "-01T12:00:00Z");
-  lastMonth.setUTCMonth(lastMonth.getUTCMonth() - 1);
-  const staleAutoSelection = pref.month === (pref.calendarMonth || lastMonth.toISOString().slice(0, 7))
-    && (pref.calendarMonth || lastMonth.toISOString().slice(0, 7)) < today;
+  const staleAutoSelection = staleStoredMonth(pref, today);
   $("month").value =
     $("rangeMonths").value === "1" && allowed().includes(pref.month) && !staleAutoSelection
       ? pref.month
       : today;
-  let openedCalendarMonth = today;
   $("device").value = devices.includes(pref.device) ? pref.device : "ALL";
   let year = Number($("month").value.slice(0, 4));
   const years = [...new Set(allowed().map((v) => v.slice(0, 4)))];
@@ -247,25 +244,7 @@ export function setupPeriod(viewNames, onChange) {
     onChange();
   };
   $("device").onchange = onChange;
-  // Also advance a dashboard kept open across the first day of a new month.
-  const rollover = () => {
-    const newMonth = currentMonth();
-    if (newMonth === openedCalendarMonth) return;
-    const followedCurrent = $("month").value === openedCalendarMonth && $("rangeMonths").value === "1";
-    openedCalendarMonth = newMonth;
-    // The month picker was constructed at page load. A long-lived open tab
-    // needs a new option when the calendar crosses midnight into a new month.
-    if (!allowed().includes(newMonth)) {
-      $("month").add(new Option(monthLabel(newMonth), newMonth), 0);
-      const years = [...new Set(allowed().map((v) => v.slice(0, 4)))];
-      $("pickerYear").replaceChildren(...years.map((y) => new Option(y, y)));
-      $("monthGrid").dataset.year = "";
-    }
-    if (followedCurrent) choose(newMonth, "1");
-    else sync();
-  };
-  window.addEventListener("focus", rollover);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) rollover(); });
+  installRollover({month:$("month"),pickerYear:$("pickerYear"),monthGrid:$("monthGrid"),rangeMonths:$("rangeMonths"),currentMonth,monthLabel,allowed,choose,sync});
   sync();
   return {
     remember,
