@@ -201,3 +201,25 @@
 .tayfun-monitor-trends .source-note{padding:0 12px 12px}
 @media(max-width:820px){.tayfun-monitor-month-pair{grid-template-columns:minmax(0,1fr)}.tayfun-monitor-seo-grid,.tayfun-monitor-version-fields{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:550px){.tayfun-monitor-month-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+/* Tayfun SEO Takibi: the search/category bar replaces redundant report headings. */
+.tayfun-monitor-toolbar{margin:0 0 6px;align-items:center}
+.tayfun-monitor-products{display:grid;gap:10px;min-width:0}
+.tayfun-monitor-products .tayfun-monitor-product[hidden]{display:none!important}
+.tayfun-monitor-toolbar .tayfun-jobs-category-scroll{gap:6px}
+.tayfun-monitor-keyword-head,.tayfun-monitor-keyword-row{grid-template-columns:minmax(190px,2.3fr) repeat(8,minmax(85px,1fr)) minmax(96px,1fr);min-width:1150px}
+.tayfun-monitor-keyword-head{padding:0 9px;align-items:stretch;position:sticky;top:0;z-index:2}
+.tayfun-monitor-th{display:flex;min-width:0;align-items:stretch}
+.tayfun-monitor-sort,.tayfun-monitor-series-sort{width:100%;padding:10px 4px;border:0;border-radius:0;background:transparent;box-shadow:none;font:inherit;font-size:11px;font-weight:700;color:#27476e;cursor:pointer;white-space:normal;line-height:1.35;text-align:right;overflow-wrap:normal}
+.tayfun-monitor-th:first-child .tayfun-monitor-sort,.tayfun-monitor-th:last-child .tayfun-monitor-sort{text-align:left}
+.tayfun-monitor-sort:hover,.tayfun-monitor-series-sort:hover{background:#e2eaf8;color:#1d4ed8}
+.tayfun-monitor-sort:focus-visible,.tayfun-monitor-series-sort:focus-visible{outline:2px solid #2563eb;outline-offset:-2px}
+.tayfun-monitor-th[aria-sort="ascending"],.tayfun-monitor-th[aria-sort="descending"]{background:#dceaff}
+.tayfun-monitor-keyword-row{padding:9px;align-items:center}
+.tayfun-monitor-keyword-row span{font-variant-numeric:tabular-nums;text-align:right}
+.tayfun-monitor-keyword-row span:first-child,.tayfun-monitor-keyword-row span:last-child{text-align:left}
+.tayfun-monitor-keyword-row:hover{background:#f1f5fc}
+.tayfun-monitor-series-head{padding:0 10px}
+.tayfun-monitor-series-head .tayfun-monitor-series-sort{padding:10px 1px}
+.tayfun-monitor-series-row:not(.tayfun-monitor-series-head) span{font-variant-numeric:tabular-nums}
