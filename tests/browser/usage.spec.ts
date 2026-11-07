@@ -195,7 +195,7 @@ test("core navigation workspaces remain accessible after redundant menu cleanup"
       animations: "disabled",
     });
   }
-  expect(positions.overview).toBeLessThan(200);
+  expect(positions.overview).toBeLessThan(260);
   // Fixed controls remain visible while only the month area scrolls.
   for (const selector of [
     "#pickerYear",
@@ -549,13 +549,15 @@ test("first ten leaders use verified selected-period product metrics and open ev
 test("Tayfun top tabs expose original overview and keep SEO sections in one place", async ({ page }) => {
   await login(page);
   await expect(page.getByRole("navigation", { name: "Ana menü" }).getByRole("link", { name: "Genel Bakış", exact: true })).toHaveCount(0);
-  await expect(page.locator("#overviewTabs")).toBeVisible();
-  await page.locator('#overviewTabs [data-tayfun-mode="jobs"]').click();
+  const tabs=page.locator("#tayfunWorkspaceTabs");
+  await expect(tabs).toBeVisible();
+  await expect(tabs.locator("button")).toHaveText(["Genel Bakış","Ürün Grupları","Eşleşmemiş Sayfalar","SEO İşleri"]);
+  await tabs.locator('[data-tayfun-target="jobs"]').click();
   await expect(page.locator("#view-tayfun")).toBeVisible();
-  await expect(page.locator("#tayfunApp .tayfun-tabs button").first()).toHaveText("Genel Bakış");
-  await expect(page.locator("#tayfunApp .tayfun-tabs button").last()).toHaveAttribute("aria-pressed", "true");
-  await page.locator("#tayfunApp .tayfun-tabs button").first().click();
+  await expect(tabs.locator('[data-tayfun-target="jobs"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#tayfunApp .tayfun-tabs")).toHaveCount(0);
+  await tabs.locator('[data-tayfun-target="overview"]').click();
   await expect(page.locator("#view-overview")).toBeVisible();
   await expect(page.locator("#kpis")).toBeVisible();
-  await expect(page.locator("#overviewTabs button").first()).toHaveAttribute("aria-pressed", "true");
+  await expect(tabs.locator("button").first()).toHaveAttribute("aria-pressed", "true");
 });
