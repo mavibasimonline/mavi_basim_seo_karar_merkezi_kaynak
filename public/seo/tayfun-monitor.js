@@ -273,7 +273,7 @@ export async function renderSeoMonitor(root,{month,device,api,notify}){
        const row=el('div','','tayfun-monitor-series-row');
        for(const value of [m.month,val(m.query?.clicks),val(m.query?.impressions),percent(m.query?.ctr),pos(m.query?.position),
         val(m.page?.clicks),m.error?'Kaynak okunamadı':coverage(m.coverage),m.seo?.recorded_at?
-         m.seo.recorded_at.slice(0,7)+' · '+(m.seo.source==='ai-review'?'AI':'Temel'):'SEO kaydı yok'])
+         date(m.seo.recorded_at)+' · '+(m.seo.source==='ai-review'?'AI kaydı':'Temel kayıt'):'SEO kaydı yok'])
         row.append(el('span',value));
        return {m,row};
       });
