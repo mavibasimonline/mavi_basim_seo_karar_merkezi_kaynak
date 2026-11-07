@@ -21,7 +21,7 @@
   "vars": {
     "SITE_ORIGIN": "https://mavibasim.com",
     "GSC_PROPERTY": "sc-domain:mavibasim.com",
-    "GA4_PROPERTY_ID": "",
+    "GA4_PROPERTY_ID": "532525867",
     "GOOGLE_REDIRECT_URI": "https://mavi-basim-seo-prod.mavibasimonline.workers.dev/api/oauth/google/callback",
     "CRAWL_ENABLED": "true",
     "AUTOMATION_ENABLED": "true",
