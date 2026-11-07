@@ -120,6 +120,22 @@ export async function tayfunApplyApprovedBaseline(storage:Storage,secret:string,
    result.push({url,status:'held'}); 
   }
  }
- return {ok:result.every(x=>x.status==='saved'||x.status==='already_saved'),reference_date:BASELINE_REFERENCE,
+ const report={ok:result.every(x=>x.status==='saved'||x.status==='already_saved'),reference_date:BASELINE_REFERENCE,
   attempted_at:now.toISOString(),items:result,live_site_mutations:0,previous_records_unchanged:true,d1_requests:0};
+ await storage.put('tayfun:approved-baseline:status',report);
+ return report;
+}
+export async function tayfunApprovedBaselineStatus(storage:Storage,secret:string,now=new Date()){
+ const last=await storage.get<{attempted_at:string;items:{url:string;status:string}[]}>('tayfun:approved-baseline:status');
+ const ledger=await tayfunList(storage,secret,now.toISOString().slice(0,7));
+ const items=[] as {url:string;status:string;entry_id:string|null;created_at:string|null;title:string|null}[];
+ for(const url of BASELINE_URLS){
+  const marker=await storage.get<{entry_id:string}>('tayfun:approved-baseline:2026-10-22:'+url);
+  const version=ledger.entries.find(x=>x.url===url&&(x.id===marker?.entry_id||x.notes.includes('2026-10-22')));
+  items.push({url,status:version?'saved':last?.items.find(x=>x.url===url)?.status||'not_checked',
+   entry_id:version?.id||null,created_at:version?.created_at||null,title:version?.title||null});
+ }
+ return {reference_date:BASELINE_REFERENCE,last_attempt_at:last?.attempted_at||null,items,
+  saved_count:items.filter(x=>x.status==='saved').length,source:'Şifreli Tayfun sürüm defterinden okundu',
+  site_mutations:0,d1_requests:0};
 }
