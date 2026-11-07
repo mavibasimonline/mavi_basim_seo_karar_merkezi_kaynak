@@ -131,3 +131,14 @@
 .tayfun-monitor-keyword-head{background:#eef3fc;color:#27476e;font-size:11px}
 .tayfun-monitor-keyword-row{font-size:12px}
 @media(max-width:620px){.tayfun-monitor-summary{grid-template-columns:1fr}.tayfun-monitor-product>summary small{margin-left:0}}
+
+
+/* One shared SEO export and JSON import workspace; pills above control scope. */
+.tayfun-ai-workspace{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch;min-width:0;width:100%}
+.tayfun-ai-workspace-panel.tayfun-jobs-package,.tayfun-ai-workspace-panel.tayfun-jobs-import{display:flex;flex-direction:column;flex-wrap:nowrap;gap:11px;align-items:stretch;min-width:0;margin:0;padding:18px;border:1px solid #dbe3ee;border-radius:12px;background:#fff}
+.tayfun-ai-workspace-panel h4{width:auto;margin:0;font-size:1rem;color:#0f172a;line-height:1.4}
+.tayfun-ai-workspace-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tayfun-ai-workspace-panel .tayfun-ai-output,.tayfun-ai-workspace-panel .tayfun-ai-answer{display:block;width:100%;max-width:100%;min-width:0;min-height:280px;box-sizing:border-box;flex:1 1 auto}
+.tayfun-ai-workspace-panel .source-note{margin:0;font-size:.83rem;line-height:1.5}
+.tayfun-ai-workspace-panel .tayfun-ai-preview{min-width:0}
+@media(max-width:900px){.tayfun-ai-workspace{grid-template-columns:minmax(0,1fr)}.tayfun-ai-workspace-panel .tayfun-ai-output,.tayfun-ai-workspace-panel .tayfun-ai-answer{min-height:210px}}
