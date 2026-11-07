@@ -59,6 +59,8 @@ export async function tayfunApplyApprovedBaseline(storage:Storage,secret:string,
  const automatic=await tayfunAutoMonth(storage,period);
  const result:{url:string;status:string;observed_at?:string;source?:string}[]=[];
  for(const url of BASELINE_URLS){
+  const marker='tayfun:approved-baseline:2026-10-22:'+url;
+  if(await storage.get(marker)){result.push({url,status:'already_saved'});continue;}
   if(existing.entries.some(e=>e.url===url)){
    result.push({url,status:'already_saved'});continue;
   }
@@ -69,6 +71,7 @@ export async function tayfunApplyApprovedBaseline(storage:Storage,secret:string,
     const detail=await historyDetail(storage,secret,'snapshot',newest.id);
     if(detail?.fields?.status===200&&typeof detail.fields.title==='string'&&detail.fields.title.trim()){
      const saved=await tayfunSaveVerifiedSnapshot(storage,secret,{url,snapshot_id:newest.id,reference_date:BASELINE_REFERENCE},now);
+     await storage.put(marker,{entry_id:saved.entry.id,observed_at:detail.observed_at,source:'seo_snapshots'});
      result.push({url,status:saved.already_saved?'already_saved':'saved',observed_at:detail.observed_at,source:'seo_snapshots'});
      continue;
     }
@@ -101,6 +104,7 @@ export async function tayfunApplyApprovedBaseline(storage:Storage,secret:string,
     open_graph:json(fields.open_graph,2500),twitter_card:json(fields.twitter_card,2500),
     status_code:String(item.status),content_excerpt:str(fields.excerpt,5000)
    },now);
+   if(saved.ok)await storage.put(marker,{entry_id:saved.entry.id,observed_at:item.observed_at,source:'live-static-html'});
    result.push({url,status:saved.ok?'saved':'held',observed_at:item.observed_at,source:'live-static-html'});
   }catch(error){
    // Per-page failures are retained as pending, never translated into a fake empty SEO version.
