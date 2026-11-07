@@ -170,7 +170,7 @@ test("core navigation workspaces remain accessible after redundant menu cleanup"
   // The unified Tayfun navigation intentionally occupies one row above overview metrics.
   const tabLayout = await page.evaluate(() => {
     const tabs = document.getElementById("tayfunWorkspaceTabs")!;
-    const rects = [...tabs.querySelectorAll("button")].map((b) => b.getBoundingClientRect());
+    const rects = Array.from(tabs.querySelectorAll("button")).map((b) => b.getBoundingClientRect());
     return { height: tabs.getBoundingClientRect().height, oneRow: rects.every((r) => Math.abs(r.top - rects[0].top) < 2) };
   });
   expect(tabLayout.height).toBeGreaterThan(30);
