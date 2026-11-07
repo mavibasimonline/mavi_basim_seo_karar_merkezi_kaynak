@@ -7,7 +7,7 @@ type Store={get<T=unknown>(key:string):Promise<T|undefined>;put(key:string,value
 type Row={page:string;device:string;clicks:number;impressions:number;position:number;query?:string};
 type Month={month:string;available:boolean;days_verified:number;expected_days:number;query_days_verified?:number;pages:Row[];queries:Row[];evidence?:{day:string;scope:string}[]};
 const previous=(month:string)=>{const d=new Date(month+'-01T12:00:00Z');d.setUTCMonth(d.getUTCMonth()-1);return d.toISOString().slice(0,7);};
-const months=(end:string)=>{const result:string[]=[];for(let m='2026-01';m<=end&&result.length<36;){result.push(m);const d=new Date(m+'-01T12:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);m=d.toISOString().slice(0,7);}return result;};
+const months=(end:string)=>{const result:string[]=[];for(let m='2026-01';m<=end&&result.length<240;){result.push(m);const d=new Date(m+'-01T12:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);m=d.toISOString().slice(0,7);}return result;};
 const aggregate=(rows:Row[],urls:Set<string>,device:string)=>{const chosen=rows.filter(r=>urls.has(r.page)&&(device==='ALL'||r.device===device));if(!chosen.length)return {clicks:0,impressions:0,position:null as number|null,observed:false};
  const clicks=chosen.reduce((n,r)=>n+r.clicks,0),impressions=chosen.reduce((n,r)=>n+r.impressions,0);
  return {clicks,impressions,position:impressions?chosen.reduce((n,r)=>n+r.position*r.impressions,0)/impressions:null,observed:true};};
@@ -42,6 +42,30 @@ const allTracked=(versions:TayfunEntry[],observed:Map<string,Metric>[])=>{
  for(const m of observed)for(const key of m.keys())if(key&&!names.has(key))names.set(key,key);
  return [...names.entries()].slice(0,500);
 };
+const seoAuditFields=[
+ ['title','SEO Title'],['description','Meta Description'],['h1','H1'],['headings','H2–H6 başlıkları'],
+ ['canonical','Canonical'],['robots','Robots'],['internal_links','İç bağlantılar'],
+ ['structured_data','Schema / JSON-LD'],['images','Görseller ve ALT'],
+ ['hreflang','Hreflang'],['open_graph','Open Graph'],['twitter_card','Twitter Card'],
+ ['x_robots','X-Robots'],['viewport','Viewport'],['lang','Dil'],['redirect','Yönlendirme'],
+ ['status_code','HTTP durum'],['content_excerpt','Sayfa içeriği özeti']
+] as const;
+export function seoRevisionTimeline(versions:TayfunEntry[]){
+ const sorted=[...versions].sort((a,b)=>a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id));
+ const byId=new Map(sorted.map(v=>[v.id,v]));
+ return sorted.map((version,index)=>{
+  const previous=version.supersedes?byId.get(version.supersedes)||null:index?sorted[index-1]:null;
+  const changes=previous?seoAuditFields.filter(([field])=>version[field]!==previous[field]).map(([,label])=>label):[];
+  const oldKeywords=new Set((previous?.keywords||[]).map(normalized));
+  const addedKeywords=(version.keywords||[]).filter(q=>!oldKeywords.has(normalized(q)));
+  return {id:version.id,month:version.month,created_at:version.created_at,source:version.source,
+   previous_version_id:previous?.id||null,previous_recorded_at:previous?.created_at||null,
+   changed_fields:changes,added_keywords:previous?addedKeywords:[],
+   keyword_count:version.keywords?.length||0,
+   title:version.title,h1:version.h1,description:version.description,
+   edit_is_live:false,record_type:'Arşiv kayıt tarihi; CMS yayın tarihi doğrulanmadı.'};
+ });
+}
 const decisionsFor=(versions:TayfunEntry[])=>{
  const result=new Map<string,{action:string;reason:string}>();
  for(const version of versions)for(const decision of version.keyword_decisions||[])
@@ -52,6 +76,7 @@ export function evaluateSeoMonitor(product:{id:string;name:string;category?:stri
  const all=history.filter(x=>x.url===product.canonical_url).sort((a,b)=>a.created_at.localeCompare(b.created_at));
  const versions=all.filter(x=>x.source==='ai-review'),latest=versions.at(-1)||null;
  const newest=all.at(-1)||null,urls=new Set(product.urls?.length?product.urls:[product.canonical_url]);
+ const revisionTimeline=seoRevisionTimeline(all);
  const currentScope=scope(current),priorScope=scope(prior),completeCurrent=currentScope.page_complete,completePrior=priorScope.page_complete;
  const priorObserved=metric(filtered(prior?.pages||[],urls,device)),currentObserved=metric(filtered(current?.pages||[],urls,device));
  const oldQueries=queryMetrics(prior?.queries||[],urls,device),newQueries=queryMetrics(current?.queries||[],urls,device);
@@ -69,7 +94,9 @@ export function evaluateSeoMonitor(product:{id:string;name:string;category?:stri
     b.clicks>a.clicks?'Yükseldi':b.clicks<a.clicks?'Düştü':'Sabit'};
  });
  const base={product_id:product.id,name:product.name,category:product.category||'',url:product.canonical_url,
-  revisions:versions.length,archive_count:all.length,latest_revision_id:latest?.id||null,
+  revisions:versions.length,archive_count:all.length,revision_timeline:revisionTimeline,
+  first_recorded_at:all[0]?.created_at||null,last_recorded_at:newest?.created_at||null,
+  latest_revision_id:latest?.id||null,
   latest_saved_at:latest?.created_at||null,first_saved_at:versions[0]?.created_at||null,
   latest_seo:newest?{version_id:newest.id,recorded_at:newest.created_at,month:newest.month,source:newest.source,
    title:newest.title,description:newest.description,h1:newest.h1,canonical:newest.canonical,robots:newest.robots,
