@@ -1,4 +1,5 @@
 import {renderSeoJobs} from './tayfun-ai.js';
+import {renderSeoMonitor} from './tayfun-monitor.js';
 // Tayfun monthly SEO evidence notebook: the source site and historical records are never changed.
 const el=(tag,text='',className='')=>{const n=document.createElement(tag);if(text)n.textContent=text;if(className)n.className=className;return n;};
 const dateMonth=m=>'01.'+m.slice(5)+'.'+m.slice(0,4);
@@ -14,7 +15,7 @@ const MAX={title:300,description:1000,h1:500,canonical:2048,robots:200,headings:
 export function createTayfunWorkspace({api,scope,notify}){
  const root=document.getElementById('tayfunApp');
  let generation=0,cache=new Map(),revision=-1,filter='',mode='groups',paintCurrent=null;
- root.addEventListener('tayfun-mode-change',()=>{const requested=root.dataset.requestedMode;if(['groups','unmapped','jobs'].includes(requested)){mode=requested;paintCurrent?.();}});
+ root.addEventListener('tayfun-mode-change',()=>{const requested=root.dataset.requestedMode;if(['groups','unmapped','jobs','monitor'].includes(requested)){mode=requested;paintCurrent?.();}});
  async function getMonth(m){
   if(cache.has(m))return cache.get(m);
   const data=await api('/api/independent/tayfun?month='+m);
@@ -162,7 +163,7 @@ export function createTayfunWorkspace({api,scope,notify}){
  }
  async function render(){
   paintCurrent=null;
-  mode=['groups','unmapped','jobs'].includes(root.dataset.requestedMode)?root.dataset.requestedMode:mode;
+  mode=['groups','unmapped','jobs','monitor'].includes(root.dataset.requestedMode)?root.dataset.requestedMode:mode;
   const at=++generation,s=scope(),month=s.month,second=nextMonth(month);
   if(revision!==s.revision){cache.clear();revision=s.revision;}
   root.replaceChildren(el('p','Aylık SEO kayıtları hazırlanıyor…'));
@@ -196,7 +197,11 @@ export function createTayfunWorkspace({api,scope,notify}){
    function paint(){
     root.dataset.requestedMode=mode;
     place.replaceChildren();
-    filterWrap.hidden=mode==='jobs';
+    filterWrap.hidden=mode==='jobs'||mode==='monitor';
+    if(mode==='monitor'){
+     renderSeoMonitor(place,{month,device:s.device,api,notify});
+     return;
+    }
     if(mode==='jobs'){
      const priorRaw=s.current?.find(r=>r.month===previousMonth(month))||s.previous?.month===previousMonth(month)&&s.previous||null;
      renderSeoJobs(place,{products:s.catalog?.products||[],month,device:s.device,current:rawFirst,previous:priorRaw,
