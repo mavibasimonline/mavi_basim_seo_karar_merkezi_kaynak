@@ -128,7 +128,10 @@ export async function verifiedGscSeries(storage:GscStorage,secret:string,month:s
 export async function verifiedGscMonth(storage:GscStorage,secret:string,month:string,time=new Date(),options:GscReadOptions={}){
  fail(/^20\d\d-(0[1-9]|1[0-2])$/.test(month),'INVALID_MONTH');
  const end=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0));
- fail(end.getTime()<time.getTime()-3*86400000&&end.getTime()>time.getTime()-401*86400000,'GSC_MONTH_NOT_CLOSED');
+ // Current month may be inspected as partial evidence; never treat future or unfinalized days as complete.
+ const sourceParts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit'}).formatToParts(time);
+ const sourceMonth=sourceParts.find(p=>p.type==='year')!.value+'-'+sourceParts.find(p=>p.type==='month')!.value;
+ fail(month<=sourceMonth&&end.getTime()>time.getTime()-401*86400000,'GSC_MONTH_NOT_CLOSED');
  const budget:Budget={chunk_reads:0,rows:0,max_chunk_reads:options.maxChunkReads??MAX_CHUNK_READS,max_rows:options.maxRows??MAX_ROWS};
  fail(integer(budget.max_chunk_reads,1,MAX_CHUNK_READS)&&integer(budget.max_rows,1,MAX_ROWS),'GSC_MONTH_BUDGET_INVALID');
  const dates=Array.from({length:end.getUTCDate()},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
@@ -159,7 +162,7 @@ export async function verifiedGscMonth(storage:GscStorage,secret:string,month:st
  const observedClicks=pages.reduce((n,p)=>n+p.clicks,0),observedImpressions=pages.reduce((n,p)=>n+p.impressions,0);
  fail(Number.isSafeInteger(observedClicks)&&Number.isSafeInteger(observedImpressions),'GSC_MONTH_METRIC_OVERFLOW');
  const complete=missing.length===0;
- return {available:complete,month,days_verified:days,expected_days:dates.length,missing_days:missing,
+ return {available:complete,month,period_state:complete?'tam':'kısmi',days_verified:days,expected_days:dates.length,missing_days:missing,
   query_days_verified:queryDays,query_missing_days:queryMissing,query_partial:true as const,
   source:'GSC Search Analytics API',property:'sc-domain:mavibasim.com',search_type:'web',data_state:'final',timezone:'America/Los_Angeles',
   scope:'verified daily page-country-device and observed query rows; anonymized queries are incomplete',d1_requests:0,
