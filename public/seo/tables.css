@@ -54,6 +54,6 @@
 @media(prefers-reduced-motion:reduce){#app button,#app a.button,#navigation a,#loginScreen button{transition:none!important;transform:none!important}}
 
 /* Shared navigation remains in one position for all Tayfun sections. */
-#tayfunWorkspaceTabs{display:flex;align-items:center;gap:8px;max-width:100%;overflow-x:auto;white-space:nowrap;margin:0 0 10px;padding:0 0 3px;scrollbar-width:thin}
+#app #tayfunWorkspaceTabs{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;max-width:100%;overflow-x:auto;white-space:nowrap;margin:0 0 10px;padding:0 0 3px;scrollbar-width:thin}
 #tayfunWorkspaceTabs[hidden]{display:none!important}
 #tayfunWorkspaceTabs button{flex:0 0 auto;min-height:36px}
