@@ -107,8 +107,8 @@ export async function tayfunKeywordTrends(storage:Store,secret:string,productId:
  const all=await Promise.all(months(month).map(m=>tayfunList(storage,secret,m)));
  const versions=all.flatMap(l=>l.entries).filter(v=>v.url===product.canonical_url).sort((a,b)=>a.created_at.localeCompare(b.created_at));
  const tracked=new Set(versions.flatMap(v=>v.keywords.map(normalized)));
- // Only one saved, product-specific keyword can be queried. Never expose raw site-wide GSC lists.
- if(!tracked.has(normalized(query)))throw Error('TAYFUN_TRENDS_UNTRACKED_QUERY');
+ // Saved keywords remain available forever; newly observed GSC queries are also trackable.
+ // Every returned row is restricted to this catalog product and device.
  const selected=months(month).slice(-span),urls=new Set(product.urls?.length?product.urls:[product.canonical_url]),rows=[];
  for(const period of selected){
   try{
@@ -126,6 +126,8 @@ export async function tayfunKeywordTrends(storage:Store,secret:string,productId:
     error:error instanceof Error?error.message:'GSC aylık arşivi okunamadı'});
   }
  }
+ if(!tracked.has(normalized(query))&&!rows.some(m=>m.query.clicks!==null||m.query.impressions!==null))
+  throw Error('TAYFUN_TRENDS_UNTRACKED_QUERY');
  return {product_id:productId,url:product.canonical_url,device,query,span,month,
   months:rows,read_only:true,site_mutations:0,d1_requests:0,
   caveat:'Aylık satırlar mevcut doğrulanmış günlük GSC arşivinden okunur. Eksik veya anonim sorgu sıfır sayılamaz. SEO kaydı yayın kanıtı değildir. Müşteri/sipariş için doğrulanmış dönüşüm verisi gerekir.'};
