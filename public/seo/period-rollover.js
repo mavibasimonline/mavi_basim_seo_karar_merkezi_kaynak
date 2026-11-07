@@ -23,3 +23,8 @@ export function installRollover({month,pickerYear,monthGrid,rangeMonths,currentM
  window.addEventListener("focus",check);
  document.addEventListener("visibilitychange",()=>{if(!document.hidden)check();});
 }
+
+export const monthLabel=value=>new Intl.DateTimeFormat("tr-TR",{month:"long",year:"numeric",timeZone:"UTC"})
+ .format(new Date(value+"-01T12:00:00Z")).replace(/^./,s=>s.toLocaleUpperCase("tr-TR"));
+export function readPeriodPreference(key){try{return JSON.parse(localStorage.getItem(key)||"{}")||{};}catch{return {};}}
+export function savePeriodPreference(key,value){try{localStorage.setItem(key,JSON.stringify(value));}catch{}}
