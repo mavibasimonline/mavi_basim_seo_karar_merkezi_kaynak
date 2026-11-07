@@ -1,20 +1,8 @@
 import { $, node } from "./ui.js";
-import {staleStoredMonth,installRollover,monthLabel,readPeriodPreference,savePeriodPreference} from "./seo/period-rollover.js";
-export {monthLabel} from "./seo/period-rollover.js";
+import {staleStoredMonth,installRollover,monthLabel,currentMonth,readPeriodPreference,savePeriodPreference} from "./seo/period-rollover.js";
+export {monthLabel,currentMonth} from "./seo/period-rollover.js";
 const KEY = "mavi-dashboard-preferences",
   devices = ["ALL", "MOBILE", "DESKTOP", "TABLET"];
-export const currentMonth = () => {
-  const p = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Istanbul",
-    year: "numeric",
-    month: "2-digit",
-  }).formatToParts(new Date());
-  return (
-    p.find((x) => x.type === "year").value +
-    "-" +
-    p.find((x) => x.type === "month").value
-  );
-};
 export const scopeParams = () =>
   new URLSearchParams({
     month: $("month").value,
