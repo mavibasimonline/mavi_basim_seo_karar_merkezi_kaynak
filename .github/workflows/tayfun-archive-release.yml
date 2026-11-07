@@ -7,7 +7,9 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: mavi-production-deployment
+  # Private archive deploys serialize with each other; strict pre/postflight
+  # still verifies that the protected main Worker did not change.
+  group: mavi-private-archive-deployment
   cancel-in-progress: false
 jobs:
   deploy:
