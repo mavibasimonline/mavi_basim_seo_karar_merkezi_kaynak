@@ -4,7 +4,7 @@ const fmt=n=>Number(n).toLocaleString('tr-TR',{maximumFractionDigits:2});
 const val=n=>n===null||n===undefined?'Kayıt yok':fmt(n);
 const percent=n=>n===null||n===undefined?'—':'%'+(100*n).toLocaleString('tr-TR',{maximumFractionDigits:2});
 const pos=n=>n===null||n===undefined?'—':Number(n).toLocaleString('tr-TR',{maximumFractionDigits:1});
-const date=s=>s?new Date(s).toLocaleString('tr-TR'):'Bilinmiyor';
+const date=s=>s&&Number.isFinite(Date.parse(s))?new Date(s).toLocaleString('tr-TR',{timeZone:'Europe/Istanbul',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'})+' TSİ':'Kayıt tarihi yok';
 const textField=(label,value)=>{const row=el('div','','tayfun-monitor-seo-field');row.append(el('strong',label),el('span',String(value??'')||'—'));return row;};
 const note=(value)=>el('p',value,'source-note');
 const openable=(name,cls='',open=false)=>{const details=el('details','',cls);details.open=open;details.append(el('summary',name));return details;};
@@ -81,16 +81,38 @@ export async function renderSeoMonitor(root,{month,device,api,notify}){
   for(const product of sorted){
    const article=openable('', 'tayfun-monitor-product '+product.status);
    const head=article.querySelector('summary');
-   head.append(el('strong',product.name),el('span',product.label,'tayfun-monitor-state '+product.status),el('small',(product.revisions||0)+' AI SEO analizi · '+(product.archive_count||0)+' kayıtlı sürüm'));
+   head.append(el('strong',product.name),el('span',product.label,'tayfun-monitor-state '+product.status),el('small',(product.revisions||0)+' AI SEO analizi · '+(product.archive_count||0)+' kayıtlı sürüm'),
+    el('small','İlk kayıt: '+date(product.first_recorded_at)+' · Son kayıt: '+date(product.last_recorded_at)));
    const detail=el('div','','tayfun-monitor-details');
    detail.append(note(product.reason));
    detail.append(note('SEO arşivi ve kelime geçmişi silinmez; taslakların canlı siteye uygulandığı varsayılmaz.'));
+   const timelineItems=product.revision_timeline||[];
+   const timeline=openable('SEO kayıt takvimi · '+timelineItems.length+' tarihli sürüm','tayfun-monitor-timeline',true);
+   const timelineBody=el('div','','tayfun-monitor-timeline-body');
+   timelineBody.append(note('Buradaki gün ve saat arşive KAYDEDİLME tarihidir; sitenin SEO yayın/değişiklik tarihi doğrulanmadan aynı kabul edilmez. Kayıtlar yenisinin altında korunur.'));
+   const log=el('ol','','tayfun-monitor-timeline-list');
+   for(const version of [...timelineItems].reverse()){
+    const item=el('li','','tayfun-monitor-timeline-item');
+    const source=version.source==='ai-review'?'Yapay zekâ analiz kaydı':'Temel / manuel SEO kaydı';
+    item.append(el('strong','Kaydedildi: '+date(version.created_at)),
+     el('span','Kayıt ayı: '+version.month+' · '+source,'tayfun-monitor-timeline-meta'));
+    item.append(el('span','SEO Title: '+(version.title||'Kaydedilmemiş'),'tayfun-monitor-timeline-title'));
+    if(version.previous_version_id){
+     const changed=version.changed_fields||[];
+     item.append(el('span',changed.length?'Önceki kayda göre değişen alanlar: '+changed.join(', '):'Önceki kayda göre Title, meta, H başlıkları ve diğer SEO alanları aynı.','tayfun-monitor-timeline-changes'));
+     if(version.added_keywords?.length)item.append(el('span','Yeni takip kelimeleri: '+version.added_keywords.join(' · '),'tayfun-monitor-timeline-meta'));
+    }else item.append(el('span','İlk tarihli arşiv kaydı · daha eski sürüm oluşturulmadı.','tayfun-monitor-timeline-meta'));
+    item.append(el('span','Takip edilen kelime: '+version.keyword_count+' · Sürüm: '+version.id,'tayfun-monitor-timeline-meta'));
+    log.append(item);
+   }
+   if(!timelineItems.length)log.append(el('li','Bu ürün için henüz tarihli SEO sürümü yok.'));
+   timelineBody.append(log);timeline.append(timelineBody);detail.append(timeline);
    const seo=product.latest_seo;
    if(seo){
-    const main=openable('Kaydedilmiş SEO başlıkları ve meta bilgileri · '+seo.month,'tayfun-monitor-seo',true);
+    const main=openable('Son SEO sürümü · Kaydedildi: '+date(seo.recorded_at),'tayfun-monitor-seo',true);
     const fields=el('div','','tayfun-monitor-seo-grid');
     for(const [label,value] of [['SEO Title',seo.title],['Meta Description',seo.description],['H1',seo.h1],
-     ['Canonical',seo.canonical],['Robots',seo.robots],['SEO kayıt ayı',seo.month],['Kayıt tarihi',date(seo.recorded_at)],
+     ['Canonical',seo.canonical],['Robots',seo.robots],['SEO kayıt ayı',seo.month],['Arşive kaydedilme günü ve saati',date(seo.recorded_at)],
      ['Kayıt türü',seo.source==='ai-review'?'Yapay zekâ SEO analizi':'Temel / manuel SEO kaydı'],['SEO notları',seo.notes]])
      fields.append(textField(label,value));
     main.append(fields);detail.append(main);
