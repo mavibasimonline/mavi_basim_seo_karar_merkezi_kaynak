@@ -6,7 +6,7 @@ import {catchupTick,catchupStatus} from './gsc-catchup';
 import {DurableObject} from 'cloudflare:workers';
 import {historyStatus,claimHistory,saveHistoryPage,holdHistory,listHistory,historyDetail} from './seo-history';
 import {tayfunList,tayfunSave} from './tayfun-ledger';
-import {tayfunSaveVerifiedSnapshot,tayfunApplyApprovedBaseline} from './tayfun-verified-baseline';
+import {tayfunSaveVerifiedSnapshot,tayfunApplyApprovedBaseline,tayfunApprovedBaselineStatus} from './tayfun-verified-baseline';
 import {tayfunAiContext,tayfunAiSave} from './tayfun-ai';
 import {tayfunMonitor} from './tayfun-monitor';
 import {tayfunSitemap} from './tayfun-sitemap';
@@ -401,6 +401,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
     const input=JSON.parse(await boundedText(new Response(request.body),32000));
     return json(await tayfunAiSave(this.ctx.storage,this.key(),input));
    }
+   if(path==='/api/independent/tayfun/approved-baseline/status'&&request.method==='GET')return json(await tayfunApprovedBaselineStatus(this.ctx.storage,this.key()));
    if(path==='/api/independent/tayfun/verified-baseline'&&request.method==='POST'){
     const input=JSON.parse(await boundedText(new Response(request.body),4096));
     return json(await tayfunSaveVerifiedSnapshot(this.ctx.storage,this.key(),input));
