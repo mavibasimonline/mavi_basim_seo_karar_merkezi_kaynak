@@ -1,0 +1,6 @@
+7 Kasım 2026: Kullanıcının açık onayına dayalı üç ürün SEO başlangıç kaydının özel Tayfun Worker sürümü.
+Ürünler: Broşür, El İlanı, Afiş.
+Kaynak: var olan gerçek seo_snapshots veya gerçek tayfun:auto gözlemi; varsayımsal geçmiş SEO yok.
+Referans: 22 Ekim 2026, yayın ve tarama tarihi değildir.
+Daha önce oluşturulan kayıtları silmez veya tekrar kaydetmez.
+Ana siteyi değiştirmez, yalnız şifreli Tayfun takip defterine kayıt yapar.
