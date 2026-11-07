@@ -170,24 +170,26 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
  nav.tabIndex=0;
  toolbar.append(searchLabel,nav);container.append(toolbar);
 
- // ONE shared export/import workspace. Product detail panels are read-only.
- const work=E('section','','tayfun-jobs-package');work.setAttribute('aria-label','Tek merkezden SEO veri aktarımı');
- work.append(E('h4','1. Seçili ürünlerin SEO verilerini ChatGPT’ye ver'));
- const scope=E('select','','tayfun-jobs-search');
- scope.setAttribute('aria-label','Veri hazırlanacak ürün');scope.style.maxWidth='340px';
+ // Single export/import workspace. Category pills and search above are the sole selectors.
+ const work=E('section','','tayfun-ai-workspace');work.setAttribute('aria-label','Tek merkezden SEO veri aktarımı');
+ const exportPanel=E('section','','tayfun-ai-workspace-panel tayfun-jobs-package');
+ exportPanel.append(E('h4','1. Seçili ürünlerin SEO verilerini ChatGPT’ye ver'));
  const make=E('button','Tek SEO veri paketini oluştur','button primary');
  const copy=E('button','Metni kopyala','button secondary');copy.disabled=true;
- const output=E('textarea','','tayfun-ai-output');output.readOnly=true;output.rows=9;output.placeholder='Hazırlanan tek SEO veri paketi burada gösterilir.';
- const exportInfo=E('p','Kategoriye göre veya tek ürün seçerek veri oluşturabilirsiniz. Seçilen ürünlerin kayıtları birbirine karışmaz.','source-note');
- const exportRow=E('div','','tayfun-jobs-toolbar');exportRow.append(scope,make,copy);
- work.append(exportRow,exportInfo,output,E('h4','2. ChatGPT JSON yanıtını tek seferde yapıştır'));
- const answer=E('textarea','','tayfun-ai-answer');answer.rows=10;
- answer.placeholder='Tek ürüne ait JSON, birden fazla JSON nesnesi dizisi veya format MAVI_BASIM_TAYFUN_AI_BATCH_V1 olan items dizisini buraya yapıştırın…';
+ const output=E('textarea','','tayfun-ai-output');output.readOnly=true;output.rows=13;output.placeholder='Hazırlanan SEO veri paketi burada gösterilir.';
+ const exportInfo=E('p','Üstteki kategori düğmelerini veya aramayı kullanın. Görünen ürünlerin verisi hazırlanır.','source-note');
+ const exportRow=E('div','','tayfun-ai-workspace-actions');exportRow.append(make,copy);
+ exportPanel.append(exportRow,exportInfo,output);
+ const importPanel=E('section','','tayfun-ai-workspace-panel tayfun-jobs-import');
+ importPanel.append(E('h4','2. ChatGPT JSON yanıtını tek seferde yapıştır'));
+ const answer=E('textarea','','tayfun-ai-answer');answer.rows=13;
+ answer.placeholder='Tek ürün JSON, JSON nesneleri dizisi veya MAVI_BASIM_TAYFUN_AI_BATCH_V1 items dizisi…';
  const inspect=E('button','Tüm ürünleri doğrula','button secondary');
  const save=E('button','Doğrulanan ürünleri tek işlemde kaydet','button primary');save.disabled=true;
  const preview=E('div','','tayfun-ai-preview');
- work.append(answer,inspect,preview,save);
- toolbar.after(work);
+ const importRow=E('div','','tayfun-ai-workspace-actions');importRow.append(inspect,save);
+ importPanel.append(answer,importRow,preview);
+ work.append(exportPanel,importPanel);toolbar.after(work);
  let verifiedBatch=null;
  const knownById=new Map(products.map(p=>[p.id,p]));
  const knownByUrl=new Map(products.map(p=>[p.canonical_url,p]));
@@ -196,12 +198,6 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
  function available(){const collection=(selectedCategory==='Tüm Kategoriler'?products:grouped.get(selectedCategory)||[])
   .filter(p=>(p.name+' '+(p.category||'')).toLocaleLowerCase('tr-TR').includes(currentQuery));
   return collection.slice().sort((a,b)=>a.name.localeCompare(b.name,'tr'));}
- function updateScope(){
-  const selected=scope.value;scope.replaceChildren();
-  scope.append(new Option('Seçili kategorideki bütün ürünler','all'));
-  for(const p of available())scope.append(new Option(p.name,p.id));
-  scope.value=available().some(p=>p.id===selected)?selected:'all';
- }
  async function evidenceFor(product){
   const history=await api('/api/independent/tayfun-ai/context?product_id='+encodeURIComponent(product.id));
   if(history.product?.id!==product.id||history.product?.canonical_url!==product.canonical_url)throw Error(product.name+': ürün kimliği ve URL eşleşmedi.');
@@ -226,7 +222,7 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
   return {payload:JSON.parse(sections[0][1]),template:JSON.parse(sections[1][1])};
  }
  make.onclick=async()=>{
-  const chosen=scope.value==='all'?available():available().filter(p=>p.id===scope.value);
+  const chosen=available();
   if(!chosen.length){notify('Önce kategori veya ürün seçin.');return;}
   make.disabled=true;copy.disabled=true;output.value='';
   const sources=[],failed=[];
@@ -351,7 +347,7 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
  function selectCategory(category){
   selectedCategory=category;
   for(const [name,button] of categoryButtons)button.setAttribute('aria-pressed',String(name===category));
-  renderGroups();updateScope();
+  renderGroups();
  }
  for(const category of categories){
   const button=E('button',category,'button tayfun-jobs-category-pill');
@@ -359,8 +355,8 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
   button.addEventListener('click',()=>selectCategory(category));
   nav.append(button);categoryButtons.set(category,button);
  }
- search.addEventListener('input',()=>{currentQuery=search.value.toLocaleLowerCase('tr-TR').trim();renderGroups();updateScope();});
- renderGroups();updateScope();
+ search.addEventListener('input',()=>{currentQuery=search.value.toLocaleLowerCase('tr-TR').trim();renderGroups();});
+ renderGroups();
  async function loadProduct(editor,product){
   editor.replaceChildren(E('p','Yalnız '+product.name+' geçmişi hazırlanıyor…','source-note'));
   try{
