@@ -6,7 +6,7 @@ import {catchupTick,catchupStatus} from './gsc-catchup';
 import {DurableObject} from 'cloudflare:workers';
 import {historyStatus,claimHistory,saveHistoryPage,holdHistory,listHistory,historyDetail} from './seo-history';
 import {tayfunList,tayfunSave} from './tayfun-ledger';
-import {tayfunSaveVerifiedSnapshot} from './tayfun-verified-baseline';
+import {tayfunSaveVerifiedSnapshot,tayfunApplyApprovedBaseline} from './tayfun-verified-baseline';
 import {tayfunAiContext,tayfunAiSave} from './tayfun-ai';
 import {tayfunMonitor} from './tayfun-monitor';
 import {tayfunSitemap} from './tayfun-sitemap';
@@ -209,6 +209,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
       return json({allowed:false,locked:false,d1_requests:0});
     }
     if(path==='/api/internal/tayfun-tick'&&request.method==='POST')return json(await tayfunAutoTick(this.ctx.storage,this.key()));
+    if(path==='/api/internal/tayfun-approved-baseline'&&request.method==='POST')return json(await tayfunApplyApprovedBaseline(this.ctx.storage,this.key()));
     if(path==='/api/internal/ga4-status'&&request.method==='GET')return json(await this.ga4().status());
     if(path==='/api/internal/ga4-inspect'&&request.method==='POST'){const ga4=this.ga4(),inspection=await ga4.inspectExisting();if(inspection.available)await ga4.prepare();return json({...inspection,...await ga4.status()});}
     if(path==='/api/internal/ga4-tick'&&request.method==='POST'){
