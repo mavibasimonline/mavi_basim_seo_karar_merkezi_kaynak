@@ -300,20 +300,22 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
    save.textContent='SEO Analizini Kaydet';save.disabled=false;return;
   }
   save.textContent='Kaydediliyor…';
-  const saved=[],failed=[];
+  const saved=[],existing=[],failed=[];
   for(const {product,data} of checked){
    try{
     const response=await api('/api/independent/tayfun-ai',{method:'POST',body:JSON.stringify(data)});
     if(!response.ok||response.entry?.product_id!==product.id||response.entry?.url!==product.canonical_url)
      throw Error(response.code||'Arşiv yanıtı doğrulanamadı');
-    saved.push(product.name);
+    (response.already_saved?existing:saved).push(product.name);
    }catch(error){failed.push(product.name+': '+error.message);}
   }
-  preview.replaceChildren(E('strong',saved.length+' ürün kaydedildi · '+failed.length+' hata'));
-  for(const name of saved)preview.append(E('p','Kaydedildi: '+name,'source-note'));
+  preview.replaceChildren(E('strong',saved.length+' yeni kayıt · '+existing.length+' zaten kayıtlı · '+failed.length+' hata'));
+  for(const name of saved)preview.append(E('p','Yeni SEO sürümü kaydedildi: '+name,'source-note'));
+  for(const name of existing)preview.append(E('p','Bu analiz zaten kayıtlı, tekrar yazılmadı: '+name,'source-note'));
   for(const error of failed)preview.append(E('p','Kaydedilemedi: '+error,'history-warning'));
   if(saved.length){onSaved?.();notify(saved.length+' ürünün SEO analizi kaydedildi. Eski sürümler korundu.');}
-  if(failed.length)notify(failed.length+' ürün kaydedilemedi; başarılı olanlar tekrar kaydedilmemeli.');
+  else if(existing.length)notify(existing.length+' ürünün aynı SEO analizi zaten arşivde var; yeni sürüm oluşturulmadı.');
+  if(failed.length)notify(failed.length+' ürün kaydedilemedi.');
   save.textContent='SEO Analizini Kaydet';save.disabled=false;
  };
 
