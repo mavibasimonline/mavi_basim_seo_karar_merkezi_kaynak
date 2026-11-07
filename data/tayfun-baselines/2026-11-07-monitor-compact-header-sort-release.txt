@@ -1,0 +1,8 @@
+User-approved Tayfun SEO Takibi UI release on 2026-11-07.
+- Replace redundant Tayfun report titles and introductory/comparison paragraphs with the compact search and category pill bar matching the provided screenshot.
+- Preserve action-slot accessibility for ChatGPT Devir and GSC export tools.
+- Filter monitor products by the four stable product groups, matching names and URLs; filtered counts update.
+- Every 10-column GSC keyword metric header is sortable by mouse (ascending/descending, missing values remain missing).
+- Also allow sorting on all 3/6/12-month trend headers.
+- Keep historical SEO revisions and GSC values read-only; old keywords not deleted. No live website changes.
+- Verified acceptance CI, main Worker release next.
