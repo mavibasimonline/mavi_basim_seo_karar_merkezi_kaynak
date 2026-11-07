@@ -1,0 +1,5 @@
+Tayfun gerçek SEO temel kayıtlarının doğrulanması ve takibi.
+Özel arşiv API: GET /api/independent/tayfun/approved-baseline/status (kimlik doğrulamalı).
+Başlangıç durumu 0/3 ise gerçek veri yazıldı gibi gösterilmez.
+Kayıt kaynakları: şifreli sürüm defterinde gözlemi doğrulanan Broşür, El İlanı, Afiş.
+Önceden saklanan kayıtlar korunur.
