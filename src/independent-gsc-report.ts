@@ -129,7 +129,7 @@ export async function verifiedGscMonth(storage:GscStorage,secret:string,month:st
  fail(/^20\d\d-(0[1-9]|1[0-2])$/.test(month),'INVALID_MONTH');
  const end=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0));
  // Current month may be inspected as partial evidence; never treat future or unfinalized days as complete.
- const sourceParts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit'}).formatToParts(time);
+ const sourceParts=new Intl.DateTimeFormat('en-US',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit'}).formatToParts(time);
  const sourceMonth=sourceParts.find(p=>p.type==='year')!.value+'-'+sourceParts.find(p=>p.type==='month')!.value;
  fail(month<=sourceMonth&&end.getTime()>time.getTime()-401*86400000,'GSC_MONTH_NOT_CLOSED');
  const budget:Budget={chunk_reads:0,rows:0,max_chunk_reads:options.maxChunkReads??MAX_CHUNK_READS,max_rows:options.maxRows??MAX_ROWS};
