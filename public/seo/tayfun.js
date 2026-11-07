@@ -144,6 +144,27 @@ export function createTayfunWorkspace({api,scope,notify}){
    card.append(el('strong',(old?'Önceki sürüm · ':version.status==='pasif'?'Pasif · ':'Aktif takip · ')+new Date(version.created_at).toLocaleString('tr-TR')),el('p','Title: '+(version.title||'Kaydedilmemiş')),el('p','H1: '+(version.h1||'Kaydedilmemiş')),el('p','Hedef sorgular: '+version.keywords.join(', ')),el('p','Not: '+(version.notes||'—')));
    recordArea.append(card);
   }
+  // This group is the first user-requested verified baseline batch. Historical dates remain labels,
+  // not fabricated capture or publication dates. Require an explicit user click to write a revision.
+  if(writable&&month===new Date().toISOString().slice(0,7)&&['/brosur','/el-ilani','/afis'].includes(new URL(item.url).pathname)){
+   const baseline=el('button','22 Ekim referanslı gerçek SEO kaydını oluştur','button secondary');baseline.type='button';
+   baseline.onclick=async()=>{
+    baseline.disabled=true;
+    try{
+     const currentDay=new Date().toISOString().slice(0,10);
+     const list=await api('/api/independent/seo-history?'+new URLSearchParams({kind:'snapshot',url:item.url,to:currentDay}));
+     const snapshots=(list.items||[]).filter(x=>x.observed_at&&x.observed_at.slice(0,10)<=currentDay).sort((a,b)=>b.observed_at.localeCompare(a.observed_at));
+     if(!snapshots.length){notify('Bu sayfada doğrulanmış kaynak taraması yok. SEO bilgisi tahminle kaydedilmedi.');return;}
+     const snapshot=snapshots[0];
+     const result=await api('/api/independent/tayfun/verified-baseline',{method:'POST',body:JSON.stringify({url:item.url,snapshot_id:snapshot.id,reference_date:'2026-10-22'})});
+     if(!result.ok)throw Error(result.code||'Doğrulanmış sürüm kaydedilemedi');
+     cache.delete(month);
+     notify(result.already_saved?'Aynı kanıtlı sürüm zaten kayıtlı.':'Tayfun sürüm defterine gerçek tarama kaydı eklendi. 22 Ekim referans tarihidir.');
+     refresh();
+    }catch(err){notify('Gerçek SEO kaydı oluşturulamadı: '+err.message);}finally{baseline.disabled=false;}
+   };
+   recordArea.append(baseline,el('p','Yalnız doğrulanmış seo_snapshots verisi kullanılır. Gerçek tarama tarihi değişmez; 22 Ekim kullanıcı referansıdır.','source-note'));
+  }
   if(!writable)recordArea.append(el('p','Şifreli arşiv API erişilebilir olmadığından kayıt oluşturma kapalı. Sayfa ve GSC verileri salt okunur gösteriliyor.','source-note'));
   const add=el('button',record?'Yeni SEO sürümü oluştur':'SEO kaydı ekle','button primary');add.type='button';
   add.onclick=()=>{const old=box.querySelector('.tayfun-form');old?.remove();box.append(formFor(month,item.url,record,scanned||automatic?.seo||null,refresh));};
