@@ -55,23 +55,26 @@ export async function renderSeoMonitor(root,{month,device,api,notify}){
   }
   toolbar.append(searchWrap,categoryScroll);root.prepend(toolbar);
   const matches=[];
+  const statValues=new Map();
   const list=el('div','','tayfun-monitor-products');
   const empty=note('Bu kategori veya aramada eşleşen ürün bulunamadı.');empty.hidden=true;
   function applyFilters(){
    const term=search.value.toLocaleLowerCase('tr-TR').trim();
-   let count=0;
+   let count=0;const tally={dusuyor:0,yukseliyor:0,bekle:0};
    for(const {product,article} of matches){
     const matchCategory=selectedCategory==='Tüm Kategoriler'||categoryOf(product)===selectedCategory;
     const matchQuery=!term||(product.name+' '+categoryOf(product)+' '+product.url).toLocaleLowerCase('tr-TR').includes(term);
     article.hidden=!(matchCategory&&matchQuery);
-    if(!article.hidden)count++;
+    if(!article.hidden){count++;tally[product.status]=(tally[product.status]||0)+1;}
    }
    empty.hidden=count>0;
+   for(const [status,node] of statValues)node.textContent=String(tally[status]||0);
   }
   search.addEventListener('input',applyFilters);
   const stats=el('div','','tayfun-monitor-summary');
   for(const [n,label,cls] of [[result.warning_count,'Kanıtlı önemli düşüş','down'],[result.rising_count,'Kanıtlı yükseliş','up'],[result.waiting_count,'İzleme / tam veri bekliyor','wait']]){
-   const stat=el('div','','tayfun-monitor-stat '+cls);stat.append(el('strong',String(n)),el('span',label));stats.append(stat);
+   const stat=el('div','','tayfun-monitor-stat '+cls),value=el('strong',String(n));statValues.set(cls==='down'?'dusuyor':cls==='up'?'yukseliyor':'bekle',value);
+   stat.append(value,el('span',label));stats.append(stat);
   }
   root.append(stats,list,empty);
   const sorted=[...(result.products||[])].sort((a,b)=>({dusuyor:0,yukseliyor:1,izle:2,bekle:3}[a.status]??4)-({dusuyor:0,yukseliyor:1,izle:2,bekle:3}[b.status]??4)||a.name.localeCompare(b.name,'tr'));
