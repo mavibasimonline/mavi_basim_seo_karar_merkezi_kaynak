@@ -8,7 +8,7 @@ const reject:(ok:unknown)=>asserts ok=(ok)=>{if(!ok)throw Error('TAYFUN_AI_INVAL
 const dateMonth=(time:Date)=>time.toISOString().slice(0,7);
 const monthRange=(from:string,to:string)=>{
  const a=new Date(from+'-01T00:00:00Z'),b=new Date(to+'-01T00:00:00Z'),result:string[]=[];
- for(let i=0;a<=b&&i<48;i++,a.setUTCMonth(a.getUTCMonth()+1))result.push(a.toISOString().slice(0,7));
+ for(let i=0;a<=b&&i<240;i++,a.setUTCMonth(a.getUTCMonth()+1))result.push(a.toISOString().slice(0,7));
  return result;
 };
 export async function tayfunAiContext(storage:Store,secret:string,productId:string,time=new Date()){
