@@ -4,11 +4,11 @@
   "reference_date_requested": "2026-10-22",
   "reference_date_kind": "user-specified baseline date; NOT verified historical crawl/publish date",
   "observed_date": "2026-11-07",
-  "source": "live public page textual extraction via web, not authenticated raw HTML",
+  "source": "Public page search snapshots (not verified raw HTML): URL paths established, SEO fields below are candidate descriptions requiring live verification",
   "verified_2026_10_22_state": false,
   "live_app_imported": false,
   "site_mutations": 0,
-  "notes": "Bu dosya GitHub kaynak arşividir. Tayfun Durable Object içindeki manuel SEO kayıtlarıyla eşdeğer değildir. HTML head meta description, robots, canonical, schema, OG gibi alanlar tam ham HTML alınamadığı için doğrulanmadan doldurulmadı. Eski SEO kayıtları değiştirilmedi.",
+  "notes": "Kaynak kontrolü 7 Kasım'da yapıldı fakat canlı HTML head doğrulanamadı. Title/H1/H2 ve metin parçaları tarihsel veya teknik olarak doğrulanmış kabul edilmemelidir; yalnız aday çalışma metnidir. 22 Ekim kullanıcı referans tarihidir, tarama veya yayın tarihi değildir. Tayfun Durable Object manuel sürümüne yazılmadı.",
   "pages": [
     {
       "url": "https://mavibasim.com/brosur",
@@ -22,7 +22,12 @@
         "130 gr. Kuşe Broşürler (Standart Kurumsal)"
       ],
       "visible_text_excerpt": "Broşür fiyatları için 115 gr, 130 gr ve 200 gr kuşe seçeneklerini mevcut fiyat listemizden karşılaştırabilirsiniz. A4, A5, A3 ve katlamalı broşür basımı hizmetini İstanbul Topkapı 2. Matbaacılar Sitesi üzerinden Türkiye geneline sunuyoruz.",
-      "source_url": "https://mavibasim.com/brosur"
+      "source_url": "https://mavibasim.com/brosur",
+      "field_verification": "unverified_candidates_only",
+      "title_verified": false,
+      "h1_verified": false,
+      "heading_structure_verified": false,
+      "content_verified": false
     },
     {
       "url": "https://mavibasim.com/el-ilani",
@@ -33,7 +38,12 @@
         "Fiyat Listesinde Olmayan El İlanı Seçenekleri"
       ],
       "visible_text_excerpt": "Kurumsal tanıtım ve bölgesel dağıtım projeleriniz için 105 gr kuşe başta olmak üzere tek ve çift yön el ilanı baskı seçeneklerimizi inceleyebilirsiniz.",
-      "source_url": "https://mavibasim.com/el-ilani"
+      "source_url": "https://mavibasim.com/el-ilani",
+      "field_verification": "unverified_candidates_only",
+      "title_verified": false,
+      "h1_verified": false,
+      "heading_structure_verified": false,
+      "content_verified": false
     },
     {
       "url": "https://mavibasim.com/afis",
@@ -44,7 +54,12 @@
         "Afiş Ölçüleri ve Kullanım Alanları"
       ],
       "visible_text_excerpt": "35x50 cm, 50x70 cm ve 70x100 cm ebatlarında 105 gr, 135 gr, 170 gr kuşe ve Blueback afiş poster baskı seçenekleri.",
-      "source_url": "https://mavibasim.com/afis"
+      "source_url": "https://mavibasim.com/afis",
+      "field_verification": "unverified_candidates_only",
+      "title_verified": false,
+      "h1_verified": false,
+      "heading_structure_verified": false,
+      "content_verified": false
     }
   ],
   "unverified_fields": [
