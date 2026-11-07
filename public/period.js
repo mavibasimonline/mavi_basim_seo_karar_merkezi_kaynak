@@ -253,7 +253,16 @@ export function setupPeriod(viewNames, onChange) {
     if (newMonth === openedCalendarMonth) return;
     const followedCurrent = $("month").value === openedCalendarMonth && $("rangeMonths").value === "1";
     openedCalendarMonth = newMonth;
-    if (followedCurrent && allowed().includes(newMonth)) choose(newMonth, "1");
+    // The month picker was constructed at page load. A long-lived open tab
+    // needs a new option when the calendar crosses midnight into a new month.
+    if (!allowed().includes(newMonth)) {
+      $("month").add(new Option(monthLabel(newMonth), newMonth), 0);
+      const years = [...new Set(allowed().map((v) => v.slice(0, 4)))];
+      $("pickerYear").replaceChildren(...years.map((y) => new Option(y, y)));
+      $("monthGrid").dataset.year = "";
+    }
+    if (followedCurrent) choose(newMonth, "1");
+    else sync();
   };
   window.addEventListener("focus", rollover);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) rollover(); });
