@@ -1,0 +1,10 @@
+Tayfun doğrulanmış SEO kayıtları - 2026-11-07
+
+Kapsam: Broşür, El İlanı, Afiş.
+Kaynak: Tayfun'un mevcut seo_snapshots tarama kanıtları. Eksik URL için veri uydurulmaz.
+Referans tarihi: 2026-10-22 (kullanıcı referansı; tarama veya yayın tarihi değildir).
+Yeni API: POST /api/independent/tayfun/verified-baseline.
+UI: ilgili sayfada '22 Ekim referanslı gerçek SEO kaydını oluştur'.
+Depolama: şifreli Tayfun sürüm defteri; önceki kayıtlar değişmez.
+
+Bu commit, mevcut CI başarılı olursa özel arşiv Worker dağıtım kapısını tetiklemek içindir.
