@@ -1050,6 +1050,12 @@ function setView(view, focus = true) {
   if (!views[view]) view = "overview";
   if (state.view !== view && $("helpDialog").open) $("helpDialog").close();
   state.view = view;
+  const tayfunTabs = $("tayfunWorkspaceTabs");
+  tayfunTabs.hidden = view !== "overview" && view !== "tayfun";
+  const selectedTab = view === "overview" ? "overview" : ($("tayfunApp").dataset.requestedMode || "groups");
+  tayfunTabs.querySelectorAll("[data-tayfun-target]").forEach((button) =>
+    button.setAttribute("aria-pressed", String(button.dataset.tayfunTarget === selectedTab)),
+  );
   for (const key of Object.keys(views)) $("view-" + key).hidden = key !== view;
   document.querySelectorAll("[data-view]").forEach((a) => {
     if (a.dataset.view === view || (view === "overview" && a.dataset.view === "tayfun")) a.setAttribute("aria-current", "page");
