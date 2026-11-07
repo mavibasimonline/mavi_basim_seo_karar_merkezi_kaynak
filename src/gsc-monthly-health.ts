@@ -1,4 +1,5 @@
 // Monthly GSC completeness audit. Derived from existing immutable daily manifests:
+// Private archive Worker needs its own controlled release after main source acceptance.
 // no Google calls, no D1, no writes and no fabricated zero-traffic days.
 import {collectedGscProof,type DailyProof} from './independent-gsc';
 
