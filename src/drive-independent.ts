@@ -6,6 +6,7 @@ import {catchupTick,catchupStatus} from './gsc-catchup';
 import {DurableObject} from 'cloudflare:workers';
 import {historyStatus,claimHistory,saveHistoryPage,holdHistory,listHistory,historyDetail} from './seo-history';
 import {tayfunList,tayfunSave} from './tayfun-ledger';
+import {tayfunSaveVerifiedSnapshot} from './tayfun-verified-baseline';
 import {tayfunAiContext,tayfunAiSave} from './tayfun-ai';
 import {tayfunMonitor} from './tayfun-monitor';
 import {tayfunSitemap} from './tayfun-sitemap';
@@ -398,6 +399,10 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    if(path==='/api/independent/tayfun-ai'&&request.method==='POST'){
     const input=JSON.parse(await boundedText(new Response(request.body),32000));
     return json(await tayfunAiSave(this.ctx.storage,this.key(),input));
+   }
+   if(path==='/api/independent/tayfun/verified-baseline'&&request.method==='POST'){
+    const input=JSON.parse(await boundedText(new Response(request.body),4096));
+    return json(await tayfunSaveVerifiedSnapshot(this.ctx.storage,this.key(),input));
    }
    if(path==='/api/independent/tayfun'&&request.method==='GET')return json(await tayfunList(this.ctx.storage,this.key(),url.searchParams.get('month')||''));
    if(path==='/api/independent/tayfun'&&request.method==='POST'){
