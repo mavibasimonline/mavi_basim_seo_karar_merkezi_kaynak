@@ -29,8 +29,10 @@ describe('independent monthly GSC evidence',()=>{
   expect(result).toMatchObject({available:false,days_verified:0,expected_days:30,d1_requests:0,total_clicks:null});
   expect(result.missing_days).toHaveLength(30);
  });
- it('rejects active and future periods',async()=>{
-  await expect(verifiedGscMonth(storage(),secret,'2026-10',new Date('2026-10-31'))).rejects.toThrow('GSC_MONTH_NOT_CLOSED');
+ it('allows current-month observations as partial evidence and rejects future periods',async()=>{
+  const partial=await verifiedGscMonth(storage(),secret,'2026-11',new Date('2026-11-07T07:00:00Z'));
+  expect(partial).toMatchObject({available:false,period_state:'kısmi',days_verified:0,expected_days:30,total_clicks:null});
+  await expect(verifiedGscMonth(storage(),secret,'2026-12',new Date('2026-11-07T07:00:00Z'))).rejects.toThrow('GSC_MONTH_NOT_CLOSED');
   await expect(verifiedGscMonth(storage(),secret,'invalid')).rejects.toThrow('INVALID_MONTH');
  });
  it('decrypts and verifies both scopes before counting days and exposes traceable source hashes',async()=>{
