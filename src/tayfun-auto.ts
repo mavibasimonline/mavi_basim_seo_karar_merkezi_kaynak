@@ -38,14 +38,16 @@ export async function tayfunAutoDetail(storage:Storage,secret:string,id:string){
  if(!raw)return null;
  return decrypt<AutoObservation>(raw,secret);
 }
-export async function tayfunAutoTick(storage:Storage,secret:string,fetcher:typeof fetch=fetch,now=new Date()){
+export async function tayfunAutoTick(storage:Storage,secret:string,fetcher:typeof fetch=fetch,now=new Date(),preferredUrl?:string){
  const month=now.toISOString().slice(0,7);
  const old=await storage.get<Progress>(PROGRESS)||{version:1,cursor:0,processed:0,last_run:'',last_url:null,last_error:null};
  if(old.version!==1)throw Error('TAYFUN_AUTO_PROGRESS_INVALID');
  const sitemap=await tayfunSitemap(storage,fetcher,now);
  const urls=sitemap.urls.filter(owned);
  if(!urls.length)return {status:'held',reason:'TAYFUN_SITEMAP_EMPTY',month,sitemap_stale:sitemap.stale,processed:old.processed,d1_requests:0,site_writes:0};
- const cursor=old.cursor%urls.length,url=urls[cursor],nextCursor=(cursor+1)%urls.length;
+ // A specifically approved baseline URL can be visited immediately without resetting the regular round-robin cursor.
+ if(preferredUrl&&(!owned(preferredUrl)||!urls.includes(preferredUrl)))return {status:'held',reason:'TAYFUN_APPROVED_URL_NOT_IN_SITEMAP',month,site_writes:0,d1_requests:0};
+ const cursor=old.cursor%urls.length,url=preferredUrl||urls[cursor],nextCursor=preferredUrl?old.cursor:(cursor+1)%urls.length;
  // Always move ahead, including on temporary network failures, to avoid starvation.
  const progress:Progress={version:1,cursor:nextCursor,processed:old.processed+1,last_run:now.toISOString(),last_url:url,last_error:null};
  const advance=async(code:string|null)=>{progress.last_error=code;await storage.put(PROGRESS,progress);};
