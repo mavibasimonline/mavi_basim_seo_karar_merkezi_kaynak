@@ -36,4 +36,33 @@ describe('Tayfun SEO Takibi read-only monthly monitoring',()=>{
   const result=evaluateSeoMonitor(product,[],month('2026-10',2,100),month('2026-09',20,200));
   expect(result.status).toBe('bekle');expect(result.revisions).toBe(0);
  });
+ it('shows October metrics and partial November observed query values without a false drop decision',()=>{
+  const older={...entry,keywords:['magnet fiyatları','eski silinmeyen kelime','dönemsel magnet'],keyword_decisions:[
+   {query:'magnet fiyatları',action:'koru',reason:'Daha önce dönüş sağlayan arama sorgusu korunsun.'}]};
+  const last=month('2026-11',4,65,false);
+  last.queries=[{...row(1,19,'magnet fiyatları'),position:4.5}];
+  const oct=month('2026-10',15,260);
+  oct.queries=[{...row(4,75,'magnet fiyatları'),position:8.25}];
+  const result=evaluateSeoMonitor(product,[older],last,oct);
+  expect(result.status).toBe('bekle');
+  expect(result.click_delta).toBeNull();
+  expect(result.observed_previous).toMatchObject({clicks:15,impressions:260});
+  expect(result.observed_current).toMatchObject({clicks:4,impressions:65});
+  expect(result.keywords[0]).toMatchObject({
+   query:'magnet fiyatları',previous_clicks:4,current_clicks:1,
+   previous_impressions:75,current_impressions:19,
+   previous_position:8.25,current_position:4.5,decision:'koru'});
+  expect(result.keywords[0].status).toContain('Kısmi ay');
+  expect(result.keywords.find(k=>k.query==='eski silinmeyen kelime')?.current_clicks).toBeNull();
+  expect(result.keywords.find(k=>k.query==='dönemsel magnet')).toBeDefined();
+ });
+ it('keeps historical keyword even when a newer AI version omits it',()=>{
+  const latest={...entry,id:'version-2',created_at:'2026-10-20T09:00:00Z',keywords:['magnet fiyatları']};
+  const result=evaluateSeoMonitor(product,[entry,latest],month('2026-11',1,30,false),month('2026-10',9,120));
+  expect(result.archive_count).toBe(2);
+  expect(result.revisions).toBe(2);
+  expect(result.tracked_keywords).toContain('eski silinmeyen kelime');
+  expect(result.latest_seo?.version_id).toBe('version-2');
+ });
+
 });
