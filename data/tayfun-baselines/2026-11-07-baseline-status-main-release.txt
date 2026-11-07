@@ -1,0 +1,5 @@
+Tayfun başlangıç SEO arşivi görünür tanı ve Cron önceliği.
+Kaynak özel arşiv sürümü: 305221e4979883b981cf38f96569688f71e428cc.
+Arayüz /api/independent/tayfun/approved-baseline/status salt okunur.
+3 ürün: Broşür, El İlanı, Afiş. Durum 0/3 ise açıkça gösterilir, manuel/AI sayaçları karıştırılmaz.
+Ana Worker onaylanmış Cron görevini GSC ve D1 işlemlerinin öncesinde çalıştırır.
