@@ -167,6 +167,15 @@ test("core navigation workspaces remain accessible after redundant menu cleanup"
     ),
   ).toHaveCount(0);
   await expect(page.locator("#viewTitle")).toHaveClass("sr-only");
+  // The unified Tayfun navigation intentionally occupies one row above overview metrics.
+  const tabLayout = await page.evaluate(() => {
+    const tabs = document.getElementById("tayfunWorkspaceTabs")!;
+    const rects = [...tabs.querySelectorAll("button")].map((b) => b.getBoundingClientRect());
+    return { height: tabs.getBoundingClientRect().height, oneRow: rects.every((r) => Math.abs(r.top - rects[0].top) < 2) };
+  });
+  expect(tabLayout.height).toBeGreaterThan(30);
+  expect(tabLayout.height).toBeLessThan(70);
+  expect(tabLayout.oneRow).toBe(true);
   const positions: Record<string, number> = {};
   for (const [name, id, target] of [
     ["Genel Bakış", "overview", "#kpis"],
@@ -195,14 +204,6 @@ test("core navigation workspaces remain accessible after redundant menu cleanup"
       animations: "disabled",
     });
   }
-  // The unified Tayfun navigation intentionally occupies one row above overview metrics.
-  const tabLayout = await page.evaluate(() => {
-    const tabs = document.getElementById("tayfunWorkspaceTabs")!;
-    const rects = [...tabs.querySelectorAll("button")].map((b) => b.getBoundingClientRect());
-    return { height: tabs.getBoundingClientRect().height, oneRow: rects.every((r) => Math.abs(r.top - rects[0].top) < 2) };
-  });
-  expect(tabLayout.height).toBeLessThan(70);
-  expect(tabLayout.oneRow).toBe(true);
   expect(positions.overview).toBeLessThan(380);
   // Fixed controls remain visible while only the month area scrolls.
   for (const selector of [
