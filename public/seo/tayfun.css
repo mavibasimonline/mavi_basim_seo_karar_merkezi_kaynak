@@ -142,3 +142,24 @@
 .tayfun-ai-workspace-panel .source-note{margin:0;font-size:.83rem;line-height:1.5}
 .tayfun-ai-workspace-panel .tayfun-ai-preview{min-width:0}
 @media(max-width:900px){.tayfun-ai-workspace{grid-template-columns:minmax(0,1fr)}.tayfun-ai-workspace-panel .tayfun-ai-output,.tayfun-ai-workspace-panel .tayfun-ai-answer{min-height:210px}}
+
+
+/* Read-only version detail panels inside Tayfun SEO İşleri. */
+.tayfun-saved-versions{border:1px solid #cbd5e1;border-radius:10px;background:#fff;min-width:0}
+.tayfun-saved-versions>summary{padding:14px 16px;cursor:pointer;font-weight:750;color:#0f172a;background:#eff6ff}
+.tayfun-saved-versions-list{display:grid;gap:10px;padding:12px;min-width:0}
+.tayfun-saved-version{border:1px solid #e2e8f0;border-radius:9px;min-width:0;overflow:hidden}
+.tayfun-saved-version>summary{padding:12px;background:#f8fafc;cursor:pointer;font-weight:700;overflow-wrap:anywhere}
+.tayfun-saved-version-body{display:grid;gap:12px;padding:14px;min-width:0}
+.tayfun-saved-primary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0}
+.tayfun-saved-field{display:grid;gap:5px;min-width:0;border:1px solid #e2e8f0;border-radius:7px;padding:10px;background:#fff}
+.tayfun-saved-field strong{font-size:.8rem;color:#475569}
+.tayfun-saved-field span{overflow-wrap:anywhere;white-space:pre-wrap;font-size:.9rem}
+.tayfun-saved-extra{min-width:0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+.tayfun-saved-extra>summary{cursor:pointer;padding:10px 12px;background:#f8fafc;font-weight:700}
+.tayfun-saved-detail-body{padding:12px;overflow-wrap:anywhere}
+.tayfun-saved-decisions{display:grid;gap:7px}
+.tayfun-saved-decision{display:grid;gap:3px;margin:0;padding:9px;border-bottom:1px solid #e2e8f0}
+.tayfun-saved-decision strong{font-size:.82rem}.tayfun-saved-decision span{font-size:.85rem}
+.tayfun-saved-json{font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:400px;overflow:auto;margin:0;padding:12px;background:#f8fafc}
+@media(max-width:700px){.tayfun-saved-primary{grid-template-columns:minmax(0,1fr)}.tayfun-saved-version-body{padding:9px}}
