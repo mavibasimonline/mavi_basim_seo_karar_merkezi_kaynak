@@ -60,7 +60,11 @@ describe('Tayfun AI product-scoped handoff and append-only keyword history',()=>
   ])await expect(tayfunAiSave(s,secret,bad,stamp)).rejects.toThrow('TAYFUN_AI_INVALID');
   const v=answer(first.entry.id);
   await tayfunAiSave(s,secret,v,stamp);
-  await expect(tayfunAiSave(s,secret,v,stamp)).rejects.toThrow('TAYFUN_AI_INVALID');
+  const repeated=await tayfunAiSave(s,secret,v,stamp);
+  expect(repeated.already_saved).toBe(true);
+  expect(repeated.entry.id).toBe((await tayfunList(s,secret,'2026-11')).entries[0].id);
+  await expect(tayfunAiSave(s,secret,{...v,seo:{...v.seo,title:'Eşleşmeyen güncel başlık'}},stamp)).rejects.toThrow('TAYFUN_AI_INVALID');
+  await expect(tayfunAiSave(s,secret,{...v,keywords:['başka kelime']},stamp)).rejects.toThrow('TAYFUN_AI_INVALID');
   expect((await tayfunList(s,secret,'2026-11')).entries).toHaveLength(1);
  });
 });
