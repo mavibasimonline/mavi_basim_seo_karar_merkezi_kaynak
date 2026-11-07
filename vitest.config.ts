@@ -7,6 +7,10 @@ export default defineConfig(async () => ({
     miniflare: { bindings: { TEST_MIGRATIONS: await readD1Migrations('./migrations'), ADMIN_TOKEN: 'test-only-owner-token', TOKEN_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' } },
   })],
   test: {
+    // Limit Cloudflare/Miniflare fixture startup contention on small CI runners.
+    maxWorkers: 2,
+    hookTimeout: 30000,
+    testTimeout: 15000,
     include: ['tests/**/*.test.ts'],
     exclude: ['tests/drive-independent/**/*.test.ts','tests/monthly-store/**/*.test.ts','tests/independent-acceptance/**/*.test.ts'],
   },
