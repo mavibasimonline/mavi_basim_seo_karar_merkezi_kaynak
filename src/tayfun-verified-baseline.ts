@@ -3,7 +3,7 @@
 import {historyDetail} from './seo-history';
 import {tayfunList,tayfunSave} from './tayfun-ledger';
 import {gscPageURL} from './urls';
-type Storage={get<T=unknown>(key:string):Promise<T|undefined>;put(key:string,value:unknown):Promise<unknown>};
+type Storage={get<T=unknown>(key:string):Promise<T|undefined>;put(key:string,value:unknown):Promise<unknown>;list<T=unknown>(options:{prefix?:string;start?:string;startAfter?:string;limit?:number;reverse?:boolean;end?:string}):Promise<Map<string,T>>};
 const assert:(v:unknown)=>asserts v=(v)=>{if(!v)throw Error('TAYFUN_VERIFIED_BASELINE_INVALID');};
 const str=(v:unknown,max:number)=>typeof v==='string'?v.slice(0,max):'';
 const json=(v:unknown,max:number)=>v===undefined||v===null?'':JSON.stringify(v).slice(0,max);
