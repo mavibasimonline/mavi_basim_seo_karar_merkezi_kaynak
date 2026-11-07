@@ -38,7 +38,7 @@ describe('Tayfun SEO Takibi read-only monthly monitoring',()=>{
  });
  it('shows October metrics and partial November observed query values without a false drop decision',()=>{
   const older={...entry,keywords:['magnet fiyatları','eski silinmeyen kelime','dönemsel magnet'],keyword_decisions:[
-   {query:'magnet fiyatları',action:'koru',reason:'Daha önce dönüş sağlayan arama sorgusu korunsun.'}]};
+   {query:'magnet fiyatları',action:'koru' as const,reason:'Daha önce tıklama sağlayan arama sorgusu korunsun.'}]};
   const last=month('2026-11',4,65,false);
   last.queries=[{...row(1,19,'magnet fiyatları'),position:4.5}];
   const oct=month('2026-10',15,260);
