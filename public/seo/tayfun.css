@@ -105,3 +105,29 @@
 @media(max-width:450px){.tayfun-jobs-toolbar{flex-wrap:wrap}
  .tayfun-jobs-search-wrap{flex:1 1 100%;max-width:none}
  .tayfun-jobs-category-scroll{flex:1 1 100%}}
+
+/* Tayfun SEO Takibi: restrained evidence-first alerts, responsive keyword history. */
+.tayfun-monitor-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tayfun-monitor-stat{display:grid;gap:4px;border:1px solid #dce6f4;border-radius:10px;background:#f8fbff;padding:16px;color:#233953}
+.tayfun-monitor-stat strong{font-size:27px;font-weight:800;color:#2563eb}
+.tayfun-monitor-stat span{font-size:12px}
+.tayfun-monitor-stat.down{border-color:#ffc9d4;background:#fff7f8}
+.tayfun-monitor-stat.down strong{color:#c82d48}
+.tayfun-monitor-stat.up{border-color:#b8e6d0;background:#f5fdf9}
+.tayfun-monitor-stat.up strong{color:#14835b}
+.tayfun-monitor-product{border:1px solid #dfe7f2;border-radius:10px;background:#fff;overflow:hidden}
+.tayfun-monitor-product>summary{cursor:pointer;display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:15px}
+.tayfun-monitor-product>summary strong{font-size:14px;color:#10213d}
+.tayfun-monitor-product>summary small{margin-left:auto;color:#5d6f86}
+.tayfun-monitor-state{padding:5px 9px;border-radius:16px;border:1px solid #d6e2f1;color:#4b5e78;background:#f5f8fc;font-size:11px;font-weight:700}
+.tayfun-monitor-state.dusuyor{background:#fff0f2;color:#c82d48;border-color:#ffbecb}
+.tayfun-monitor-state.yukseliyor{background:#edfbf4;color:#147f54;border-color:#b9e7ce}
+.tayfun-monitor-details{display:grid;gap:10px;padding:16px;border-top:1px solid #e4ecf5;color:#34465d}
+.tayfun-monitor-details p{margin:0;overflow-wrap:anywhere}
+.tayfun-monitor-keywords{margin-top:8px}
+.tayfun-monitor-keywords>summary{cursor:pointer;font-weight:700}
+.tayfun-monitor-keyword-table{margin-top:10px;display:grid;gap:0;overflow-x:auto}
+.tayfun-monitor-keyword-head,.tayfun-monitor-keyword-row{display:grid;grid-template-columns:minmax(170px,2fr) repeat(3,minmax(100px,1fr));gap:8px;padding:9px;border-bottom:1px solid #edf1f8;min-width:500px}
+.tayfun-monitor-keyword-head{background:#eef3fc;color:#27476e;font-size:11px}
+.tayfun-monitor-keyword-row{font-size:12px}
+@media(max-width:620px){.tayfun-monitor-summary{grid-template-columns:1fr}.tayfun-monitor-product>summary small{margin-left:0}}
