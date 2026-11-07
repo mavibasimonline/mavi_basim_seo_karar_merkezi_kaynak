@@ -46,10 +46,17 @@ export function setupPeriod(viewNames, onChange) {
   )
     ? String(pref.rangeMonths)
     : "1";
+  // A remembered previous month must never trap the dashboard after a calendar rollover.
+  // Keep intentionally selected historical months when they were chosen in the current calendar month.
+  const lastMonth = new Date(today + "-01T12:00:00Z");
+  lastMonth.setUTCMonth(lastMonth.getUTCMonth() - 1);
+  const staleAutoSelection = pref.month === (pref.calendarMonth || lastMonth.toISOString().slice(0, 7))
+    && (pref.calendarMonth || lastMonth.toISOString().slice(0, 7)) < today;
   $("month").value =
-    $("rangeMonths").value === "1" && allowed().includes(pref.month)
+    $("rangeMonths").value === "1" && allowed().includes(pref.month) && !staleAutoSelection
       ? pref.month
       : today;
+  let openedCalendarMonth = today;
   $("device").value = devices.includes(pref.device) ? pref.device : "ALL";
   let year = Number($("month").value.slice(0, 4));
   const years = [...new Set(allowed().map((v) => v.slice(0, 4)))];
@@ -60,6 +67,7 @@ export function setupPeriod(viewNames, onChange) {
         KEY,
         JSON.stringify({
           month: $("month").value,
+          calendarMonth: currentMonth(),
           rangeMonths: $("rangeMonths").value,
           device: $("device").value,
           view: viewNames.includes(view) ? view : "overview",
@@ -239,6 +247,16 @@ export function setupPeriod(viewNames, onChange) {
     onChange();
   };
   $("device").onchange = onChange;
+  // Also advance a dashboard kept open across the first day of a new month.
+  const rollover = () => {
+    const newMonth = currentMonth();
+    if (newMonth === openedCalendarMonth) return;
+    const followedCurrent = $("month").value === openedCalendarMonth && $("rangeMonths").value === "1";
+    openedCalendarMonth = newMonth;
+    if (followedCurrent && allowed().includes(newMonth)) choose(newMonth, "1");
+  };
+  window.addEventListener("focus", rollover);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) rollover(); });
   sync();
   return {
     remember,
