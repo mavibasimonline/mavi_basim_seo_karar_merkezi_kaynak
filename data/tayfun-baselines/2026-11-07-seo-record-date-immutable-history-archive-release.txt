@@ -1,0 +1,7 @@
+SEO Takibi dated SEO version timeline release, 7 November 2026.
+- Store stays append-only encrypted: Title, Meta Description, H1, H2–H6, Canonical, Robots and technical SEO previous versions are not overwritten.
+- Record date/time (created_at) is displayed explicitly in Europe/Istanbul, separate from the SEO tracking month and any unknown website publication date.
+- Product revision timeline compares recorded previous and new SEO fields and retains previously tracked keywords.
+- 3/6/12-month GSC keyword metrics remain read-only observations.
+- Cross-month changes produce new dated versions, preserving previous months. No SEO site edits, no paid tools.
+- Typecheck, unit tests, imports and browser E2E passed before archive release.
