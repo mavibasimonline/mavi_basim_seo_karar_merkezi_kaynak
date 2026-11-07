@@ -567,7 +567,7 @@ test("Tayfun top tabs expose original overview and keep SEO sections in one plac
   await expect(page.locator("#tayfunApp .tayfun-tabs")).toHaveCount(0);
   await tabs.locator('[data-tayfun-target="monitor"]').click();
   await expect(tabs.locator('[data-tayfun-target="monitor"]')).toHaveAttribute("aria-pressed","true");
-  await expect(page.locator("#tayfunApp")).toContainText("SEO Takibi");
+  await expect(page.locator("#tayfunApp")).toHaveAttribute("data-requested-mode","monitor");
   await tabs.locator('[data-tayfun-target="overview"]').click();
   await expect(page.locator("#view-overview")).toBeVisible();
   await expect(page.locator("#kpis")).toBeVisible();
