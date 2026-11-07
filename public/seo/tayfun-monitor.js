@@ -147,18 +147,46 @@ export async function renderSeoMonitor(root,{month,device,api,notify}){
    if(words.length){
     const wrap=el('div','','tayfun-monitor-keyword-scroll');
     const table=el('div','','tayfun-monitor-keyword-table');
-    const headers=el('div','','tayfun-monitor-keyword-head');
-    for(const name of ['Sorgu','Önce tık','Önce göst.','Önce CTR','Önce sıra','Şimdi tık','Şimdi göst.','Şimdi CTR','Şimdi sıra','Karar'])
-     headers.append(el('strong',name));
-    table.append(headers);
-    for(const w of words){
-     const row=el('div','','tayfun-monitor-keyword-row');
-     for(const v of [w.query,val(w.previous_clicks),val(w.previous_impressions),percent(w.previous_ctr),pos(w.previous_position),
-      val(w.current_clicks),val(w.current_impressions),percent(w.current_ctr),pos(w.current_position),w.decision||'izle'])
-      row.append(el('span',v));
-     row.title=w.decision_reason||w.status||'';
-     table.append(row);
+    const headers=el('div','','tayfun-monitor-keyword-head');headers.setAttribute('role','row');
+    const columns=[
+     ['Sorgu','query'],['Önce tık','previous_clicks'],['Önce göst.','previous_impressions'],
+     ['Önce CTR','previous_ctr'],['Önce sıra','previous_position'],
+     ['Şimdi tık','current_clicks'],['Şimdi göst.','current_impressions'],
+     ['Şimdi CTR','current_ctr'],['Şimdi sıra','current_position'],['Karar','decision']
+    ];
+    let sortKey='current_impressions',sortDirection=-1;
+    const buttons=new Map(),heads=new Map();
+    for(const [label,key] of columns){
+     const cell=el('div','','tayfun-monitor-th');cell.setAttribute('role','columnheader');
+     const button=el('button',label,'tayfun-monitor-sort');button.type='button';
+     button.title=label+' sütununa göre sırala';
+     button.addEventListener('click',()=>{
+      if(sortKey===key)sortDirection*=-1;
+      else{sortKey=key;sortDirection=['query','decision'].includes(key)?1:-1;}
+      orderRows();
+     });
+     cell.append(button);headers.append(cell);heads.set(key,cell);buttons.set(key,button);
     }
+    const wordRows=words.map(w=>{
+     const row=el('div','','tayfun-monitor-keyword-row');row.setAttribute('role','row');
+     for(const v of [w.query,val(w.previous_clicks),val(w.previous_impressions),percent(w.previous_ctr),pos(w.previous_position),
+      val(w.current_clicks),val(w.current_impressions),percent(w.current_ctr),pos(w.current_position),w.decision||'izle']){
+      const cell=el('span',v);cell.setAttribute('role','cell');row.append(cell);
+     }
+     row.title=w.decision_reason||w.status||'';
+     return {data:w,row};
+    });
+    function orderRows(){
+     for(const [key,button] of buttons){
+      const active=key===sortKey;
+      button.textContent=columns.find(col=>col[1]===key)[0]+(active?(sortDirection===1?' ↑':' ↓'):'');
+      heads.get(key).setAttribute('aria-sort',active?(sortDirection===1?'ascending':'descending'):'none');
+     }
+     const sorted=[...wordRows].sort((a,b)=>sortValue(a.data[sortKey],b.data[sortKey],sortDirection)
+      ||a.data.query.localeCompare(b.data.query,'tr'));
+     table.replaceChildren(headers,...sorted.map(v=>v.row));
+    }
+    orderRows();
     wrap.append(table);wordPanel.append(wrap);
     wordPanel.append(note('GSC sorgu metrikleri organik arama görünürlüğüdür; bunlardan satış, teklif veya gerçek müşteri sayısı çıkarılmaz. Kaydı olmayan sorgu sıfır değildir.'));
    }else wordPanel.append(note('Henüz izlenecek kelime arşivi veya doğrulanmış görünür sorgu yok.'));
