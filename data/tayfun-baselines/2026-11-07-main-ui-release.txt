@@ -1,0 +1,6 @@
+Tayfun ana Worker yayın tetiklemesi, 7 Kasım 2026.
+
+Kapsam: Broşür, El İlanı ve Afiş için yalnız doğrulanmış seo_snapshots kaydından şifreli SEO sürümü oluşturma arayüzü.
+Bağımlı özel arşiv commit: e5313c0359fff73571b24309aee1f51558ffd96a.
+Güvenlik: önceki sürüm korunur, canlı matbaa sitesi değiştirilmez, 22 Ekim referans tarihi tarama tarihi yapılmaz.
+CI, D1 kota, üretim koruma ve canlı sürüm testleri geçmeden yayın yapılmaz.
