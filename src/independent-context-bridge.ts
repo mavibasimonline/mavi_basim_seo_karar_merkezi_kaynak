@@ -52,7 +52,9 @@ export async function independentContextCron(env:E,time=new Date(),initial=false
   if(status.available){
    if(initial)return 'idle';
    if(typeof status.captured_at!=='string'||!Number.isFinite(Date.parse(status.captured_at))||Date.parse(status.captured_at)>time.getTime()+300000)return 'held';
-   if(status.captured_at.slice(0,10)>=time.toISOString().slice(0,10)||time.getUTCHours()!==0||time.getUTCMinutes()!==15)return 'idle';
+   // A missed 00:15 UTC capture must not leave Tayfun's evidence context stale for another day.
+   // Retry once hourly after the scheduled window, using the same date guard and read budget.
+   if(status.captured_at.slice(0,10)>=time.toISOString().slice(0,10)||time.getUTCHours()===0&&time.getUTCMinutes()<15||time.getUTCMinutes()!==15)return 'idle';
   }
   const context=await loadIndependentContext(env,time,initial?'/internal/context-source-read':'cron');
   const saved=await env.DRIVE_ARCHIVE_SERVICE.fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(context)});
