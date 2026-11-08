@@ -233,8 +233,12 @@ export class IndependentGa4 {
   const manifests=kinds.map(kind=>views[kind]?.manifest);
   const archived=kinds.every(kind=>!!views[kind]);
   const period_consistent=archived?manifests.every(m=>m?.from===manifests[0]?.from&&m?.to===manifests[0]?.to&&m?.closed===manifests[0]?.closed&&m?.property.id===property.id&&m?.property.time_zone===property.time_zone):null;
-  const available=!!period_consistent;
-  return {available,period_consistent,connected:!!await this.store.get(ROOT+'oauth'),property,month,source:SOURCE,channel:'Organic Search',hostnames:['mavibasim.com','www.mavibasim.com'],
+  // A current-month archive can be internally consistent yet outdated after the
+  // two-day Analytics data cutoff advances. Never publish it as today's complete evidence.
+  const expected=period(month,new Date(),property.time_zone);
+  const period_current=period_consistent===true&&manifests[0]?.from===expected.from&&manifests[0]?.to===expected.to&&manifests[0]?.closed===expected.closed;
+  const available=period_current;
+  return {available,period_consistent,period_current,connected:!!await this.store.get(ROOT+'oauth'),property,month,source:SOURCE,channel:'Organic Search',hostnames:['mavibasim.com','www.mavibasim.com'],
    from:city?.manifest.from||total?.manifest.from||null,to:city?.manifest.to||total?.manifest.to||null,closed:city?.manifest.closed===true,
    captured_at:city?.manifest.captured_at||null,thresholded:Object.values(views).some(v=>v!.manifest.thresholded),other_rows:Object.values(views).some(v=>v!.manifest.other_rows),
    totals:available&&total?.rows.length===1?total.rows[0]:null,
@@ -242,7 +246,7 @@ export class IndependentGa4 {
    devices:(available?views.devices?.rows||[]:[]).map(r=>({device:r.dimensions[0],active_users:r.activeUsers,sessions:r.sessions,engaged_sessions:r.engagedSessions})),
    pages:(available?views.pages?.rows||[]:[]).map(r=>({page:r.dimensions[0],active_users:r.activeUsers,sessions:r.sessions,engaged_sessions:r.engagedSessions})),
    evidence:Object.values(views).map(v=>({source:SOURCE,property:property.id,month,kind:v!.manifest.kind,from:v!.manifest.from,to:v!.manifest.to,timezone:property.time_zone,generation:v!.manifest.generation,captured_at:v!.manifest.captured_at,rows:v!.rows.length,hashes:v!.manifest.pages.map(p=>p.sha256)})),
-   message:available?(city?.rows.length?'GA4 organik arama oturumları ve aktif kullanıcılar doğrulandı.':'Dört GA4 kırılımı aynı dönem için arşivlendi; şehir raporunda satır bulunmuyor.'):(archived?'Dört GA4 kırılımının bitiş tarihleri farklı; dönem eşitlenmeden sonuçlar karşılaştırılamaz.':'Dört GA4 kırılımının tamamı henüz doğrulanmadı; eksik kayıt sıfır ziyaretçi değildir.'),
+   message:available?(city?.rows.length?'GA4 organik arama oturumları ve aktif kullanıcılar doğrulandı.':'Dört GA4 kırılımı aynı dönem için arşivlendi; şehir raporunda satır bulunmuyor.'):(archived?(period_consistent?'GA4 kırılımları kendi içinde eşleşiyor ancak güncel kesinleşebilir tarihe kadar yenilenmedi; otomatik toplama bekleniyor.':'Dört GA4 kırılımının bitiş tarihleri farklı; dönem eşitlenmeden sonuçlar karşılaştırılamaz.'):'Dört GA4 kırılımının tamamı henüz doğrulanmadı; eksik kayıt sıfır ziyaretçi değildir.'),
    limitations:['Aktif kullanıcılar ve şehir/cihaz/sayfa satırları toplanarak benzersiz ziyaretçi toplamı hesaplanmaz.','Şehir, arayanın sorgusu değildir; GA4 oturumu GSC tıklamasıyla eşit sayılmaz.','Gizlilik eşiği ve (not set)/(other) konumlar ayrıca belirtilir.'],d1_requests:0};
  }
 }
