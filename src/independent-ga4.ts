@@ -226,7 +226,10 @@ export class IndependentGa4 {
    let rows:Row[]=[];const identities=new Set<string>();for(const part of m.pages){const r=await this.readPart(m,part);for(const row of r){const id=JSON.stringify(row.dimensions);check(!identities.has(id),'GA4_DUPLICATE_ROW');identities.add(id);}rows.push(...r);}
    check(rows.length===m.cursor&&m.cursor===m.row_count,'GA4_ROW_COUNT_INVALID');views[kind]={manifest:m,rows};
   }
-  const city=views.cities,total=views.total,available=!!city&&city.rows.length>0;
+  const city=views.cities,total=views.total;
+  // A complete zero-row Organic Search report is a verified empty result, not an absent archive.
+  // All four independently checked manifests are required before declaring the month available.
+  const available=(['total','cities','devices','pages'] as Kind[]).every(kind=>!!views[kind]);
   return {available,connected:!!await this.store.get(ROOT+'oauth'),property,month,source:SOURCE,channel:'Organic Search',hostnames:['mavibasim.com','www.mavibasim.com'],
    from:city?.manifest.from||total?.manifest.from||null,to:city?.manifest.to||total?.manifest.to||null,closed:city?.manifest.closed===true,
    captured_at:city?.manifest.captured_at||null,thresholded:Object.values(views).some(v=>v!.manifest.thresholded),other_rows:Object.values(views).some(v=>v!.manifest.other_rows),
@@ -235,7 +238,7 @@ export class IndependentGa4 {
    devices:(views.devices?.rows||[]).map(r=>({device:r.dimensions[0],active_users:r.activeUsers,sessions:r.sessions,engaged_sessions:r.engagedSessions})),
    pages:(views.pages?.rows||[]).map(r=>({page:r.dimensions[0],active_users:r.activeUsers,sessions:r.sessions,engaged_sessions:r.engagedSessions})),
    evidence:Object.values(views).map(v=>({source:SOURCE,property:property.id,month,kind:v!.manifest.kind,from:v!.manifest.from,to:v!.manifest.to,timezone:property.time_zone,generation:v!.manifest.generation,captured_at:v!.manifest.captured_at,rows:v!.rows.length,hashes:v!.manifest.pages.map(p=>p.sha256)})),
-   message:available?'GA4 organik arama oturumları ve aktif kullanıcılar doğrulandı.':'Bu dönemin şehir kayıtları henüz doğrulanmadı; eksik kayıt sıfır ziyaretçi değildir.',
+   message:available?(city?.rows.length?'GA4 organik arama oturumları ve aktif kullanıcılar doğrulandı.':'Dört GA4 kırılımı da arşivlendi; şehir raporunda satır bulunmuyor. Doğrulanmış boş rapor ile eksik kayıt farklıdır.'):'Bu dönemin dört GA4 kırılımının tamamı doğrulanmadı; eksik kayıt sıfır ziyaretçi değildir.',
    limitations:['Aktif kullanıcılar ve şehir/cihaz/sayfa satırları toplanarak benzersiz ziyaretçi toplamı hesaplanmaz.','Şehir, arayanın sorgusu değildir; GA4 oturumu GSC tıklamasıyla eşit sayılmaz.','Gizlilik eşiği ve (not set)/(other) konumlar ayrıca belirtilir.'],d1_requests:0};
  }
 }
