@@ -232,7 +232,7 @@ export function createTayfunWorkspace({api,scope,notify}){
     categoryButtons.set(category,pill);target.append(pill);
    }
    appendCategory('Tüm Kategoriler',productRow);
-   const otherAll=el('button','Tüm Kategoriler','button tayfun-jobs-category-pill');
+   const otherAll=el('button','Tüm Kategoriler','button tayfun-unmapped-all-pill');
    otherAll.type='button';otherAll.onclick=()=>{selectedCategory='Tüm Kategoriler';paintCurrent?.();};
    otherRow.append(otherAll);
    for(const category of productCategories)appendCategory(category,productRow);
