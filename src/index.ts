@@ -207,7 +207,11 @@ export default {
       return securityHeaders(json({error:invalid?'İstek verisi geçersiz.':'İşlem tamamlanamadı. Veri kaynağı ve sistem durumunu kontrol edin.',code:invalid?'INVALID_INPUT':error instanceof ProviderError?error.code:'INTERNAL_ERROR'},invalid?400:503));
     }
   },
-  async scheduled(_event:ScheduledController,env:Env,context:ExecutionContext){if(env.AUTOMATION_ENABLED!=='true')return;context.waitUntil((async()=>{
+  async scheduled(_event:ScheduledController,env:Env,context:ExecutionContext){if(env.AUTOMATION_ENABLED!=='true')return;
+    // GA4 must not wait behind GSC bootstrap, Sheets refresh, or D1 quotas.
+    const ga4Time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
+    context.waitUntil(independentGa4Cron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time).then(status=>{console.log(JSON.stringify({event:'independent-ga4',status,d1_requests:0}));}).catch(()=>{console.log(JSON.stringify({event:'independent-ga4',status:'held',code:'GA4_PRIVATE_TICK_UNAVAILABLE',d1_requests:0}));}));
+    context.waitUntil((async()=>{
     try{
       const time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
       // Keep user-approved SEO baseline capture independent from all Google and D1 workflows.
@@ -232,7 +236,6 @@ export default {
       try{await independentGscCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);}
       catch{console.log(JSON.stringify({event:'independent-gsc',status:'held',code:'GSC_PRIVATE_SYNC_UNAVAILABLE',d1_collection_writes:0}));}
       await independentGscBootstrapCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);
-      await independentGa4Cron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);
       // Optional bounded metadata copy has its own budget. Its failure never
       // gates daily collection or reads from a user-facing GSC report.
       await independentContextCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);
