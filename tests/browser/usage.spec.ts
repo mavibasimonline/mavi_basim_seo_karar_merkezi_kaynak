@@ -700,7 +700,11 @@ test("Tayfun Ürün Grupları mirrors category toolbar and groups all SEO page t
    root.dataset.requestedMode='unmapped';
    root.dispatchEvent(new Event('tayfun-mode-change'));
   });
-  await expect(toolbar.locator(".tayfun-jobs-category-scroll")).toBeHidden();
+  await expect(toolbar.locator(".tayfun-jobs-category-scroll")).toBeVisible();
+  await expect(toolbar.locator(".tayfun-category-products")).toBeHidden();
+  await expect(toolbar.locator(".tayfun-category-other")).toBeVisible();
+  await expect(toolbar.locator(".tayfun-category-other")).toContainText("Şehir Sayfaları");
+  await expect(toolbar.locator(".tayfun-category-other")).toContainText("Blog Sayfaları");
   await expect(page.locator("#tayfunApp .tayfun-page-summary").first()).toContainText("bilinmeyen-sayfa");
   expect(failures).toEqual([]);
 });
