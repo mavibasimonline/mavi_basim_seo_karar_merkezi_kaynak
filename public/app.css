@@ -3378,30 +3378,3 @@ dialog::backdrop {
 .tayfun-upload-feedback[data-state="success"]{border-color:#86c9a4;background:#effbf3;color:#17653b;font-weight:650;}
 .tayfun-upload-feedback[data-state="error"]{border-color:#e7a9a9;background:#fff4f4;color:#9f2828;font-weight:650;}
 @media(max-width:600px){#tayfunManualUploadRow{gap:8px;}#tayfunManualUploadRow .tayfun-upload-feedback{flex-basis:100%;}}
-
-
-/* Global single-owner reporting toolbar. */
-.topbar .topbar-actions{position:relative}
-.topbar #globalReportToggle{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;height:34px;padding:5px 9px;font-size:11px;white-space:nowrap}
-.topbar #globalReportToggle .icon{width:15px;height:15px}
-.topbar #reportActions{display:none;position:absolute;top:calc(100% + 8px);right:0;z-index:80;min-width:230px;max-width:min(320px,calc(100vw - 16px));padding:10px;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 10px 26px rgba(20,36,62,.17);flex-direction:column;align-items:stretch;gap:7px;white-space:nowrap}
-.topbar #reportActions.is-open{display:flex}
-.topbar #reportActions .button{width:100%;justify-content:center}
-.topbar #reportActions .icon-button{align-self:flex-end}
-@media(min-width:1600px){
- .topbar #globalReportToggle{display:none}
- .topbar #reportActions,.topbar #reportActions.is-open{display:flex;position:static;min-width:0;max-width:none;padding:0;background:transparent;border:0;box-shadow:none;flex-direction:row;align-items:center;gap:4px}
- .topbar #reportActions .button{width:auto;white-space:nowrap;font-size:10.5px;padding:5px 7px}
- .topbar #reportActions .icon-button{align-self:auto}
-}
-@media(max-width:720px){
- .topbar #globalReportToggle{width:30px;min-width:30px;padding:5px}
- .topbar #globalReportToggle .report-toggle-label{display:none}
- .topbar #reportActions{right:0}
-}
-/* Strong and explicit private archive receipt without changing Google data. */
-.tayfun-upload-feedback[data-state="success"]{font-weight:700}
-.manual-upload-toast{position:fixed;right:18px;bottom:20px;z-index:120;max-width:min(480px,calc(100vw - 32px));display:flex;align-items:flex-start;gap:12px;padding:15px 16px;background:#fff;border:2px solid #16834d;border-radius:12px;box-shadow:0 10px 36px rgba(20,36,62,.22);color:#14532d;font-size:13px;line-height:1.5}
-.manual-upload-toast[data-state="error"]{border-color:#cb4141;color:#952626}
-.manual-upload-toast .manual-upload-message{flex:1;overflow-wrap:anywhere}
-.manual-upload-toast button{border:0;background:transparent;color:inherit;font-size:20px;line-height:1;cursor:pointer;min-width:26px;min-height:26px}
