@@ -639,8 +639,17 @@ test("Tayfun Ürün Grupları mirrors SEO category toolbar and groups blog city 
     });
   });
   await view(page, "Tayfun");
+  const pageErrors:string[]=[];
+  page.on("pageerror",error=>pageErrors.push(error.message));
   await page.locator('#tayfunWorkspaceTabs [data-tayfun-target="groups"]').click();
   const toolbar=page.locator("#tayfunApp .tayfun-groups-toolbar");
+  await page.waitForTimeout(750);
+  console.log("TAYFUN_GROUPS_DIAG",JSON.stringify({
+   content:await page.locator("#tayfunApp").innerText(),
+   errors:pageErrors,
+   mode:await page.locator("#tayfunApp").getAttribute("data-requested-mode"),
+   scripts:await page.evaluate(()=>Array.from(document.querySelectorAll('script[src*="tayfun"]')).map(s=>s.getAttribute("src")))
+  }).slice(0,4000));
   await expect(toolbar).toBeVisible();
   const pills=toolbar.locator(".tayfun-jobs-category-pill");
   await expect(pills.first()).toHaveText("Tüm Kategoriler");
