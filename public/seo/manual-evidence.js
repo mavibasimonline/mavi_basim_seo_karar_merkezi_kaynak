@@ -61,6 +61,31 @@ function mount(){
  let current=null,tab='pages';
  for(const [key,name]of tabNames){const b=el('button',name,'button secondary');b.type='button';b.addEventListener('click',()=>{tab=key;filter.value='';show();});tabs.append(b);}
  host.append(stats,tabs,filter,results);
+ const qa=el('form'),query=el('input'),ask=el('button','Yerel verilere sor','button primary'),reply=el('div');
+ query.type='search';query.placeholder='Örnek: broşür, magnet, hangi sorgu, organik trafik';query.maxLength=160;query.setAttribute('aria-label','Yerel arşivle ilgili SEO sorusu');query.required=true;
+ ask.type='submit';reply.setAttribute('role','status');qa.append(query,ask);host.append(el('h3','Tayfun · Manuel veri soruları'),qa,reply);
+ qa.addEventListener('submit',event=>{
+  event.preventDefault();reply.replaceChildren();if(!current){reply.append(el('p','Önce bir veri paketi içe aktarın.'));return;}
+  const p=current.payload,q=query.value.toLocaleLowerCase('tr').trim(),box=el('div');
+  const organic=p.ga4.channels.find(r=>r.channel==='Organic Search');
+  const add=txt=>box.append(el('p',txt));
+  add('Kaynak: '+p.period.start+' — '+p.period.end+' · Manuel GSC/GA4 dışa aktarımı; gerçek zamanlı veri değildir.');
+  if(/organik|oturum|ga4|analytics|ziyaret/.test(q)){
+   add(organic?'GA4 Organic Search: '+num(organic.sessions)+' oturum, '+num(organic.engaged_sessions)+' etkileşimli oturum.':'Bu pakette GA4 organik oturum kaydı yok.');
+  }else if(/şehir|ilçe|bölge|il/.test(q)){
+   add('GA4 şehir kırılımı bu dosyada yok. Şehir bazlı ziyaretçi veya yükseliş sonucu çıkarılamaz.');
+  }else{
+   const stop=['hangi','sayfa','sorgu','kelime','durumu','kaç','tıklama','performans','nedir','seo','bana','göster','en','çok','ençok','var','mı','ile','için','nasıl','ne','bu','ay','geçen','düştü','yükseldi','sonuç','sonuçları','ürün','ürünün','yaz'];
+   const words=q.split(/s+/).filter(w=>w.length>=3&&!stop.includes(w));
+   const matches=(records,field)=>records.filter(r=>words.length&&words.every(w=>r[field].toLocaleLowerCase('tr').includes(w))).sort((a,b)=>b.clicks-a.clicks||b.impressions-a.impressions).slice(0,5);
+   let pages=matches(p.gsc.pages,'page'),queries=matches(p.gsc.queries,'query');
+   if(!words.length||(!pages.length&&!queries.length)){pages=[...p.gsc.pages].sort((a,b)=>b.clicks-a.clicks).slice(0,5);queries=[...p.gsc.queries].sort((a,b)=>b.clicks-a.clicks).slice(0,5);}
+   if(pages.length){add('Dönem boyunca eşleşen sayfalar:');for(const v of pages)add(v.page+' · '+num(v.clicks)+' tıklama · '+num(v.impressions)+' gösterim · '+num(v.position)+' ortalama konum.');}
+   if(queries.length){add('Dönem boyunca eşleşen sorgular:');for(const v of queries)add(v.query+' · '+num(v.clicks)+' tıklama · '+num(v.impressions)+' gösterim · '+num(v.position)+' ortalama konum.');}
+   add('Bu dışa aktarımdaki sorgu/sayfa satırları tüm dönemi kapsar. Aylık artış, düşüş veya SEO değişikliğinin etkisi bu tek dosyadan kanıtlanamaz.');
+  }
+  reply.append(box);
+ });
  function show(){
   results.replaceChildren();stats.replaceChildren();if(!current)return;
   const p=current.payload,gs=p.gsc,ga=p.ga4;
