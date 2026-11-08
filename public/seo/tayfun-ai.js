@@ -1,3 +1,4 @@
+import {mountSiteCapture} from './tayfun-site-capture.js';
 // SEO İşleri: one product per AI handoff. No external AI API, no live SEO edits.
 const E=(tag,text='',className='')=>{const el=document.createElement(tag);if(text)el.textContent=text;if(className)el.className=className;return el;};
 const norm=v=>typeof v==='string'?v:JSON.stringify(v??'');
@@ -172,6 +173,10 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
  const importRow=E('div','','tayfun-ai-workspace-actions');importRow.append(save);
  importPanel.append(answer,importRow,preview);
  work.append(exportPanel,importPanel);toolbar.after(work);
+ const capturedHost=E('div','','tayfun-site-capture-host');
+ work.after(capturedHost);
+ mountSiteCapture(capturedHost,{api,notify});
+
  const knownById=new Map(products.map(p=>[p.id,p]));
  const knownByUrl=new Map(products.map(p=>[p.canonical_url,p]));
  answer.addEventListener('input',()=>{save.disabled=!answer.value.trim();preview.replaceChildren();});
