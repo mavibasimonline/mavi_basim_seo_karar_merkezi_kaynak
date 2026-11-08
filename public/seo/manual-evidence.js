@@ -52,6 +52,7 @@ function mount(){
  const bar=el('div',null,'report-actions');
  const pick=el('input');pick.type='file';pick.accept='.json,application/json';pick.id='manualEvidenceFile';pick.setAttribute('aria-label','ChatGPT veri paketi seç');pick.hidden=true;
  const upload=el('button','GSC + GA4 Veri Dosyasını Yükle','button primary');upload.type='button';upload.id='manualEvidenceUpload';upload.addEventListener('click',()=>pick.click());
+ const quickUpload=$('tayfunQuickUpload');if(quickUpload)quickUpload.addEventListener('click',()=>pick.click());
  const select=el('select');select.id='manualEvidenceSelect';select.setAttribute('aria-label','Arşiv dönemi seç');
  const exportButton=el('button','Seçili arşivi yedekle','button secondary');exportButton.type='button';
  const status=el('p','Yerel arşiv okunuyor…');status.id='manualEvidenceStatus';status.setAttribute('role','status');
