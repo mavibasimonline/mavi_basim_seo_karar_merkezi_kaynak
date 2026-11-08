@@ -259,3 +259,17 @@
  border:1px solid #dbe5f1;border-radius:8px;color:#243752;font-size:12.5px;font-weight:750}
 .tayfun-month .tayfun-page-group-heading:first-of-type{margin-top:10px}
 @media(max-width:640px){.tayfun-page-group-heading{padding:8px 10px}}
+
+/* Two-level product and other pages navigation. Existing pill appearance is unchanged. */
+#tayfunApp .tayfun-groups-toolbar{align-items:flex-start}
+#tayfunApp .tayfun-groups-toolbar .tayfun-jobs-search-wrap{margin-top:22px}
+#tayfunApp .tayfun-grouped-navigation{display:grid;gap:7px;overflow:visible;padding:0;min-width:0;scroll-behavior:auto}
+#tayfunApp .tayfun-category-row{display:flex;align-items:center;gap:6px;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#a2a8ae transparent;padding:2px 2px 6px}
+#tayfunApp .tayfun-category-row-label{flex:0 0 auto;min-width:85px;align-self:center;color:#52627b;font-size:11px;font-weight:750}
+#tayfunApp .tayfun-category-other{border-top:1px solid #e1e7f0;padding-top:8px}
+@media(max-width:720px){
+ #tayfunApp .tayfun-groups-toolbar{flex-wrap:wrap}
+ #tayfunApp .tayfun-groups-toolbar .tayfun-jobs-search-wrap{margin-top:0;flex:1 1 100%;max-width:400px}
+ #tayfunApp .tayfun-grouped-navigation{flex:1 1 100%}
+ #tayfunApp .tayfun-category-row-label{min-width:75px}
+}
