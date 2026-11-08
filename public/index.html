@@ -192,6 +192,28 @@
               </select>
             </div>
             <div class="topbar-actions">
+              <button type="button" id="globalReportToggle" class="button secondary" aria-label="Rapor işlemleri menüsünü aç" aria-expanded="false" aria-controls="reportActions" title="Rapor işlemleri"><svg class="icon" aria-hidden="true"><use href="/icons.svg#down" /></svg><span class="report-toggle-label">Raporlar</span></button>
+              <div
+                      id="reportActions"
+                      class="report-actions"
+                      aria-label="Rapor işlemleri"
+                    >
+                      <button id="chatgptHandoff" class="button secondary" type="button" title="Seçili ayın doğrulanmış GSC, GA4 ve SEO değişiklik kanıtlarını tek dosyada aktarır; eksik verileri açıkça belirtir.">ChatGPT Devir Raporu</button>
+                      <a id="export" class="button secondary" href="/api/export"
+                        ><svg class="icon" aria-hidden="true">
+                          <use href="/icons.svg#down" /></svg
+                        ><span id="exportLabel">Raporu indir</span></a
+                      ><button
+                        id="refresh"
+                        class="icon-button"
+                        aria-label="Ekranı yenile"
+                        title="Yalnızca ekrandaki kayıtları yeniden yükler; Google aktarımını başlatmaz."
+                      >
+                        <svg class="icon" aria-hidden="true">
+                          <use href="/icons.svg#refresh" />
+                        </svg>
+                      </button>
+                    </div>
               <div id="deviceControl" class="device-selector">
                 <label class="sr-only" for="device">Cihaz</label
                 ><select id="device" aria-label="Cihaz">
@@ -258,27 +280,7 @@
                         Doğrulanmış günlük GSC ölçümleri
                       </p>
                     </div>
-                    <div
-                      id="reportActions"
-                      class="report-actions"
-                      aria-label="Rapor işlemleri"
-                    >
-                      <button id="chatgptHandoff" class="button secondary" type="button" title="Seçili ayın doğrulanmış GSC, GA4 ve SEO değişiklik kanıtlarını tek dosyada aktarır; eksik verileri açıkça belirtir.">ChatGPT Devir Raporu</button>
-                      <a id="export" class="button secondary" href="/api/export"
-                        ><svg class="icon" aria-hidden="true">
-                          <use href="/icons.svg#down" /></svg
-                        ><span id="exportLabel">Raporu indir</span></a
-                      ><button
-                        id="refresh"
-                        class="icon-button"
-                        aria-label="Ekranı yenile"
-                        title="Yalnızca ekrandaki kayıtları yeniden yükler; Google aktarımını başlatmaz."
-                      >
-                        <svg class="icon" aria-hidden="true">
-                          <use href="/icons.svg#refresh" />
-                        </svg>
-                      </button>
-                    </div>
+
                   </div>
                   <div
                     id="chartMetrics"
