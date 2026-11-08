@@ -229,9 +229,18 @@ export default {
         const archive=(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE;
         if(typeof archive?.fetch!=='function')return;
         const dayInTurkey=new Date(ga4Time.getTime()+3*3600000).toISOString().slice(0,10);
-        const path=dayInTurkey==='2026-11-08'?'tayfun-site-capture':'tayfun-tick';
+        const path=dayInTurkey>='2026-11-08'?'tayfun-site-capture':'tayfun-tick';
         const response=await archive.fetch('https://archive.private/api/internal/'+path,{method:'POST'});
-        if(!response.ok)console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_PRIVATE_ARCHIVE_UNAVAILABLE'}));
+        if(!response.ok){
+          console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_PRIVATE_ARCHIVE_UNAVAILABLE'}));
+        }else if(path==='tayfun-site-capture'){
+          const result=await response.json<{status:string;attempted?:number;recorded?:number;captured_count?:number;remaining?:number}>();
+          console.log(JSON.stringify({event:'tayfun-site-capture',status:result.status,
+            attempted:result.attempted??0,recorded:result.recorded??0,captured:result.captured_count??null,
+            remaining:result.remaining??null,site_mutations:0}));
+          if(result.status==='complete')
+            await archive.fetch('https://archive.private/api/internal/tayfun-tick',{method:'POST'});
+        }
       }catch{console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_AUTO_TICK_UNAVAILABLE'}));}
     })());
     // Transfer immutable SEO history under the existing atomic D1 quota guard,
