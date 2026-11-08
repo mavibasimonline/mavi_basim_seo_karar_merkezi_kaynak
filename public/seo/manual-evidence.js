@@ -55,11 +55,22 @@ function mount(){
  const quickUpload=$('tayfunQuickUpload');if(quickUpload)quickUpload.addEventListener('click',()=>pick.click());
  const quickStatus=$('tayfunQuickUploadStatus');
  function feedback(message,state='info'){if(quickStatus){quickStatus.textContent=message;quickStatus.dataset.state=state;}}
+ let toastTimer;
+ function alertUpload(message,state='success'){
+  const old=document.getElementById('manualUploadToast');if(old)old.remove();
+  if(toastTimer)clearTimeout(toastTimer);
+  const toast=el('div',null,'manual-upload-toast');toast.id='manualUploadToast';toast.dataset.state=state;
+  toast.setAttribute('role',state==='error'?'alert':'status');
+  const copy=el('span',message,'manual-upload-message'),close=el('button','×');
+  close.type='button';close.setAttribute('aria-label','Bildirimi kapat');close.addEventListener('click',()=>toast.remove());
+  toast.append(copy,close);document.body.append(toast);
+  toastTimer=setTimeout(()=>toast.remove(),10000);
+ }
  function receipt(record,count){
   const p=record.payload,clicks=p.gsc.daily.reduce((sum,r)=>sum+r.clicks,0);
   const organic=p.ga4.channels.find(r=>r.channel==='Organic Search');
   const saved=Number.isFinite(Date.parse(record.imported_at))?new Date(record.imported_at).toLocaleString('tr-TR',{timeZone:'Europe/Istanbul',dateStyle:'short',timeStyle:'short'}):'';
-  return '✓ Dosya kaydedildi'+(saved?' · '+saved:'')+' · Dönem '+p.period.start+' — '+p.period.end+' · GSC '+num(clicks)+' tıklama · GA4 organik '+(organic?num(organic.sessions):'—')+' oturum · '+count+' yerel arşiv. Yedeğinizi saklayın.';
+  return '✓ Dosya kaydedildi'+(saved?' · '+saved:'')+' · Dönem '+p.period.start+' — '+p.period.end+' · GSC '+num(clicks)+' tıklama · GA4 organik '+(organic?num(organic.sessions):'—')+' oturum · '+count+' kayıt. Kayıt yeri: Bu bilgisayardaki tarayıcının yerel IndexedDB arşivi. Cloudflare sunucusuna gönderilmedi. Yedek almayı unutmayın.';
  }
  const select=el('select');select.id='manualEvidenceSelect';select.setAttribute('aria-label','Arşiv dönemi seç');
  const exportButton=el('button','Seçili arşivi yedekle','button secondary');exportButton.type='button';
@@ -135,14 +146,16 @@ function mount(){
     await refresh(id);
     status.textContent='Bu dosya zaten kayıtlı. Yeniden yazılmadı; mevcut arşiv korundu.';
     feedback('✓ Bu dosya zaten kayıtlı. '+receipt(current,(await all()).length),'success');
+    alertUpload('Bu dosya zaten yerel tarayıcı arşivinde kayıtlı; tekrar kaydedilmedi. Kayıt yeri: Bu bilgisayar (IndexedDB).');
     return;
    }
    await put({id,period:p.period,imported_at:new Date().toISOString(),file_name:file.name.slice(0,200),payload:p});
    await refresh(id);
-   status.textContent='✓ Dosya başarıyla yüklendi ve bu tarayıcının arşivine kaydedildi. Eski kayıtlar korunuyor.';
+   status.textContent='✓ Dosya başarıyla kaydedildi. Kayıt yeri: Bu bilgisayardaki tarayıcının IndexedDB arşivi. Veriler Cloudflare\'a gönderilmedi. Eski kayıtlar korundu.';
+   alertUpload('✓ Yükleme başarılı: '+file.name+' · '+p.period.start+' — '+p.period.end+'. Kayıt yeri: Bu bilgisayardaki tarayıcı (IndexedDB). Sunucuya yüklenmedi.');
   }catch(e){
    const message='Yükleme başarısız: '+(e?.message||'Geçersiz dosya');
-   status.textContent=message;feedback('✕ '+message,'error');
+   status.textContent=message;feedback('✕ '+message,'error');alertUpload('✕ '+message,'error');
   }finally{
    upload.disabled=false;if(quickUpload)quickUpload.disabled=false;pick.value='';
   }
