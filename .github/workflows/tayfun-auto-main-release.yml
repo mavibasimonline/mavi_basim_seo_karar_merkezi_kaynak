@@ -6,6 +6,7 @@ on:
 permissions:
   contents: read
   actions: read
+  statuses: write
 concurrency:
   group: tayfun-verified-main-release-20261106
   cancel-in-progress: false
@@ -37,7 +38,7 @@ jobs:
           test "$VERIFIED_CI_SHA" = "$(git rev-parse refs/remotes/origin/main)" || exit 0
           title="$(git log -1 --format=%s)"
           if [ "$title" = "fix(ga4): activate existing analytics property in protected production" ]; then echo "ga4=true" >> "$GITHUB_OUTPUT"; fi
-          if [ "$title" = "fix(ga4): activate existing analytics property in protected production" ] || [ "$title" = "fix(ga4): automatic bounded retry for transient source failures" ] || [ "$title" = "fix(ga4): run independent analytics cron without GSC starvation" ] || [ "$title" = "fix(tayfun): recover missed daily evidence-context archive refresh" ] || [ "$title" = "fix(tayfun): distinguish bounded SEO summary from immutable complete history" ] || [ "$title" = "fix(gsc): distinguish future days from overdue monthly data" ] || [ "$title" = "fix(release): scope GA4 transition permission to activation only" ] || [ "$title" = "fix(gsc): preserve actual collector outcome instead of success" ] || [ "$title" = "fix(gsc): isolate daily collection from slow Sheets and baseline tasks" ] || [ "$title" = "fix(gsc): sequence historical catch-up after independent daily collector" ] || [ "$title" = "fix(tayfun): isolate robots-aware crawl from historical SEO queue" ] || [ "$title" = "fix(ga4): distinguish verified empty report from missing monthly archive" ] || [ "$title" = "fix(release): deploy only tested latest main commit" ] || [ "$title" = "fix(gsc): reject unknown historical collector states" ] || [ "$title" = "fix(ga4): require matching date ranges across all archived report dimensions" ] || [ "$title" = "fix(ga4): suppress mismatched monthly metrics and use verified total sessions" ] || [ "$title" = "fix(tayfun): decouple metered immutable SEO history transfer from slow background queue" ] || [ "$title" = "fix(ga4): explain incomplete date-consistent archive in city answers" ] || [ "$title" = "fix(ga4): gate all metric breakdowns on consistent archive dates" ] || [ "$title" = "fix(tayfun): show active Cloudflare Worker commit in data health" ]; then echo "safe_release=true" >> "$GITHUB_OUTPUT"; elif [ "$title" != "Tayfun: sitemap sayfalarının aylık otomatik SEO arşivi ve sürüm karşılaştırması (#93)" ] && [ "$title" != "fix(tayfun): publish verified main Worker after archive release" ]; then exit 0; fi
+          if [ "$title" = "fix(ga4): activate existing analytics property in protected production" ] || [ "$title" = "fix(ga4): automatic bounded retry for transient source failures" ] || [ "$title" = "fix(ga4): run independent analytics cron without GSC starvation" ] || [ "$title" = "fix(tayfun): recover missed daily evidence-context archive refresh" ] || [ "$title" = "fix(tayfun): distinguish bounded SEO summary from immutable complete history" ] || [ "$title" = "fix(gsc): distinguish future days from overdue monthly data" ] || [ "$title" = "fix(release): scope GA4 transition permission to activation only" ] || [ "$title" = "fix(gsc): preserve actual collector outcome instead of success" ] || [ "$title" = "fix(gsc): isolate daily collection from slow Sheets and baseline tasks" ] || [ "$title" = "fix(gsc): sequence historical catch-up after independent daily collector" ] || [ "$title" = "fix(tayfun): isolate robots-aware crawl from historical SEO queue" ] || [ "$title" = "fix(ga4): distinguish verified empty report from missing monthly archive" ] || [ "$title" = "fix(release): deploy only tested latest main commit" ] || [ "$title" = "fix(gsc): reject unknown historical collector states" ] || [ "$title" = "fix(ga4): require matching date ranges across all archived report dimensions" ] || [ "$title" = "fix(ga4): suppress mismatched monthly metrics and use verified total sessions" ] || [ "$title" = "fix(tayfun): decouple metered immutable SEO history transfer from slow background queue" ] || [ "$title" = "fix(ga4): explain incomplete date-consistent archive in city answers" ] || [ "$title" = "fix(ga4): gate all metric breakdowns on consistent archive dates" ] || [ "$title" = "fix(tayfun): show active Cloudflare Worker commit in data health" ] || [ "$title" = "fix(release): publish successful Cloudflare smoke as commit status" ]; then echo "safe_release=true" >> "$GITHUB_OUTPUT"; elif [ "$title" != "Tayfun: sitemap sayfalarının aylık otomatik SEO arşivi ve sürüm karşılaştırması (#93)" ] && [ "$title" != "fix(tayfun): publish verified main Worker after archive release" ]; then exit 0; fi
           echo 'ready=true' >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         if: steps.gate.outputs.ready == 'true'
@@ -97,6 +98,32 @@ jobs:
       - name: Verify exact live commit, 100% Worker version and safety guards
         if: steps.gate.outputs.ready == 'true'
         run: python3 scripts/production_guard.py smoke
+      - name: Record verified Cloudflare release on the exact tested GitHub commit
+        if: steps.gate.outputs.ready == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json,os,urllib.request
+          commit=os.environ['VERIFIED_CI_SHA']
+          repo=os.environ['GITHUB_REPOSITORY']
+          url=f'https://api.github.com/repos/{repo}/statuses/{commit}'
+          payload={
+            'state':'success',
+            'context':'mavi-basim-seo/cloudflare-production',
+            'description':'Production smoke verified this exact Worker commit',
+            'target_url':f"https://github.com/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+          }
+          req=urllib.request.Request(url,data=json.dumps(payload).encode(),headers={
+            'Authorization':'Bearer '+os.environ['GH_TOKEN'],
+            'Accept':'application/vnd.github+json',
+            'Content-Type':'application/json',
+            'X-GitHub-Api-Version':'2022-11-28'},method='POST')
+          with urllib.request.urlopen(req,timeout=20) as response:
+            if response.status!=201:raise ValueError('GITHUB_DEPLOY_STATUS_NOT_SAVED')
+          print('Verified production source commit status recorded')
+          PY
       - name: Roll back app only if this exact deployment fails after publishing
         if: failure() && steps.publish.outcome == 'success'
         env:
