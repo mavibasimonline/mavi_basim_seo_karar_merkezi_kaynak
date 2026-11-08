@@ -66,6 +66,42 @@ it('empty provider results are available evidence but never presented as zero vi
  const ga4=new IndependentGa4(f.store,KEY,f.broker,transport as typeof fetch);await authorize(f,ga4);await ga4.tick();await ga4.tick();
  const d=new Date();d.setUTCDate(d.getUTCDate()-2);const result:any=await ga4.report(d.toISOString().slice(0,7));expect(result.available).toBe(false);expect(result.totals).toBeNull();expect(result.message).toContain('sıfır ziyaretçi değildir');
 });
+it('does not expose partial GA4 totals or cities before all four report dimensions are verified',async()=>{
+ const f=fixture(),ga4=new IndependentGa4(f.store,KEY,f.broker,provider() as typeof fetch);await authorize(f,ga4);
+ const first:any=await ga4.tick();
+ expect(first).toMatchObject({status:'complete',kind:'total'});
+ const incomplete:any=await ga4.report(first.month);
+ expect(incomplete.available).toBe(false);
+ expect(incomplete.period_consistent).toBeNull();
+ expect(incomplete.totals).toBeNull();
+ expect(incomplete.cities).toEqual([]);
+ expect(incomplete.devices).toEqual([]);
+ expect(incomplete.pages).toEqual([]);
+ for(let i=0;i<3;i++)expect((await ga4.tick()).status).toBe('complete');
+ const verified:any=await ga4.report(first.month);
+ expect(verified.available).toBe(true);
+ expect(verified.period_consistent).toBe(true);
+ expect(verified.totals.sessions).toBe(12);
+ expect(verified.cities[0].sessions).toBe(12);
+});
+
+it('accepts a fully archived zero-row month without inventing traffic',async()=>{
+ const f=fixture(),base=provider(),transport=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>{
+  if(!String(url).endsWith(':runReport'))return base(url,init);
+  const req=JSON.parse(String(init?.body));
+  return Response.json({dimensionHeaders:req.dimensions,metricHeaders:['activeUsers','sessions','engagedSessions'].map(name=>({name})),rowCount:0,rows:[]});
+ });
+ const ga4=new IndependentGa4(f.store,KEY,f.broker,transport as typeof fetch);await authorize(f,ga4);
+ let month='';
+ for(let i=0;i<4;i++){const result:any=await ga4.tick();expect(result.status).toBe('complete');month=result.month;}
+ const report:any=await ga4.report(month);
+ expect(report.available).toBe(true);
+ expect(report.period_consistent).toBe(true);
+ expect(report.totals).toBeNull();
+ expect(report.cities).toEqual([]);
+ expect(report.message).toContain('şehir raporunda satır bulunmuyor');
+});
+
 it('a low shared storage budget and provider quota preserve all existing reports',async()=>{
  const f=fixture(),transport=provider(),ga4=new IndependentGa4(f.store,KEY,f.broker,transport as typeof fetch);await authorize(f,ga4);
  f.values.set('gsc:storage-budget:v1',{version:1,measured_since:new Date().toISOString(),day:new Date().toISOString().slice(0,10),reserved_bytes:128*1024*1024,day_reserved_bytes:0});
