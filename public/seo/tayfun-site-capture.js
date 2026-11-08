@@ -1,6 +1,5 @@
 // Read-only, product and sitemap SEO evidence. Never edits mavibasim.com.
 const E=(tag,text='',className='')=>{const node=document.createElement(tag);if(text)node.textContent=text;if(className)node.className=className;return node;};
-let initialCaptureStarted=false;
 export function mountSiteCapture(host,{api,notify}){
  const section=E('section','','tayfun-site-capture');
  const title=E('h4','8 Kasım 2026 · Canlı Site SEO Kayıtları');
@@ -64,10 +63,6 @@ export function mountSiteCapture(host,{api,notify}){
    status.textContent='Kaydedilen: '+captured+' / '+total+' site sayfası · '+state.product_pages_captured+' / '+state.product_pages_total+' ürün · Tarih: 08.11.2026 · '+(failed?failed+' tarama başarısız · ':'')+(state.complete?'Tamamlandı':'Eksik kayıtlar otomatik taranıyor')+'.';
    button.disabled=state.complete||state.clock_day!==state.reference_day;
    render();
-   if(!initialCaptureStarted&&button.disabled===false){
-    initialCaptureStarted=true;
-    run();
-   }
   }catch(error){status.textContent='SEO arşivi okunamadı: '+(error.message||'Bağlantı hatası');}
  }
  async function run(){
