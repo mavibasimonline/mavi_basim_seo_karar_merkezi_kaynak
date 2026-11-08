@@ -1,0 +1,6 @@
+8 Kasım 2026 - Tayfun SEO İşleri doğrulanmış site envanteri.
+Kapsam: mavibasim.com sitemap URL'leri. Gerçek tarama zamanı ve SEO alanları ayrı ayrı arşivlenir.
+Öncelik: 29 ürün sayfası; ardından sitedeki diğer sayfalar.
+Alanlar: title, description, H1-H6, canonical, robots, yapılandırılmış veri, OG/Twitter, hreflang, görseller, iç bağlantılar, HTML içerik özeti.
+Eski SEO sürümleri silinmez veya yeniden tarihlenmez. Canlı site salt okunur. Doğrulanmamış URL'ler başarı diye gösterilmez.
+Release: mevcut özel Cloudflare Workers arşiv servisi; yeni D1, ücretli API, secret veya migration yok.
