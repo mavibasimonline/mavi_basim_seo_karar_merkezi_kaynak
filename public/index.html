@@ -223,23 +223,11 @@
                   <option value="TABLET">Tablet</option>
                 </select>
               </div>
-              <button
-                id="freshness"
-                class="freshness"
-                type="button"
-                aria-haspopup="dialog"
-                aria-controls="helpDialog"
-              >
-                <span class="status-dot"></span> Veri durumu kontrol ediliyor</button
-              ><button
-                id="help"
-                class="icon-button"
-                aria-label="Veri kaynakları hakkında"
-              >
-                <svg class="icon" aria-hidden="true">
-                  <use href="/icons.svg#info" />
-                </svg></button
-              ><span
+              <!-- Veri sağlığı hesaplanmaya devam eder; bu iki bilgi düğmesi üst barda gösterilmez. -->
+              <div hidden aria-hidden="true" style="display:none">
+                <button id="freshness" type="button">Veri durumu kontrol ediliyor</button>
+                <button id="help" type="button">Veri kaynakları hakkında</button>
+              </div><span
                 class="avatar"
                 role="img"
                 aria-label="Mavi Basım çalışma alanı"
