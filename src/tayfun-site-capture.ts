@@ -79,7 +79,7 @@ export async function tayfunSiteSeoTick(storage:Store,secret:string,now=new Date
    if(productSet.has(url)){
     const prior=latest.get(url);
     const existing=prior?.notes?.includes('TAYFUN_SITE_CAPTURE:'+TARGET+':'+url);
-    if(existing)ledgerId=prior.id;
+    if(existing&&prior)ledgerId=prior.id;
     else {
      const created=await tayfunSave(storage,secret,{
       month,url,source:'user-entry',status:'aktif',supersedes:prior?.id||null,
