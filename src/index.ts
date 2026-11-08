@@ -235,7 +235,7 @@ export default {
     // Transfer immutable SEO history under the existing atomic D1 quota guard,
     // without waiting for unrelated Sheets, GSC catch-up, or baseline tasks.
     context.waitUntil(syncSeoHistory(env,'Cloudflare Cron',ga4Time.toISOString()).then(result=>{
-      if(result.status!=='caught_up')console.log(JSON.stringify({event:'seo-history-sync',status:result.status,code:result.code||null}));
+      if(result.status!=='caught_up')console.log(JSON.stringify({event:'seo-history-sync',status:result.status,code:'code' in result?result.code:null}));
     }).catch(()=>{console.log(JSON.stringify({event:'seo-history-sync',status:'held',code:'HISTORY_SOURCE_UNAVAILABLE'}));}));
     // Daily evidence refresh is isolated so slow GSC tasks cannot starve it.
     context.waitUntil(independentContextCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time).then(status=>{if(status!=='idle')console.log(JSON.stringify({event:'independent-context',status}));}).catch(()=>{console.log(JSON.stringify({event:'independent-context',status:'held',code:'CONTEXT_UPDATE_UNAVAILABLE'}));}));
