@@ -5,6 +5,7 @@ import {resolvedCatalog} from './independent-catalog';
 import {tayfunSitemap} from './tayfun-sitemap';
 import {tayfunAutoTick,tayfunAutoMonth,tayfunAutoDetail} from './tayfun-auto';
 import {tayfunList,tayfunSave} from './tayfun-ledger';
+import {gscPageURL} from './urls';
 
 type Store={get<T=unknown>(key:string):Promise<T|undefined>;put(key:string,value:unknown):Promise<unknown>};
 type Captured={url:string;observed_at:string;source_id:string;title:string;ledger_id?:string};
@@ -85,7 +86,7 @@ export async function tayfunSiteSeoTick(storage:Store,secret:string,now=new Date
       month,url,source:'user-entry',status:'aktif',supersedes:prior?.id||null,
       title:fmt(original.title,300),description:fmt(original.description,1000),
       h1:headings.filter((h:any)=>h?.level===1&&typeof h.text==='string').map((h:any)=>h.text).join(' / ').slice(0,500),
-      canonical:typeof canonical==='string'&&canonical.startsWith('https://mavibasim.com')?canonical:'',
+      canonical:typeof canonical==='string'&&gscPageURL(canonical)===canonical?canonical:'',
       robots:fmt(original.robots,200),headings:fmt(headings,20000),internal_links:fmt(original.links,20000),
       structured_data:fmt(original.structured_data,65536),hreflang:fmt(original.hreflang,2500),
       images:fmt(original.images,2500),open_graph:fmt(original.open_graph,2500),twitter_card:fmt(original.twitter_card,2500),
