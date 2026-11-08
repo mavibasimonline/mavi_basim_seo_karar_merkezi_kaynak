@@ -237,24 +237,22 @@ export default {
     context.waitUntil(syncSeoHistory(env,'Cloudflare Cron',ga4Time.toISOString()).then(result=>{
       if(result.status!=='caught_up')console.log(JSON.stringify({event:'seo-history-sync',status:result.status,code:'code' in result?result.code:null}));
     }).catch(()=>{console.log(JSON.stringify({event:'seo-history-sync',status:'held',code:'HISTORY_SOURCE_UNAVAILABLE'}));}));
+    // Approved baseline capture must not wait for old D1 tasks or Sheets refresh.
+    context.waitUntil((async()=>{
+      try{
+        const archive=(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE;
+        if(typeof archive?.fetch!=='function')return;
+        const response=await archive.fetch('https://archive.private/api/internal/tayfun-approved-baseline',{method:'POST'});
+        if(!response.ok){console.log(JSON.stringify({event:'tayfun-approved-baseline',status:'held',code:'BASELINE_ARCHIVE_HTTP_ERROR'}));return;}
+        const payload=await response.json<{ok:boolean;items:{url:string;status:string}[]}>();
+        console.log(JSON.stringify({event:'tayfun-approved-baseline',status:payload.ok?'ok':'partial',items:payload.items.map(x=>({url:x.url,status:x.status})),d1_requests:0}));
+      }catch{console.log(JSON.stringify({event:'tayfun-approved-baseline',status:'held',code:'BASELINE_ARCHIVE_UNAVAILABLE',d1_requests:0}));}
+    })());
     // Daily evidence refresh is isolated so slow GSC tasks cannot starve it.
     context.waitUntil(independentContextCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time).then(status=>{if(status!=='idle')console.log(JSON.stringify({event:'independent-context',status}));}).catch(()=>{console.log(JSON.stringify({event:'independent-context',status:'held',code:'CONTEXT_UPDATE_UNAVAILABLE'}));}));
     context.waitUntil((async()=>{
     try{
       const time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
-      // Keep user-approved SEO baseline capture independent from all Google and D1 workflows.
-      // A failure in GSC, GA4 or quota checks must not starve the three baseline records.
-      try{
-        const archive=(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE;
-        if(typeof archive?.fetch==='function'){
-          const response=await archive.fetch('https://archive.private/api/internal/tayfun-approved-baseline',{method:'POST'});
-          if(!response.ok){console.log(JSON.stringify({event:'tayfun-approved-baseline',status:'held',code:'BASELINE_ARCHIVE_HTTP_ERROR'}));}
-          else{
-            const payload=await response.json<{ok:boolean;items:{url:string;status:string}[]}>();
-            console.log(JSON.stringify({event:'tayfun-approved-baseline',status:payload.ok?'ok':'partial',items:payload.items.map(x=>({url:x.url,status:x.status})),d1_requests:0}));
-          }
-        }
-      }catch{console.log(JSON.stringify({event:'tayfun-approved-baseline',status:'held',code:'BASELINE_ARCHIVE_UNAVAILABLE',d1_requests:0}));}
       if(independentRefreshDue(time)){
         // Keep the source refresh outside the quota-limited legacy D1 tick.
         try{await refreshIndependentSheets(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);}
