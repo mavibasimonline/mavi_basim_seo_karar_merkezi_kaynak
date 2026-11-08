@@ -705,6 +705,7 @@ test("Tayfun Ürün Grupları mirrors category toolbar and groups all SEO page t
   await expect(toolbar.locator(".tayfun-category-other")).toBeVisible();
   await expect(toolbar.locator(".tayfun-category-other")).toContainText("Şehir Sayfaları");
   await expect(toolbar.locator(".tayfun-category-other")).toContainText("Blog Sayfaları");
+  await toolbar.locator(".tayfun-category-other").getByRole("button",{name:"Diğer Sayfalar"}).click();
   await expect(page.locator("#tayfunApp .tayfun-page-summary").first()).toContainText("bilinmeyen-sayfa");
   expect(failures).toEqual([]);
 });
