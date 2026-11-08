@@ -624,30 +624,51 @@ test("manual GSC and GA4 upload displays durable success, duplicate and error re
 });
 
 
-test("Tayfun Ürün Grupları mirrors SEO category toolbar and groups blog city sector URLs", async ({ page }) => {
-  await login(page);
-  await page.route("**/api/independent/tayfun-pages", async route => {
-    await route.fulfill({
-      status: 200, contentType: "application/json",
-      body: JSON.stringify({ source:"fixture sitemap", stale:false, urls:[
-        "https://mavibasim.com/brosur",
-        "https://mavibasim.com/ankara-matbaa",
-        "https://mavibasim.com/blog/brosur-secimi",
-        "https://mavibasim.com/sektor/kuafor-kartvizit-baski",
-        "https://mavibasim.com/bilinmeyen-sayfa"
-      ]})
-    });
+test("Tayfun Ürün Grupları mirrors category toolbar and groups all SEO page types",async ({page})=>{
+  // Browser-only source fixture: this test must not depend on the unrelated Google bootstrap.
+  await page.goto("/");
+  await page.addStyleTag({url:"/seo/tayfun.css"});
+  await page.evaluate(()=>{
+    document.getElementById("app")!.hidden=false;
+    document.getElementById("view-tayfun")!.hidden=false;
+    document.getElementById("loginScreen")!.hidden=true;
   });
-  await view(page, "Tayfun");
-  await page.locator('#tayfunWorkspaceTabs [data-tayfun-target="groups"]').click();
+  const failures:string[]=[];
+  page.on("pageerror",e=>failures.push(e.message));
+  await page.addScriptTag({type:"module",content:`
+   import {createTayfunWorkspace} from '/seo/tayfun.js';
+   const make=(name,category,slug)=>({id:slug,name,category,canonical_url:'https://mavibasim.com/'+slug});
+   const products=[
+    make('Broşür','Broşürler ve El İlanları','brosur'),
+    make('Magnet','Reklam Ürünleri','magnet'),
+    make('Kartvizit','Kurumsal Ürünler','kartvizit'),
+    make('Adisyon','Makbuz ve Formlar','adisyon')
+   ];
+   const urls=[
+     'https://mavibasim.com/brosur','https://mavibasim.com/magnet','https://mavibasim.com/kartvizit',
+     'https://mavibasim.com/ankara-matbaa','https://mavibasim.com/blog/brosur-secimi',
+     'https://mavibasim.com/sektor/kuafor-kartvizit-baski',
+     'https://mavibasim.com/bilinmeyen-sayfa'
+   ];
+   const api=async path=>{
+    if(path.startsWith('/api/independent/tayfun?'))return {entries:[]};
+    if(path.startsWith('/api/independent/gsc-month?'))return {pages:[],days_verified:0,expected_days:30};
+    if(path==='/api/independent/tayfun-pages')return {urls,source:'Fixture sitemap',stale:false};
+    if(path.startsWith('/api/independent/tayfun-auto?'))return {observations:[],observed_urls:0};
+    throw Error('Unexpected mocked API: '+path);
+   };
+   const workspace=createTayfunWorkspace({api,notify:()=>{},
+    scope:()=>({catalog:{products,snapshots:[]},current:[],previous:null,month:'2026-11',device:'ALL',revision:1})});
+   try{await workspace.render();window.__tayfunFixtureReady=true}
+   catch(error){window.__tayfunFixtureError=String(error)}
+  `});
   const toolbar=page.locator("#tayfunApp .tayfun-groups-toolbar");
-  // Login exposes the shell before the full GSC/GA4 bootstrap resolves.
-  // Wait for the actual Tayfun workspace instead of the placeholder shell.
-  await expect(toolbar).toBeVisible({timeout:30000});
+  await expect(toolbar,JSON.stringify(failures)).toBeVisible({timeout:12000});
   const pills=toolbar.locator(".tayfun-jobs-category-pill");
   await expect(pills.first()).toHaveText("Tüm Kategoriler");
-  for(const label of ["Broşürler ve El İlanları","Reklam Ürünleri","Kurumsal Ürünler","Makbuz ve Formlar","Şehir Sayfaları","Blog Sayfaları","Sektörel Sayfalar","Diğer Sayfalar"]){
-    await expect(pills.filter({hasText:label})).toHaveCount(1);
+  for(const label of ["Broşürler ve El İlanları","Reklam Ürünleri","Kurumsal Ürünler","Makbuz ve Formlar",
+    "Şehir Sayfaları","Blog Sayfaları","Sektörel Sayfalar","Diğer Sayfalar"]){
+   await expect(pills.filter({hasText:label})).toHaveCount(1);
   }
   await pills.filter({hasText:"Şehir Sayfaları"}).click();
   await expect(pills.filter({hasText:"Şehir Sayfaları"})).toHaveAttribute("aria-pressed","true");
@@ -659,7 +680,12 @@ test("Tayfun Ürün Grupları mirrors SEO category toolbar and groups blog city 
   await search.fill("bulunmayan-bir-urun");
   await expect(page.locator("#tayfunApp .tayfun-page-summary")).toHaveCount(0);
   await search.fill("");
-  await page.locator('#tayfunWorkspaceTabs [data-tayfun-target="unmapped"]').click();
+  await page.evaluate(()=>{
+   const root=document.getElementById('tayfunApp')!;
+   root.dataset.requestedMode='unmapped';
+   root.dispatchEvent(new Event('tayfun-mode-change'));
+  });
   await expect(toolbar.locator(".tayfun-jobs-category-scroll")).toBeHidden();
   await expect(page.locator("#tayfunApp .tayfun-page-summary").first()).toContainText("bilinmeyen-sayfa");
+  expect(failures).toEqual([]);
 });
