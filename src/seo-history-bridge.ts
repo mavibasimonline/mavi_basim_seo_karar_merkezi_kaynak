@@ -36,6 +36,16 @@ export async function syncSeoHistory(env:E,trigger='Authenticated maintenance',s
    return value;
   },time);
   const proof=await call('/page',page);
+  // HTTP 200 alone is not proof that the immutable archive accepted our records.
+  // Verify the returned cumulative counts and exact source cursors before success.
+  const expectedEvents=page.events.at(-1)?.source_rowid??page.events_after;
+  const expectedSnapshots=page.snapshots.at(-1)?.source_rowid??page.snapshots_after;
+  if(proof?.ok!==true||proof.d1_requests!==0||typeof proof.caught_up!=='boolean'||
+    proof.caught_up!==(page.events_caught_up&&page.snapshots_caught_up)||
+    !Number.isSafeInteger(proof.events)||proof.events<page.events.length||
+    !Number.isSafeInteger(proof.snapshots)||proof.snapshots<page.snapshots.length||
+    proof.through?.events!==expectedEvents||proof.through?.snapshots!==expectedSnapshots)
+   throw Error('HISTORY_ARCHIVE_PROOF_INVALID');
   return {status:proof.caught_up?'caught_up':'partial',events:proof.events,snapshots:proof.snapshots,through:proof.through,
    source_mutations:0,metered_d1:true};
  }catch(error){
