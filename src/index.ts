@@ -232,6 +232,11 @@ export default {
         if(!response.ok)console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_PRIVATE_ARCHIVE_UNAVAILABLE'}));
       }catch{console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_AUTO_TICK_UNAVAILABLE'}));}
     })());
+    // Transfer immutable SEO history under the existing atomic D1 quota guard,
+    // without waiting for unrelated Sheets, GSC catch-up, or baseline tasks.
+    context.waitUntil(syncSeoHistory(env,'Cloudflare Cron',ga4Time.toISOString()).then(result=>{
+      if(result.status!=='caught_up')console.log(JSON.stringify({event:'seo-history-sync',status:result.status,code:result.code||null}));
+    }).catch(()=>{console.log(JSON.stringify({event:'seo-history-sync',status:'held',code:'HISTORY_SOURCE_UNAVAILABLE'}));}));
     // Daily evidence refresh is isolated so slow GSC tasks cannot starve it.
     context.waitUntil(independentContextCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time).then(status=>{if(status!=='idle')console.log(JSON.stringify({event:'independent-context',status}));}).catch(()=>{console.log(JSON.stringify({event:'independent-context',status:'held',code:'CONTEXT_UPDATE_UNAVAILABLE'}));}));
     context.waitUntil((async()=>{
@@ -257,7 +262,6 @@ export default {
       }
       // Optional bounded metadata copy has its own budget. Its failure never
       // gates daily collection or reads from a user-facing GSC report.
-      try{await syncSeoHistory(env,'Cloudflare Cron',time.toISOString());}catch{/* History never gates existing collection. */}
       try{await syncPlanner(env,true);}catch{/* Planner verification never gates existing collection. */}
       const result=await tick(env,fetch,time,'cron');
       if(time.getUTCMinutes()%15!==0)return;
