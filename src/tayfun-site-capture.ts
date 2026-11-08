@@ -117,7 +117,7 @@ export async function tayfunSiteSeoTick(storage:Store,secret:string,now=new Date
   // Respect the live site's origin; never send a burst of parallel crawls.
   await new Promise(resolve=>setTimeout(resolve,150));
  }
- return {status:recorded?'recorded':held?'partial':remaining.length?'throttled':'complete',reference_day:TARGET,actual_day:localDay(now),
+ return {status:Object.keys(saved.pages).length===urls.length?'complete':recorded?'recorded':held?'partial':'throttled',reference_day:TARGET,actual_day:localDay(now),
   attempted,recorded,held,captured_count:Object.keys(saved.pages).length,total:urls.length,
   remaining:urls.length-Object.keys(saved.pages).length,last_run:saved.last_run,
   site_mutations:0,d1_requests:0,immutable:true};
