@@ -228,7 +228,9 @@ export default {
       try{
         const archive=(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher}).DRIVE_ARCHIVE_SERVICE;
         if(typeof archive?.fetch!=='function')return;
-        const response=await archive.fetch('https://archive.private/api/internal/tayfun-tick',{method:'POST'});
+        const dayInTurkey=new Date(ga4Time.getTime()+3*3600000).toISOString().slice(0,10);
+        const path=dayInTurkey==='2026-11-08'?'tayfun-site-capture':'tayfun-tick';
+        const response=await archive.fetch('https://archive.private/api/internal/'+path,{method:'POST'});
         if(!response.ok)console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_PRIVATE_ARCHIVE_UNAVAILABLE'}));
       }catch{console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_AUTO_TICK_UNAVAILABLE'}));}
     })());
