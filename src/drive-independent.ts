@@ -394,6 +394,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
    const url=new URL(request.url),path=url.pathname;
    if(path==='/api/independent/tayfun-auto'&&request.method==='GET')return json(await tayfunAutoMonth(this.ctx.storage,url.searchParams.get('month')||''));
    if(path==='/api/independent/tayfun/site-capture/status'&&request.method==='GET')return json(await tayfunSiteSeoStatus(this.ctx.storage));
+   if(path==='/api/independent/tayfun/site-capture/run'&&request.method==='POST')return json(await tayfunSiteSeoTick(this.ctx.storage,this.key()));
    if(path==='/api/independent/tayfun-auto/detail'&&request.method==='GET'){
     const record=await tayfunAutoDetail(this.ctx.storage,this.key(),url.searchParams.get('id')||'');
     return record?json(record):json({code:'TAYFUN_AUTO_NOT_FOUND'},404);
