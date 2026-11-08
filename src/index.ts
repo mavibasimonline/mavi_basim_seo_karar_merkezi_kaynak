@@ -212,7 +212,17 @@ export default {
     const ga4Time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
     context.waitUntil(independentGa4Cron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time).then(status=>{console.log(JSON.stringify({event:'independent-ga4',status,d1_requests:0}));}).catch(()=>{console.log(JSON.stringify({event:'independent-ga4',status:'held',code:'GA4_PRIVATE_TICK_UNAVAILABLE',d1_requests:0}));}));
     // GSC daily collection also runs independently, rather than waiting for Sheets and baseline tasks.
-    context.waitUntil(independentGscCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time).then(status=>{console.log(JSON.stringify({event:'independent-gsc',status,d1_collection_writes:0}));}).catch(()=>{console.log(JSON.stringify({event:'independent-gsc',status:'held',code:'GSC_PRIVATE_SYNC_UNAVAILABLE',d1_collection_writes:0}));}));
+    context.waitUntil((async()=>{
+      try{
+        const status=await independentGscCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time);
+        console.log(JSON.stringify({event:'independent-gsc',status,d1_collection_writes:0}));
+        // Historical GSC catch-up follows the daily collector, never Sheets or Tayfun tasks.
+        if(status==='collected'||status==='idle'){
+          const backfill=await independentGscBootstrapCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time);
+          if(backfill!=='idle')console.log(JSON.stringify({event:'independent-gsc-bootstrap',status:backfill,d1_collection_writes:0}));
+        }
+      }catch{console.log(JSON.stringify({event:'independent-gsc',status:'held',code:'GSC_PRIVATE_SYNC_UNAVAILABLE',d1_collection_writes:0}));}
+    })());
     // Daily evidence refresh is isolated so slow GSC tasks cannot starve it.
     context.waitUntil(independentContextCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time).then(status=>{if(status!=='idle')console.log(JSON.stringify({event:'independent-context',status}));}).catch(()=>{console.log(JSON.stringify({event:'independent-context',status:'held',code:'CONTEXT_UPDATE_UNAVAILABLE'}));}));
     context.waitUntil((async()=>{
@@ -236,7 +246,6 @@ export default {
         try{await refreshIndependentSheets(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);}
         catch{console.log(JSON.stringify({event:'independent-sheets-refresh',status:'held',code:'INDEPENDENT_REFRESH_UNAVAILABLE',d1_requests:0}));}
       }
-      await independentGscBootstrapCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);
       // Optional bounded metadata copy has its own budget. Its failure never
       // gates daily collection or reads from a user-facing GSC report.
       try{await syncSeoHistory(env,'Cloudflare Cron',time.toISOString());}catch{/* History never gates existing collection. */}
