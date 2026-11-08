@@ -32,7 +32,7 @@ function validate(p){
  return p;
 }
 function db(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DATABASE,1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(STORE))req.result.createObjectStore(STORE,{keyPath:'id'});};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
-async function transaction(mode,action){const d=await db();return new Promise((resolve,reject)=>{const tx=d.transaction(STORE,mode),s=tx.objectStore(STORE),r=action(s);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>d.close();tx.onerror=()=>{d.close();reject(tx.error);};});}
+async function transaction(mode,action){const d=await db();return new Promise((resolve,reject)=>{let result;const tx=d.transaction(STORE,mode),r=action(tx.objectStore(STORE));r.onsuccess=()=>{result=r.result;};tx.oncomplete=()=>{d.close();resolve(result);};tx.onerror=()=>{d.close();reject(tx.error);};tx.onabort=()=>{d.close();reject(tx.error);};});}
 const all=()=>transaction('readonly',s=>s.getAll());
 const get=id=>transaction('readonly',s=>s.get(id));
 const put=value=>transaction('readwrite',s=>s.add(value));
@@ -53,6 +53,14 @@ function mount(){
  const pick=el('input');pick.type='file';pick.accept='.json,application/json';pick.id='manualEvidenceFile';pick.setAttribute('aria-label','ChatGPT veri paketi seç');pick.hidden=true;
  const upload=el('button','GSC + GA4 Veri Dosyasını Yükle','button primary');upload.type='button';upload.id='manualEvidenceUpload';upload.addEventListener('click',()=>pick.click());
  const quickUpload=$('tayfunQuickUpload');if(quickUpload)quickUpload.addEventListener('click',()=>pick.click());
+ const quickStatus=$('tayfunQuickUploadStatus');
+ function feedback(message,state='info'){if(quickStatus){quickStatus.textContent=message;quickStatus.dataset.state=state;}}
+ function receipt(record,count){
+  const p=record.payload,clicks=p.gsc.daily.reduce((sum,r)=>sum+r.clicks,0);
+  const organic=p.ga4.channels.find(r=>r.channel==='Organic Search');
+  const saved=Number.isFinite(Date.parse(record.imported_at))?new Date(record.imported_at).toLocaleString('tr-TR',{timeZone:'Europe/Istanbul',dateStyle:'short',timeStyle:'short'}):'';
+  return '✓ Dosya kaydedildi'+(saved?' · '+saved:'')+' · Dönem '+p.period.start+' — '+p.period.end+' · GSC '+num(clicks)+' tıklama · GA4 organik '+(organic?num(organic.sessions):'—')+' oturum · '+count+' yerel arşiv. Yedeğinizi saklayın.';
+ }
  const select=el('select');select.id='manualEvidenceSelect';select.setAttribute('aria-label','Arşiv dönemi seç');
  const exportButton=el('button','Seçili arşivi yedekle','button secondary');exportButton.type='button';
  const status=el('p','Yerel arşiv okunuyor…');status.id='manualEvidenceStatus';status.setAttribute('role','status');
@@ -112,22 +120,35 @@ function mount(){
   if(id&&values.some(r=>r.id===id))select.value=id;
   current=values.find(r=>r.id===select.value)||null;
   status.textContent=values.length?'Bu tarayıcıda '+values.length+' değiştirilemez arşiv sürümü var. Önemli: Yedekle düğmesini kullanın.':'Henüz yerel arşiv yok. ChatGPT tarafından hazırlanan JSON paketini seçin.';
+  feedback(current?receipt(current,values.length):'Henüz dosya yüklenmedi. Yüklemek için yukarıdaki butona basın.',current?'success':'info');
   show();
  }
  pick.addEventListener('change',async()=>{
   const file=pick.files?.[0];if(!file)return;
+  feedback('Dosya kontrol ediliyor: '+file.name,'loading');
+  upload.disabled=true;if(quickUpload)quickUpload.disabled=true;
   try{
    if(file.size>8_000_000)throw Error('Dosya 8 MB sınırını aşıyor.');
    const raw=await file.text(),p=validate(JSON.parse(raw)),hash=await digest(JSON.stringify(p));
    const id=p.property+'|'+p.period.start+'|'+p.period.end+'|'+hash;
-   if(await get(id)){status.textContent='Bu arşiv zaten kayıtlı. Aynı kayıt yeniden yazılmadı.';await refresh(id);return;}
-   await put({id,period:p.period,imported_at:new Date().toISOString(),payload:p});
-   await refresh(id);status.textContent='Arşiv bu tarayıcıya kaydedildi. Eski tarihler ve sürümler korunuyor.';
-  }catch(e){status.textContent='İçe aktarılamadı: '+(e.message||'Geçersiz dosya');}
-  finally{pick.value='';}
+   if(await get(id)){
+    await refresh(id);
+    status.textContent='Bu dosya zaten kayıtlı. Yeniden yazılmadı; mevcut arşiv korundu.';
+    feedback('✓ Bu dosya zaten kayıtlı. '+receipt(current,(await all()).length),'success');
+    return;
+   }
+   await put({id,period:p.period,imported_at:new Date().toISOString(),file_name:file.name.slice(0,200),payload:p});
+   await refresh(id);
+   status.textContent='✓ Dosya başarıyla yüklendi ve bu tarayıcının arşivine kaydedildi. Eski kayıtlar korunuyor.';
+  }catch(e){
+   const message='Yükleme başarısız: '+(e?.message||'Geçersiz dosya');
+   status.textContent=message;feedback('✕ '+message,'error');
+  }finally{
+   upload.disabled=false;if(quickUpload)quickUpload.disabled=false;pick.value='';
+  }
  });
- select.addEventListener('change',async()=>{current=await get(select.value);show();});
+ select.addEventListener('change',async()=>{current=await get(select.value);feedback(current?receipt(current,(await all()).length):'Arşiv seçilmedi.',current?'success':'info');show();});
  exportButton.addEventListener('click',()=>{if(!current){status.textContent='Yedeklenecek kayıt yok.';return;}saveFile('mavi-basim-yerel-arsiv-'+current.period.start+'-'+current.period.end+'.json',JSON.stringify(current.payload));});
- refresh().catch(e=>{status.textContent='Tarayıcı yerel arşive erişemiyor: '+e.message;});
+ refresh().catch(e=>{const message='Tarayıcı yerel arşive erişemiyor: '+e.message;status.textContent=message;feedback('✕ '+message,'error');});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
