@@ -574,3 +574,45 @@ test("Tayfun top tabs expose original overview and keep SEO sections in one plac
   await expect(page.locator("#kpis")).toBeVisible();
   await expect(tabs.locator("button").first()).toHaveAttribute("aria-pressed", "true");
 });
+
+
+test("manual GSC and GA4 upload displays durable success, duplicate and error receipts", async ({ page }) => {
+  await login(page);
+  await view(page, "Tayfun");
+  const feedback = page.locator("#tayfunQuickUploadStatus");
+  await expect(feedback).toContainText("Henüz dosya yüklenmedi");
+  const metric = { clicks: 4, impressions: 20, ctr: 0.2, position: 5 };
+  const packet = {
+    format: "mavi-basim-manual-evidence-v1",
+    property: "mavibasim.com",
+    period: { start: "2026-10-20", end: "2026-10-20" },
+    gsc: {
+      daily: [{ day: "2026-10-20", ...metric }],
+      queries: [{ query: "broşür", ...metric }],
+      pages: [{ page: "https://mavibasim.com/brosur", ...metric }],
+      countries: [],
+      devices: [],
+      search_appearance: [],
+    },
+    ga4: {
+      channels: [{ channel: "Organic Search", sessions: 10, engaged_sessions: 7, engagement_rate: 0.7 }],
+    },
+  };
+  const picker = page.locator("#manualEvidenceFile");
+  const file = { name: "gsc-ga4-test.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(packet)) };
+  await picker.setInputFiles(file);
+  await expect(feedback).toContainText("Dosya kaydedildi");
+  await expect(feedback).toContainText("GSC 4 tıklama");
+  await expect(feedback).toHaveAttribute("data-state", "success");
+  await page.reload();
+  await view(page, "Tayfun");
+  await expect(feedback).toContainText("Dosya kaydedildi");
+  await expect(feedback).toContainText("1 yerel arşiv");
+  await picker.setInputFiles(file);
+  await expect(feedback).toContainText("zaten kayıtlı");
+  await expect(page.locator("#manualEvidenceStatus")).toContainText("Yeniden yazılmadı");
+  await picker.setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from('{"format":"wrong"}') });
+  await expect(feedback).toContainText("Yükleme başarısız");
+  await expect(feedback).toHaveAttribute("data-state", "error");
+  await expect(page.locator("#manualEvidenceSelect option")).toHaveCount(1);
+});
