@@ -211,6 +211,8 @@ export default {
     // GA4 must not wait behind GSC bootstrap, Sheets refresh, or D1 quotas.
     const ga4Time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
     context.waitUntil(independentGa4Cron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time).then(status=>{console.log(JSON.stringify({event:'independent-ga4',status,d1_requests:0}));}).catch(()=>{console.log(JSON.stringify({event:'independent-ga4',status:'held',code:'GA4_PRIVATE_TICK_UNAVAILABLE',d1_requests:0}));}));
+    // Daily evidence refresh is isolated so slow GSC tasks cannot starve it.
+    context.waitUntil(independentContextCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time).then(status=>{if(status!=='idle')console.log(JSON.stringify({event:'independent-context',status}));}).catch(()=>{console.log(JSON.stringify({event:'independent-context',status:'held',code:'CONTEXT_UPDATE_UNAVAILABLE'}));}));
     context.waitUntil((async()=>{
     try{
       const time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
@@ -238,7 +240,6 @@ export default {
       await independentGscBootstrapCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);
       // Optional bounded metadata copy has its own budget. Its failure never
       // gates daily collection or reads from a user-facing GSC report.
-      await independentContextCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);
       try{await syncSeoHistory(env,'Cloudflare Cron',time.toISOString());}catch{/* History never gates existing collection. */}
       // One robots-aware page per Cron; Tayfun writes only to the private archive Worker.
       // Does not block GSC/GA4/D1 and cannot change the live website.
