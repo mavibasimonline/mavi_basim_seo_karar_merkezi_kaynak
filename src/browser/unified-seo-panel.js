@@ -62,7 +62,14 @@ export function createIndependentPanel({api,notify}){
  }
  function coverage(){
   const days=current.reduce((n,r)=>n+(r.days_verified||0),0),expected=current.reduce((n,r)=>n+(r.expected_days||0),0);
-  return 'GSC sayfa kapsamı '+days+'/'+expected+' gün. '+(complete()?'Seçili dönem doğrulandı.':'Eksik günler sıfır değildir; dönem toplamı ve SEO kararı üretilmez.');
+  if(complete())return 'GSC sayfa kapsamı '+days+'/'+expected+' takvim günü. Seçili dönem doğrulandı.';
+  const months=status?.monthly_health?.months||[];
+  const selected=months.filter(m=>current.some(r=>r.month===m.month));
+  const eligible=selected.reduce((n,m)=>n+(m.eligible_days||0),0);
+  const verified=selected.reduce((n,m)=>n+(m.verified_page_days||0),0);
+  const overdue=selected.reduce((n,m)=>n+(m.overdue_page_days?.length||0),0);
+  const detail=selected.length===current.length?' Kesinleşebilir GSC günleri: '+verified+'/'+eligible+'.'+(overdue?' Gecikmiş kayıt: '+overdue+'.':''):''; 
+  return 'GSC sayfa kapsamı '+days+'/'+expected+' takvim günü.'+detail+' Gelecek günler eksik veri olarak sayılmaz; tamamlanmayan ay için nihai SEO kararı üretilmez.';
  }
  function chart(next=metric){
   metric=next;const series=[];
