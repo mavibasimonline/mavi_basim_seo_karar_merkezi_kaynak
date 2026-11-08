@@ -88,13 +88,16 @@ describe('bounded context bridge independent of GSC collection',()=>{
   expect(fixture.sqls.every(sql=>/^SELECT\b/.test(sql))).toBe(true);
   expect(fixture.requests.every(url=>url==='https://archive.private/api/internal/evidence-context')).toBe(true);
  });
- it('avoids D1 for fresh cache and for existing stale cache outside its daily slot',async()=>{
+ it('avoids D1 for fresh cache and for stale cache outside the hourly catch-up slot',async()=>{
   for(const [status,now] of [
    [{available:true,captured_at:time.toISOString(),d1_requests:0},time],
-   [{available:true,captured_at:'2026-11-03T00:15:00Z',d1_requests:0},new Date('2026-11-04T06:15:00Z')],
+   [{available:true,captured_at:'2026-11-03T00:15:00Z',d1_requests:0},new Date('2026-11-04T06:30:00Z')],
   ] as const){
    const fixture=bridgeEnv(status);expect(await independentContextCron(fixture.env,now)).toBe('idle');expect(fixture.sqls).toEqual([]);
   }
+  const missed=bridgeEnv({available:true,captured_at:'2026-11-03T00:15:00Z',d1_requests:0});
+  expect(await independentContextCron(missed.env,new Date('2026-11-04T06:15:00Z'))).toBe('updated');
+  expect(missed.sqls).toEqual([CONTEXT_PRODUCTS_SQL,CONTEXT_SNAPSHOTS_SQL,CONTEXT_CHANGES_SQL]);
  });
  it('returns held instead of throwing when source budget/access fails and never publishes an unverified cache',async()=>{
   const fixture=bridgeEnv({available:false,d1_requests:0});
