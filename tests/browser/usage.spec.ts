@@ -635,9 +635,11 @@ test("Tayfun Ürün Grupları mirrors category toolbar and groups all SEO page t
   });
   const failures:string[]=[];
   page.on("pageerror",e=>failures.push(e.message));
-  await page.addScriptTag({type:"module",content:`
-   import {createTayfunWorkspace} from '/seo/tayfun.js';
-   const make=(name,category,slug)=>({id:slug,name,category,canonical_url:'https://mavibasim.com/'+slug});
+  // Execute via Playwright's isolated browser world: production CSP correctly blocks inline scripts.
+  await page.evaluate(async()=>{
+   const moduleUrl="/seo/tayfun.js";
+   const {createTayfunWorkspace}=await import(moduleUrl);
+   const make=(name:string,category:string,slug:string)=>({id:slug,name,category,canonical_url:'https://mavibasim.com/'+slug});
    const products=[
     make('Broşür','Broşürler ve El İlanları','brosur'),
     make('Magnet','Reklam Ürünleri','magnet'),
@@ -650,7 +652,7 @@ test("Tayfun Ürün Grupları mirrors category toolbar and groups all SEO page t
      'https://mavibasim.com/sektor/kuafor-kartvizit-baski',
      'https://mavibasim.com/bilinmeyen-sayfa'
    ];
-   const api=async path=>{
+   const api=async(path:string)=>{
     if(path.startsWith('/api/independent/tayfun?'))return {entries:[]};
     if(path.startsWith('/api/independent/gsc-month?'))return {pages:[],days_verified:0,expected_days:30};
     if(path==='/api/independent/tayfun-pages')return {urls,source:'Fixture sitemap',stale:false};
@@ -659,9 +661,8 @@ test("Tayfun Ürün Grupları mirrors category toolbar and groups all SEO page t
    };
    const workspace=createTayfunWorkspace({api,notify:()=>{},
     scope:()=>({catalog:{products,snapshots:[]},current:[],previous:null,month:'2026-11',device:'ALL',revision:1})});
-   try{await workspace.render();window.__tayfunFixtureReady=true}
-   catch(error){window.__tayfunFixtureError=String(error)}
-  `});
+   await workspace.render();
+  });
   const toolbar=page.locator("#tayfunApp .tayfun-groups-toolbar");
   await expect(toolbar,JSON.stringify(failures)).toBeVisible({timeout:12000});
   const pills=toolbar.locator(".tayfun-jobs-category-pill");
