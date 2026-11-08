@@ -19,3 +19,15 @@ tabs?.querySelectorAll('[data-tayfun-target]').forEach(button=>button.addEventLi
 }));
 window.addEventListener('hashchange',()=>updateTabs());
 updateTabs();
+
+const globalReportToggle=document.getElementById('globalReportToggle');
+const globalReportActions=document.getElementById('reportActions');
+function closeReportMenu(){globalReportActions.classList.remove('is-open');globalReportToggle.setAttribute('aria-expanded','false');}
+globalReportToggle.addEventListener('click',()=>{
+ const open=!globalReportActions.classList.contains('is-open');
+ globalReportActions.classList.toggle('is-open',open);
+ globalReportToggle.setAttribute('aria-expanded',String(open));
+});
+document.addEventListener('click',e=>{if(!globalReportToggle.contains(e.target)&&!globalReportActions.contains(e.target))closeReportMenu();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&globalReportActions.classList.contains('is-open')){closeReportMenu();globalReportToggle.focus();}});
+globalReportActions.addEventListener('click',e=>{if(e.target.closest('button,a'))closeReportMenu();});
