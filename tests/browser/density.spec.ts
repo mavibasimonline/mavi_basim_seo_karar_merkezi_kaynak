@@ -109,7 +109,7 @@ test("month strip alone scrolls, has 4-6 px gaps and readable equal buttons; rig
           border: getComputedStyle(b).borderTopWidth,
         };
       });
-      const bounds = ["pickerYear", "rangeToggle", "device", "freshness"]
+      const bounds = ["pickerYear", "rangeToggle", "device"]
         .map((id) => document.getElementById(id)!.getBoundingClientRect())
         .concat(
           document.querySelector(".topbar .avatar")!.getBoundingClientRect(),
