@@ -44,6 +44,8 @@ export async function independentGscBootstrapCron(env:E,time=new Date()):Promise
   if(status.connected!==true||status.reauthorization_required===true||!Array.isArray(status.coverage)||status.coverage.length!==14)return 'idle';
   const result=await read(await service.fetch('https://archive.private/api/internal/gsc-bootstrap-tick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'cloudflare-cron',scheduled_at:time.toISOString()})}));
   if(result.d1_requests!==0)return 'held';
+  // Never mark an unknown or failed historical collector response as successful.
+  if(!['partial','complete','idle','held'].includes(String(result.status)))return 'held';
   return result.status==='held'?'held':result.status==='idle'?'idle':'collected';
  }catch{return 'held';}
 }
