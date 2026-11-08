@@ -667,10 +667,24 @@ test("Tayfun Ürün Grupları mirrors category toolbar and groups all SEO page t
   await expect(toolbar,JSON.stringify(failures)).toBeVisible({timeout:12000});
   const pills=toolbar.locator(".tayfun-jobs-category-pill");
   await expect(pills.first()).toHaveText("Tüm Kategoriler");
+  const productRow=toolbar.locator(".tayfun-category-products");
+  const otherRow=toolbar.locator(".tayfun-category-other");
+  await expect(productRow).toContainText("Ürünler");
+  await expect(otherRow).toContainText("Diğer sayfalar");
+  await expect(productRow.locator(".tayfun-jobs-category-pill")).toHaveText([
+    "Tüm Kategoriler","Broşürler ve El İlanları","Reklam Ürünleri",
+    "Kurumsal Ürünler","Makbuz ve Formlar"
+  ]);
+  await expect(otherRow.locator(".tayfun-jobs-category-pill")).toHaveText([
+    "Şehir Sayfaları","Blog Sayfaları","Sektörel Sayfalar","Diğer Sayfalar"
+  ]);
   for(const label of ["Broşürler ve El İlanları","Reklam Ürünleri","Kurumsal Ürünler","Makbuz ve Formlar",
     "Şehir Sayfaları","Blog Sayfaları","Sektörel Sayfalar","Diğer Sayfalar"]){
    await expect(pills.filter({hasText:label})).toHaveCount(1);
   }
+  await productRow.getByRole("button",{name:"Broşürler ve El İlanları"}).click();
+  await expect(page.locator("#tayfunApp .tayfun-page-summary").first()).toContainText("brosur");
+  await expect(page.locator("#tayfunApp .tayfun-page-group-heading").first()).toContainText("Broşürler ve El İlanları");
   await pills.filter({hasText:"Şehir Sayfaları"}).click();
   await expect(pills.filter({hasText:"Şehir Sayfaları"})).toHaveAttribute("aria-pressed","true");
   await expect(page.locator("#tayfunApp .tayfun-page-group-heading").first()).toContainText("Şehir Sayfaları");
