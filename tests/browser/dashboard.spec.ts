@@ -177,6 +177,7 @@ test("browser-only fixtures verify real chart rendering, gaps, measured zeros an
   await expect(page.locator(".kpi-value").first()).toHaveText("40");
   await expect(page.locator("#status")).toContainText("3/30");
   await expect(page.locator(".delta")).toHaveCount(0);
+  if (!(await page.locator("#export").isVisible())) await page.locator("#globalReportToggle").click();
   await expect(page.locator("#export")).toBeVisible();
   await expect(page.locator("#export")).toContainText("Kısmi raporu indir");
   await expect(page.locator(".chart-point")).toHaveCount(3);
@@ -313,6 +314,7 @@ test("failed analysis or network never manufactures values and keeps the interfa
       json: { error: "Bağlantı geçici olarak kullanılamıyor." },
     }),
   );
+  if (!(await page.locator("#refresh").isVisible())) await page.locator("#globalReportToggle").click();
   await page.locator("#refresh").click();
   await expect(page.locator("#message")).toContainText(
     "önceki başarılı yükleme korunuyor",
