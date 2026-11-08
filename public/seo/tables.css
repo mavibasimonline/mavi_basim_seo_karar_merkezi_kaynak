@@ -132,3 +132,17 @@
 #scrollToTop:hover{background:#194ac8}
 #scrollToTop:focus-visible{outline:3px solid #1b55e2;outline-offset:3px}
 @media(max-width:640px){#scrollToTop:not([hidden]){right:12px;bottom:12px;width:42px;height:42px}}
+
+
+/* Archived live-site SEO metadata with a stable, readable evidence preview. */
+.tayfun-site-capture{margin:16px 0;padding:17px;border:1px solid #cbd5e1;border-radius:12px;background:#fff}
+.tayfun-site-capture h4{margin:0 0 8px;font-size:16px}
+.tayfun-site-status{padding:9px 12px;border:1px solid #dbe6f7;background:#f5f9ff;border-radius:7px;color:#172b4d;font-weight:650;line-height:1.55}
+.tayfun-site-capture button{margin:6px 0 10px}
+.tayfun-site-search{display:block;width:100%;max-width:550px;min-height:37px;margin:8px 0;padding:7px 10px;border:1px solid #cbd5e1;border-radius:7px}
+.tayfun-site-record{margin:7px 0;border:1px solid #dde4f0;border-radius:8px;overflow:hidden}
+.tayfun-site-record summary{cursor:pointer;overflow-wrap:anywhere;padding:9px 11px;font-weight:600;color:#263957;background:#f8fafc}
+.tayfun-site-record-body{padding:10px 12px;background:#fff}
+.tayfun-site-field{margin:8px 0;padding:7px 9px;border-bottom:1px solid #eef2f7;overflow-wrap:anywhere}
+.tayfun-site-field strong{display:block;margin-bottom:4px;font-size:12px}
+.tayfun-site-field pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:12px;line-height:1.55}
