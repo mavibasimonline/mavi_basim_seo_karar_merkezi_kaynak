@@ -186,10 +186,18 @@ test("core navigation workspaces remain accessible after redundant menu cleanup"
   ]) {
     await view(page, name);
     await expect(page.locator(target)).toBeVisible();
-    await expect(page.locator("#view-" + id + " #reportActions")).toHaveCount(
-      1,
-    );
-    await expect(page.locator("#refresh")).toBeVisible();
+    await expect(page.locator(".topbar #reportActions")).toHaveCount(1);
+    await expect(page.locator("#reportActions")).toHaveCount(1);
+    const reportMenu = page.locator("#globalReportToggle");
+    if (await reportMenu.isVisible()) {
+      await reportMenu.click();
+      await expect(page.locator("#refresh")).toBeVisible();
+      await expect(page.locator("#chatgptHandoff")).toBeVisible();
+      await page.keyboard.press("Escape");
+    } else {
+      await expect(page.locator("#refresh")).toBeVisible();
+      await expect(page.locator("#chatgptHandoff")).toBeVisible();
+    }
     const box = (await page.locator(target).boundingBox())!;
     positions[id] = box.y;
     expect(box.y).toBeLessThan(["overview", "tayfun"].includes(id) ? 380 : 220);
@@ -603,16 +611,21 @@ test("manual GSC and GA4 upload displays durable success, duplicate and error re
   await picker.setInputFiles(file);
   await expect(feedback).toContainText("Dosya kaydedildi");
   await expect(feedback).toContainText("GSC 4 tıklama");
+  await expect(feedback).toContainText("Cloudflare sunucusuna gönderilmedi");
+  await expect(page.locator("#manualUploadToast")).toContainText("Yükleme başarılı");
+  await expect(page.locator("#manualUploadToast")).toContainText("IndexedDB");
   await expect(feedback).toHaveAttribute("data-state", "success");
   await page.reload();
   await view(page, "Tayfun");
   await expect(feedback).toContainText("Dosya kaydedildi");
-  await expect(feedback).toContainText("1 yerel arşiv");
+  await expect(feedback).toContainText("1 kayıt");
+  await expect(feedback).toContainText("IndexedDB");
   await picker.setInputFiles(file);
   await expect(feedback).toContainText("zaten kayıtlı");
   await expect(page.locator("#manualEvidenceStatus")).toContainText("Yeniden yazılmadı");
   await picker.setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from('{"format":"wrong"}') });
   await expect(feedback).toContainText("Yükleme başarısız");
   await expect(feedback).toHaveAttribute("data-state", "error");
+  await expect(page.locator("#manualUploadToast")).toHaveAttribute("data-state", "error");
   await expect(page.locator("#manualEvidenceSelect option")).toHaveCount(1);
 });
