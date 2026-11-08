@@ -33,7 +33,7 @@ jobs:
           set -euo pipefail
           test "$VERIFIED_CI_SHA" = "$(git rev-parse HEAD)" || exit 0
           title="$(git log -1 --format=%s)"
-          if [ "$title" != "Tayfun: sitemap sayfalarının aylık otomatik SEO arşivi ve sürüm karşılaştırması (#93)" ] && [ "$title" != "fix(tayfun): publish verified main Worker after archive release" ]; then exit 0; fi
+          if [ "$title" = "fix(ga4): activate existing analytics property in protected production" ]; then echo "ga4=true" >> "$GITHUB_OUTPUT"; elif [ "$title" != "Tayfun: sitemap sayfalarının aylık otomatik SEO arşivi ve sürüm karşılaştırması (#93)" ] && [ "$title" != "fix(tayfun): publish verified main Worker after archive release" ]; then exit 0; fi
           echo 'ready=true' >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         if: steps.gate.outputs.ready == 'true'
@@ -61,7 +61,7 @@ jobs:
           print('Read-only production version pinned')
           PY
       - name: Confirm private Tayfun archive already holds verified matching source
-        if: steps.gate.outputs.ready == 'true'
+        if: steps.gate.outputs.ready == 'true' && steps.gate.outputs.ga4 != 'true'
         run: |
           python3 - <<'PY'
           import os,sys
@@ -79,6 +79,7 @@ jobs:
         if: steps.gate.outputs.ready == 'true'
         env:
           EXPECTED_PREVIOUS_VERSION: ${{ steps.version.outputs.previous_version }}
+          ALLOW_GA4_PROPERTY_ACTIVATION: ${{ steps.gate.outputs.ga4 == 'true' && '532525867' || '' }}
         run: |
           python3 scripts/production_guard.py preflight
           python3 scripts/release_checks.py --base HEAD
@@ -88,7 +89,7 @@ jobs:
         id: publish
         if: steps.gate.outputs.ready == 'true'
         run: |
-          node scripts/run.mjs wrangler deploy --config deploy/wrangler.production.jsonc --keep-vars --var D1_READ_GUARD_ENABLED:true --var SYNC_MAX_PAGES_PER_TICK:1 --tag "$VERIFIED_CI_SHA" --message "Tayfun auto crawl reviewed source $VERIFIED_CI_SHA"
+          node scripts/run.mjs wrangler deploy --config deploy/wrangler.production.jsonc --keep-vars --var D1_READ_GUARD_ENABLED:true --var SYNC_MAX_PAGES_PER_TICK:1 --var GA4_PROPERTY_ID:532525867 --tag "$VERIFIED_CI_SHA" --message "Tayfun auto crawl reviewed source $VERIFIED_CI_SHA"
       - name: Verify exact live commit, 100% Worker version and safety guards
         if: steps.gate.outputs.ready == 'true'
         run: python3 scripts/production_guard.py smoke
