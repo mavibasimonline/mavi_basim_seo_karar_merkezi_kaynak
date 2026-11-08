@@ -250,3 +250,12 @@
 
 /* Keep first/last immutable SEO save dates visible beneath each product even on narrow screens. */
 .tayfun-monitor-product>summary small:last-child{flex:0 0 100%;margin-left:0;color:#475569;font-size:11px;line-height:1.5;font-variant-numeric:tabular-nums}
+
+
+/* Tayfun Ürün Grupları: the same search + pills as SEO İşleri, now for all sitemap families. */
+.tayfun-groups-toolbar{margin:6px 0 9px}
+.tayfun-groups-toolbar[hidden],.tayfun-groups-toolbar [hidden]{display:none!important}
+.tayfun-page-group-heading{margin:18px 0 4px;padding:9px 12px;background:#f1f5fb;
+ border:1px solid #dbe5f1;border-radius:8px;color:#243752;font-size:12.5px;font-weight:750}
+.tayfun-month .tayfun-page-group-heading:first-of-type{margin-top:10px}
+@media(max-width:640px){.tayfun-page-group-heading{padding:8px 10px}}
