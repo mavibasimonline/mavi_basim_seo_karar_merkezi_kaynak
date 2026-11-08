@@ -280,3 +280,7 @@
 #tayfunApp .tayfun-table-header .tayfun-sort-button[aria-pressed="true"]{color:#075985;background:#e0f2fe}
 #tayfunApp .tayfun-table-header .tayfun-sort-button:focus-visible{outline:2px solid #0284c7;outline-offset:2px}
 #tayfunApp .tayfun-category-row[hidden],#tayfunApp .tayfun-category-row [hidden]{display:none!important}
+
+#tayfunApp .tayfun-category-row .tayfun-unmapped-all-pill{flex:0 0 auto;min-height:29px;height:29px;border-radius:7px;border:1px solid transparent;background:#f1f3f6;color:#455c7e;padding:5px 12px;font-size:11px;font-weight:600;white-space:nowrap;cursor:pointer}
+#tayfunApp .tayfun-category-row .tayfun-unmapped-all-pill[aria-pressed="true"]{background:#2563eb;color:#fff;border-color:#2563eb}
+#tayfunApp .tayfun-category-row .tayfun-unmapped-all-pill:focus-visible{outline:2px solid #0284c7;outline-offset:2px}
