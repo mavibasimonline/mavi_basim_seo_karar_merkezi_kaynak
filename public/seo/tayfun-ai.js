@@ -383,11 +383,11 @@ export function renderSeoJobs(container,{products,month,device,current,previous,
    const section=(name,body,open=false)=>{const fold=E('details','','tayfun-saved-extra');fold.open=open;
     fold.append(E('summary',name),body);return fold;};
    for(const [index,version] of revisions.entries()){
-    const ai=version.source==='ai-review',date=version.created_at?new Date(version.created_at).toLocaleString('tr-TR'):'Tarih doğrulanamadı';
+    const ai=version.source==='ai-review',crawl=version.notes?.startsWith('TAYFUN_SITE_CAPTURE:'),date=version.created_at?new Date(version.created_at).toLocaleString('tr-TR'):'Tarih doğrulanamadı';
     const card=E('details','','tayfun-saved-version');card.open=index===0;
-    card.append(E('summary',(ai?'Yapay zekâ SEO analizi':'Temel / manuel SEO kaydı')+' · '+date+' · '+(version.title||'Başlık kaydı yok')));
+    card.append(E('summary',(ai?'Yapay zekâ SEO analizi':crawl?'Canlı SEO taraması':'Temel / manuel SEO kaydı')+' · '+date+' · '+(version.title||'Başlık kaydı yok')));
     const body=E('div','','tayfun-saved-version-body');
-    body.append(E('p',ai?'Bu kayıt yapay zekâ analizinin arşiv sürümüdür; canlı sitede yayınlandığı anlamına gelmez.':'Bu kayıt temel SEO sürümüdür; tarih, canlı sitenin yayın tarihi değildir.','source-note'));
+    body.append(E('p',ai?'Bu kayıt yapay zekâ analizinin arşiv sürümüdür; canlı sitede yayınlandığı anlamına gelmez.':crawl?'Canlı HTML taramasından tarihli SEO kanıtıdır. Tarama tarihi, yayın tarihi değildir.':'Bu kayıt temel SEO sürümüdür; tarih, canlı sitenin yayın tarihi değildir.','source-note'));
     const main=E('div','','tayfun-saved-primary');
     for(const [key,value] of [['SEO Title',version.title],['Meta Description',version.description],['H1',version.h1],
       ['Canonical',version.canonical],['Robots',version.robots],['Kaydetme tarihi',date],
