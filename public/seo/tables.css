@@ -95,6 +95,12 @@
 .topbar #globalReportToggle{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;height:34px;padding:5px 9px;font-size:11px;white-space:nowrap}
 .topbar #globalReportToggle .icon{width:15px;height:15px}
 @media(max-width:1599px){.topbar #globalReportToggle{width:26px;min-width:26px;padding:3px;flex:0 0 26px}.topbar #globalReportToggle .report-toggle-label{display:none}}
+@media(min-width:981px) and (max-width:1599px){
+ .topbar .toolbar-track,.topbar .scope-controls{gap:6px}
+ .topbar .topbar-actions{gap:3px}
+ .topbar .month-strip button{width:48px;min-width:48px;flex-basis:48px;font-size:11px;padding-inline:1px}
+}
+
 .topbar #reportActions{display:none;position:absolute;top:calc(100% + 8px);right:0;z-index:80;min-width:230px;max-width:min(320px,calc(100vw - 16px));padding:10px;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 10px 26px rgba(20,36,62,.17);flex-direction:column;align-items:stretch;gap:7px;white-space:nowrap}
 .topbar #reportActions.is-open{display:flex}
 .topbar #reportActions .button{width:100%;justify-content:center}
