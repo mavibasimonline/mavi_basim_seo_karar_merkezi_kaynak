@@ -140,24 +140,7 @@ function ensureValidOutput(data,product,history){
 export function renderSeoJobs(container,{products,month,device,current,previous,auto,api,notify,onSaved}){
  container.replaceChildren();
  const now=new Date().toISOString().slice(0,7);
- const intro=E('div','','tayfun-jobs-intro');intro.append(E('h3','SEO İşleri · Tek merkezden yapay zekâ SEO çalışması'),
- E('p','Kategori veya ürün seç → bütün seçili ürünlerin kanıtlarını tek metin olarak ChatGPT’ye gönder → tek JSON cevabını buraya yapıştır. Sistem her kaydı ürün kimliği ve URL’sine göre ayırır. Eski sürümler silinmez.'));
- container.append(intro);
- // Read actual encrypted ledger state; do not confuse AI proposal counts with baseline observations.
- const baselineStatus=E('div','Broşür, El İlanı ve Afiş kanıtlı başlangıç kayıtları kontrol ediliyor…','source-note');
- container.append(baselineStatus);
- api('/api/independent/tayfun/approved-baseline/status').then(state=>{
-  baselineStatus.replaceChildren();
-  baselineStatus.append(E('strong','22 Ekim 2026 referanslı gerçek SEO temel kayıtları: '+state.saved_count+'/3'));
-  for(const item of state.items||[]){
-   const name=item.url.endsWith('/brosur')?'Broşür':item.url.endsWith('/el-ilani')?'El İlanı':'Afiş';
-   const label=item.status==='saved'?'Kaydedildi · '+new Date(item.created_at).toLocaleString('tr-TR'):
-    item.status==='awaiting_verified_crawl'?'Gerçek tarama bekleniyor':
-    item.status==='held'?'Kayıt başarısız · tarama/izin durumunu kontrol et':'Henüz kayıt doğrulanmadı';
-   baselineStatus.append(E('p',name+': '+label,'source-note'));
-  }
-  baselineStatus.append(E('p','Bu kayıtlar gerçek tarama sürümleridir; aşağıdaki SEO Takibi yalnız AI SEO taslaklarını sayar.','source-note'));
- }).catch(()=>{baselineStatus.textContent='Gerçek SEO temel kayıtları okunamadı; veritabanında kayıt varmış gibi gösterilmez.';});
+ // SEO temel kayıtları arşivde korunur; istenmeyen giriş metinleri gösterilmez.
  const toolbar=E('div','','tayfun-jobs-toolbar');
  const searchLabel=E('label','','tayfun-jobs-search-wrap');
  searchLabel.setAttribute('aria-label','Ürün veya kategori ara');
