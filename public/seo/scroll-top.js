@@ -6,8 +6,9 @@ function update(){
   button.hidden=Boolean(app.hidden)||(page?.scrollTop||window.scrollY)<220;
 }
 button.addEventListener('click',()=>{
-  window.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
-  document.scrollingElement?.scrollTo({top:0,behavior:'smooth'});
+  const behavior=window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth';
+  window.scrollTo({top:0,behavior});
+  document.scrollingElement?.scrollTo({top:0,behavior});
 });
 window.addEventListener('scroll',update,{passive:true});
 window.addEventListener('hashchange',update);
