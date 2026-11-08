@@ -4,3 +4,5 @@ Kapsam: mavibasim.com sitemap URL'leri. Gerçek tarama zamanı ve SEO alanları 
 Alanlar: title, description, H1-H6, canonical, robots, yapılandırılmış veri, OG/Twitter, hreflang, görseller, iç bağlantılar, HTML içerik özeti.
 Eski SEO sürümleri silinmez veya yeniden tarihlenmez. Canlı site salt okunur. Doğrulanmamış URL'ler başarı diye gösterilmez.
 Release: mevcut özel Cloudflare Workers arşiv servisi; yeni D1, ücretli API, secret veya migration yok.
+
+Devam garantisi: 8 Kasım başlatılmış envanter, eksik sayfalar için sonraki günlerde gerçek gözlem tarihleriyle sürer. Eski SEO sürümleri ve kelimeler korunur. Tarama başarı durumları sayılır; doğrulanmamış sayfalar kaydedilmiş gösterilmez.
