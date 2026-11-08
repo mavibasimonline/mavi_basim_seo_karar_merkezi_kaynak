@@ -67,8 +67,6 @@ test("responsive month toolbar preserves equal-width months and visible fixed co
           "pickerYear",
           "rangeToggle",
           "device",
-          "freshness",
-          "help",
         ].map(rect);
         const months = Array.from(
           document.querySelectorAll("#monthGrid button"),
@@ -81,7 +79,7 @@ test("responsive month toolbar preserves equal-width months and visible fixed co
             menu.left >= strip.right &&
             toolbar.height <= (innerWidth <= 640 ? 108 : 64) &&
             controls
-              .filter((_, i) => innerWidth > 640 || (i !== 2 && i !== 5))
+              .filter((_, i) => innerWidth > 640 || i !== 2
               .every(
                 (r) =>
                   Math.abs(
@@ -218,7 +216,6 @@ test("core navigation workspaces remain accessible after redundant menu cleanup"
     "#pickerYear",
     "#rangeToggle",
     "#device",
-    "#freshness",
     ".topbar .avatar",
   ]) {
     await page.locator(selector).scrollIntoViewIfNeeded();
@@ -230,17 +227,13 @@ test("core navigation workspaces remain accessible after redundant menu cleanup"
     path: ".local/compact-toolbar-status-" + test.info().project.name + ".png",
     animations: "disabled",
   });
-  await page.locator("#freshness").click();
-  await expect(page.locator("#helpDialog")).toBeVisible();
+  await expect(page.locator("#freshness")).toBeHidden();
+  await expect(page.locator("#help")).toBeHidden();
+  await expect(page.locator("#helpDialog")).not.toBeVisible();
   await expect(page.locator("#coverageText")).toContainText("gün doğrulandı");
   await expect(page.locator("#dataExplanation")).toContainText(
     "Google bağlantısı yok",
   );
-  await expect(page.locator("#helpDialog")).toContainText(
-    "Google aktarımını başlatmaz",
-  );
-  await page.keyboard.press("Escape");
-  await expect(page.locator("#helpDialog")).not.toBeVisible();
 });
 test("real error indicators remain visible outside collapsed details and private detail state clears on logout", async ({
   page,
@@ -257,12 +250,12 @@ test("real error indicators remain visible outside collapsed details and private
     "Aylık SEO analizi alınamadı",
   );
   await expect(page.locator("#freshness")).toHaveClass(/error/);
+  await expect(page.locator("#freshness")).toBeHidden();
+  await expect(page.locator("#help")).toBeHidden();
   await expect(page.locator("#helpDialog")).not.toBeVisible();
-  await page.locator("#freshness").click();
   await expect(page.locator("#dataExplanation")).toContainText(
     "TEST ONLY analiz bağlantısı kesildi",
   );
-  await page.keyboard.press("Escape");
   if (
     (await page.locator("#sidebarToggle").getAttribute("aria-label")) ===
     "Menüyü aç"
