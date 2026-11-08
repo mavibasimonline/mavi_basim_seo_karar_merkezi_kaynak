@@ -1062,9 +1062,7 @@ function setView(view, focus = true) {
     else a.removeAttribute("aria-current");
   });
   $("viewTitle").textContent = views[view];
-  $("view-" + view)
-    .querySelector("[data-actions-slot]")
-    .append($("reportActions"));
+  // Shared report actions stay in the topbar for every workspace; no per-view movement.
   $("periodControl").hidden = false;
   periodControl.remember(view);
   $("deviceControl").hidden = false;
@@ -1090,6 +1088,29 @@ function setView(view, focus = true) {
     window.scrollTo({ top: 0, behavior: "instant" });
   }
 }
+const globalReportToggle = $("globalReportToggle");
+const globalReportActions = $("reportActions");
+function closeReportMenu() {
+  globalReportActions.classList.remove("is-open");
+  globalReportToggle.setAttribute("aria-expanded", "false");
+}
+globalReportToggle.addEventListener("click", () => {
+  const opened = !globalReportActions.classList.contains("is-open");
+  globalReportActions.classList.toggle("is-open", opened);
+  globalReportToggle.setAttribute("aria-expanded", String(opened));
+});
+document.addEventListener("click", (event) => {
+  if (!globalReportToggle.contains(event.target) && !globalReportActions.contains(event.target)) closeReportMenu();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && globalReportActions.classList.contains("is-open")) {
+    closeReportMenu();
+    globalReportToggle.focus();
+  }
+});
+globalReportActions.addEventListener("click", (event) => {
+  if (event.target.closest("a,button")) closeReportMenu();
+});
 // Responsive navigation stores only a layout preference, never credentials or data.
 const mobile = matchMedia("(max-width:980px)");
 try {
