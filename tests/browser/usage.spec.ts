@@ -622,3 +622,42 @@ test("manual GSC and GA4 upload displays durable success, duplicate and error re
   await expect(page.locator("#manualUploadToast")).toHaveAttribute("data-state", "error");
   await expect(page.locator("#manualEvidenceSelect option")).toHaveCount(1);
 });
+
+
+test("Tayfun Ürün Grupları mirrors SEO category toolbar and groups blog city sector URLs", async ({ page }) => {
+  await login(page);
+  await page.route("**/api/independent/tayfun-pages", async route => {
+    await route.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ source:"fixture sitemap", stale:false, urls:[
+        "https://mavibasim.com/brosur",
+        "https://mavibasim.com/ankara-matbaa",
+        "https://mavibasim.com/blog/brosur-secimi",
+        "https://mavibasim.com/sektor/kuafor-kartvizit-baski",
+        "https://mavibasim.com/bilinmeyen-sayfa"
+      ]})
+    });
+  });
+  await view(page, "Tayfun");
+  await page.locator('#tayfunWorkspaceTabs [data-tayfun-target="groups"]').click();
+  const toolbar=page.locator("#tayfunApp .tayfun-groups-toolbar");
+  await expect(toolbar).toBeVisible();
+  const pills=toolbar.locator(".tayfun-jobs-category-pill");
+  await expect(pills.first()).toHaveText("Tüm Kategoriler");
+  for(const label of ["Broşürler ve El İlanları","Reklam Ürünleri","Kurumsal Ürünler","Makbuz ve Formlar","Şehir Sayfaları","Blog Sayfaları","Sektörel Sayfalar","Diğer Sayfalar"]){
+    await expect(pills.filter({hasText:label})).toHaveCount(1);
+  }
+  await pills.filter({hasText:"Şehir Sayfaları"}).click();
+  await expect(pills.filter({hasText:"Şehir Sayfaları"})).toHaveAttribute("aria-pressed","true");
+  await expect(page.locator("#tayfunApp .tayfun-page-group-heading").first()).toContainText("Şehir Sayfaları");
+  await expect(page.locator("#tayfunApp .tayfun-page-summary").first()).toContainText("ankara-matbaa");
+  const search=toolbar.getByRole("searchbox",{name:"Ürün veya kategori ara"});
+  await search.fill("mavibasim.com/ankara-matbaa");
+  await expect(page.locator("#tayfunApp .tayfun-page-summary").first()).toContainText("ankara-matbaa");
+  await search.fill("bulunmayan-bir-urun");
+  await expect(page.locator("#tayfunApp .tayfun-page-summary")).toHaveCount(0);
+  await search.fill("");
+  await page.locator('#tayfunWorkspaceTabs [data-tayfun-target="unmapped"]').click();
+  await expect(toolbar.locator(".tayfun-jobs-category-scroll")).toBeHidden();
+  await expect(page.locator("#tayfunApp .tayfun-page-summary").first()).toContainText("bilinmeyen-sayfa");
+});
