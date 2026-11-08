@@ -27,7 +27,12 @@ export function createTayfunWorkspace({api,scope,notify}){
   const map=new Map();
   for(const p of s.catalog?.products||[]){
    const urls=p.urls?.length?p.urls:[p.canonical_url];
-   for(const url of urls||[])if(url)map.set(url,{url,product:p.name,category:p.category||'Ürünler'});
+   for(const url of urls||[])if(url){
+    // A catalog mapping must not reclassify blog, city or sector landing pages as products.
+    const pageType=pageGroupFor(url);
+    const category=pageType==='Diğer Sayfalar'?p.category||'Ürünler':pageType;
+    map.set(url,{url,product:p.name,category});
+   }
   }
   const categoryFor=url=>pageGroupFor(url);
   for(const raw of [...s.current||[],s.previous].filter(Boolean))for(const r of raw.pages||[]){
