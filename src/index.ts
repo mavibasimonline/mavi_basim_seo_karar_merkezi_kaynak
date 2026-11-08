@@ -238,7 +238,7 @@ export default {
           console.log(JSON.stringify({event:'tayfun-site-capture',status:result.status,
             attempted:result.attempted??0,recorded:result.recorded??0,captured:result.captured_count??null,
             remaining:result.remaining??null,site_mutations:0}));
-          if(result.status==='complete')
+          if(result.status==='complete'||(result.status==='throttled'&&result.attempted===0))
             await archive.fetch('https://archive.private/api/internal/tayfun-tick',{method:'POST'});
         }
       }catch{console.log(JSON.stringify({event:'tayfun-auto',status:'held',code:'TAYFUN_AUTO_TICK_UNAVAILABLE'}));}
