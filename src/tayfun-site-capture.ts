@@ -9,7 +9,7 @@ import {gscPageURL} from './urls';
 
 type Store={get<T=unknown>(key:string):Promise<T|undefined>;put(key:string,value:unknown):Promise<unknown>};
 type Captured={url:string;observed_at:string;source_id:string;title:string;ledger_id?:string};
-type ErrorRecord={code:string;tries:number};
+type ErrorRecord={code:string;tries:number;last_attempt?:string};
 type Progress={version:1;reference_day:string;last_run:string;pages:Record<string,Captured>;errors:Record<string,ErrorRecord>};
 const TARGET='2026-11-08', KEY='tayfun:site-seo:capture:'+TARGET+':v1';
 const productPaths=['/adisyon','/afis','/ambalaj','/amerikan-servis','/antetli','/arac-kiralama',
@@ -44,7 +44,7 @@ export async function tayfunSiteSeoStatus(storage:Store,now=new Date()){
   note:'Yalnız 200 HTML dönen ve robots.txt izinli canlı sayfalar. Tarih gerçek tarama zamanıdır; site yayını tarihi değildir.'};
 }
 export async function tayfunSiteSeoTick(storage:Store,secret:string,now=new Date(),maxPages=24){
- if(localDay(now)!==TARGET)return {status:'outside_reference_day',reference_day:TARGET,actual_day:localDay(now),site_mutations:0};
+ if(localDay(now)<TARGET)return {status:'outside_reference_day',reference_day:TARGET,actual_day:localDay(now),site_mutations:0};
  const sitemap=await tayfunSitemap(storage,fetch,now);
  if(!sitemap.urls.length)return {status:'held',code:'SITEMAP_UNAVAILABLE',reference_day:TARGET,site_mutations:0};
  const urls=[...sitemap.urls].sort((a,b)=>Number(preferred.has(b))-Number(preferred.has(a))||a.localeCompare(b));
@@ -56,17 +56,23 @@ export async function tayfunSiteSeoTick(storage:Store,secret:string,now=new Date
  const month=now.toISOString().slice(0,7),oldLedger=await tayfunList(storage,secret,month);
  const latest=new Map<string,(typeof oldLedger.entries)[number]>();
  for(const entry of oldLedger.entries)latest.set(entry.url,entry);
- const remaining=urls.filter(u=>!saved.pages[u]&&(saved.errors[u]?.tries||0)<3);
+ const remaining=urls.filter(u=>{
+  if(saved.pages[u])return false;
+  const error=saved.errors[u];
+  if(!error)return true;
+  if(['ROBOTS_DISALLOW','NON_HTML_RESPONSE'].includes(error.code))return false;
+  return error.tries<3||now.getTime()-Date.parse(error.last_attempt||saved.last_run||'1970-01-01T00:00:00Z')>=45*60000;
+ });
  let attempted=0,recorded=0,held=0;
  const started=Date.now();
  for(const url of remaining){
-  if(attempted>=Math.max(1,Math.min(30,maxPages))||Date.now()-started>22000||localDay(new Date())!==TARGET)break;
+  if(attempted>=Math.max(1,Math.min(30,maxPages))||Date.now()-started>22000)break;
   attempted++;
   try{
    const at=new Date(),result=await tayfunAutoTick(storage,secret,fetch,at,url);
    if(result.status!=='archived'&&result.status!=='unchanged'){
     const previous=saved.errors[url];
-    saved.errors[url]={code:('code' in result&&typeof result.code==='string'?result.code:result.status).slice(0,70),tries:(previous?.tries||0)+1};
+    saved.errors[url]={code:('code' in result&&typeof result.code==='string'?result.code:result.status).slice(0,70),tries:(previous?.tries||0)+1,last_attempt:at.toISOString()};
     held++;await storage.put(KEY,saved);continue;
    }
    const monthData=await tayfunAutoMonth(storage,month);
@@ -93,7 +99,7 @@ export async function tayfunSiteSeoTick(storage:Store,secret:string,now=new Date
       x_robots:fmt(original.x_robots,200),viewport:fmt(original.viewport,500),lang:fmt(original.lang,100),
       redirect:fmt(original.redirect,2048),status_code:'200',
       content_excerpt:fmt(original.excerpt,5000),keywords:prior?.keywords||[],
-      notes:('TAYFUN_SITE_CAPTURE:'+TARGET+':'+url+' Gerçek 8 Kasım 2026 canlı SEO taraması; '+
+      notes:('TAYFUN_SITE_CAPTURE:'+TARGET+':'+url+' İstek tarihi: 8 Kasım 2026. Gerçek tarama günü: '+localDay(at)+'; '+
        'doğrulama: '+at.toISOString()+'; kaynak: tayfun:auto:'+source.id+'; hash: '+source.hash+
        '; içerik değişimi yalnız hash ile karşılaştırılır. Siteye uygulanmadı.').slice(0,2500)
      },at);
@@ -104,14 +110,14 @@ export async function tayfunSiteSeoTick(storage:Store,secret:string,now=new Date
    delete saved.errors[url];recorded++;
   }catch(error){
    const code=error instanceof Error&&/^TAYFUN_[A-Z_]+$/.test(error.message)?error.message:'TAYFUN_SITE_CAPTURE_UNAVAILABLE';
-   const previous=saved.errors[url];saved.errors[url]={code,tries:(previous?.tries||0)+1};held++;
+   const previous=saved.errors[url];saved.errors[url]={code,tries:(previous?.tries||0)+1,last_attempt:new Date().toISOString()};held++;
   }
   saved.last_run=new Date().toISOString();
   await storage.put(KEY,saved);
   // Respect the live site's origin; never send a burst of parallel crawls.
   await new Promise(resolve=>setTimeout(resolve,150));
  }
- return {status:recorded?'recorded':held?'partial':'complete',reference_day:TARGET,
+ return {status:recorded?'recorded':held?'partial':remaining.length?'throttled':'complete',reference_day:TARGET,actual_day:localDay(now),
   attempted,recorded,held,captured_count:Object.keys(saved.pages).length,total:urls.length,
   remaining:urls.length-Object.keys(saved.pages).length,last_run:saved.last_run,
   site_mutations:0,d1_requests:0,immutable:true};
