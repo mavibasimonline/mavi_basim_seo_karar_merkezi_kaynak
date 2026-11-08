@@ -56,7 +56,10 @@ def preflight(client,config,expected,allow_held_cron=False):
  for name in ('ADMIN_TOKEN','TOKEN_ENCRYPTION_KEY','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET'):
   if name not in names:raise ValueError('EXISTING_AUTH_BINDING_MISSING')
  for name in ('SITE_ORIGIN','GSC_PROPERTY','GOOGLE_REDIRECT_URI','AUTOMATION_ENABLED','CRAWL_ENABLED','ENABLE_GOOGLE_ADS','GA4_PROPERTY_ID'):
-  if plain.get(name,'')!=config['vars'].get(name,''):raise ValueError('RUNTIME_CONFIG_DRIFT')
+  if plain.get(name,'')!=config['vars'].get(name,''):
+   # One-time explicit migration of the already consented GA4 property. No other setting may drift.
+   if not (name=='GA4_PROPERTY_ID' and os.environ.get('ALLOW_GA4_PROPERTY_ACTIVATION')=='532525867' and config['vars'].get(name)=='532525867' and plain.get(name,'')==''):
+    raise ValueError('RUNTIME_CONFIG_DRIFT')
  rows=schedules['result'].get('schedules',[]) if isinstance(schedules['result'],dict) else schedules['result']
  crons=[r['cron'] for r in rows]
  if crons not in (['*/15 * * * *'],['* * * * *']) and not (allow_held_cron and crons==[]):raise ValueError('UNEXPECTED_CURRENT_CRON')
