@@ -273,3 +273,10 @@
  #tayfunApp .tayfun-grouped-navigation{flex:1 1 100%}
  #tayfunApp .tayfun-category-row-label{min-width:75px}
 }
+
+/* Accessible column sorting, shared by grouped and unmatched SEO pages. */
+#tayfunApp .tayfun-table-header .tayfun-sort-button{appearance:none;border:0;background:transparent;color:inherit;font:inherit;font-weight:750;text-align:left;cursor:pointer;min-width:0;padding:6px 2px;border-radius:5px;white-space:normal}
+#tayfunApp .tayfun-table-header .tayfun-sort-button:hover{background:#dbeafe;color:#173d6a}
+#tayfunApp .tayfun-table-header .tayfun-sort-button[aria-pressed="true"]{color:#075985;background:#e0f2fe}
+#tayfunApp .tayfun-table-header .tayfun-sort-button:focus-visible{outline:2px solid #0284c7;outline-offset:2px}
+#tayfunApp .tayfun-category-row[hidden],#tayfunApp .tayfun-category-row [hidden]{display:none!important}
