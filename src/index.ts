@@ -248,19 +248,18 @@ export default {
         console.log(JSON.stringify({event:'tayfun-approved-baseline',status:payload.ok?'ok':'partial',items:payload.items.map(x=>({url:x.url,status:x.status})),d1_requests:0}));
       }catch{console.log(JSON.stringify({event:'tayfun-approved-baseline',status:'held',code:'BASELINE_ARCHIVE_UNAVAILABLE',d1_requests:0}));}
     })());
+    // Refresh Sheets without delaying the legacy tick or its D1 quota checks.
+    if(independentRefreshDue(ga4Time))context.waitUntil(
+      refreshIndependentSheets(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time)
+        .catch(()=>{console.log(JSON.stringify({event:'independent-sheets-refresh',status:'held',code:'INDEPENDENT_REFRESH_UNAVAILABLE',d1_requests:0}));})
+    );
+    // Planner verification retains the existing metered quota guard, but never blocks the daily tick.
+    context.waitUntil(syncPlanner(env,true).catch(()=>{console.log(JSON.stringify({event:'planner-sync',status:'held',code:'PLANNER_SYNC_UNAVAILABLE'}));}));
     // Daily evidence refresh is isolated so slow GSC tasks cannot starve it.
     context.waitUntil(independentContextCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time).then(status=>{if(status!=='idle')console.log(JSON.stringify({event:'independent-context',status}));}).catch(()=>{console.log(JSON.stringify({event:'independent-context',status:'held',code:'CONTEXT_UPDATE_UNAVAILABLE'}));}));
     context.waitUntil((async()=>{
     try{
       const time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
-      if(independentRefreshDue(time)){
-        // Keep the source refresh outside the quota-limited legacy D1 tick.
-        try{await refreshIndependentSheets(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);}
-        catch{console.log(JSON.stringify({event:'independent-sheets-refresh',status:'held',code:'INDEPENDENT_REFRESH_UNAVAILABLE',d1_requests:0}));}
-      }
-      // Optional bounded metadata copy has its own budget. Its failure never
-      // gates daily collection or reads from a user-facing GSC report.
-      try{await syncPlanner(env,true);}catch{/* Planner verification never gates existing collection. */}
       const result=await tick(env,fetch,time,'cron');
       if(time.getUTCMinutes()%15!==0)return;
     }catch(error){
