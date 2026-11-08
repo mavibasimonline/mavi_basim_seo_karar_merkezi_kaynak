@@ -50,11 +50,12 @@ function mount(){
  const title=el('h2','GSC + GA4 Manuel Veri Arşivi');
  const note=el('p','Dosya yalnızca bu tarayıcıdaki IndexedDB belleğine kaydedilir. Canlı Google kayıtları, eski SEO sürümleri ve site içeriği değiştirilmez. Google dışa aktarım tablolarındaki 92 günlük toplamlar aylara yapay olarak dağıtılmaz.','source-note');
  const bar=el('div',null,'report-actions');
- const pick=el('input');pick.type='file';pick.accept='.json,application/json';pick.id='manualEvidenceFile';pick.setAttribute('aria-label','ChatGPT veri paketi seç');
+ const pick=el('input');pick.type='file';pick.accept='.json,application/json';pick.id='manualEvidenceFile';pick.setAttribute('aria-label','ChatGPT veri paketi seç');pick.hidden=true;
+ const upload=el('button','GSC + GA4 Veri Dosyasını Yükle','button primary');upload.type='button';upload.id='manualEvidenceUpload';upload.addEventListener('click',()=>pick.click());
  const select=el('select');select.id='manualEvidenceSelect';select.setAttribute('aria-label','Arşiv dönemi seç');
  const exportButton=el('button','Seçili arşivi yedekle','button secondary');exportButton.type='button';
  const status=el('p','Yerel arşiv okunuyor…');status.id='manualEvidenceStatus';status.setAttribute('role','status');
- bar.append(pick,select,exportButton);host.append(title,note,bar,status);
+ bar.append(upload,pick,select,exportButton);host.append(title,note,bar,status);
  const stats=el('div',null,'archive-stats'),tabs=el('div',null,'report-actions'),filter=el('input'),results=el('div');
  filter.type='search';filter.placeholder='Sorgu veya URL ara';filter.setAttribute('aria-label','Yerel GSC tablolarında ara');filter.maxLength=200;
  const tabNames=[['pages','Sayfalar'],['queries','Arama sorguları'],['daily','Günlük toplamlar'],['devices','Cihazlar'],['channels','GA4 kanalları']];
@@ -72,11 +73,11 @@ function mount(){
   add('Kaynak: '+p.period.start+' — '+p.period.end+' · Manuel GSC/GA4 dışa aktarımı; gerçek zamanlı veri değildir.');
   if(/organik|oturum|ga4|analytics|ziyaret/.test(q)){
    add(organic?'GA4 Organic Search: '+num(organic.sessions)+' oturum, '+num(organic.engaged_sessions)+' etkileşimli oturum.':'Bu pakette GA4 organik oturum kaydı yok.');
-  }else if(/şehir|ilçe|bölge|il/.test(q)){
+  }else if(/şehir|ilçe|bölge|il\\b/.test(q)){
    add('GA4 şehir kırılımı bu dosyada yok. Şehir bazlı ziyaretçi veya yükseliş sonucu çıkarılamaz.');
   }else{
    const stop=['hangi','sayfa','sorgu','kelime','durumu','kaç','tıklama','performans','nedir','seo','bana','göster','en','çok','ençok','var','mı','ile','için','nasıl','ne','bu','ay','geçen','düştü','yükseldi','sonuç','sonuçları','ürün','ürünün','yaz'];
-   const words=q.split(/s+/).filter(w=>w.length>=3&&!stop.includes(w));
+   const words=q.split(/\\s+/).filter(w=>w.length>=3&&!stop.includes(w));
    const matches=(records,field)=>records.filter(r=>words.length&&words.every(w=>r[field].toLocaleLowerCase('tr').includes(w))).sort((a,b)=>b.clicks-a.clicks||b.impressions-a.impressions).slice(0,5);
    let pages=matches(p.gsc.pages,'page'),queries=matches(p.gsc.queries,'query');
    if(!words.length||(!pages.length&&!queries.length)){pages=[...p.gsc.pages].sort((a,b)=>b.clicks-a.clicks).slice(0,5);queries=[...p.gsc.queries].sort((a,b)=>b.clicks-a.clicks).slice(0,5);}
