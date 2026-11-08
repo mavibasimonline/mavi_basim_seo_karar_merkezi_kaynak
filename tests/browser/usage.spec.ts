@@ -79,7 +79,7 @@ test("responsive month toolbar preserves equal-width months and visible fixed co
             menu.left >= strip.right &&
             toolbar.height <= (innerWidth <= 640 ? 108 : 64) &&
             controls
-              .filter((_, i) => innerWidth > 640 || i !== 2
+              .filter((_, i) => innerWidth > 640 || i !== 2)
               .every(
                 (r) =>
                   Math.abs(
