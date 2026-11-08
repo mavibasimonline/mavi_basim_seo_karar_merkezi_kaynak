@@ -125,3 +125,10 @@
 .manual-upload-toast[data-state="error"]{border-color:#cb4141;color:#952626}
 .manual-upload-toast .manual-upload-message{flex:1;overflow-wrap:anywhere}
 .manual-upload-toast button{border:0;background:transparent;color:inherit;font-size:20px;line-height:1;cursor:pointer;min-width:26px;min-height:26px}
+
+/* Short route back to the top of long Tayfun SEO records. */
+#scrollToTop:not([hidden]){position:fixed;right:22px;bottom:24px;z-index:60;display:flex;justify-content:center;align-items:center;width:44px;height:44px;border-radius:50%;border:1px solid #a7b6d0;background:#245ce9;color:#fff;font-size:26px;font-weight:800;box-shadow:0 5px 22px rgba(0,0,0,.21);cursor:pointer}
+#scrollToTop[hidden]{display:none!important}
+#scrollToTop:hover{background:#194ac8}
+#scrollToTop:focus-visible{outline:3px solid #1b55e2;outline-offset:3px}
+@media(max-width:640px){#scrollToTop:not([hidden]){right:12px;bottom:12px;width:42px;height:42px}}
