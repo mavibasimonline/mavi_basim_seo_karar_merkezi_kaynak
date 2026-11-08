@@ -10,7 +10,7 @@ const read=async(res:Response)=>{
  if(!res.ok)throw Error('GSC_PRIVATE_SERVICE_UNAVAILABLE');
  return res.json() as Promise<Record<string,unknown>>;
 };
-export async function independentGscCron(env:E,time=new Date()):Promise<'imported'|'collected'|'unavailable'>{
+export async function independentGscCron(env:E,time=new Date()):Promise<'imported'|'collected'|'idle'|'held'|'unavailable'>{
  if(env.AUTOMATION_ENABLED!=='true'||typeof env.DRIVE_ARCHIVE_SERVICE?.fetch!=='function')return 'unavailable';
  const svc=env.DRIVE_ARCHIVE_SERVICE;
  let status=await read(await svc.fetch('https://archive.private/api/internal/gsc-status'));
@@ -32,7 +32,8 @@ export async function independentGscCron(env:E,time=new Date()):Promise<'importe
  if(status.connected!==true)return 'unavailable';
  const result=await read(await svc.fetch('https://archive.private/api/internal/gsc-tick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'cloudflare-cron',scheduled_at:time.toISOString(),limit:3})}));
  if(result.d1_requests!==0||!['partial','complete','idle','held'].includes(String(result.status)))throw Error('GSC_INDEPENDENT_TICK_UNVERIFIED');
- return 'collected';
+ // Preserve actual collector outcome; an idle or held tick is not a successful download.
+ return result.status==='held'?'held':result.status==='idle'?'idle':'collected';
 }
 export async function independentGscBootstrapCron(env:E,time=new Date()):Promise<'idle'|'collected'|'held'>{
  if(env.AUTOMATION_ENABLED!=='true'||typeof env.DRIVE_ARCHIVE_SERVICE?.fetch!=='function')return 'idle';
