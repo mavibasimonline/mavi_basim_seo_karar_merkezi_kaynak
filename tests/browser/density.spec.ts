@@ -122,6 +122,16 @@ test("month strip alone scrolls, has 4-6 px gaps and readable equal buttons; rig
         allMonthsVisible: months.every(
           (m) => m.box.left >= r.left && m.box.right <= r.right,
         ),
+        monthLayoutDiagnostic: {
+          width: innerWidth, sidebar: getComputedStyle(document.documentElement).getPropertyValue("--sidebar"),
+          strip: { left:r.left,right:r.right,width:r.width,scrollWidth:strip.scrollWidth,clientWidth:strip.clientWidth },
+          firstMonth: { left:months[0].box.left,right:months[0].box.right },
+          lastMonth: { left:months.at(-1)!.box.left,right:months.at(-1)!.box.right },
+          toolbar: document.getElementById("toolbarTrack")!.getBoundingClientRect().width,
+          reports: document.getElementById("reportActions")!.getBoundingClientRect().width,
+          reportToggle: document.getElementById("globalReportToggle")!.getBoundingClientRect().width,
+          available: document.querySelector(".topbar")!.getBoundingClientRect().width,
+        },
         gaps: months.slice(1).map((m, i) => m.box.left - months[i].box.right),
         readable: months.every(
           (m) => m.textWidth <= m.box.width - 2 && m.border === "1px",
@@ -139,7 +149,7 @@ test("month strip alone scrolls, has 4-6 px gaps and readable equal buttons; rig
     expect(layout.readable).toBe(true);
     expect(layout.gaps.every((g) => g >= 4 && g <= 6)).toBe(true);
     if (desktop) {
-      expect(layout.allMonthsVisible).toBe(true);
+      expect(layout.allMonthsVisible,JSON.stringify(layout.monthLayoutDiagnostic)).toBe(true);
       expect(layout.yearGap).toBeGreaterThanOrEqual(6);
       expect(layout.periodGap).toBeGreaterThanOrEqual(6);
     }
