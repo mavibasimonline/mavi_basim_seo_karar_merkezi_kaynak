@@ -251,7 +251,7 @@ export function answerGa4(current:any,previous:any,question:string){
  const city=current.cities?.filter((r:any)=>question.toLowerCase().includes(r.city.toLowerCase())||fold(question).includes(fold(r.city)));
  const selected=city?.length?city:[];
  const refs=current.evidence||[],base={requires_ga4:!current.available,source:SOURCE,month:current.month,decision:'Veri bekle',d1_requests:0,evidence:refs.map((r:any)=>'ga4:'+r.property+':'+r.month+':'+r.kind+':'+r.generation),evidence_refs:refs};
- if(!current.available)return {...base,answer:'Kanıt: GA4 şehir verisi doğrulanmadı. Yorum: GSC ülke veya sorgu verisi şehir ziyaretçisi değildir. SEO kararı: Google Analytics bağlantısı ve gerçek şehir kayıtları gelene kadar veri bekle.'};
+ if(!current.available)return {...base,answer:'Kanıt: '+(current.message||'GA4 aylık arşiv kapsamı eksik veya tarihleri eşit değil.')+' Yorum: doğrulanmamış ya da farklı tarih aralıklı kırılımlardan şehir karşılaştırması yapılmaz. SEO kararı: tutarlı aylık kayıtlar tamamlanana kadar veri bekle.'};
  if(!selected.length)return {...base,answer:'Kanıt: '+current.month+' için '+current.cities.length+' şehir kırılımı var. Şehir adını belirterek sorun. Yorum: eksik veya gizlenen konum sıfır ziyaretçi değildir. SEO kararı: konumu doğrulamadan yerel içerik değişikliği yapma.'};
  const observations=selected.slice(0,5).map((r:any)=>{
   const old=previous?.available&&previous?.closed&&current.closed?previous.cities.find((p:any)=>p.city===r.city&&p.region===r.region&&p.country===r.country):null;
