@@ -1,6 +1,6 @@
 import {renderSeoJobs} from './tayfun-ai.js';
 import {renderSeoMonitor} from './tayfun-monitor.js';
-import {pageGroupFor,groupOrder} from './tayfun-page-groups.js';
+import {pageGroupFor,groupOrder,PRODUCT_GROUPS,OTHER_GROUPS} from './tayfun-page-groups.js';
 // Tayfun monthly SEO evidence notebook: the source site and historical records are never changed.
 const el=(tag,text='',className='')=>{const n=document.createElement(tag);if(text)n.textContent=text;if(className)n.className=className;return n;};
 const dateMonth=m=>'01.'+m.slice(5)+'.'+m.slice(0,4);
@@ -202,15 +202,21 @@ export function createTayfunWorkspace({api,scope,notify}){
    search.placeholder='Ürün veya kategori ara…';search.setAttribute('aria-label','Ürün veya kategori ara');
    search.value=filter;
    searchLabel.append(searchIcon,search);
-   const nav=el('div','','tayfun-jobs-category-scroll');
+   const nav=el('div','','tayfun-jobs-category-scroll tayfun-grouped-navigation');
    nav.setAttribute('role','group');nav.setAttribute('aria-label','Ürün ve site sayfası kategorileri');
-   nav.tabIndex=0;
    const availableCategories=groupOrder(new Set(pages.map(p=>p.category)));
    const categoryRank=new Map(availableCategories.map((category,i)=>[category,i]));
    const allCategories=['Tüm Kategoriler',...availableCategories];
    if(!allCategories.includes(selectedCategory))selectedCategory='Tüm Kategoriler';
+   const productCategories=availableCategories.filter(category=>PRODUCT_GROUPS.includes(category)||!OTHER_GROUPS.includes(category));
+   const otherCategories=availableCategories.filter(category=>OTHER_GROUPS.includes(category));
    const categoryButtons=new Map();
-   for(const category of allCategories){
+   const productRow=el('div','','tayfun-category-row tayfun-category-products');
+   const otherRow=el('div','','tayfun-category-row tayfun-category-other');
+   const productsLabel=el('span','Ürünler','tayfun-category-row-label');
+   const othersLabel=el('span','Diğer sayfalar','tayfun-category-row-label');
+   productRow.append(productsLabel);otherRow.append(othersLabel);
+   function appendCategory(category,target){
     const pill=el('button',category,'button tayfun-jobs-category-pill');
     pill.type='button';pill.setAttribute('aria-pressed',String(category===selectedCategory));
     pill.onclick=()=>{
@@ -218,8 +224,13 @@ export function createTayfunWorkspace({api,scope,notify}){
      for(const [name,button] of categoryButtons)button.setAttribute('aria-pressed',String(name===category));
      paintCurrent?.();
     };
-    categoryButtons.set(category,pill);nav.append(pill);
+    categoryButtons.set(category,pill);target.append(pill);
    }
+   appendCategory('Tüm Kategoriler',productRow);
+   for(const category of productCategories)appendCategory(category,productRow);
+   for(const category of otherCategories)appendCategory(category,otherRow);
+   nav.append(productRow);
+   if(otherCategories.length)nav.append(otherRow);
    filterWrap.append(searchLabel,nav);root.append(filterWrap);
    root.append(el('p','Kayıtlı sayfalar · '+pages.length+' gözlenen URL; tüm sitemap sayfalarının eksiksiz listesi olduğu garanti edilmez.','source-note'));
    const place=el('div','','tayfun-months');root.append(place);
