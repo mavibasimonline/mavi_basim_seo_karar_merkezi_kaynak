@@ -220,7 +220,7 @@ export class IndependentDriveStore extends DurableObject<IndependentDriveEnv>{
       let current=await ga4.tick(time);
       // A transient generic GA4 provider failure gets one bounded automatic retry per day.
       // The retry helper rejects OAuth, quota, permission and storage failures.
-      if(scheduled&&current.status==='held'&&current.code==='GA4_SOURCE_UNAVAILABLE'&&await ga4.retryGenericOnce(time))current=await ga4.tick(time);
+      if(scheduled&&current.status==='held'&&'code' in current&&current.code==='GA4_SOURCE_UNAVAILABLE'&&await ga4.retryGenericOnce(time))current=await ga4.tick(time);
       // Natural Cron fills at most one old GA4 scope only after current months are idle.
       // Private internal reconciliation can advance historical GA4 without a forged Cron receipt.
       // Existing current-month priority, OAuth, quota and immutable report semantics remain unchanged.
