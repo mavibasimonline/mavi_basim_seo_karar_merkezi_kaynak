@@ -211,6 +211,8 @@ export default {
     // GA4 must not wait behind GSC bootstrap, Sheets refresh, or D1 quotas.
     const ga4Time=new Date(typeof _event.scheduledTime==='number'?_event.scheduledTime:Date.now());
     context.waitUntil(independentGa4Cron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time).then(status=>{console.log(JSON.stringify({event:'independent-ga4',status,d1_requests:0}));}).catch(()=>{console.log(JSON.stringify({event:'independent-ga4',status:'held',code:'GA4_PRIVATE_TICK_UNAVAILABLE',d1_requests:0}));}));
+    // GSC daily collection also runs independently, rather than waiting for Sheets and baseline tasks.
+    context.waitUntil(independentGscCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time).then(status=>{console.log(JSON.stringify({event:'independent-gsc',status,d1_collection_writes:0}));}).catch(()=>{console.log(JSON.stringify({event:'independent-gsc',status:'held',code:'GSC_PRIVATE_SYNC_UNAVAILABLE',d1_collection_writes:0}));}));
     // Daily evidence refresh is isolated so slow GSC tasks cannot starve it.
     context.waitUntil(independentContextCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},ga4Time).then(status=>{if(status!=='idle')console.log(JSON.stringify({event:'independent-context',status}));}).catch(()=>{console.log(JSON.stringify({event:'independent-context',status:'held',code:'CONTEXT_UPDATE_UNAVAILABLE'}));}));
     context.waitUntil((async()=>{
@@ -234,9 +236,6 @@ export default {
         try{await refreshIndependentSheets(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);}
         catch{console.log(JSON.stringify({event:'independent-sheets-refresh',status:'held',code:'INDEPENDENT_REFRESH_UNAVAILABLE',d1_requests:0}));}
       }
-      // Independent GSC collection is isolated from the legacy D1 read/write budget.
-      try{await independentGscCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);}
-      catch{console.log(JSON.stringify({event:'independent-gsc',status:'held',code:'GSC_PRIVATE_SYNC_UNAVAILABLE',d1_collection_writes:0}));}
       await independentGscBootstrapCron(env as Env & {DRIVE_ARCHIVE_SERVICE?:Fetcher},time);
       // Optional bounded metadata copy has its own budget. Its failure never
       // gates daily collection or reads from a user-facing GSC report.
