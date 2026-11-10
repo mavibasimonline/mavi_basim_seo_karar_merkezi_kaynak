@@ -6,7 +6,16 @@ on:
         description: Salt okunur tanılama veya mevcut şifreli yedek
         type: choice
         default: backup
-        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl, quota-inspect, quota-contain, quota-builds, gsc-row-inspect, gsc-row-requeue]
+        options: [backup, diagnose, crawl-pilot, frontend-check, product-crawl, quota-inspect, quota-contain, quota-builds, gsc-row-inspect, gsc-row-requeue, september-report-refresh, september-report-verify, september-source-metadata]
+      expected_worker_commit:
+        description: Approved live Worker commit for September-only acceptance
+        type: string
+      expected_worker_version:
+        description: Approved live Worker version for September-only acceptance
+        type: string
+      receipt_public_key:
+        description: Base64 PUBLIC encryption key; never a private key or token
+        type: string
   schedule:
     - cron: '17 2 * * *'
     - cron: '7 0 * * *' # 03:07 Turkey: read-only rollover evidence, may be delayed by GitHub
@@ -172,4 +181,45 @@ jobs:
           name: gsc-row-recovery-${{ github.run_id }}
           path: .local/gsc-row-recovery.json
           retention-days: 3
+          if-no-files-found: warn
+
+  september-report-refresh:
+    if: github.event_name == 'workflow_dispatch' && (inputs.operation == 'september-report-refresh' || inputs.operation == 'september-report-verify' || inputs.operation == 'september-source-metadata')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      EXPECTED_WORKER_COMMIT: ${{ inputs.expected_worker_commit }}
+      EXPECTED_WORKER_VERSION: ${{ inputs.expected_worker_version }}
+      RECEIPT_PUBLIC_KEY: ${{ inputs.receipt_public_key }}
+      SEPTEMBER_OPERATION: ${{ inputs.operation }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Guarded one-time operator tests — no production data
+        run: |
+          node scripts/run.mjs vitest run tests/september-operator.test.ts
+          python3 -m unittest discover -s tests -p 'test_september_refresh.py' -v
+      - name: Existing September routes once; guarded real D1; encrypted receipt only
+        run: |
+          if [ "$SEPTEMBER_OPERATION" = 'september-source-metadata' ]; then
+            python3 scripts/september_refresh.py --source-metadata-only
+          elif [ "$SEPTEMBER_OPERATION" = 'september-report-verify' ]; then
+            python3 scripts/september_refresh.py --verify-only
+          else
+            python3 scripts/september_refresh.py
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: september-private-receipt-${{ github.run_id }}
+          path: .local/september-refresh/receipt.encrypted.json
+          retention-days: 2
           if-no-files-found: warn
